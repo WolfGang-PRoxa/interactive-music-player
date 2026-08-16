@@ -1,0 +1,1087 @@
+.speakers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    max-height: 180px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+}
+
+.no-speakers,
+.no-tracks {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    padding: 1.5rem 0;
+    border: 1px dashed rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+}
+
+.speaker-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 12px;
+    padding: 0.8rem 1rem;
+    transition: all 0.2s ease;
+}
+
+.speaker-profile {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.avatar-mock {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--c-primary) 0%, var(--c-violet) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 0.8rem;
+    color: #ffffff;
+}
+
+.speaker-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.speaking-glow {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: transparent;
+    transition: all 0.3s ease;
+}
+
+.speaker-item.active-speaking {
+    border-color: var(--c-accent) !important;
+    background: rgba(235, 69, 158, 0.15) !important;
+    box-shadow: 0 0 14px rgba(235, 69, 158, 0.35) !important;
+}
+
+.speaker-item.active-speaking .speaking-glow {
+    background-color: var(--c-accent) !important;
+    box-shadow: 0 0 10px var(--c-accent), 0 0 18px var(--c-accent) !important;
+    animation: speakingPulse 1.2s ease-in-out infinite alternate !important;
+}
+
+.speaker-item.active-speaking .avatar-mock,
+.speaker-item.active-speaking img.avatar-mock {
+    border: 2px solid var(--c-accent) !important;
+    box-shadow: 0 0 10px var(--c-accent) !important;
+}
+
+@keyframes speakingPulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 6px var(--c-accent);
+        opacity: 0.7;
+    }
+
+    100% {
+        transform: scale(1.4);
+        box-shadow: 0 0 16px var(--c-accent), 0 0 25px var(--c-accent);
+        opacity: 1;
+    }
+}
+
+/* Contrôles speaker (switch + glow) */
+.speaker-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+/* Mini switch pour la détection vocale */
+.switch-mini {
+    width: 32px;
+    height: 18px;
+}
+
+.switch-mini .switch-slider {
+    border-radius: 18px;
+}
+
+.switch-mini .switch-slider:before {
+    height: 12px;
+    width: 12px;
+    left: 2px;
+    bottom: 2px;
+}
+
+.switch-mini input:checked+.switch-slider:before {
+    transform: translateX(14px);
+}
+
+/* Utilisateur avec détection vocale désactivée */
+.speaker-item.voice-disabled {
+    opacity: 0.5;
+}
+
+.speaker-item.voice-disabled .speaker-name {
+    text-decoration: line-through;
+    text-decoration-color: rgba(255, 255, 255, 0.3);
+}
+
+.speaker-item.voice-disabled .speaking-glow {
+    background-color: transparent !important;
+    box-shadow: none !important;
+    animation: none !important;
+}
+
+/* Queue Playlist Container */
+.playlist-queue {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    max-height: 250px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+    min-height: 0;
+}
+
+.queue-item,
+.history-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(255, 255, 255, 0.01);
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.85rem;
+    flex-shrink: 0 !important;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.queue-item:hover {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.06);
+    transform: translateX(2px);
+}
+
+.queue-index {
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.8rem;
+    min-width: 20px;
+}
+
+.queue-item-left {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    overflow: hidden;
+    flex-grow: 1;
+    max-width: 75%;
+}
+
+.queue-thumbnail {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    object-fit: cover;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    flex-shrink: 0;
+}
+
+.queue-title {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.queue-item-right,
+.history-item-right {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    flex-shrink: 0;
+}
+
+.queue-duration {
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.75rem;
+}
+
+.queue-remove-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.queue-remove-btn svg {
+    width: 15px;
+    height: 15px;
+}
+
+.queue-remove-btn:hover {
+    color: var(--c-error);
+    background: rgba(237, 66, 69, 0.1);
+}
+
+.queue-play-now-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.queue-play-now-btn svg {
+    width: 15px;
+    height: 15px;
+}
+
+.queue-play-now-btn:hover {
+    color: var(--c-success);
+    background: rgba(87, 242, 135, 0.1);
+}
+
+/* History Playlist Container */
+.playlist-history {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    max-height: 180px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+}
+
+.history-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(255, 255, 255, 0.005);
+    border: 1px solid rgba(255, 255, 255, 0.02);
+    border-radius: 12px;
+    padding: 0.5rem 0.7rem;
+    font-size: 0.8rem;
+    opacity: 0.6;
+    transition: all 0.2s ease;
+}
+
+.history-item:hover {
+    opacity: 0.95;
+    background: rgba(255, 255, 255, 0.02);
+    border-color: rgba(255, 255, 255, 0.04);
+    transform: translateX(2px);
+}
+
+/* Preloaded Track Light Green Tint Filter */
+.queue-item.is-preloaded,
+.history-item.is-preloaded {
+    background: rgba(46, 204, 113, 0.08) !important;
+    border-color: rgba(46, 204, 113, 0.28) !important;
+    box-shadow: inset 0 0 10px rgba(46, 204, 113, 0.06);
+}
+
+.history-item.is-preloaded {
+    opacity: 0.85;
+}
+
+.queue-item.is-preloaded:hover,
+.history-item.is-preloaded:hover {
+    background: rgba(46, 204, 113, 0.15) !important;
+    border-color: rgba(46, 204, 113, 0.45) !important;
+    box-shadow: 0 0 12px rgba(46, 204, 113, 0.18);
+    opacity: 1;
+}
+
+.queue-item.is-preloaded .queue-index,
+.history-item.is-preloaded .history-title {
+    color: #2ecc71;
+}
+
+html[data-theme="light"] .queue-item.is-preloaded,
+html[data-theme="light"] .history-item.is-preloaded {
+    background: rgba(46, 204, 113, 0.12) !important;
+    border-color: rgba(46, 204, 113, 0.35) !important;
+}
+
+html[data-style="neon-cyberpunk"] .queue-item.is-preloaded,
+html[data-style="neon-cyberpunk"] .history-item.is-preloaded {
+    background: rgba(0, 255, 170, 0.1) !important;
+    border-color: rgba(0, 255, 170, 0.35) !important;
+    box-shadow: 0 0 8px rgba(0, 255, 170, 0.2);
+}
+
+.history-item-left {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    overflow: hidden;
+    flex-grow: 1;
+    max-width: 80%;
+}
+
+.history-thumbnail {
+    width: 30px;
+    height: 30px;
+    border-radius: 5px;
+    object-fit: cover;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    flex-shrink: 0;
+}
+
+.history-title {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.history-duration {
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.7rem;
+}
+
+/* Context Menu */
+.context-menu {
+    position: fixed;
+    z-index: 2000;
+    background: rgba(15, 14, 22, 0.95);
+    border: 1px solid var(--border-card-hover);
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    padding: 0.5rem;
+    min-width: 180px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.context-menu.hidden {
+    display: none;
+}
+
+.menu-item {
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    font-family: var(--font-primary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.6rem 0.8rem;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.2s ease;
+    width: 100%;
+}
+
+.menu-item svg {
+    width: 14px;
+    height: 14px;
+    color: var(--text-muted);
+}
+
+.menu-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.menu-item:hover svg {
+    color: var(--text-main);
+}
+
+.menu-item-danger:hover {
+    background: rgba(237, 66, 69, 0.15);
+    color: var(--c-error);
+}
+
+.menu-item-danger:hover svg {
+    color: var(--c-error);
+}
+
+/* Drag and Drop Visual Feedback */
+.history-item,
+.queue-item,
+.playlist-track-item,
+#now-playing-thumbnail {
+    cursor: grab;
+}
+
+.history-item:active,
+.queue-item:active,
+.playlist-track-item:active,
+#now-playing-thumbnail:active {
+    cursor: grabbing;
+}
+
+.queue-item.drag-over {
+    border-top: 2px solid var(--c-accent);
+    background: rgba(235, 69, 158, 0.08);
+}
+
+.playlist-queue.drag-over-empty {
+    border: 2px dashed var(--c-accent);
+    background: rgba(235, 69, 158, 0.03);
+    border-radius: 12px;
+}
+
+
+.playlists-card {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.playlists-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    height: 100%;
+    min-height: 0;
+    flex-grow: 1;
+}
+
+/*
+ * Longueurs des fondus de bord de la bande d'onglets.
+ *
+ * Déclarées plutôt que simplement écrites, pour une seule raison : une variable
+ * ordinaire est un texte aux yeux du navigateur, et un texte ne s'interpole pas.
+ * `--fade-left` passait donc de 0 à sa valeur d'un coup, et le bord apparaissait
+ * d'un bloc. Typée en `<length>`, elle devient une vraie longueur, que la
+ * `transition` de `.playlists-tabs` peut parcourir.
+ *
+ * `inherits: false` : ces longueurs ne concernent que la bande elle-même, et
+ * n'ont rien à faire dans le calcul de style de chacun de ses onglets.
+ *
+ * Les navigateurs qui ignorent `@property` retombent sur l'apparition franche
+ * d'avant — le fondu reste juste, seule son arrivée est brusque.
+ */
+@property --fade-left {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0px;
+}
+
+@property --fade-right {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0px;
+}
+
+/* Tabs Header styling */
+.playlists-tabs-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--border-card);
+    padding-bottom: 8px;
+    width: 100%;
+}
+
+.playlists-tabs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    /*
+     * `hidden` et non `auto`, alors que la bande défile bel et bien.
+     *
+     * Un conteneur réellement défilable est peint par le navigateur mobile dans
+     * un calque séparé, borné à la hauteur de fenêtre connue avant que la barre
+     * d'adresse ne se rétracte. Passée cette limite, il cesse de peindre son
+     * contenu : la carte gardait son fond et son titre, mais la bande d'onglets
+     * y était vide. C'est le défaut décrit au long dans css/device.css, section
+     * « Plus de défilement dans le défilement », qui avait valu à cette bande de
+     * passer à la ligne plutôt que de défiler.
+     *
+     * `hidden` ne renonce qu'au défilement *natif* : la position reste pilotable
+     * par `scrollLeft`, et js/playlistTabsScroll.js s'en charge — glissement au
+     * doigt avec élan, molette à la souris. Le navigateur, lui, ne voit plus
+     * qu'une boîte qui rogne, et la peint dans le calque principal comme le
+     * reste de la carte.
+     *
+     * `scroll-behavior: smooth` a disparu pour la même raison : il s'appliquait
+     * aussi aux écritures de `scrollLeft`, et la bande aurait traîné d'une
+     * animation entière derrière chaque pixel du doigt.
+     */
+    overflow-x: hidden;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    /* Hide scrollbars in Firefox */
+    flex-grow: 1;
+    flex-wrap: nowrap;
+    /* Prevent tabs from wrapping to next line */
+
+    /*
+     * Le geste vertical reste au navigateur — on doit pouvoir faire défiler la
+     * page en partant de la bande — et l'horizontal nous revient, sans avoir à
+     * l'arracher au coup par coup.
+     */
+    touch-action: pan-y;
+
+    /* Sans quoi la base de largeur `auto` d'un élément flex l'empêche de
+       descendre sous la largeur de son contenu : la bande poussait la carte
+       au lieu de défiler. */
+    min-width: 0;
+
+    /*
+     * Repères de bord : la bande s'estompe du côté où il reste des onglets.
+     *
+     * Un fondu par masque, et non un dégradé posé par-dessus : la carte est
+     * translucide et floute ce qu'il y a derrière, si bien qu'aucune couleur
+     * opaque ne s'accorderait avec son fond sur les huit thèmes. Le masque, lui,
+     * efface les onglets eux-mêmes et laisse voir le fond, quel qu'il soit.
+     *
+     * Les deux longueurs valent zéro au repos : le dégradé passe alors du
+     * transparent à l'opaque sur une distance nulle, ce qui revient à n'avoir
+     * aucun masque. js/playlistTabsScroll.js pose les classes ci-dessous selon
+     * la position de défilement.
+     */
+    --fade-left: 0px;
+    --fade-right: 0px;
+    /* Assez lent pour se lire comme une apparition, assez court pour ne pas
+       traîner derrière le doigt quand on balaie la bande d'un bout à l'autre. */
+    transition: --fade-left 280ms ease, --fade-right 280ms ease;
+    -webkit-mask-image: linear-gradient(to right,
+            transparent 0,
+            #000 var(--fade-left),
+            #000 calc(100% - var(--fade-right)),
+            transparent 100%);
+    mask-image: linear-gradient(to right,
+            transparent 0,
+            #000 var(--fade-left),
+            #000 calc(100% - var(--fade-right)),
+            transparent 100%);
+}
+
+/* 36 px plutôt que la vingtaine qu'il faudrait pour simplement signaler le
+   débordement : sur une distance courte, le fondu se lit comme un bord net et
+   un peu sale. Étalé, il se lit comme un estompage. */
+.playlists-tabs.can-scroll-left {
+    --fade-left: 36px;
+}
+
+.playlists-tabs.can-scroll-right {
+    --fade-right: 36px;
+}
+
+.playlists-tabs::-webkit-scrollbar {
+    display: none;
+    /* Hide scrollbars in Webkit browsers */
+}
+
+.playlist-tab {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-card);
+    border-radius: 10px 10px 0 0;
+    color: var(--text-muted);
+    padding: 8px 12px;
+    font-family: var(--font-primary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: grab;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    /*
+     * Chaque onglet à la largeur de son titre, ni plus ni moins.
+     *
+     * Il se partageait auparavant la largeur disponible avec ses voisins
+     * — `flex: 1 1 0%`, entre 80 et 160 px — ce qui revenait à donner la même
+     * largeur à « My music » et à « Youtube à voir » : le premier flottait dans
+     * le vide, le second était rogné des deux côtés et devenait « utube à vo ».
+     * Le compromis se défendait tant que la bande devait tenir dans le cadre ;
+     * il n'a plus lieu d'être depuis qu'elle défile — ce qui dépasse reste
+     * atteignable, et l'onglet peut donc prendre la place qu'il lui faut.
+     *
+     * Sans borne haute : un titre long donne un onglet long, qu'on atteint en
+     * faisant défiler la bande comme les autres.
+     */
+    flex: 0 0 auto;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-drag: element;
+}
+
+.playlist-tab-name-wrapper {
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    flex-grow: 1;
+    width: 100%;
+    pointer-events: none;
+    user-select: none;
+}
+
+.playlist-tab.has-marquee .playlist-tab-name-wrapper {
+    justify-content: flex-start;
+}
+
+.playlist-tab-name {
+    white-space: nowrap;
+    display: inline-block;
+    pointer-events: none;
+    user-select: none;
+}
+
+.playlist-tab.has-marquee:hover .playlist-tab-name {
+    animation: tabMarquee 3.5s linear infinite alternate;
+}
+
+@keyframes tabMarquee {
+
+    0%,
+    20% {
+        transform: translateX(0);
+    }
+
+    80%,
+    100% {
+        transform: translateX(var(--scroll-dist, 0px));
+    }
+}
+
+.playlist-tab:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--border-card-hover);
+}
+
+.playlist-tab.active {
+    color: #ffffff;
+    background: linear-gradient(135deg, var(--c-primary) 0%, var(--c-violet) 100%);
+    border-color: transparent;
+    box-shadow: 0 4px 12px rgba(88, 101, 242, 0.15);
+}
+
+.playlist-tab-add {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-card);
+    border-radius: 50%;
+    color: var(--text-main);
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-family: var(--font-primary);
+    font-size: 1.1rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.playlist-tab-add:hover {
+    background: var(--c-primary);
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(88, 101, 242, 0.3);
+    transform: scale(1.08);
+}
+
+/* Playlist active content styling */
+.playlist-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex-grow: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.playlist-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.playlist-name-container {
+    position: relative;
+    display: inline-block;
+    flex-grow: 1;
+}
+
+.playlist-name-input {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-card);
+    border-radius: 8px;
+    color: var(--text-main);
+    font-family: var(--font-primary);
+    font-size: 1.1rem;
+    font-weight: 600;
+    padding: 6px 12px;
+    width: 100%;
+    outline: none;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.playlist-delete-progress {
+    position: absolute;
+    bottom: 2px;
+    left: 8px;
+    right: 8px;
+    height: 3px;
+    background-color: var(--c-error);
+    width: 0%;
+    border-radius: 2px;
+    pointer-events: none;
+    transition: width 0.04s linear;
+}
+
+.playlist-name-input:hover {
+    background: rgba(0, 0, 0, 0.35);
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.playlist-name-input:focus {
+    background: rgba(0, 0, 0, 0.45);
+    border-color: var(--c-primary);
+    box-shadow: 0 0 10px rgba(88, 101, 242, 0.25);
+}
+
+.delete-playlist-btn {
+    background: rgba(237, 66, 69, 0.1) !important;
+    border: 1px solid rgba(237, 66, 69, 0.2) !important;
+    color: var(--c-error) !important;
+    border-radius: 8px;
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.delete-playlist-btn:hover {
+    background: var(--c-error) !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 10px rgba(237, 66, 69, 0.2);
+    transform: scale(1.05);
+}
+
+/* Track lists */
+.playlist-tracks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex-grow: 1;
+    min-height: 0;
+    padding-right: 4px;
+}
+
+.playlist-track-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-card);
+    border-radius: 12px;
+    padding: 10px 14px;
+    flex-shrink: 0 !important;
+    transition: all 0.25s ease;
+    user-select: none;
+}
+
+.playlist-track-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--border-card-hover);
+    transform: translateX(2px);
+}
+
+.playlist-track-item.drag-over {
+    border-color: var(--c-primary);
+    background: rgba(88, 101, 242, 0.05);
+}
+
+.track-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    overflow: hidden;
+    flex-grow: 1;
+}
+
+.track-idx {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    min-width: 20px;
+}
+
+/* Numéro et icône de lecture cohabitent : la classe décide lequel se montre.
+   Un enchaînement mix allume deux lignes à la fois, et le basculement doit se
+   faire sans réécrire leur contenu. */
+.track-idx-play {
+    display: none;
+    width: 14px;
+    height: 14px;
+    color: var(--c-accent, #eb459e);
+    flex-shrink: 0;
+    vertical-align: middle;
+}
+
+.is-playing-now .track-idx-num {
+    display: none;
+}
+
+.is-playing-now .track-idx-play {
+    display: inline-block;
+}
+
+.track-thumb {
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    object-fit: cover;
+    background: rgba(255, 255, 255, 0.01);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    flex-shrink: 0;
+}
+
+.track-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.track-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.track-duration {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.track-play-btn,
+.track-remove-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.track-play-btn svg,
+.track-remove-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.track-play-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--c-success);
+    transform: scale(1.1);
+}
+
+.track-remove-btn:hover {
+    background: rgba(237, 66, 69, 0.1);
+    color: var(--c-error);
+    transform: scale(1.1);
+}
+
+.no-playlists {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    padding: 30px 10px;
+    border: 2px dashed rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+}
+
+.playlist-tab-name-wrapper,
+.playlist-tab-name {
+    pointer-events: none;
+}
+
+html[data-style="neon-cyberpunk"] .playlist-tab.active {
+    box-shadow: 0 0 10px var(--c-primary);
+}
+
+html[data-style="retro-synthwave"] .playlist-tab.active {
+    box-shadow: 0 0 10px var(--c-accent);
+}
+
+.playlists-tabs.drag-over {
+    border-bottom-color: var(--c-primary);
+    background: rgba(88, 101, 242, 0.03);
+}
+
+.playlist-tab.drag-over {
+    border-color: var(--c-primary);
+    background: rgba(88, 101, 242, 0.1);
+    color: #ffffff;
+}
+
+.playlist-tab.drag-over-tab {
+    border-color: var(--c-accent) !important;
+    background: rgba(88, 101, 242, 0.25) !important;
+    box-shadow: 0 0 12px rgba(88, 101, 242, 0.4) !important;
+}
+
+.playlist-tab.drag-over-left {
+    border-left: 3px solid var(--c-accent) !important;
+    box-shadow: -4px 0 10px rgba(88, 101, 242, 0.5) !important;
+    background: rgba(88, 101, 242, 0.15) !important;
+}
+
+.playlist-tab.drag-over-right {
+    border-right: 3px solid var(--c-accent) !important;
+    box-shadow: 4px 0 10px rgba(88, 101, 242, 0.5) !important;
+    background: rgba(88, 101, 242, 0.15) !important;
+}
+
+/* Dynamic Drag & Drop Interactive Feedback Styles */
+.queue-item.is-dragging,
+.playlist-track-item.is-dragging,
+.playlist-tab.is-dragging,
+.history-item.is-dragging {
+    opacity: 0.35 !important;
+    transform: scale(0.97) !important;
+    border-color: var(--c-primary) !important;
+    box-shadow: 0 0 14px rgba(88, 101, 242, 0.35) !important;
+    cursor: grabbing !important;
+}
+
+body.is-dragging-active,
+body.is-dragging-active * {
+    cursor: grabbing !important;
+}
+
+body.is-dragging-active .playlist-queue,
+body.is-dragging-active .playlist-tracks-list,
+body.is-dragging-active .playlist-history {
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.queue-item,
+.playlist-track-item,
+.history-item {
+    position: relative;
+    transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), margin 0.2s cubic-bezier(0.2, 0, 0, 1), background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.queue-item.drag-over-above,
+.playlist-track-item.drag-over-above {
+    margin-top: 16px !important;
+    border-top-color: var(--c-primary) !important;
+}
+
+.queue-item.drag-over-above::before,
+.playlist-track-item.drag-over-above::before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: 4px;
+    right: 4px;
+    height: 4px;
+    background: linear-gradient(90deg, var(--c-primary) 0%, var(--c-accent) 100%);
+    border-radius: 4px;
+    box-shadow: 0 0 12px var(--c-primary), 0 0 5px var(--c-accent);
+    animation: dragLinePulse 1.2s infinite ease-in-out;
+    pointer-events: none;
+    z-index: 100;
+}
+
+.queue-item.drag-over-below,
+.playlist-track-item.drag-over-below {
+    margin-bottom: 16px !important;
+    border-bottom-color: var(--c-primary) !important;
+}
+
+.queue-item.drag-over-below::after,
+.playlist-track-item.drag-over-below::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: 4px;
+    right: 4px;
+    height: 4px;
+    background: linear-gradient(90deg, var(--c-primary) 0%, var(--c-accent) 100%);
+    border-radius: 4px;
+    box-shadow: 0 0 12px var(--c-primary), 0 0 5px var(--c-accent);
+    animation: dragLinePulse 1.2s infinite ease-in-out;
+    pointer-events: none;
+    z-index: 100;
+}
+
+@keyframes dragLinePulse {
+
+    0%,
+    100% {
+        opacity: 0.85;
+        box-shadow: 0 0 8px var(--c-primary), 0 0 3px var(--c-accent);
+    }
+
+    50% {
+        opacity: 1;
+        box-shadow: 0 0 16px var(--c-primary), 0 0 8px var(--c-accent);
+    }
+}
+
+.playlist-queue.drag-over,
+.playlist-tracks-list.drag-over {
+    background: rgba(88, 101, 242, 0.04) !important;
+    border-color: rgba(88, 101, 242, 0.4) !important;
+    box-shadow: inset 0 0 20px rgba(88, 101, 242, 0.12);
+}
+
+.playlist-queue.drag-over-empty {
+    border: 2px dashed var(--c-primary) !important;
+    background: rgba(88, 101, 242, 0.06) !important;
+    border-radius: 12px;
+}
+
+.playlist-tab.drag-over {
+    border-color: var(--c-primary) !important;
+    background: rgba(88, 101, 242, 0.2) !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 14px rgba(88, 101, 242, 0.4) !important;
+    transform: translateY(-2px) scale(1.04) !important;
+}

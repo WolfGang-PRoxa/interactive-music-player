@@ -1,0 +1,938 @@
+/* ═══════════════════════════════════════════════════════════════
+   Right-Side Sliding Drawer Menu & Activity Tracking CSS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Discrete Top-Right Edge Trigger Tab & Resorption Animation */
+.drawer-edge-tab {
+    position: fixed;
+    top: 70px;
+    right: 0;
+    width: 6px;
+    height: 80px;
+    background: linear-gradient(180deg, var(--c-primary, #00f3ff), var(--c-secondary, #5865f2));
+    border-radius: 8px 0 0 8px;
+    box-shadow: -3px 0 12px rgba(0, 243, 255, 0.45);
+    z-index: 9998;
+    cursor: pointer;
+    opacity: 0.8;
+    transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.35s ease,
+                box-shadow 0.35s ease;
+}
+
+.drawer-edge-tab:hover {
+    width: 12px;
+    opacity: 1;
+    box-shadow: -5px 0 20px var(--c-primary, #00f3ff), 0 0 10px rgba(255, 255, 255, 0.8);
+}
+
+/* Resorption Animation: Absorbs seamlessly into drawer panel texture when drawer opens */
+body.drawer-is-open .drawer-edge-tab,
+.drawer-panel.open ~ .drawer-edge-tab {
+    transform: translateX(100%) scaleX(0);
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Backdrop Overlay */
+.drawer-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 9998;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.drawer-backdrop.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Sliding Drawer Panel */
+.drawer-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 520px;
+    max-width: 92vw;
+    z-index: 9999;
+    background: var(--bg-card, rgba(18, 18, 26, 0.85));
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-left: 1px solid var(--border-card, rgba(255, 255, 255, 0.08));
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    box-sizing: border-box;
+}
+
+.drawer-panel.open {
+    transform: translateX(0);
+}
+
+/* Drawer Header */
+.drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.2rem 1.4rem;
+    border-bottom: 1px solid var(--border-card, rgba(255, 255, 255, 0.08));
+    background: rgba(0, 0, 0, 0.15);
+}
+
+.drawer-title-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+/* Pastille "EN DIRECT" accolée au titre du tiroir */
+.drawer-title-group .live-pulse-badge {
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.3px;
+}
+
+.drawer-title-icon {
+    width: 20px;
+    height: 20px;
+    color: var(--c-primary, #5865f2);
+}
+
+.drawer-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-main, #ffffff);
+    margin: 0;
+    letter-spacing: -0.2px;
+}
+
+.drawer-close-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-card, rgba(255, 255, 255, 0.08));
+    color: var(--text-muted, #a0a0b0);
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.drawer-close-btn:hover {
+    background: rgba(237, 66, 69, 0.2);
+    color: var(--c-error, #ed4245);
+    border-color: var(--c-error, #ed4245);
+    transform: scale(1.05);
+}
+
+/* Drawer Settings Strip (top area, no card container) */
+.drawer-settings {
+    flex-shrink: 0;
+    padding: 0.9rem 1.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    border-bottom: 1px solid var(--border-card, rgba(255, 255, 255, 0.08));
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.drawer-setting-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.drawer-setting-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-muted, #a0a0b0);
+    white-space: nowrap;
+}
+
+.drawer-setting-icon {
+    width: 15px;
+    height: 15px;
+    color: var(--c-primary, #5865f2);
+    flex-shrink: 0;
+}
+
+.drawer-setting-range {
+    flex: 1;
+    min-width: 80px;
+}
+
+.drawer-setting-row .drawer-range-val {
+    flex-shrink: 0;
+    min-width: 48px;
+    text-align: center;
+}
+
+/* Drawer Content Body */
+.drawer-body {
+    padding: 1.2rem 1.4rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Section Cards */
+.drawer-section {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-card, rgba(255, 255, 255, 0.06));
+    border-radius: 14px;
+    padding: 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.drawer-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Widgets réorganisables verticalement
+   ═══════════════════════════════════════════════════════════════ */
+
+.drawer-widget {
+    position: relative;
+}
+
+.drawer-widget > .drawer-section-header {
+    cursor: grab;
+    user-select: none;
+}
+
+.drawer-widget-handle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 16px;
+    height: 18px;
+    margin-left: -4px;
+    color: var(--text-muted, #a0a0b0);
+    opacity: 0.35;
+    cursor: grab;
+    touch-action: none;
+    transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+.drawer-widget-handle svg {
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+}
+
+.drawer-widget > .drawer-section-header:hover .drawer-widget-handle {
+    opacity: 1;
+    color: var(--c-primary, #5865f2);
+}
+
+/* État saisi : la carte se détache du flux visuel et suit le curseur */
+.drawer-widget.widget-dragging {
+    z-index: 40;
+    pointer-events: none;
+    will-change: transform;
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--c-primary, #5865f2);
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(88, 101, 242, 0.35);
+}
+
+.drawer-widget.widget-dragging .drawer-widget-handle {
+    opacity: 1;
+    color: var(--c-primary, #5865f2);
+}
+
+body.drawer-widget-drag-active {
+    user-select: none;
+}
+
+body.drawer-widget-drag-active .drawer-panel,
+body.drawer-widget-drag-active .drawer-panel * {
+    cursor: grabbing !important;
+}
+
+.drawer-section-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-main, #ffffff);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.drawer-section-icon {
+    width: 16px;
+    height: 16px;
+    color: var(--c-primary, #5865f2);
+}
+
+.drawer-range-val {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--c-primary, #5865f2);
+    background: rgba(88, 101, 242, 0.1);
+    border: 1px solid rgba(88, 101, 242, 0.2);
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-family: monospace;
+}
+
+.drawer-slider-wrapper {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 4px 0;
+}
+
+/* Dynamic Auto-Scaling Bandwidth Card */
+.bandwidth-single-card {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.bandwidth-display-group {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.bandwidth-main-value {
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: var(--c-primary, #5865f2);
+    font-family: 'Outfit', monospace;
+    letter-spacing: -0.5px;
+    line-height: 1;
+}
+
+.bandwidth-unit-badge {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-main, #ffffff);
+    background: rgba(88, 101, 242, 0.15);
+    border: 1px solid rgba(88, 101, 242, 0.3);
+    padding: 4px 10px;
+    border-radius: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.bandwidth-sub-detail {
+    font-size: 0.8rem;
+    color: var(--text-muted, #a0a0b0);
+    font-family: monospace;
+}
+
+.bandwidth-unit {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted, #a0a0b0);
+    text-transform: uppercase;
+}
+
+.bandwidth-value {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--c-primary, #5865f2);
+    font-family: monospace;
+}
+
+/* Real-Time Pulsing Status Indicator */
+.live-pulse-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: #26de81;
+    background: rgba(38, 222, 128, 0.1);
+    padding: 3px 8px;
+    border-radius: 12px;
+    border: 1px solid rgba(38, 222, 128, 0.2);
+}
+
+.live-pulse-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: #26de81;
+    box-shadow: 0 0 8px #26de81;
+    animation: livePulse 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes livePulse {
+    0% { transform: scale(0.9); opacity: 0.6; }
+    100% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 12px #26de81; }
+}
+
+/* Canvas Graph Container */
+/* Canvas & SVG Graph Container */
+.memory-graph-wrapper {
+    position: relative;
+    width: 100%;
+    height: 170px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    cursor: crosshair;
+    user-select: none;
+    overflow: visible;
+}
+
+.graph-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+/* Graduations : positionnées au pixel près par le script, pour tomber
+   exactement sur les lignes de la grille tracées dans le SVG. */
+.y-axis-container {
+    position: absolute;
+    left: 8px;
+    top: 0;
+    width: 50px;
+    height: 100%;
+    pointer-events: none;
+}
+
+.y-axis-label {
+    position: absolute;
+    right: 0;
+    transform: translateY(-50%);
+    font-size: 10px;
+    font-family: monospace;
+    color: rgba(255, 255, 255, 0.45);
+    text-align: right;
+    white-space: nowrap;
+    transition: color 0.15s ease;
+}
+.y-axis-label.highlight {
+    color: #ffffff;
+    font-weight: 700;
+}
+
+.x-axis-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.x-axis-label {
+    position: absolute;
+    transform: translateX(-50%);
+    font-size: 10px;
+    font-family: monospace;
+    color: rgba(255, 255, 255, 0.4);
+    white-space: nowrap;
+}
+
+.graph-grid-line {
+    stroke: rgba(255, 255, 255, 0.07);
+    stroke-width: 1;
+}
+
+.graph-grid-line.vertical {
+    stroke-dasharray: 3 5;
+}
+
+.nodes-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+/* Repère de survol : une pastille par série, posée sur la courbe sous le
+   curseur. Elle se tient en permanence sous la souris — donc inerte, sinon
+   elle volerait au conteneur son curseur en croix. */
+.dom-graph-node {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    margin-left: -4px;
+    margin-top: -4px;
+    border-radius: 50%;
+    pointer-events: none;
+    transition: left 0.016s linear,
+                top 0.016s linear,
+                transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+                opacity 0.25s ease,
+                box-shadow 0.25s ease;
+}
+
+.dom-graph-node.rss {
+    background-color: var(--c-primary, #00f3ff);
+    border: 1.5px solid rgba(255, 255, 255, 0.8);
+}
+.dom-graph-node.heap {
+    background-color: #eb459e;
+    border: 1.5px solid rgba(255, 255, 255, 0.8);
+}
+
+.dom-graph-node:hover, .dom-graph-node.active {
+    transform: scale(1.75) !important;
+    opacity: 1 !important;
+    border-color: #ffffff;
+    z-index: 20;
+}
+
+.dom-graph-node.rss:hover, .dom-graph-node.rss.active {
+    box-shadow: 0 0 14px var(--c-primary, #00f3ff), 0 0 6px #ffffff;
+}
+
+.dom-graph-node.heap:hover, .dom-graph-node.heap.active {
+    box-shadow: 0 0 14px #eb459e, 0 0 6px #ffffff;
+}
+
+/* Floating Interactive Tooltip */
+.graph-tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: rgba(18, 20, 32, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 8px;
+    padding: 8px 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 10px rgba(88, 101, 242, 0.2);
+    z-index: 1000;
+    transition: opacity 0.15s ease;
+    white-space: nowrap;
+}
+
+.graph-tooltip.hidden {
+    opacity: 0;
+    visibility: hidden;
+}
+
+.graph-tooltip-time {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-muted, #a0a0b0);
+    font-family: monospace;
+    margin-bottom: 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 3px;
+}
+
+.graph-tooltip-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-family: 'Outfit', sans-serif;
+    color: #ffffff;
+    margin-top: 2px;
+}
+
+.gt-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.gt-dot.rss { background-color: var(--c-primary, #00f3ff); }
+.gt-dot.heap { background-color: #eb459e; }
+
+/* Memory Metrics Legend */
+.memory-legend {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    font-size: 0.8rem;
+    padding-top: 4px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-muted, #a0a0b0);
+}
+
+.legend-color-box {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+}
+
+.legend-color-box.rss { background-color: #5865f2; }
+.legend-color-box.heap { background-color: #eb459e; }
+
+/* ── Répartition mémoire du tableau de bord ── */
+.breakdown-bar {
+    display: flex;
+    width: 100%;
+    height: 12px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    margin-bottom: 10px;
+}
+
+.breakdown-seg {
+    height: 100%;
+    transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.breakdown-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.breakdown-group-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--text-muted, #a0a0b0);
+    margin: 10px 0 4px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.breakdown-group-title:first-child {
+    margin-top: 0;
+}
+
+/* La jauge est en fond de ligne : elle donne l'ordre de grandeur sans
+   ajouter de colonne, la place manquant dans le tiroir. */
+.breakdown-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.78rem;
+    padding: 4px 6px;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.breakdown-rowbar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    opacity: 0.13;
+    border-radius: 5px;
+    transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+}
+
+.breakdown-dot {
+    position: relative;
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+    flex: 0 0 auto;
+}
+
+.breakdown-label {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-main, #ffffff);
+}
+
+.breakdown-detail {
+    position: relative;
+    flex: 0 0 auto;
+    font-size: 0.68rem;
+    font-family: monospace;
+    color: var(--text-muted, #a0a0b0);
+}
+
+.breakdown-value {
+    position: relative;
+    flex: 0 0 auto;
+    font-family: monospace;
+    font-weight: 700;
+    color: var(--text-main, #ffffff);
+}
+
+.breakdown-sub-intro {
+    font-size: 0.68rem;
+    font-style: italic;
+    color: var(--text-muted, #a0a0b0);
+    margin: 5px 0 1px 17px;
+}
+
+.breakdown-sub {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.72rem;
+    color: var(--text-muted, #a0a0b0);
+    padding: 2px 6px 2px 24px;
+}
+
+.breakdown-sub .breakdown-value {
+    font-weight: 600;
+    color: var(--text-muted, #a0a0b0);
+}
+
+.breakdown-note {
+    font-size: 0.68rem;
+    line-height: 1.45;
+    color: var(--text-muted, #a0a0b0);
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.07);
+}
+
+/* Bot System Details */
+.bot-info-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.bot-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    padding: 6px 0;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+}
+
+.bot-info-row:last-child {
+    border-bottom: none;
+}
+
+.bot-info-label {
+    color: var(--text-muted, #a0a0b0);
+}
+
+.bot-info-val {
+    font-weight: 600;
+    color: var(--text-main, #ffffff);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Theme Adaptation Rules
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Light Theme Mode */
+html.light-theme .drawer-panel {
+    background: var(--bg-card, rgba(255, 255, 255, 0.92));
+    border-left-color: rgba(0, 0, 0, 0.08);
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.15);
+}
+
+html.light-theme .drawer-header {
+    background: rgba(0, 0, 0, 0.03);
+    border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+html.light-theme .drawer-settings,
+html[data-theme="light"] .drawer-settings {
+    background: rgba(0, 0, 0, 0.02);
+    border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+html.light-theme .drawer-section {
+    background: rgba(0, 0, 0, 0.02);
+    border-color: rgba(0, 0, 0, 0.06);
+}
+
+html.light-theme .drawer-widget.widget-dragging,
+html[data-theme="light"] .drawer-widget.widget-dragging {
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(88, 101, 242, 0.3);
+}
+
+html.light-theme .bandwidth-card {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.06);
+}
+
+html.light-theme .memory-graph-wrapper,
+html[data-theme="light"] .memory-graph-wrapper {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+html.light-theme .y-axis-label,
+html[data-theme="light"] .y-axis-label,
+html.light-theme .x-axis-label,
+html[data-theme="light"] .x-axis-label {
+    color: rgba(0, 0, 0, 0.5);
+}
+
+html.light-theme .graph-grid-line,
+html[data-theme="light"] .graph-grid-line {
+    stroke: rgba(0, 0, 0, 0.09);
+}
+
+html.light-theme .breakdown-bar,
+html[data-theme="light"] .breakdown-bar {
+    background: rgba(0, 0, 0, 0.06);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+html.light-theme .breakdown-group-title,
+html[data-theme="light"] .breakdown-group-title {
+    border-bottom-color: rgba(0, 0, 0, 0.1);
+}
+
+html.light-theme .breakdown-note,
+html[data-theme="light"] .breakdown-note {
+    border-top-color: rgba(0, 0, 0, 0.1);
+}
+
+html.light-theme .breakdown-rowbar,
+html[data-theme="light"] .breakdown-rowbar {
+    opacity: 0.18;
+}
+
+html.light-theme .svg-crosshair,
+html[data-theme="light"] .svg-crosshair {
+    stroke: rgba(0, 0, 0, 0.45);
+}
+
+/* Neon Cyberpunk Theme */
+html[data-style="neon-cyberpunk"] .drawer-panel {
+    background: rgba(10, 10, 20, 0.92);
+    border-left: 1px solid #00f3ff;
+    box-shadow: -10px 0 30px rgba(0, 243, 255, 0.2);
+}
+
+html[data-style="neon-cyberpunk"] .drawer-title {
+    color: #00f3ff;
+    text-shadow: 0 0 8px rgba(0, 243, 255, 0.6);
+}
+
+html[data-style="neon-cyberpunk"] .bandwidth-value {
+    color: #ff007f;
+    text-shadow: 0 0 8px rgba(255, 0, 127, 0.6);
+}
+
+/* Retro Synthwave Theme */
+html[data-style="retro-synthwave"] .drawer-panel {
+    background: rgba(20, 10, 30, 0.92);
+    border-left: 1px solid #ff71ce;
+    box-shadow: -10px 0 30px rgba(255, 113, 206, 0.25);
+}
+
+html[data-style="retro-synthwave"] .drawer-title {
+    color: #ff71ce;
+}
+
+html[data-style="retro-synthwave"] .bandwidth-value {
+    color: #01cdfe;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Pied du tiroir — version en cours d'exécution
+   ═══════════════════════════════════════════════════════════════ */
+
+/*
+   Ancré sous le corps défilant, en miroir de l'en-tête : le corps porte
+   `flex-grow: 1`, ce pied garde donc sa hauteur et reste visible quel que
+   soit le nombre de widgets ouverts au-dessus.
+*/
+.drawer-footer {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.85rem 1.4rem;
+    border-top: 1px solid var(--border-card, rgba(255, 255, 255, 0.08));
+    background: rgba(0, 0, 0, 0.15);
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.drawer-footer-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.drawer-footer-label {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.72rem;
+}
+
+.drawer-footer-value {
+    margin-left: auto;
+    font-weight: 600;
+    color: var(--text-main);
+    letter-spacing: 0.02em;
+}
+
+/* La version de développement se signale d'elle-même : c'est du code en cours
+   d'écriture, pas une release, et la confusion entre les deux coûte cher. */
+.drawer-footer-value.is-dev {
+    color: var(--c-accent);
+}
+
+.drawer-footer-value.is-dev::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    vertical-align: middle;
+    box-shadow: 0 0 6px currentColor;
+}
+
+html.light-theme .drawer-footer {
+    background: rgba(0, 0, 0, 0.03);
+}

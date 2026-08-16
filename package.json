@@ -1,0 +1,55 @@
+{
+  "name": "interactive-music-player",
+  "version": "1.0.0",
+  "description": "Bot Discord de musique interactive avec audio ducking automatique dans les salons vocaux",
+  "main": "src/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/WolfGang-PRoxa/interactive_music_player.git"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "deploy": "node src/deploy-commands.js",
+    "dev": "node --watch src/index.js",
+    "smoke": "node tests/smoke.js",
+    "test:device": "node tests/deviceMode.js",
+    "test:drag": "node tests/dragPreview.js",
+    "test": "node tests/deviceMode.js && node tests/dragPreview.js && node tests/smoke.js"
+  },
+  "keywords": [
+    "discord",
+    "music",
+    "bot",
+    "ducking",
+    "voice"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@discord-player/extractor": "^7.2.0",
+    "@discordjs/voice": "^0.19.2",
+    "@snazzah/davey": "^0.1.11",
+    "discord-api-types": "^0.38.48",
+    "discord-player": "^7.2.0",
+    "discord-player-youtubei": "^2.0.0",
+    "discord-voip": "npm:@discordjs/voice@^0.19.2",
+    "discord.js": "^14.16.0",
+    "dotenv": "^16.4.0",
+    "express": "^5.2.1",
+    "ffmpeg-static": "^5.2.0",
+    "mediaplex": "^1.0.0",
+    "opusscript": "^0.0.8",
+    "ws": "^8.21.0",
+    "youtube-dl-exec": "^3.1.7",
+    "youtube-ext": "^1.1.25"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^11.0.0"
+  },
+  "overrides": {
+    "discord-voip": "npm:@discordjs/voice@^0.19.2",
+    "discord-player": {
+      "discord-voip": "npm:@discordjs/voice@^0.19.2"
+    },
+    "youtubei.js": "^17.0.1"
+  }
+}

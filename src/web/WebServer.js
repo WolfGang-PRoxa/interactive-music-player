@@ -1,0 +1,1543 @@
+/**
+ * WebServer — Serveur web intégré avec Express et WebSocket pour le contrôle en temps réel du bot.
+ */
+
+const express = require('express');
+const http = require('http');
+const { WebSocketServer } = require('ws');
+const path = require('path');
+const fs = require('fs');
+const database = require('../database/Database');
+const broadcastManager = require('../broadcast/BroadcastManager');
+const playbackStateManager = require('../database/PlaybackStateManager');
+const preloadManager = require('../audio/PreloadManager');
+const { moteurActif } = require('../audio/mix');
+const auth = require('./auth');
+const { arePathsOrUrlsEqual } = require('../utils/paths');
+const { readSetAsideQueue } = require('../utils/setAsideQueue');
+const { formatMs, parseDurationToMs } = require('../utils/duration');
+const log = require('../utils/logger');
+
+/** Le dashboard n'échange que de petits messages JSON ; les fichiers passent par POST /api/upload. */
+const WS_MAX_PAYLOAD_BYTES = 1024 * 1024;
+
+/**
+ * Flux mémoire haute cadence du tiroir.
+ *
+ * La mesure embarquée dans `progress` ne tombe qu'une fois par seconde : de
+ * quoi tenir un historique, pas de quoi tracer une courbe vivante. Ce flux
+ * échantillonne bien plus vite, mais seulement pendant qu'un tableau de bord
+ * regarde (tiroir ouvert) — sinon aucun minuteur ne tourne.
+ *
+ * Les échantillons partent groupés : la résolution temporelle est celle de
+ * l'échantillonnage, la charge réseau celle du regroupement.
+ */
+const MEM_CADENCE_HZ = 60;
+/**
+ * Le minuteur est volontairement réglé plus court que la période visée, et
+ * c'est l'horloge qui décide de retenir ou non la mesure.
+ *
+ * Sous Windows la granularité des minuteurs est d'environ 15,6 ms : demander
+ * 17 ms y donne un réveil toutes les 31 ms, soit deux fois moins de mesures
+ * que prévu. En se réveillant plus souvent et en filtrant sur le temps écoulé,
+ * la cadence obtenue est la même quelle que soit la résolution du système.
+ */
+const MEM_PERIODE_MINUTEUR_MS = 8;
+const MEM_ECART_MIN_MS = (1000 / MEM_CADENCE_HZ) * 0.6;
+const MEM_PERIODE_ENVOI_MS = 50;
+/** Garde-fou : plafonne le lot si un envoi venait à traîner. */
+const MEM_LOT_MAX = MEM_CADENCE_HZ * 4;
+
+/**
+ * Délai laissé au tableau de bord pour annoncer lui-même une fin de piste, en
+ * diffusion personnelle.
+ *
+ * Le son sort du navigateur : c'est lui qui sait quand un morceau s'achève, et
+ * il le signale toujours — sur `ended`, ou à la fin d'un fondu enchaîné.
+ * L'horloge du serveur ne fait que suivre, et n'avance d'elle-même que si ce
+ * signal n'arrive pas.
+ *
+ * Deux secondes : largement au-delà d'un aller-retour WebSocket, largement en
+ * deçà de ce qui s'entendrait si le navigateur venait réellement à se taire.
+ */
+const FIN_AUTOMATIQUE_DELAI_MS = 2000;
+
+// Le logger écrit dans data/logs et applique la rétention ; le serveur web ne
+// fait que s'y abonner pour retransmettre les entrées au tableau de bord.
+log.configure({
+    dir: path.join(process.cwd(), 'data/logs'),
+    level: process.env.LOG_LEVEL || 'debug',
+    retention: Number(process.env.LOG_RETENTION) || 20,
+});
+
+class WebServer {
+    constructor() {
+        this.app = express();
+        this.server = http.createServer(this.app);
+        this.wss = new WebSocketServer({
+            server: this.server,
+            maxPayload: WS_MAX_PAYLOAD_BYTES,
+            verifyClient: auth.verifyUpgrade
+        });
+        this.client = null;
+        this.port = 3000;
+        this.host = '127.0.0.1';
+        /**
+         * Tableau de bord pilote de chaque serveur : guildId → WebSocket.
+         *
+         * En diffusion personnelle, le son sort du navigateur et c'est lui qui
+         * sait quand un morceau s'achève. Plusieurs tableaux de bord peuvent
+         * être ouverts — un téléphone, un poste fixe —, et chacun mène alors sa
+         * propre lecture. Tous annonçaient la fin de la même piste, et la file
+         * avançait d'autant de crans qu'il y avait d'appareils.
+         *
+         * Un seul est donc habilité à émettre les annonces automatiques. Les
+         * commandes explicites — lecture, pause, suivant, repositionnement —
+         * restent acceptées de n'importe lequel : ce sont des intentions de
+         * l'utilisateur, pas des constats de fin de piste.
+         */
+        this.pilotes = new Map();
+
+        // Flux mémoire haute cadence : voir setFluxMemoire.
+        this._abonnesMemoire = new Set();
+        this._minuteurMesureMemoire = null;
+        this._minuteurEnvoiMemoire = null;
+        this._tamponMemoire = [];
+
+        WebServer.instance = this;
+
+        // Retransmission des journaux au tableau de bord. L'abonnement remplace
+        // le détournement de console : le logger ignore tout du serveur web.
+        log.subscribe((entry) => {
+            if (!this.wss) return;
+            const payload = JSON.stringify({ type: 'log', data: entry });
+            this.wss.clients.forEach((client) => {
+                if (client.readyState === 1) {
+                    try { client.send(payload); } catch (e) {}
+                }
+            });
+        });
+
+        this._initExpress();
+        this._initWebSocket();
+    }
+
+    /**
+     * Démarre le serveur web.
+     * @param {import('discord.js').Client} client - Instance du client Discord
+     * @param {number} port - Port d'écoute
+     * @param {string} host - Interface d'écoute (127.0.0.1 par défaut ; mettre
+     *   HOST=0.0.0.0 pour exposer le dashboard sur le réseau local)
+     */
+    start(client, port = 3000, host = '127.0.0.1') {
+        this.client = client;
+        this.port = port;
+        this.host = host;
+
+        const token = auth.getToken();
+
+        // Ménage de démarrage : transferts interrompus (les journaux sont
+        // purgés par le logger lors de sa configuration)
+        try {
+            require('./uploadService').cleanIncomingUploads();
+        } catch (err) {
+            log.error(`[WebServer] Nettoyage des transferts interrompus impossible : ${err.message}`);
+        }
+
+        this.server.listen(port, host, () => {
+            const displayHost = (host === '0.0.0.0' || host === '::') ? 'localhost' : host;
+            log.success(`[WebServer] Tableau de bord accessible sur : http://${displayHost}:${port}/?token=${token}`);
+            if (host === '0.0.0.0' || host === '::') {
+                log.warn(`[WebServer] Le dashboard est exposé sur toutes les interfaces réseau (HOST=${host}).`);
+            }
+
+            // Ouvrir automatiquement le navigateur après 5 secondes si aucun client n'est connecté
+            //
+            // Débrayable par AUTO_OPEN_DASHBOARD=false. En diffusion personnelle,
+            // ce tableau de bord joue la musique et annonce les fins de piste au
+            // même titre que celui de l'utilisateur : sur une machine pilotée à
+            // distance, il double la lecture sans que personne ne l'entende.
+            setTimeout(() => {
+                if (String(process.env.AUTO_OPEN_DASHBOARD || '').toLowerCase() === 'false') {
+                    log.info('[WebServer] Ouverture automatique du tableau de bord désactivée '
+                        + '(AUTO_OPEN_DASHBOARD=false).');
+                    return;
+                }
+                if (this.wss.clients.size === 0) {
+                    log.success(`[WebServer] Aucun client connecté détecté. Ouverture automatique du tableau de bord.`);
+                    const { exec } = require('child_process');
+                    // Le jeton est passé en query : le middleware pose le cookie puis nettoie l'URL.
+                    const url = `http://${displayHost}:${port}/?token=${token}`;
+                    let cmd;
+                    if (process.platform === 'win32') {
+                        cmd = `start "" "${url}"`;
+                    } else if (process.platform === 'darwin') {
+                        cmd = `open "${url}"`;
+                    } else {
+                        cmd = `xdg-open "${url}"`;
+                    }
+                    exec(cmd, { windowsHide: true }, (err) => {
+                        if (err) {
+                            log.error(`[WebServer] Impossible d'ouvrir le navigateur : ${err.message}`);
+                        }
+                    });
+                } else {
+                    log.success(`[WebServer] Client existant détecté (${this.wss.clients.size} client(s) connecté(s)).`);
+                }
+            }, 5000);
+        });
+
+        preloadManager.onProgress = () => {
+            try {
+                if (this.wss && this.wss.clients) {
+                    this.wss.clients.forEach((c) => {
+                        if (c.readyState === 1 && c.selectedGuildId) {
+                            try {
+                                const state = this.getState(c.selectedGuildId, c.selectedVoiceChannelId);
+                                c.send(JSON.stringify({ type: 'state', data: state }));
+                            } catch (e) {}
+                        }
+                    });
+                }
+            } catch (e) {
+                log.error('[WebServer] Erreur onProgress préchargement :', e.message);
+            }
+        };
+
+        // Intervalle de mise à jour périodique (progrès de lecture, synco état)
+        setInterval(() => {
+            try {
+                // Mettre à jour la progression de la file d'attente virtuelle en mode personnel
+                const { useMainPlayer } = require('discord-player');
+                const player = useMainPlayer();
+                if (player && player.queues) {
+                    player.queues.cache.forEach(queue => {
+                        const guildId = queue.guild.id;
+                        const settings = database.getSettings(guildId);
+                        if (settings.broadcastMode === 'personal' && queue.virtualCurrentTrack) {
+                            if (queue.virtualIsPlaying && !queue.virtualIsPaused) {
+                                // En diffusion personnelle le son sort du navigateur :
+                                // sans tableau de bord connecté, rien n'est joué. Laisser
+                                // courir l'horloge dans le vide décalerait la reprise après
+                                // un redémarrage du bot, voire enchaînerait des pistes que
+                                // personne n'a entendues. On la gèle et on repousse le
+                                // repère temporel pour repartir sans à-coup à la reconnexion.
+                                if (!this.aUnClientConnecte(guildId)) {
+                                    queue.virtualLastUpdated = Date.now();
+                                } else {
+                                    const speed = parseFloat(settings.playbackSpeed || '1.0');
+                                    const now = Date.now();
+                                    const elapsed = (now - (queue.virtualLastUpdated || now)) * speed;
+                                    queue.virtualProgressMs = (queue.virtualProgressMs || 0) + elapsed;
+                                    queue.virtualLastUpdated = now;
+
+                                    const durationMs = queue.virtualCurrentTrack.durationMS || parseDurationToMs(queue.virtualCurrentTrack.duration);
+                                    // Le délai de courtoisie laisse le navigateur annoncer
+                                    // lui-même la fin, ce qu'il fait toujours : sur
+                                    // l'événement `ended`, ou à l'issue du fondu enchaîné.
+                                    //
+                                    // Sans lui, les deux avancent pour la même fin de
+                                    // piste. En enchaînement mix la collision est
+                                    // systématique — le fondu s'achève précisément quand
+                                    // cette horloge atteint la durée —, et le serveur
+                                    // passait à n+1 juste avant que le saut du navigateur
+                                    // n'arrive et ne fasse passer à n+2, à la position
+                                    // déjà jouée du fondu.
+                                    //
+                                    // Cette avance n'est qu'une roue de secours, pour le
+                                    // cas où le tableau de bord se tairait. Elle peut donc
+                                    // attendre ; lui, non.
+                                    if (durationMs > 0 && queue.virtualProgressMs >= durationMs + FIN_AUTOMATIQUE_DELAI_MS) {
+                                        log.warn('[WebServer] Fin de piste non annoncée par le tableau de bord : '
+                                            + 'avance automatique de la file virtuelle.');
+                                        this.handleVirtualSkip(queue, guildId);
+                                    }
+                                }
+                            }
+                        }
+
+                        // L'enchaînement mix de la diffusion commune était mené
+                        // d'ici, à la seconde : faute de pouvoir superposer deux
+                        // pistes, il ne pouvait qu'éteindre la sortante et
+                        // compter sur le fondu d'entrée de la suivante pour
+                        // masquer le trou. Le bus de mixage s'en charge désormais
+                        // lui-même, cadencé sur les trames qu'il produit — donc
+                        // au millième de seconde et sans blanc entre les deux.
+                    });
+                }
+
+                if (this.wss.clients.size > 0) {
+                    const uniqueGuildIds = new Set();
+                    this.wss.clients.forEach(client => {
+                        if (client.readyState === 1 && client.selectedGuildId) {
+                            uniqueGuildIds.add(client.selectedGuildId);
+                        }
+                    });
+                    uniqueGuildIds.forEach(guildId => {
+                        // Seule la progression est diffusée périodiquement.
+                        // L'état complet part sur événement (piste, file,
+                        // réglages), via broadcastState.
+                        try {
+                            preloadManager.update(guildId);
+                        } catch (err) {
+                            log.error('[WebServer] Erreur de mise à jour du préchargement :', err.message);
+                        }
+                        this.broadcastProgress(guildId);
+                    });
+                }
+            } catch (err) {
+                // Ignorer
+            }
+        }, 1000);
+    }
+
+    _initExpress() {
+        // L'authentification passe avant tout le reste, fichiers statiques compris.
+        this.app.use(auth.middleware);
+
+        // Servir les fichiers statiques du dashboard
+        this.app.use(express.static(path.join(__dirname, 'public')));
+        // Les corps JSON du dashboard sont petits ; les fichiers passent par /api/upload
+        // qui lit le flux brut sans jamais le bufferiser en mémoire.
+        this.app.use(express.json({ limit: '1mb' }));
+        this.app.use(express.urlencoded({ limit: '1mb', extended: true }));
+
+        const createApiRouter = require('./routes/api');
+        this.app.use('/api', createApiRouter(this));
+    }
+
+    _initWebSocket() {
+        // Heartbeat interval to check alive connections every 30 seconds
+        const heartbeatInterval = setInterval(() => {
+            this.wss.clients.forEach((ws) => {
+                if (ws.isAlive === false) {
+                    log.info('[WebServer] Client WebSocket inactif, fermeture...');
+                    return ws.terminate();
+                }
+                ws.isAlive = false;
+                ws.ping();
+            });
+        }, 30000);
+
+        this.wss.on('close', () => {
+            clearInterval(heartbeatInterval);
+        });
+
+        this.wss.on('connection', (ws) => {
+            // L'initialisation d'un client interroge l'état du lecteur. Sans
+            // cette protection, une exception y remonterait comme exception non
+            // interceptée et terminerait le processus : une simple connexion au
+            // tableau de bord au mauvais moment suffirait à arrêter le bot.
+            try {
+                this._initClient(ws);
+            } catch (err) {
+                log.error('[WebServer] Initialisation du client WebSocket échouée :', err);
+                try {
+                    ws.send(JSON.stringify({
+                        type: 'error',
+                        data: { message: 'Initialisation impossible, réessayez dans un instant.' }
+                    }));
+                } catch (e) {}
+                try { ws.close(); } catch (e) {}
+            }
+        });
+    }
+
+    /**
+     * Prépare un client fraîchement connecté : historique des journaux,
+     * sélection du serveur et du salon, envoi de l'état initial.
+     * @param {import('ws').WebSocket} ws
+     */
+    _initClient(ws) {
+        ws.isAlive = true;
+        ws.on('pong', () => {
+            ws.isAlive = true;
+        });
+        // L'historique part AVANT de journaliser la connexion. Dans l'ordre
+        // inverse, la ligne « Client connecté » était diffusée en direct au
+        // client qui venait de s'ouvrir, donc affichée avant l'historique — puis
+        // une seconde fois à sa place chronologique, l'historique la contenant
+        // déjà.
+        try {
+            ws.send(JSON.stringify({ type: 'logsHistory', data: log.getHistory() }));
+        } catch (err) {}
+
+        log.success('[WebServer] Client connecté en WebSocket.');
+
+        let selectedGuildId = null;
+        let selectedChannelId = null;
+
+        // 1. Rechercher s'il y a un salon par défaut global (FAVORI) défini sur l'un des serveurs
+        for (const [gId, settings] of database.cache.entries()) {
+            if (settings.defaultVoiceChannelId) {
+                selectedGuildId = gId;
+                selectedChannelId = settings.defaultVoiceChannelId;
+                break;
+            }
+        }
+
+        // 2. Si aucun salon par défaut (FAVORI) n'est défini, retomber sur le dernier salon visité (lastVoiceChannel)
+        if (!selectedGuildId || !selectedChannelId) {
+            const lastChannelInfo = database.getLastVoiceChannel();
+            if (lastChannelInfo.guildId && lastChannelInfo.channelId) {
+                const guild = this.client.guilds.cache.get(lastChannelInfo.guildId);
+                if (guild && guild.channels.cache.has(lastChannelInfo.channelId)) {
+                    selectedGuildId = lastChannelInfo.guildId;
+                    selectedChannelId = lastChannelInfo.channelId;
+                }
+            }
+        }
+
+        // 3. Fallback standard s'il n'y a ni favori ni dernier salon disponible
+        if (!selectedGuildId) {
+            selectedGuildId = this._getFirstGuildId();
+            if (selectedGuildId) {
+                const settings = database.getSettings(selectedGuildId);
+                const { useMainPlayer } = require('discord-player');
+                const player = useMainPlayer();
+                const queue = player.queues.get(selectedGuildId);
+                selectedChannelId = queue?.channel?.id || settings.defaultVoiceChannelId || settings.lastVoiceChannelId;
+                if (!selectedChannelId) {
+                    const guild = this.client.guilds.cache.get(selectedGuildId);
+                    if (guild) {
+                        const voiceChannels = guild.channels.cache.filter(c => c.type === 2);
+                        const withUsers = voiceChannels.filter(c => c.members.filter(m => !m.user.bot).size > 0);
+                        if (withUsers.size > 0) {
+                            selectedChannelId = withUsers.first().id;
+                        } else if (voiceChannels.size > 0) {
+                            selectedChannelId = voiceChannels.first().id;
+                        }
+                    }
+                }
+                if (queue && !queue.activeChannelId && selectedChannelId) {
+                    queue.activeChannelId = selectedChannelId;
+                }
+            }
+        }
+
+        ws.selectedGuildId = selectedGuildId;
+        ws.selectedVoiceChannelId = selectedChannelId;
+
+        // Le premier connecté prend les commandes ; les suivants observent.
+        this._assurerPilote(selectedGuildId);
+
+        // Envoyer l'état actuel lors de la connexion
+        if (selectedGuildId) {
+            ws.send(JSON.stringify({
+                type: 'state',
+                data: {
+                    ...this.getState(selectedGuildId, ws.selectedVoiceChannelId),
+                    pilote: this.estPilote(ws, selectedGuildId),
+                }
+            }));
+        }
+
+        ws.on('message', async (message) => {
+            try {
+                // require différé : wsHandler dépend indirectement de ce module
+                const wsHandler = require('./websocket/wsHandler');
+                const parsed = JSON.parse(message);
+                await wsHandler.handleMessage(ws, parsed, this);
+            } catch (err) {
+                log.error('[WebServer] Erreur message WebSocket :', err.message);
+                // Un handler interrompu n'a pas atteint son broadcastState : sans
+                // ce renvoi, l'IHM resterait sur son état optimiste (interrupteur
+                // coché, curseur déplacé…) jusqu'au prochain événement, en
+                // désaccord avec le réglage réellement enregistré.
+                if (ws.readyState === 1 && ws.selectedGuildId) {
+                    try {
+                        ws.send(JSON.stringify({
+                            type: 'state',
+                            data: this.getState(ws.selectedGuildId, ws.selectedVoiceChannelId)
+                        }));
+                    } catch (e) {}
+                }
+            }
+        });
+
+        // Un client parti ne doit pas maintenir le flux mémoire en vie, ni
+        // laisser la lecture sans pilote.
+        ws.on('close', () => {
+            this.setFluxMemoire(ws, false);
+            this._retirerClient(ws);
+        });
+    }
+
+    /**
+     * Diffuse l'état actuel à tous les clients connectés.
+     * @param {string} guildId
+     */
+    broadcastState(guildId) {
+        try {
+            preloadManager.update(guildId);
+        } catch (err) {
+            log.error('[WebServer] Erreur de mise à jour du préchargement :', err.message);
+        }
+
+        this.wss.clients.forEach((client) => {
+            if (client.readyState === 1 && client.selectedGuildId === guildId) {
+                const state = this.getState(guildId, client.selectedVoiceChannelId);
+
+                // Chaque tableau de bord doit savoir s'il pilote : lui seul mène
+                // les enchaînements et annonce les fins de piste. La valeur entre
+                // dans la signature ci-dessous, de sorte qu'une réélection soit
+                // transmise même si rien d'autre n'a bougé.
+                state.pilote = this.estPilote(client, guildId);
+
+                // Mettre à jour le canal vocal sélectionné sur le client pour rester synchronisé avec l'état réel du bot
+                if (state.selectedVoiceChannelId) {
+                    client.selectedVoiceChannelId = state.selectedVoiceChannelId;
+                }
+
+                // botStats change à chaque appel (horodatage, mémoire) : l'exclure
+                // de la comparaison, sinon aucun état ne serait jamais identique.
+                const { botStats, ...comparable } = state;
+                const signature = JSON.stringify(comparable);
+                if (client._lastStateSignature === signature) return;
+                client._lastStateSignature = signature;
+
+                client.send(JSON.stringify({ type: 'state', data: state }));
+            }
+        });
+    }
+
+    /**
+     * Diffuse la seule liste des locuteurs d'une guilde.
+     *
+     * La parole va et vient plusieurs fois par seconde et par personne. Y
+     * répondre par un état complet ferait resérialiser à chaque fois la file,
+     * l'historique et toutes les playlists — pour un tableau qui ne change pas.
+     * Message léger, donc, sur le modèle de `progress`.
+     *
+     * @param {string} guildId
+     */
+    broadcastSpeakers(guildId) {
+        if (!this.wss) return;
+
+        const duckingManager = this.client?.duckingManagers?.get(guildId);
+        if (!duckingManager) return;
+
+        let queue = null;
+        try {
+            const { useMainPlayer } = require('discord-player');
+            queue = useMainPlayer()?.queues?.get(guildId) || null;
+        } catch (e) {}
+
+        // Le bot n'écoute qu'un salon : la connexion fait foi. Un tableau de
+        // bord qui en consulte un autre ne doit voir personne parler, sans quoi
+        // il animerait des membres qu'il n'écoute pas.
+        const salonEcoute = queue?.channel?.id || duckingManager.channelId || null;
+        const locuteurs = Array.from(duckingManager.activeSpeakers);
+
+        this.wss.clients.forEach((client) => {
+            if (client.readyState !== 1 || client.selectedGuildId !== guildId) return;
+            const concerne = !!salonEcoute && client.selectedVoiceChannelId === salonEcoute;
+            try {
+                client.send(JSON.stringify({
+                    type: 'speakers',
+                    data: { speakers: concerne ? locuteurs : [] },
+                }));
+            } catch (e) {}
+        });
+    }
+
+    /**
+     * Ce tableau de bord est-il celui qui pilote la lecture de ce serveur ?
+     * @param {import('ws').WebSocket} ws
+     * @param {string} guildId
+     * @returns {boolean}
+     */
+    estPilote(ws, guildId) {
+        return this.pilotes.get(guildId) === ws;
+    }
+
+    /**
+     * Désigne un pilote si le serveur n'en a pas, ou si le sien a disparu.
+     *
+     * Le premier arrivé l'emporte : rien ne permet de deviner lequel des
+     * appareils connectés l'utilisateur écoute réellement. Ce qui importe est
+     * qu'il n'y en ait qu'un, et qu'il soit remplacé s'il s'en va — sans quoi
+     * la lecture ne s'enchaînerait plus du tout.
+     *
+     * @param {string} guildId
+     * @returns {import('ws').WebSocket|null}
+     */
+    _assurerPilote(guildId) {
+        if (!guildId) return null;
+
+        const actuel = this.pilotes.get(guildId);
+        if (actuel && actuel.readyState === 1) return actuel;
+
+        for (const client of this.wss.clients) {
+            if (client.readyState === 1 && client.selectedGuildId === guildId) {
+                this.pilotes.set(guildId, client);
+                log.info(`[WebServer] Tableau de bord pilote désigné pour la guild ${guildId} `
+                    + `(${this._compterClients(guildId)} connecté(s)).`);
+                this.broadcastState(guildId);
+                return client;
+            }
+        }
+
+        this.pilotes.delete(guildId);
+        return null;
+    }
+
+    /** Nombre de tableaux de bord connectés sur une guilde. */
+    _compterClients(guildId) {
+        let n = 0;
+        for (const client of this.wss.clients) {
+            if (client.readyState === 1 && client.selectedGuildId === guildId) n++;
+        }
+        return n;
+    }
+
+    /**
+     * Retire un tableau de bord et réélit un pilote s'il l'était.
+     * @param {import('ws').WebSocket} ws
+     */
+    _retirerClient(ws) {
+        for (const [guildId, pilote] of this.pilotes.entries()) {
+            if (pilote !== ws) continue;
+            this.pilotes.delete(guildId);
+            log.info(`[WebServer] Le tableau de bord pilote de la guild ${guildId} s'est déconnecté.`);
+            // Différé : à cet instant la connexion figure encore parmi les
+            // clients, et se réélirait elle-même.
+            setImmediate(() => this._assurerPilote(guildId));
+        }
+    }
+
+    /**
+     * Un tableau de bord est-il connecté sur cette guilde ?
+     *
+     * En diffusion personnelle, c'est la condition pour que quelque chose soit
+     * réellement audible : le lecteur vit dans le navigateur, pas dans le bot.
+     *
+     * @param {string} guildId
+     * @returns {boolean}
+     */
+    aUnClientConnecte(guildId) {
+        if (!this.wss || !this.wss.clients) return false;
+        for (const client of this.wss.clients) {
+            if (client.readyState === 1 && client.selectedGuildId === guildId) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Abonne ou désabonne un client du flux mémoire haute cadence.
+     *
+     * Le tableau de bord ne le demande que tiroir ouvert : tant que personne
+     * ne regarde, aucun minuteur ne tourne et la mesure d'une fois par seconde
+     * embarquée dans `progress` suffit à entretenir l'historique.
+     *
+     * @param {import('ws').WebSocket} ws
+     * @param {boolean} actif
+     */
+    setFluxMemoire(ws, actif) {
+        if (actif) {
+            this._abonnesMemoire.add(ws);
+            this._demarrerFluxMemoire();
+        } else {
+            this._abonnesMemoire.delete(ws);
+            this._arreterFluxMemoireSiInutile();
+        }
+    }
+
+    _demarrerFluxMemoire() {
+        if (this._minuteurMesureMemoire) return;
+        this._tamponMemoire = [];
+
+        let derniereMesure = 0;
+        this._minuteurMesureMemoire = setInterval(() => {
+            const t = Date.now();
+            if (t - derniereMesure < MEM_ECART_MIN_MS) return;
+            derniereMesure = t;
+
+            const m = process.memoryUsage();
+            // Tableau compact plutôt qu'objet nommé : à cette cadence, les noms
+            // de champs pèseraient plus lourd que les valeurs elles-mêmes.
+            this._tamponMemoire.push([t, m.rss, m.heapUsed, m.heapTotal]);
+            if (this._tamponMemoire.length > MEM_LOT_MAX) {
+                this._tamponMemoire.splice(0, this._tamponMemoire.length - MEM_LOT_MAX);
+            }
+        }, MEM_PERIODE_MINUTEUR_MS);
+
+        this._minuteurEnvoiMemoire = setInterval(() => {
+            if (this._tamponMemoire.length === 0) {
+                this._arreterFluxMemoireSiInutile();
+                return;
+            }
+            const lot = this._tamponMemoire;
+            this._tamponMemoire = [];
+            const payload = JSON.stringify({ type: 'memory', data: { samples: lot } });
+
+            for (const ws of Array.from(this._abonnesMemoire)) {
+                if (ws.readyState !== 1) {
+                    this._abonnesMemoire.delete(ws);
+                    continue;
+                }
+                try { ws.send(payload); } catch (e) {}
+            }
+            this._arreterFluxMemoireSiInutile();
+        }, MEM_PERIODE_ENVOI_MS);
+
+        log.debug(`[WebServer] Flux mémoire haute cadence démarré (${MEM_CADENCE_HZ} Hz).`);
+    }
+
+    _arreterFluxMemoireSiInutile() {
+        if (this._abonnesMemoire.size > 0) return;
+        if (this._minuteurMesureMemoire) {
+            clearInterval(this._minuteurMesureMemoire);
+            this._minuteurMesureMemoire = null;
+        }
+        if (this._minuteurEnvoiMemoire) {
+            clearInterval(this._minuteurEnvoiMemoire);
+            this._minuteurEnvoiMemoire = null;
+        }
+        this._tamponMemoire = [];
+    }
+
+    /**
+     * Diffuse uniquement ce qui évolue en continu : position de lecture et
+     * statistiques du processus.
+     *
+     * Utilisé par la boucle périodique à la place de broadcastState, dont la
+     * charge utile — file d'attente, historique et playlists reformatés —
+     * croît avec le nombre de pistes alors que rien n'y change entre deux
+     * secondes.
+     *
+     * @param {string} guildId
+     */
+    broadcastProgress(guildId) {
+        if (this.wss.clients.size === 0) return;
+
+        const { useMainPlayer } = require('discord-player');
+        const player = useMainPlayer();
+        const queue = player.queues.get(guildId);
+        const settings = database.getSettings(guildId);
+
+        const memory = process.memoryUsage();
+        const botStats = {
+            memory: {
+                rss: memory.rss,
+                heapUsed: memory.heapUsed,
+                heapTotal: memory.heapTotal,
+                external: memory.external
+            },
+            uptime: Math.floor(process.uptime()),
+            timestamp: Date.now()
+        };
+
+        this.wss.clients.forEach((client) => {
+            if (client.readyState !== 1 || client.selectedGuildId !== guildId) return;
+            const position = this.getPlaybackPosition(queue, client.selectedVoiceChannelId, settings);
+            try {
+                client.send(JSON.stringify({ type: 'progress', data: { ...position, botStats } }));
+            } catch (e) {}
+        });
+    }
+
+    /**
+     * Calcule la position de lecture d'un salon, sans toucher aux pistes.
+     *
+     * Séparé de getChannelPlaybackState pour que la diffusion périodique
+     * n'ait pas à reformater toute la file d'attente et l'historique alors que
+     * seule la progression évolue.
+     *
+     * @returns {{ progress: object|null, isPlaying: boolean, isPaused: boolean,
+     *   attenteAuditeur: object|null }}
+     */
+    getPlaybackPosition(queue, channelId, settings) {
+        const isPersonal = settings.broadcastMode === 'personal';
+        const activeChannelId = queue?.activeChannelId || queue?.channel?.id;
+
+        // Bot retiré d'un salon vide : son lecteur est démonté et ne rendrait
+        // que des zéros. La session a relevé la position avant le départ.
+        if (queue && channelId && channelId === activeChannelId && queue.session.estGelee()) {
+            const attente = queue.session.attenteAuditeur();
+            return {
+                progress: buildProgress(queue.positionFigeeMs, queue.currentTrack),
+                isPlaying: queue.session.getIsPlaying(),
+                isPaused: queue.session.getIsPaused(),
+                // Le tableau de bord annoncerait sinon une lecture en cours sur
+                // une barre qui n'avance pas, sans rien qui l'explique.
+                attenteAuditeur: attente
+                    ? { ...attente, salon: this._nomSalon(queue.guild?.id, channelId) }
+                    : null,
+            };
+        }
+
+        if (queue && channelId && channelId === activeChannelId) {
+            let timestamp = null;
+            if (queue.currentTrack) {
+                try {
+                    timestamp = queue.node.getTimestamp();
+                } catch (err) {}
+            }
+
+            return {
+                // Fondu enchaîné du bus de mixage : deux morceaux sonnent
+                // ensemble, et le tableau de bord doit pouvoir les montrer tous
+                // les deux. En diffusion personnelle, le navigateur tient cette
+                // information lui-même — ses deux éléments audio sont sous sa
+                // main —, et le serveur n'a rien à en dire.
+                mixTransition: isPersonal ? null : etatFonduEnchaine(queue),
+                // La durée passe par `buildProgress` comme dans les autres
+                // branches, et non par `timestamp.total` : le lecteur y divise
+                // déjà la durée par la vitesse de lecture, alors que la position
+                // qu'il rend reste comptée dans le temps du fichier. Le tableau
+                // de bord, lui, applique la vitesse lui-même à l'affichage — la
+                // durée s'y retrouvait donc divisée deux fois, et la barre de
+                // progression rapportait une position du fichier à une durée
+                // qui ne l'était plus. Il attend des repères bruts, ici comme
+                // pour les demandes de repositionnement.
+                progress: isPersonal
+                    ? buildProgress(queue.virtualProgressMs, queue.virtualCurrentTrack)
+                    : (queue.transitioningToEveryone && queue.transitionTrack
+                        ? buildProgress(queue.transitionTargetProgress, queue.transitionTrack)
+                        : (timestamp ? buildProgress(timestamp.current.value, queue.currentTrack) : null)),
+                // La session porte la même logique de branchement, testée
+                isPlaying: queue.session.getIsPlaying(),
+                isPaused: queue.session.getIsPaused(),
+                attenteAuditeur: null,
+            };
+        }
+
+        const savedState = queue?.channelStates?.[channelId];
+        if (savedState) {
+            return {
+                progress: buildProgress(savedState.currentProgress, savedState.currentTrack),
+                isPlaying: !!savedState.isPlaying,
+                isPaused: !!savedState.isPaused,
+                attenteAuditeur: null,
+            };
+        }
+
+        return { progress: null, isPlaying: false, isPaused: false, attenteAuditeur: null };
+    }
+
+    /**
+     * Nom lisible d'un salon vocal, pour les messages du tableau de bord.
+     * @returns {string|null}
+     */
+    _nomSalon(guildId, channelId) {
+        if (!guildId || !channelId) return null;
+        const guild = this.client?.guilds?.cache?.get(guildId);
+        return guild?.channels?.cache?.get(channelId)?.name || null;
+    }
+
+    /**
+     * Récupère l'état de lecture spécifique à un salon vocal (actif ou en cache).
+     */
+    getChannelPlaybackState(queue, channelId, settings) {
+        const isPersonal = settings.broadcastMode === 'personal';
+        const activeChannelId = queue?.activeChannelId || queue?.channel?.id;
+        const position = this.getPlaybackPosition(queue, channelId, settings);
+
+        if (queue && channelId && channelId === activeChannelId) {
+            // Salon actif : renvoyer l'état en direct du lecteur
+            return {
+                currentTrack: isPersonal
+                    ? formatTrackWithPreload(queue.virtualCurrentTrack)
+                    : (queue.transitioningToEveryone && queue.transitionTrack
+                        ? formatTrackWithPreload(queue.transitionTrack)
+                        : formatTrackWithPreload(queue.currentTrack)),
+                ...position,
+                // Une playlist occupe le lecteur : le panneau montre la file
+                // mise de côté, la même liste dans les deux modes.
+                queue: (settings.activePlaybackSource && settings.activePlaybackSource !== 'queue')
+                    ? readSetAsideQueue(settings).map(formatTrackWithPreload)
+                    : (isPersonal
+                        ? (queue.virtualTracks || []).map(formatTrackWithPreload)
+                        : (queue.tracks.map(formatTrackWithPreload).filter(t => !t || !queue.transitioningToEveryone || !queue.transitionTrack || t.url !== queue.transitionTrack.url))),
+                // Historique : la piste la plus récente en tête, dans les deux modes.
+                // C'est l'ordre naturel de `history.tracks`, une file LIFO — et celui
+                // que `virtualHistory` respecte désormais aussi.
+                history: isPersonal
+                    ? (queue.virtualHistory || []).map(formatTrackWithPreload)
+                    : (queue.history ? queue.history.tracks.toArray().map(formatTrackWithPreload) : [])
+            };
+        } else {
+            // Salon inactif : charger les données depuis queue.channelStates s'il y a un cache
+            const savedState = queue?.channelStates?.[channelId];
+            if (savedState) {
+                return {
+                    currentTrack: savedState.currentTrack ? formatTrackWithPreload(savedState.currentTrack) : null,
+                    ...position,
+                    queue: (savedState.queue || []).map(formatTrackWithPreload),
+                    history: (savedState.history || []).map(formatTrackWithPreload)
+                };
+            }
+        }
+
+        return {
+            currentTrack: null,
+            ...position,
+            queue: [],
+            history: []
+        };
+    }
+
+    /**
+     * Génère l'état complet du bot pour une guild.
+     * @param {string} guildId
+     * @param {string|null} selectedVoiceChannelId
+     * @returns {object}
+     */
+    getState(guildId, selectedVoiceChannelId = null) {
+        const settings = database.getSettings(guildId);
+        const { useMainPlayer } = require('discord-player');
+        const player = useMainPlayer();
+        const queue = player.queues.get(guildId);
+
+        // Prioriser la sélection client, puis le salon actif de la queue, puis le salon connecté, puis le salon favori, puis le dernier salon utilisé
+        let activeVoiceChannelId = selectedVoiceChannelId || queue?.activeChannelId || queue?.channel?.id || settings.defaultVoiceChannelId || settings.lastVoiceChannelId;
+        if (!activeVoiceChannelId) {
+            const lastChannelInfo = database.getLastVoiceChannel();
+            if (lastChannelInfo.guildId === guildId && lastChannelInfo.channelId) {
+                activeVoiceChannelId = lastChannelInfo.channelId;
+            }
+        }
+        if (!activeVoiceChannelId && this.client) {
+            const guild = this.client.guilds.cache.get(guildId);
+            if (guild) {
+                const voiceChannels = guild.channels.cache.filter(c => c.type === 2); // GuildVoice
+                const withUsers = voiceChannels.filter(c => c.members.filter(m => !m.user.bot).size > 0);
+                if (withUsers.size > 0) {
+                    activeVoiceChannelId = withUsers.first().id;
+                } else if (voiceChannels.size > 0) {
+                    activeVoiceChannelId = voiceChannels.first().id;
+                }
+            }
+        }
+
+        // Locuteurs du salon que le tableau de bord affiche, et de lui seul :
+        // l'écoute suit le bot, qui peut se trouver ailleurs que le salon
+        // consulté. La connexion fait foi plutôt que le salon mémorisé par le
+        // gestionnaire, qui ne serait qu'un reflet de plus à tenir à jour.
+        let activeSpeakers = [];
+        const duckingManager = this.client?.duckingManagers?.get(guildId);
+        const salonEcoute = queue?.channel?.id || duckingManager?.channelId || null;
+        if (duckingManager && salonEcoute && salonEcoute === activeVoiceChannelId) {
+            activeSpeakers = Array.from(duckingManager.activeSpeakers);
+        }
+
+        const guildsList = this.client ? this.client.guilds.cache.map(g => {
+            const q = player.queues.get(g.id);
+            const voiceChannels = g.channels.cache
+                .filter(c => c.type === 2) // GuildVoice
+                .sort((a, b) => a.position - b.position)
+                .map(c => {
+                    const botConnected = q?.channel?.id === c.id;
+                    const nonBotMembers = c.members.filter(m => !m.user.bot);
+                    return {
+                        id: c.id,
+                        name: c.name,
+                        userCount: nonBotMembers.size,
+                        botConnected: botConnected,
+                        // La session plutôt que `q.node` : en diffusion
+                        // personnelle le lecteur de discord-player ne porte
+                        // rien — le son sort du navigateur —, et le salon était
+                        // annoncé « inactif » pendant qu'un morceau jouait.
+                        isPlaying: botConnected && q ? q.session.getIsPlaying() : false,
+                        // Une lecture en pause n'est pas une absence de lecture :
+                        // la liste des salons annonçait « inactif » là où un
+                        // morceau attend simplement d'être repris.
+                        isPaused: botConnected && q ? q.session.getIsPaused() : false
+                    };
+                });
+
+            return {
+                id: g.id,
+                name: g.name,
+                defaultVoiceChannelId: database.getSettings(g.id).defaultVoiceChannelId || null,
+                currentVoiceChannelId: q?.channel?.id || null,
+                voiceChannels: voiceChannels
+            };
+        }) : [];
+
+        const channelPlaybackState = this.getChannelPlaybackState(queue, activeVoiceChannelId, settings);
+
+        return {
+            guildId,
+            selectedVoiceChannelId: activeVoiceChannelId,
+            guilds: guildsList,
+            currentTrack: channelPlaybackState.currentTrack,
+            progress: channelPlaybackState.progress,
+            isPlaying: channelPlaybackState.isPlaying,
+            isPaused: channelPlaybackState.isPaused,
+            // Lecture immobile faute d'auditeur : de quoi l'expliquer plutôt
+            // que de laisser le tableau de bord passer pour en panne.
+            attenteAuditeur: channelPlaybackState.attenteAuditeur || null,
+            isTransitioning: !!queue?.isPendingTransition,
+            repeatMode: queue ? queue.repeatMode : 0,
+            volume: settings.baseVolume,
+            settings: {
+                duckingEnabled: settings.duckingEnabled,
+                duckingLevel: settings.duckingLevel,
+                duckingDelay: settings.duckingDelay,
+                duckingFade: settings.duckingFade,
+                broadcastMode: settings.broadcastMode,
+                playbackSpeed: settings.playbackSpeed || '1.0',
+                defaultVoiceChannelId: settings.defaultVoiceChannelId || null,
+                mixEnabled: !!settings.mixEnabled,
+                mixDuration: settings.mixDuration !== undefined ? settings.mixDuration : 5,
+                mixType: settings.mixType || 'volume',
+                importAudioQuality: settings.importAudioQuality || '320',
+                importVideoQuality: settings.importVideoQuality || '720',
+                // Secondes. Zéro est un choix, pas une absence de valeur : le
+                // `??` est donc de rigueur ici.
+                presenceDepartureDelay: settings.presenceDepartureDelay ?? 30
+            },
+            queue: channelPlaybackState.queue,
+            history: channelPlaybackState.history,
+            playlists: (database.getGlobalPlaylists() || []).map(p => ({
+                ...p,
+                tracks: (p.tracks || []).map(formatTrackWithPreload)
+            })),
+            // Fade-in de démarrage laissé en attente parce que le son sort du
+            // navigateur : le client le joue à sa connexion, puis le consomme.
+            startupFadein: queue?.fadeinDemarrageEnAttente || null,
+            activePlaybackSource: settings.activePlaybackSource || 'queue',
+            playlistCurrentIndex: settings.playlistCurrentIndex || 0,
+            loopPlaylist: !!settings.loopPlaylist,
+            speakers: activeSpeakers,
+            ignoredVoiceUsers: (() => {
+                if (activeVoiceChannelId) {
+                    const ignored = settings.ignoredVoiceUsers?.[activeVoiceChannelId];
+                    return ignored || [];
+                }
+                return [];
+            })(),
+            members: (() => {
+                if (activeVoiceChannelId && this.client) {
+                    const guild = this.client.guilds.cache.get(guildId);
+                    if (guild) {
+                        const channel = guild.channels.cache.get(activeVoiceChannelId);
+                        if (channel) {
+                            return channel.members.filter(m => !m.user.bot).map(m => ({
+                                id: m.id,
+                                displayName: m.displayName,
+                                avatar: m.user.displayAvatarURL({ size: 64 })
+                            }));
+                        }
+                    }
+                }
+                return [];
+            })(),
+            botStats: {
+                memory: {
+                    rss: process.memoryUsage().rss,
+                    heapUsed: process.memoryUsage().heapUsed,
+                    heapTotal: process.memoryUsage().heapTotal,
+                    external: process.memoryUsage().external
+                },
+                uptime: Math.floor(process.uptime()),
+                timestamp: Date.now()
+            }
+        };
+    }
+
+    /**
+     * @param {number} [startProgressMs=0] - Position de départ dans le titre
+     *   chargé. Sans effet en diffusion « everyone », où la lecture est menée
+     *   par le lecteur du bot et non par le navigateur.
+     */
+    async _syncPlaylistToPlayer(guildId, playlistId, startIndex = 0, forceRestart = false, startProgressMs = 0) {
+        const { useMainPlayer, Track } = require('discord-player');
+        const player = useMainPlayer();
+        const queue = player.queues.get(guildId);
+        if (!queue) return;
+
+        const globalPlaylists = database.getGlobalPlaylists();
+        const playlist = globalPlaylists.find(p => p.id === playlistId);
+        if (!playlist) return;
+
+        const settings = database.getSettings(guildId);
+        const isPersonal = settings.broadcastMode === 'personal';
+        const tracks = playlist.tracks || [];
+
+        if (isPersonal) {
+            if (tracks.length === 0) {
+                queue.virtualCurrentTrack = null;
+                queue.virtualTracks = [];
+                queue.virtualIsPlaying = false;
+                queue.virtualIsPaused = false;
+                queue.virtualProgressMs = 0;
+            } else {
+                const targetTrack = tracks[startIndex] || null;
+                const isSameTrack = !forceRestart && queue.virtualCurrentTrack && targetTrack && arePathsOrUrlsEqual(queue.virtualCurrentTrack.url, targetTrack.url);
+
+                if (isSameTrack) {
+                    queue.virtualTracks = tracks.slice(startIndex + 1).map(t => ({
+                        title: t.title,
+                        author: t.author || 'Inconnu',
+                        duration: t.duration || '0:00',
+                        thumbnail: t.thumbnail || null,
+                        url: t.url,
+                        queryType: t.queryType || (t.url && (t.url.startsWith('http') ? 'youtube' : 'file')),
+                        raw: {},
+                        extractorName: t.extractorName || null
+                    }));
+                } else {
+                    queue.virtualCurrentTrack = targetTrack ? {
+                        title: targetTrack.title,
+                        author: targetTrack.author || 'Inconnu',
+                        duration: targetTrack.duration || '0:00',
+                        thumbnail: targetTrack.thumbnail || null,
+                        url: targetTrack.url,
+                        queryType: targetTrack.queryType || (targetTrack.url && (targetTrack.url.startsWith('http') ? 'youtube' : 'file')),
+                        raw: {},
+                        extractorName: targetTrack.extractorName || null
+                    } : null;
+                    queue.virtualTracks = tracks.slice(startIndex + 1).map(t => ({
+                        title: t.title,
+                        author: t.author || 'Inconnu',
+                        duration: t.duration || '0:00',
+                        thumbnail: t.thumbnail || null,
+                        url: t.url,
+                        queryType: t.queryType || (t.url && (t.url.startsWith('http') ? 'youtube' : 'file')),
+                        raw: {},
+                        extractorName: t.extractorName || null
+                    }));
+                    queue.virtualProgressMs = startProgressMs;
+                    queue.virtualIsPlaying = !!queue.virtualCurrentTrack;
+                    queue.virtualIsPaused = false;
+                    queue.virtualLastUpdated = Date.now();
+                }
+            }
+        } else {
+            const targetTrackData = tracks[startIndex];
+            const hasCurrentTrack = queue.currentTrack;
+            const isSameTrack = !forceRestart && hasCurrentTrack && targetTrackData && arePathsOrUrlsEqual(hasCurrentTrack.url, targetTrackData.url);
+
+            if (isSameTrack) {
+                queue.tracks.clear();
+                const subsequentTracksData = tracks.slice(startIndex + 1);
+                if (subsequentTracksData.length > 0) {
+                    const resolvedSubsequent = subsequentTracksData.map(t => {
+                        const track = new Track(player, {
+                            title: t.title,
+                            author: t.author || 'Inconnu',
+                            duration: t.duration || '0:00',
+                            thumbnail: t.thumbnail || null,
+                            url: t.url,
+                            queryType: t.queryType || (t.url && (t.url.startsWith('http') ? 'youtube' : 'file')),
+                            raw: t.raw || {}
+                        });
+                        if (t.extractorName) {
+                            track.extractor = player.extractors.store.get(t.extractorName) || null;
+                        }
+                        return track;
+                    });
+                    queue.addTrack(resolvedSubsequent);
+                }
+            } else {
+                queue.tracks.clear();
+                if (tracks.length > 0 && targetTrackData) {
+                    const resolvedTracks = tracks.map(t => {
+                        const track = new Track(player, {
+                            title: t.title,
+                            author: t.author || 'Inconnu',
+                            duration: t.duration || '0:00',
+                            thumbnail: t.thumbnail || null,
+                            url: t.url,
+                            queryType: t.queryType || (t.url && (t.url.startsWith('http') ? 'youtube' : 'file')),
+                            raw: t.raw || {}
+                        });
+                        if (t.extractorName) {
+                            track.extractor = player.extractors.store.get(t.extractorName) || null;
+                        }
+                        return track;
+                    });
+
+                    const targetTrack = resolvedTracks[startIndex];
+
+                    // Lecture figée : aucun lecteur où lancer la piste. Elle est
+                    // posée comme piste courante, et démarrera vraiment quand
+                    // l'arrivée d'un auditeur ramènera le bot dans le salon.
+                    if (queue.session.estGelee()) {
+                        queue.__current = targetTrack;
+                        queue.positionFigeeMs = 0;
+                        const suite = resolvedTracks.slice(startIndex + 1);
+                        if (suite.length > 0) queue.addTrack(suite);
+                        this.broadcastState(guildId);
+                        playbackStateManager.saveState(player);
+                        return;
+                    }
+
+                    const oldVol = queue.node.volume;
+                    queue.node.setVolume(0);
+
+                    try {
+                        await queue.play(targetTrack, {
+                            nodeOptions: {
+                                metadata: { channel: null },
+                                selfDeaf: false,
+                                volume: 0
+                            }
+                        });
+                    } catch (e) {
+                        log.error('[WebServer] Erreur play track playlist everyone:', e);
+                    }
+
+                    setTimeout(() => {
+                        try { queue.node.setVolume(oldVol); } catch (e) {}
+                    }, 100);
+
+                    const subsequent = resolvedTracks.slice(startIndex + 1);
+                    if (subsequent.length > 0) {
+                        queue.addTrack(subsequent);
+                    }
+                } else {
+                    if (queue.currentTrack) {
+                        queue.node.skip();
+                    }
+                }
+            }
+        }
+    }
+
+    _getFirstGuildId() {
+        return this.client?.guilds?.cache?.first()?.id || null;
+    }
+
+    _findActiveVoiceChannel(guild) {
+        // 1. Chercher un salon avec des utilisateurs non-bot dedans
+        const voiceChannels = guild.channels.cache.filter(c => c.type === 2); // GuildVoice
+        for (const [_, channel] of voiceChannels) {
+            const humans = channel.members.filter(m => !m.user.bot);
+            if (humans.size > 0) {
+                return channel;
+            }
+        }
+        // 2. Sinon, prendre le premier salon vocal
+        return voiceChannels.first();
+    }
+
+    _sendError(message) {
+        const payload = JSON.stringify({ type: 'error', data: { message } });
+        this.wss.clients.forEach((client) => {
+            if (client.readyState === 1) {
+                client.send(payload);
+            }
+        });
+    }
+
+    async _addVirtualTracks(guildId, tracks, isPlaylist = false) {
+        const { useMainPlayer } = require('discord-player');
+        const player = useMainPlayer();
+        const queue = player.queues.get(guildId);
+        if (!queue) return;
+
+
+        const mapTrack = (track) => {
+            const dMs = track.durationMS || parseDurationToMs(track.duration);
+            return {
+                title: track.title,
+                author: track.author || 'Inconnu',
+                duration: track.duration || '0:00',
+                durationMS: dMs,
+                thumbnail: track.thumbnail || null,
+                url: track.url,
+                queryType: track.queryType || 'youtube',
+                extractorName: track.extractor?.identifier || null
+            };
+        };
+
+        if (isPlaylist) {
+            tracks.forEach(track => {
+                const trackData = mapTrack(track);
+                if (!queue.virtualCurrentTrack) {
+                    queue.virtualCurrentTrack = trackData;
+                    queue.virtualIsPlaying = true;
+                    queue.virtualIsPaused = false;
+                    queue.virtualProgressMs = 0;
+                    queue.virtualLastUpdated = Date.now();
+                } else {
+                    queue.virtualTracks.push(trackData);
+                }
+            });
+        } else {
+            const track = tracks[0];
+            if (track) {
+                const trackData = mapTrack(track);
+                if (!queue.virtualCurrentTrack) {
+                    queue.virtualCurrentTrack = trackData;
+                    queue.virtualIsPlaying = true;
+                    queue.virtualIsPaused = false;
+                    queue.virtualProgressMs = 0;
+                    queue.virtualLastUpdated = Date.now();
+                } else {
+                    queue.virtualTracks.push(trackData);
+                }
+            }
+        }
+        this.broadcastState(guildId);
+        playbackStateManager.saveState(player);
+    }
+
+    handleVirtualSkip(queue, guildId, data = {}) {
+
+        const startProgressMs = (data && typeof data.startProgressMs === 'number') ? data.startProgressMs : 0;
+
+        // Une fin de piste n'avance la file qu'une fois, quel que soit le nombre
+        // de tableaux de bord ouverts.
+        //
+        // En diffusion personnelle, chaque tableau de bord mène sa propre lecture
+        // et son propre fondu enchaîné : le navigateur que le bot ouvre sur le PC
+        // au démarrage, et celui de l'utilisateur. Tous annoncent la même fin, à
+        // quelques millisecondes d'intervalle, et la file avançait d'autant de
+        // crans qu'il y avait de clients — d'où un titre sauté à chaque
+        // enchaînement.
+        //
+        // L'annonce déclare la piste qu'elle termine : celles qui arrivent après
+        // la première portent une piste que la file a déjà quittée, et sont
+        // écartées. Un appui sur « suivant » ne porte pas ce marquage et reste
+        // donc toujours honoré, y compris deux fois de suite.
+        if (data && data.auto && data.finishedUrl) {
+            const courante = queue.virtualCurrentTrack?.url || null;
+            if (!courante || !arePathsOrUrlsEqual(courante, data.finishedUrl)) {
+                log.debug('[WebServer] Fin de piste déjà traitée, annonce ignorée : '
+                    + `« ${data.finishedUrl} » n'est plus la piste courante.`);
+                return;
+            }
+        }
+
+        // Le doublon est désormais écarté à la source, par l'élection du
+        // tableau de bord pilote : un anti-rebond temporel n'a plus lieu d'être,
+        // et il aurait fini par écarter une fin légitime — un morceau plus court
+        // que sa fenêtre, ou deux titres très brefs qui s'enchaînent.
+
+        // Trace de l'avance de la file virtuelle.
+        //
+        // Deux mécanismes peuvent la faire avancer pour une même fin de piste —
+        // l'annonce du navigateur et la roue de secours du serveur —, et seul un
+        // relevé horodaté dit lequel a joué, combien de fois, et sur quelle file.
+        // Le déduire du seul état final s'est révélé impossible.
+        log.debug(`[WebServer] Saut virtuel : « ${queue.virtualCurrentTrack?.title || '—'} » → `
+            + `« ${queue.virtualTracks?.[0]?.title || '—'} » | file de ${queue.virtualTracks?.length ?? 0} `
+            + `| départ ${startProgressMs} ms | source ${database.getSettings(guildId).activePlaybackSource || 'queue'}`);
+
+        // Repeat mode TRACK check
+        const repeatMode = queue.repeatMode;
+        if (repeatMode === 1 && queue.virtualCurrentTrack) {
+            queue.virtualProgressMs = startProgressMs;
+            queue.virtualLastUpdated = Date.now();
+            this.broadcastState(guildId);
+            const { useMainPlayer } = require('discord-player');
+            playbackStateManager.saveState(useMainPlayer());
+            return;
+        }
+
+        if (queue.virtualCurrentTrack) {
+            // En tête : `virtualHistory` suit la même convention que history.tracks,
+            // la piste la plus récente d'abord.
+            queue.virtualHistory.unshift(queue.virtualCurrentTrack);
+        }
+        const nextTrack = queue.virtualTracks.shift();
+        if (nextTrack) {
+            queue.virtualCurrentTrack = nextTrack;
+            queue.virtualIsPlaying = true;
+            queue.virtualIsPaused = false;
+            queue.virtualProgressMs = startProgressMs;
+            queue.virtualLastUpdated = Date.now();
+
+            // Synchroniser playlistCurrentIndex
+            const settings = database.getSettings(guildId);
+            if (settings.activePlaybackSource && settings.activePlaybackSource !== 'queue') {
+                const globalPlaylists = database.getGlobalPlaylists();
+                const playlist = globalPlaylists.find(p => p.id === settings.activePlaybackSource);
+                if (playlist) {
+                    const idx = playlist.tracks.findIndex(t => arePathsOrUrlsEqual(t.url, nextTrack.url));
+                    if (idx !== -1) {
+                        database.updateSettings(guildId, { playlistCurrentIndex: idx });
+                    }
+                }
+            }
+        } else if (this.relancerPlaylistBouclee(guildId, startProgressMs)) {
+            // La playlist a été rechargée depuis son premier titre : rien à
+            // arrêter, la lecture se poursuit.
+            return;
+        } else {
+            queue.virtualCurrentTrack = null;
+            queue.virtualIsPlaying = false;
+            queue.virtualIsPaused = false;
+            queue.virtualProgressMs = 0;
+            queue.virtualLastUpdated = Date.now();
+        }
+        this.broadcastState(guildId);
+        const { useMainPlayer } = require('discord-player');
+        playbackStateManager.saveState(useMainPlayer());
+    }
+
+    /**
+     * Recharge la playlist active depuis son début lorsqu'elle vient de
+     * s'achever et que la lecture en boucle est demandée.
+     *
+     * Appelée aux deux points d'épuisement — la file virtuelle du mode
+     * personnel et l'événement `emptyQueue` du mode everyone — car les deux
+     * moteurs de lecture n'ont rien en commun.
+     *
+     * @param {string} guildId
+     * @param {number} [startProgressMs=0] - Position déjà atteinte dans le
+     *   premier titre. Non nulle quand l'enchaînement mix a commencé à le
+     *   jouer avant la fin du précédent : repartir de zéro ferait alors
+     *   reculer la lecture du navigateur, que le serveur recale sur lui.
+     * @returns {boolean} true si un rebouclage a été enclenché
+     */
+    relancerPlaylistBouclee(guildId, startProgressMs = 0) {
+        const settings = database.getSettings(guildId);
+        if (!settings.loopPlaylist) return false;
+
+        const source = settings.activePlaybackSource;
+        if (!source || !source.startsWith('playlist_')) return false;
+
+        const playlist = (database.getGlobalPlaylists() || []).find(p => p.id === source);
+        if (!playlist || !playlist.tracks || playlist.tracks.length === 0) return false;
+
+        log.info(`[WebServer] Fin de la playlist « ${playlist.name} » : relance depuis le début (lecture en boucle).`);
+        database.updateSettings(guildId, { playlistCurrentIndex: 0 });
+
+        // forceRestart : sans lui, une playlist d'un seul titre serait vue
+        // comme « déjà en cours » et ne repartirait jamais.
+        this._syncPlaylistToPlayer(guildId, source, 0, true, startProgressMs)
+            .then(() => {
+                this.broadcastState(guildId);
+                const { useMainPlayer } = require('discord-player');
+                playbackStateManager.saveState(useMainPlayer());
+            })
+            .catch(err => log.error('[WebServer] Erreur de relance de playlist :', err.message));
+
+        return true;
+    }
+}
+
+module.exports = new WebServer();
+
+/**
+ * Construit le bloc de progression d'une piste.
+ *
+ * Remplace trois variantes qui recalculaient la durée jusqu'à quatre fois par
+ * appel.
+ *
+ * @param {number} positionMs - Position courante
+ * @param {object|null} track - Piste concernée
+ * @returns {object|null}
+ */
+/**
+ * Fondu enchaîné en cours sur le bus de mixage, mis en forme pour le client.
+ *
+ * La piste entrante est formatée comme n'importe quelle piste affichée : le
+ * tableau de bord la présente pendant la superposition, exactement comme la
+ * diffusion personnelle présente celle que son second élément audio a lancée.
+ *
+ * @param {object} queue
+ * @returns {object|null}
+ */
+function etatFonduEnchaine(queue) {
+    const moteur = moteurActif(queue);
+    const fondu = moteur?.etatFondu();
+    if (!fondu) return null;
+
+    const decrire = (part) => ({
+        url: part.url,
+        positionMs: part.positionMs,
+        dureeMs: part.dureeMs,
+        ratio: part.ratio,
+    });
+
+    return {
+        sortante: decrire(fondu.sortante),
+        entrante: { ...decrire(fondu.entrante), track: formatTrackWithPreload(fondu.entrante.piste) },
+    };
+}
+
+function buildProgress(positionMs, track) {
+    if (!track) return null;
+    const totalMs = track.durationMS || parseDurationToMs(track.duration);
+    const current = positionMs || 0;
+    return {
+        current: formatMs(current),
+        currentMs: current,
+        total: track.duration || formatMs(totalMs),
+        totalMs,
+        percent: totalMs > 0 ? Math.min(100, Math.max(0, (current / totalMs) * 100)) : 0,
+    };
+}
+
+function getTrackPreloadInfo(t) {
+    const vide = { isPreloaded: false, isPreloading: false, preloadProgress: 0, cachedAudioQuality: null, requalify: null };
+    if (!t) return vide;
+    if (t.queryType === 'file' || (t.url && fs.existsSync(t.url))) {
+        // Fichier local : lu tel quel, jamais transcodé ni mis en cache.
+        return { ...vide, isPreloaded: true, preloadProgress: 100, isLocal: true };
+    }
+    if (typeof preloadManager.getPreloadStatus === 'function') {
+        return preloadManager.getPreloadStatus(t);
+    }
+    return { ...vide, isPreloaded: !!preloadManager.getCachedPath(t) };
+}
+
+/**
+ * Réglages d'import du premier serveur connu. Le tableau de bord est
+ * mono-utilisateur : la box « Ajouter un fichier » y affiche la même valeur
+ * quel que soit le serveur sélectionné.
+ *
+ * @returns {{ audio: string, video: string }}
+ */
+function reglagesImportCourants() {
+    const premier = database.cache.size > 0 ? [...database.cache.keys()][0] : null;
+    const settings = premier ? database.getSettings(premier) : {};
+    return {
+        audio: String(settings.importAudioQuality || '320'),
+        video: String(settings.importVideoQuality || '720')
+    };
+}
+
+/**
+ * Une piste distante peut porter une vidéo ; un fichier local ou un envoi
+ * passent par le visualiseur audio et n'ont pas de réglage vidéo à proposer.
+ */
+function pisteAVideo(t) {
+    const url = t?.url || '';
+    if (!/^https?:\/\//i.test(url)) return false;
+    return !url.includes('/uploads/');
+}
+
+function formatTrackWithPreload(t) {
+    if (!t) return null;
+    const pInfo = getTrackPreloadInfo(t);
+
+    // Qualité figée à la première rencontre de la piste, sur la base des
+    // réglages d'import du moment. Sans cet instantané, déplacer le menu
+    // déroulant de la box d'ajout réécrirait après coup la qualité affichée
+    // pour tout l'historique.
+    // Ce chemin est emprunté pour chaque piste à chaque diffusion d'état : on
+    // ne calcule les réglages de repli que lorsque la piste n'est pas déjà figée.
+    let souhaitee = t.url ? database.getTrackQuality(t.url) : null;
+    if (!souhaitee || !souhaitee.audio || !souhaitee.video) {
+        souhaitee = t.url
+            ? database.ensureTrackQuality(t.url, reglagesImportCourants())
+            : { audio: '320', video: '720' };
+    }
+
+    return {
+        title: t.title,
+        author: t.author || null,
+        duration: t.duration,
+        thumbnail: t.thumbnail || null,
+        url: t.url || null,
+        isPreloaded: pInfo.isPreloaded,
+        isPreloading: pInfo.isPreloading,
+        preloadProgress: pInfo.preloadProgress,
+        isLocal: !!pInfo.isLocal,
+        hasVideo: pisteAVideo(t),
+        // Qualité réellement présente en cache, quand elle est connue ; sinon
+        // l'interface se rabat sur la qualité souhaitée.
+        cachedAudioQuality: pInfo.cachedAudioQuality || null,
+        desiredAudioQuality: souhaitee.audio,
+        desiredVideoQuality: souhaitee.video,
+        requalify: pInfo.requalify || null
+    };
+}

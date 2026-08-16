@@ -1,0 +1,481 @@
+/**
+ * Menu contextuel de qualité d'une piste, et retours visuels d'une
+ * requalification de préchargement en cours.
+ */
+
+/* --- Roues de réglage --- */
+
+/*
+ * Comportement commun aux deux roues — celle incrustée sur l'image et celle de
+ * la carte « En cours de lecture ». Elles pilotent le même menu sur la même
+ * piste : leur apparence et leurs états doivent rester indissociables, seule
+ * la chromie s'adapte au fond qui les porte.
+ */
+.quality-gear-btn {
+    flex-shrink: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.18s ease, color 0.18s ease;
+}
+
+/* Seul l'engrenage pivote : faire tourner le bouton entraînerait son cadre et
+   son fond, ce qui se voit et n'a pas de sens. */
+.quality-gear-btn svg {
+    width: 16px;
+    height: 16px;
+    transition: transform 0.35s ease;
+}
+
+.quality-gear-btn:hover svg,
+.quality-gear-btn.is-open svg {
+    transform: rotate(45deg);
+}
+
+.quality-gear-btn.is-open {
+    background: var(--c-accent);
+    border-color: var(--c-accent);
+    color: #ffffff;
+}
+
+.quality-gear-btn.hidden {
+    display: none;
+}
+
+/* Variante « en-tête de carte » : plus discrète, elle s'aligne sur les autres
+   commandes de la boîte plutôt que sur une incrustation vidéo. */
+.player-quality-btn {
+    width: 26px;
+    height: 26px;
+}
+
+.player-quality-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.player-quality-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-main);
+}
+
+/* --- Menu principal --- */
+
+.quality-menu {
+    position: fixed;
+    z-index: 2100;
+    background: rgba(15, 14, 22, 0.96);
+    border: 1px solid var(--border-card-hover);
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    padding: 0.5rem;
+    min-width: 232px;
+    max-width: 300px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.quality-menu-title {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-main);
+    padding: 0.3rem 0.5rem 0.15rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* --- Ligne d'état du préchargement --- */
+
+.quality-menu-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.5rem 0.4rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.quality-menu-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    opacity: 0.5;
+    flex-shrink: 0;
+}
+
+.quality-menu-status-text {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.quality-menu-status-value {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.quality-menu-status.is-preloaded .quality-menu-dot,
+.quality-menu-status.is-preloading .quality-menu-dot {
+    background: var(--c-success);
+    opacity: 1;
+    box-shadow: 0 0 8px rgba(38, 222, 128, 0.6);
+}
+
+.quality-menu-status.is-preloaded .quality-menu-status-value {
+    color: var(--c-success);
+}
+
+.quality-menu-status.is-preloading .quality-menu-dot,
+.quality-menu-status.is-requalifying .quality-menu-dot {
+    animation: quality-dot-pulse 1.2s ease-in-out infinite;
+}
+
+.quality-menu-status.is-requalifying.is-up .quality-menu-dot {
+    background: var(--c-success);
+    opacity: 1;
+}
+
+.quality-menu-status.is-requalifying.is-down .quality-menu-dot {
+    background: var(--c-error);
+    opacity: 1;
+}
+
+.quality-menu-status.is-requalifying.is-up .quality-menu-status-value {
+    color: var(--c-success);
+}
+
+.quality-menu-status.is-requalifying.is-down .quality-menu-status-value {
+    color: var(--c-error);
+}
+
+@keyframes quality-dot-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.45; transform: scale(0.8); }
+}
+
+.quality-menu-note {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    padding: 0.1rem 0.5rem 0.35rem;
+    line-height: 1.35;
+}
+
+.quality-menu-separator {
+    height: 1px;
+    background: var(--border-card-hover);
+    opacity: 0.5;
+    margin: 0.15rem 0.25rem 0.25rem;
+}
+
+/* --- Boutons de qualité --- */
+
+.quality-menu-item {
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    font-family: var(--font-primary);
+    font-size: 0.82rem;
+    font-weight: 500;
+    padding: 0.5rem 0.6rem;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    text-align: left;
+}
+
+.quality-menu-item:hover,
+.quality-menu-item.is-open {
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.quality-menu-icon {
+    display: flex;
+    align-items: center;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.quality-menu-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+.quality-menu-label {
+    flex: 1;
+}
+
+.quality-menu-value {
+    font-weight: 600;
+    font-size: 0.78rem;
+    color: var(--c-success);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Qualité seulement souhaitée : aucun fichier ne la porte encore. */
+.quality-menu-value.is-desired {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.quality-menu-arrow {
+    display: flex;
+    align-items: center;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.quality-menu-chevron {
+    width: 13px;
+    height: 13px;
+    transition: transform 0.15s ease;
+}
+
+.quality-menu-item.is-open .quality-menu-chevron {
+    transform: rotate(90deg);
+}
+
+/* --- Copie de la source --- */
+
+.quality-menu-copy-mark svg {
+    width: 13px;
+    height: 13px;
+}
+
+/* Le libellé peut être long (« Copier le chemin d'accès ») : il s'abrège
+   plutôt que d'élargir le menu ou de passer à la ligne. */
+.quality-menu-source .quality-menu-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.quality-menu-source.is-copied,
+.quality-menu-source.is-copied:hover {
+    background: rgba(87, 242, 135, 0.12);
+}
+
+.quality-menu-source.is-copied .quality-menu-label,
+.quality-menu-source.is-copied .quality-menu-icon,
+.quality-menu-source.is-copied .quality-menu-copy-mark {
+    color: var(--c-success);
+}
+
+/* --- Ouverture du dossier (fichiers locaux) --- */
+
+.quality-menu-open-mark svg {
+    width: 13px;
+    height: 13px;
+}
+
+/* Mise en évidence pendant que la demande part vers le serveur. Neutre, et non
+   verte comme la copie : rien ici ne prouve que la fenêtre s'est ouverte. */
+.quality-menu-reveal.is-opening,
+.quality-menu-reveal.is-opening:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.quality-menu-reveal.is-opening .quality-menu-label,
+.quality-menu-reveal.is-opening .quality-menu-icon,
+.quality-menu-reveal.is-opening .quality-menu-open-mark {
+    color: var(--text-main);
+}
+
+/* --- Sous-menu de choix --- */
+
+.quality-submenu {
+    position: fixed;
+    z-index: 2110;
+    background: rgba(15, 14, 22, 0.97);
+    border: 1px solid var(--border-card-hover);
+    border-radius: 10px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.55);
+    padding: 0.35rem;
+    min-width: 140px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.quality-submenu-item {
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    font-family: var(--font-primary);
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 0.42rem 0.55rem;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.quality-submenu-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.quality-submenu-item.is-current {
+    color: var(--c-success);
+    font-weight: 600;
+}
+
+.quality-submenu-check {
+    display: flex;
+    align-items: center;
+    width: 13px;
+    flex-shrink: 0;
+}
+
+.quality-submenu-check svg {
+    width: 13px;
+    height: 13px;
+}
+
+/* --- Barre de requalification, superposée au vert du préchargement --- */
+
+.requalify-fill-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    transform-origin: left center;
+    transform: scaleX(0);
+    pointer-events: none;
+    z-index: 1;
+    transition: transform 0.25s ease-out;
+    will-change: transform;
+    display: none;
+}
+
+.is-requalifying .requalify-fill-bar {
+    display: block;
+}
+
+/* Montée en qualité : progression verte, plus vive que le vert du cache. */
+.is-requalifying.requalify-up .requalify-fill-bar {
+    background: linear-gradient(90deg, rgba(38, 222, 128, 0.30), rgba(72, 255, 168, 0.55));
+    box-shadow: 0 0 12px rgba(38, 222, 128, 0.45);
+}
+
+/* Descente en qualité : progression rouge. */
+.is-requalifying.requalify-down .requalify-fill-bar {
+    background: linear-gradient(90deg, rgba(237, 66, 69, 0.28), rgba(255, 108, 110, 0.5));
+    box-shadow: 0 0 12px rgba(237, 66, 69, 0.4);
+}
+
+/* Tête de progression, comme pour le préchargement initial. */
+.is-requalifying .requalify-fill-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 2px;
+    transform-origin: right center;
+    transform: scaleX(calc(1 / var(--requalify-scale, 1)));
+    will-change: transform;
+    pointer-events: none;
+}
+
+.is-requalifying.requalify-up .requalify-fill-bar::after {
+    background: rgba(72, 255, 168, 0.95);
+    box-shadow: 0 0 8px rgba(38, 222, 128, 0.85);
+}
+
+.is-requalifying.requalify-down .requalify-fill-bar::after {
+    background: rgba(255, 108, 110, 0.95);
+    box-shadow: 0 0 8px rgba(237, 66, 69, 0.85);
+}
+
+/* --- Flèches animées le long de l'élément --- */
+
+.requalify-arrows {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 3;
+    display: none;
+}
+
+.is-requalifying .requalify-arrows {
+    display: block;
+}
+
+.requalify-arrow {
+    position: absolute;
+    bottom: -10px;
+    width: 9px;
+    height: 9px;
+    opacity: 0;
+    border-left: 2px solid currentColor;
+    border-top: 2px solid currentColor;
+    border-radius: 1px;
+}
+
+/* Montée : flèches vertes qui remontent l'élément. */
+.requalify-up .requalify-arrow {
+    color: rgba(72, 255, 168, 0.9);
+    transform: rotate(45deg);
+    animation: requalify-rise 2.2s ease-in-out infinite;
+}
+
+/* Descente : flèches rouges qui redescendent. */
+.requalify-down .requalify-arrow {
+    color: rgba(255, 108, 110, 0.9);
+    top: -10px;
+    bottom: auto;
+    transform: rotate(-135deg);
+    animation: requalify-fall 2.2s ease-in-out infinite;
+}
+
+@keyframes requalify-rise {
+    0%   { opacity: 0; transform: translateY(0) rotate(45deg); }
+    18%  { opacity: 0.95; }
+    72%  { opacity: 0.65; }
+    100% { opacity: 0; transform: translateY(calc(-1 * var(--requalify-travel, 46px))) rotate(45deg); }
+}
+
+@keyframes requalify-fall {
+    0%   { opacity: 0; transform: translateY(0) rotate(-135deg); }
+    18%  { opacity: 0.95; }
+    72%  { opacity: 0.65; }
+    100% { opacity: 0; transform: translateY(var(--requalify-travel, 46px)) rotate(-135deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .requalify-arrow {
+        animation: none !important;
+        opacity: 0 !important;
+    }
+    .quality-menu-status .quality-menu-dot {
+        animation: none !important;
+    }
+}

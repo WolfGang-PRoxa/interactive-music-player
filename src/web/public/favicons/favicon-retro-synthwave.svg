@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1a0933"/>
+      <stop offset="100%" stop-color="#3b0764"/>
+    </linearGradient>
+    <linearGradient id="sunGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffbe0b"/>
+      <stop offset="100%" stop-color="#ff007f"/>
+    </linearGradient>
+    <style>
+      @keyframes synthRock {
+        0%, 100% { transform: translateY(0px) rotate(0deg); }
+        25% { transform: translateY(-2px) rotate(-4deg); }
+        75% { transform: translateY(1px) rotate(4deg); }
+      }
+      @keyframes sunPulse {
+        0%, 100% { transform: scale(1); filter: drop-shadow(0 0 4px #ff007f); }
+        50% { transform: scale(1.08); filter: drop-shadow(0 0 8px #ffbe0b); }
+      }
+      .synth-note {
+        transform-origin: 32px 32px;
+        animation: synthRock 1.6s ease-in-out infinite;
+      }
+      .synth-sun {
+        transform-origin: 32px 36px;
+        animation: sunPulse 2s ease-in-out infinite;
+      }
+    </style>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="15" fill="url(#bgGrad)" stroke="#ff007f" stroke-width="1.5"/>
+  <circle class="synth-sun" cx="32" cy="35" r="17" fill="url(#sunGrad)"/>
+  <line x1="14" y1="33" x2="50" y2="33" stroke="#1a0933" stroke-width="1.5"/>
+  <line x1="14" y1="37" x2="50" y2="37" stroke="#1a0933" stroke-width="2"/>
+  <line x1="14" y1="42" x2="50" y2="42" stroke="#1a0933" stroke-width="2.5"/>
+  <g class="synth-note" fill="#ffffff" transform="translate(32, 28) scale(1.16) translate(-32, -28)">
+    <ellipse cx="20" cy="46" rx="6.5" ry="5" transform="rotate(-25 20 46)"/>
+    <ellipse cx="44" cy="40" rx="6.5" ry="5" transform="rotate(-25 44 40)"/>
+    <rect x="23" y="14" width="3.5" height="32" rx="1.5"/>
+    <rect x="47" y="8" width="3.5" height="32" rx="1.5"/>
+    <polygon points="23,14 50.5,8 50.5,13.5 23,19.5"/>
+    <polygon points="23,21.5 50.5,15.5 50.5,21 23,27"/>
+  </g>
+</svg>

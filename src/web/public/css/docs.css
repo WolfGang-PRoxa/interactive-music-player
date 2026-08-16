@@ -1,0 +1,914 @@
+/*
+   Lecteur de documentation — voir js/docs.js pour la mécanique.
+
+   Deux principes tiennent toute cette feuille :
+
+   1. **Rien n'est peint en dur.** Le papier, l'encre et les accents sortent des
+      variables de thème du tableau de bord ; la documentation suit donc le
+      style choisi (glassmorphisme, cyberpunk…) sans une règle de plus.
+   2. **La page est une fenêtre, pas un contenu.** `.docs-viewport` découpe,
+      `.docs-flow` défile. C'est la feuille de style qui décide de la largeur
+      d'une page, donc du nombre de pages — le JS ne fait que la mesurer.
+*/
+
+.docs-overlay {
+    /* Papier opaque : une page translucide laisserait voir au travers pendant
+       la tourne, ce qui ruinerait l'illusion. `--bg-main` est la seule couleur
+       de fond pleine dont chaque style dispose. */
+    --docs-paper: var(--bg-main);
+    --docs-ink: var(--text-main);
+    --docs-rule: var(--border-card);
+    --docs-gutter: 60px;
+
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(10, 9, 15, 0.72);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    /* Au-dessus des paramètres (20000), d'où cette fenêtre est ouverte, et des
+       pop-ups de version (20010) qui vivent dans la même famille. */
+    z-index: 20020;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.docs-overlay.hidden {
+    display: none !important;
+}
+
+.docs-window {
+    box-sizing: border-box;
+    width: min(1580px, 95vw);
+    height: min(940px, 93vh);
+    height: min(940px, 93dvh);
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-dropdown);
+    border: 1px solid var(--border-card-hover);
+    border-radius: 22px;
+    box-shadow: var(--shadow-card), 0 0 60px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+    transform: scale(0.94);
+    opacity: 0;
+}
+
+.docs-overlay:not(.hidden) .docs-window {
+    animation: docsOuverture 0.42s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes docsOuverture {
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* ───────────────────────────── En-tête ───────────────────────────── */
+
+.docs-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.1rem 1.4rem;
+    border-bottom: 1px solid var(--border-card);
+    flex-shrink: 0;
+}
+
+.docs-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    min-width: 0;
+}
+
+.docs-heading-icon {
+    width: 22px;
+    height: 22px;
+    color: var(--c-primary);
+    flex-shrink: 0;
+}
+
+.docs-heading-texte {
+    min-width: 0;
+}
+
+.docs-heading-texte h2 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--text-main);
+    line-height: 1.2;
+}
+
+.docs-subtitle {
+    display: block;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.docs-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.docs-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    height: 34px;
+    min-width: 34px;
+    padding: 0 0.55rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-card);
+    border-radius: 10px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.docs-icon-btn:hover {
+    color: var(--text-main);
+    border-color: var(--border-card-hover);
+    background: var(--bg-hover);
+}
+
+.docs-icon-btn svg {
+    width: 15px;
+    height: 15px;
+}
+
+/* Bouton de bascule MD ↔ HTML : il annonce la vue vers laquelle il mène. */
+.docs-view-btn {
+    color: var(--c-primary);
+    border-color: color-mix(in srgb, var(--c-primary) 35%, transparent);
+}
+
+.docs-view-btn:hover {
+    color: var(--c-primary);
+    border-color: var(--c-primary);
+}
+
+.docs-view-badge {
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+}
+
+/* ────────────────────────────── Corps ────────────────────────────── */
+
+.docs-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+}
+
+/* Sommaire */
+
+.docs-toc {
+    box-sizing: border-box;
+    width: 258px;
+    flex-shrink: 0;
+    padding: 0.9rem 0.7rem;
+    border-right: 1px solid var(--border-card);
+    overflow-y: auto;
+}
+
+.docs-toc-groupe {
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--c-accent);
+    padding: 0.8rem 0.6rem 0.4rem;
+}
+
+.docs-toc-groupe:first-child {
+    padding-top: 0.2rem;
+}
+
+.docs-toc-entree {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.5rem 0.6rem;
+    margin-bottom: 0.15rem;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.16s ease;
+}
+
+.docs-toc-entree:hover {
+    background: var(--bg-hover);
+    color: var(--text-main);
+}
+
+.docs-toc-entree.active {
+    background: linear-gradient(135deg, var(--c-primary) 0%, var(--c-violet) 100%);
+    color: #ffffff;
+    border-color: transparent;
+}
+
+.docs-toc-titre {
+    display: block;
+    font-size: 0.86rem;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.docs-toc-fichier {
+    display: block;
+    font-size: 0.7rem;
+    opacity: 0.65;
+    font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+}
+
+.docs-toc-vide {
+    padding: 1rem 0.6rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+/* Lecteur */
+
+.docs-reader {
+    display: flex;
+    align-items: stretch;
+    flex: 1;
+    min-width: 0;
+    padding: 0.9rem 0.5rem;
+    gap: 0.3rem;
+}
+
+.docs-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    border-radius: 12px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.18s ease;
+}
+
+.docs-nav:hover:not(:disabled) {
+    background: var(--bg-hover);
+    color: var(--c-primary);
+}
+
+.docs-nav:disabled {
+    opacity: 0.18;
+    cursor: default;
+}
+
+.docs-nav svg {
+    width: 26px;
+    height: 26px;
+}
+
+/* ─────────────────────────────  Livre  ───────────────────────────── */
+
+.docs-book {
+    position: relative;
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    /* La profondeur donne à la feuille son relief pendant la rotation ; sans
+       elle, la page se contenterait de s'aplatir. */
+    perspective: 2600px;
+    border-radius: 14px;
+    background: var(--docs-paper);
+    border: 1px solid var(--docs-rule);
+    box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.22);
+    overflow: hidden;
+    transition: opacity 0.2s ease;
+}
+
+.docs-book.docs-book-charge {
+    opacity: 0.35;
+}
+
+.docs-sheet {
+    box-sizing: border-box;
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    padding: 2rem 2.2rem 2.6rem;
+    background: var(--docs-paper);
+}
+
+/* Ombre de reliure : le pli central d'un livre ouvert. */
+.docs-spine {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 44px;
+    margin-left: -22px;
+    pointer-events: none;
+    background: linear-gradient(
+        90deg,
+        rgba(0, 0, 0, 0) 0%,
+        rgba(0, 0, 0, 0.16) 38%,
+        rgba(0, 0, 0, 0.26) 50%,
+        rgba(0, 0, 0, 0.16) 62%,
+        rgba(0, 0, 0, 0) 100%
+    );
+    z-index: 3;
+}
+
+.docs-viewport {
+    position: relative;
+    height: 100%;
+    overflow: hidden;
+}
+
+/*
+   Le ruban. Une seule colonne, hauteur imposée : tout ce qui dépasse crée des
+   colonnes supplémentaires qui s'empilent vers la droite, hors du cadre. Le JS
+   ne fait que translater ce ruban d'un multiple de (largeur + gouttière).
+*/
+.docs-flow {
+    position: relative;
+    height: 100%;
+    column-count: 1;
+    column-gap: var(--docs-gutter);
+    column-fill: auto;
+    color: var(--docs-ink);
+    font-family: var(--font-primary);
+    font-size: 0.92rem;
+    line-height: 1.68;
+    text-align: justify;
+    hyphens: auto;
+}
+
+.docs-folio {
+    position: absolute;
+    bottom: 1rem;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* ──────────────────────── Feuille qui tourne ──────────────────────── */
+
+.docs-leaf {
+    position: absolute;
+    transform-style: preserve-3d;
+    backface-visibility: visible;
+    z-index: 4;
+    pointer-events: none;
+}
+
+.docs-leaf.hidden {
+    display: none;
+}
+
+/* La transition n'est armée que pendant le mouvement : la pose initiale de la
+   feuille doit être instantanée, sinon elle s'anime depuis sa position
+   précédente au lieu de partir à plat. */
+.docs-leaf.docs-leaf-anime {
+    transition: transform 760ms cubic-bezier(0.42, 0.02, 0.28, 1);
+}
+
+.docs-leaf-face {
+    box-sizing: border-box;
+    position: absolute;
+    inset: 0;
+    padding: 2rem 2.2rem 2.6rem;
+    background: var(--docs-paper);
+    backface-visibility: hidden;
+    overflow: hidden;
+}
+
+.docs-leaf-back {
+    transform: rotateY(180deg);
+}
+
+/* Ombre portée du volume : le recto s'assombrit en s'éloignant, le verso
+   s'éclaire en arrivant. Deux dégradés opposés suffisent à donner l'épaisseur. */
+.docs-leaf-shade {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 760ms ease-in;
+}
+
+.docs-leaf-front .docs-leaf-shade {
+    background: linear-gradient(90deg, rgba(0, 0, 0, 0.42) 0%, rgba(0, 0, 0, 0.05) 45%, rgba(0, 0, 0, 0) 100%);
+}
+
+.docs-leaf-back .docs-leaf-shade {
+    background: linear-gradient(270deg, rgba(0, 0, 0, 0.42) 0%, rgba(0, 0, 0, 0.05) 45%, rgba(0, 0, 0, 0) 100%);
+    opacity: 0.85;
+}
+
+.docs-leaf-anime .docs-leaf-front .docs-leaf-shade {
+    opacity: 0.85;
+}
+
+.docs-leaf-anime .docs-leaf-back .docs-leaf-shade {
+    opacity: 0;
+}
+
+/*
+   Retour arrière : la charnière passe du bord gauche au bord droit de la
+   feuille, et l'ombre du volume doit suivre — c'est près de la reliure qu'une
+   page se creuse. Les deux dégradés s'inversent donc, faces comprises : le
+   verso est déjà retourné, son repère gauche/droite est l'inverse du recto.
+*/
+.docs-leaf-retour .docs-leaf-front .docs-leaf-shade {
+    background: linear-gradient(270deg, rgba(0, 0, 0, 0.42) 0%, rgba(0, 0, 0, 0.05) 45%, rgba(0, 0, 0, 0) 100%);
+}
+
+.docs-leaf-retour .docs-leaf-back .docs-leaf-shade {
+    background: linear-gradient(90deg, rgba(0, 0, 0, 0.42) 0%, rgba(0, 0, 0, 0.05) 45%, rgba(0, 0, 0, 0) 100%);
+}
+
+/* Repli en page simple : la feuille n'aurait nulle part où se poser. */
+.docs-sortie-gauche {
+    transition: transform 0.2s ease-in, opacity 0.2s ease-in;
+    transform: translateX(-24px);
+    opacity: 0;
+}
+
+.docs-sortie-droite {
+    transition: transform 0.2s ease-in, opacity 0.2s ease-in;
+    transform: translateX(24px);
+    opacity: 0;
+}
+
+.docs-entree-droite {
+    animation: docsEntreeDroite 0.22s ease-out;
+}
+
+.docs-entree-gauche {
+    animation: docsEntreeGauche 0.22s ease-out;
+}
+
+@keyframes docsEntreeDroite {
+    from {
+        transform: translateX(24px);
+        opacity: 0;
+    }
+}
+
+@keyframes docsEntreeGauche {
+    from {
+        transform: translateX(-24px);
+        opacity: 0;
+    }
+}
+
+/* ───────────────────────────── Pied ───────────────────────────── */
+
+.docs-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.7rem 1.4rem;
+    border-top: 1px solid var(--border-card);
+    flex-shrink: 0;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.docs-pager {
+    font-weight: 700;
+    color: var(--text-main);
+    letter-spacing: 0.03em;
+}
+
+.docs-hint {
+    opacity: 0.65;
+}
+
+/* ═════════════════════ Typographie du document ═════════════════════ */
+
+.docs-titre {
+    margin: 0 0 0.5rem;
+    line-height: 1.25;
+    color: var(--text-main);
+    text-align: left;
+    /* Un titre seul en bas de page n'annonce plus rien : il part avec sa suite. */
+    break-after: avoid;
+    break-inside: avoid;
+}
+
+.docs-titre-1 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    padding-bottom: 0.4rem;
+    border-bottom: 2px solid var(--c-primary);
+    margin-bottom: 0.9rem;
+}
+
+.docs-titre-2 {
+    font-size: 1.2rem;
+    font-weight: 800;
+    margin-top: 1.4rem;
+    color: var(--c-primary);
+}
+
+.docs-titre-3 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-top: 1.1rem;
+    color: var(--c-accent);
+}
+
+.docs-titre-4,
+.docs-titre-5,
+.docs-titre-6 {
+    font-size: 0.92rem;
+    font-weight: 700;
+    margin-top: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
+.docs-paragraphe {
+    margin: 0 0 0.85rem;
+}
+
+.docs-liste {
+    margin: 0 0 0.9rem;
+    padding-left: 1.15rem;
+}
+
+.docs-liste li {
+    margin-bottom: 0.3rem;
+}
+
+.docs-liste .docs-liste {
+    margin: 0.3rem 0 0.2rem;
+}
+
+.docs-filet {
+    border: none;
+    border-top: 1px solid var(--docs-rule);
+    margin: 1.3rem 0;
+}
+
+.docs-citation {
+    margin: 0 0 0.9rem;
+    padding: 0.1rem 0 0.1rem 0.9rem;
+    border-left: 3px solid var(--c-accent);
+    color: var(--text-muted);
+    break-inside: avoid;
+}
+
+.docs-citation .docs-paragraphe:last-child {
+    margin-bottom: 0;
+}
+
+.docs-code-inline {
+    font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+    font-size: 0.85em;
+    padding: 0.08em 0.35em;
+    border-radius: 5px;
+    background: var(--bg-hover);
+    border: 1px solid var(--docs-rule);
+    color: var(--c-accent);
+    white-space: nowrap;
+}
+
+/*
+   Les schémas en art ASCII ne survivent pas au retour à la ligne : d'où
+   `white-space: pre`. Mais **surtout pas** de `overflow`, qui ferait du bloc un
+   conteneur de défilement — donc un bloc monolithique, que le moteur refuse de
+   couper entre deux colonnes. Un schéma plus haut qu'une page serait alors
+   tronqué, et son bas perdu pour de bon.
+
+   Sans overflow, le bloc se répartit sur deux pages comme n'importe quel
+   paragraphe. Reste à garantir qu'aucune ligne ne dépasse en largeur : c'est le
+   travail d'`ajusterBlocsCode()` dans js/docs.js, qui règle la taille du texte
+   sur la plus longue ligne de chaque bloc.
+*/
+.docs-bloc-code {
+    margin: 0 0 0.95rem;
+    padding: 0.75rem 0.85rem;
+    border-radius: 10px;
+    background: var(--bg-select);
+    border: 1px solid var(--docs-rule);
+    white-space: pre;
+    text-align: left;
+}
+
+.docs-bloc-code code {
+    font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+    font-size: 0.74rem;
+    line-height: 1.5;
+    color: var(--text-main);
+}
+
+/* Pas d'`overflow` ici non plus, pour la même raison que les blocs de code : un
+   tableau plus haut qu'une page doit pouvoir se poursuivre sur la suivante. Un
+   tableau, lui, sait se rétrécir tout seul — il n'a besoin d'aucun réglage. */
+.docs-tableau-cadre {
+    margin: 0 0 0.95rem;
+}
+
+.docs-tableau {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    text-align: left;
+}
+
+.docs-tableau th,
+.docs-tableau td {
+    padding: 0.4rem 0.55rem;
+    border: 1px solid var(--docs-rule);
+    vertical-align: top;
+}
+
+.docs-tableau th {
+    background: var(--bg-hover);
+    font-weight: 700;
+    color: var(--c-primary);
+}
+
+.docs-lien {
+    color: var(--c-primary);
+    text-decoration: none;
+    border-bottom: 1px solid color-mix(in srgb, var(--c-primary) 40%, transparent);
+    cursor: pointer;
+}
+
+.docs-lien:hover {
+    color: var(--c-accent);
+    border-bottom-color: var(--c-accent);
+}
+
+/* Les trois familles de liens ne mènent pas au même endroit : la lecture doit
+   pouvoir les distinguer avant le clic. */
+.docs-lien-doc {
+    color: var(--c-violet);
+    border-bottom-color: color-mix(in srgb, var(--c-violet) 40%, transparent);
+}
+
+.docs-lien-doc:hover {
+    color: var(--c-accent);
+}
+
+.docs-lien-ancre {
+    border-bottom-style: dotted;
+}
+
+/* Seul lien qui fasse quitter le tableau de bord : il le dit. */
+.docs-lien-externe::after {
+    content: '↗';
+    font-size: 0.75em;
+    vertical-align: super;
+    margin-left: 0.1em;
+    opacity: 0.7;
+}
+
+.docs-lien-inerte {
+    color: var(--text-muted);
+}
+
+/* ═══════════════════════ Vue « source » (MD) ═══════════════════════ */
+
+.docs-vue-md .docs-flow {
+    font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+    font-size: 0.76rem;
+    line-height: 1.62;
+    text-align: left;
+    hyphens: manual;
+}
+
+.docs-md-ligne {
+    white-space: pre-wrap;
+    word-break: break-word;
+    /* Une ligne vide de la source doit occuper une ligne à l'écran : sans
+       hauteur minimale, un `<div>` sans contenu ne prend aucune place et les
+       paragraphes de la source se colleraient les uns aux autres. */
+    min-height: 1.62em;
+    color: var(--text-main);
+}
+
+.docs-md-sigle {
+    color: var(--c-accent);
+    font-weight: 700;
+}
+
+.docs-md-titre {
+    color: var(--c-primary);
+    font-weight: 700;
+}
+
+.docs-md-cloture,
+.docs-md-code {
+    color: var(--text-muted);
+}
+
+.docs-md-cloture {
+    color: var(--c-violet);
+}
+
+.docs-md-citation {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.docs-md-tableau {
+    color: var(--text-muted);
+}
+
+.docs-md-filet {
+    color: var(--c-violet);
+}
+
+.docs-md-litteral {
+    color: var(--c-accent);
+}
+
+.docs-md-fort {
+    color: var(--text-main);
+    font-weight: 700;
+}
+
+.docs-md-lien {
+    color: var(--c-primary);
+}
+
+.docs-md-cible {
+    color: var(--text-muted);
+    opacity: 0.8;
+}
+
+/* ════════════════════════════ Thème clair ════════════════════════════ */
+
+html[data-theme='light'] .docs-overlay {
+    background: rgba(20, 18, 30, 0.45);
+}
+
+html[data-theme='light'] .docs-book {
+    box-shadow: inset 0 0 50px rgba(80, 70, 110, 0.08);
+}
+
+html[data-theme='light'] .docs-spine {
+    background: linear-gradient(
+        90deg,
+        rgba(0, 0, 0, 0) 0%,
+        rgba(0, 0, 0, 0.06) 38%,
+        rgba(0, 0, 0, 0.1) 50%,
+        rgba(0, 0, 0, 0.06) 62%,
+        rgba(0, 0, 0, 0) 100%
+    );
+}
+
+html[data-theme='light'] .docs-leaf-front .docs-leaf-shade {
+    background: linear-gradient(90deg, rgba(60, 50, 80, 0.22) 0%, rgba(60, 50, 80, 0.03) 45%, rgba(0, 0, 0, 0) 100%);
+}
+
+html[data-theme='light'] .docs-leaf-back .docs-leaf-shade {
+    background: linear-gradient(270deg, rgba(60, 50, 80, 0.22) 0%, rgba(60, 50, 80, 0.03) 45%, rgba(0, 0, 0, 0) 100%);
+}
+
+html[data-theme='light'] .docs-leaf-retour .docs-leaf-front .docs-leaf-shade {
+    background: linear-gradient(270deg, rgba(60, 50, 80, 0.22) 0%, rgba(60, 50, 80, 0.03) 45%, rgba(0, 0, 0, 0) 100%);
+}
+
+html[data-theme='light'] .docs-leaf-retour .docs-leaf-back .docs-leaf-shade {
+    background: linear-gradient(90deg, rgba(60, 50, 80, 0.22) 0%, rgba(60, 50, 80, 0.03) 45%, rgba(0, 0, 0, 0) 100%);
+}
+
+html[data-theme='light'] .docs-icon-btn {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+/* ═════════════════════════ Fenêtres étroites ═════════════════════════ */
+
+/* Sous cette largeur, deux pages ne laisseraient plus assez de place au texte :
+   le livre passe en page simple. `mesurer()` lit cette bascule sur le DOM — la
+   décision reste donc ici, dans la feuille de style. */
+@media (max-width: 1180px) {
+    .docs-sheet-right {
+        display: none;
+    }
+
+    .docs-spine {
+        display: none;
+    }
+}
+
+@media (max-width: 860px) {
+    .docs-toc {
+        display: none;
+    }
+
+    .docs-window {
+        width: 98vw;
+        height: 96vh;
+        height: 96dvh;
+    }
+
+    .docs-sheet {
+        padding: 1.2rem 1.1rem 2.2rem;
+    }
+
+    .docs-hint {
+        display: none;
+    }
+}
+
+/*
+ * Téléphone. Le palier précédent avait été pensé pour une fenêtre étroite sur
+ * un écran d'ordinateur ; en deçà, l'en-tête et les marges restaient calibrés
+ * pour une largeur qui n'existe plus.
+ *
+ * La mise à plein écran, elle, n'est pas ici mais dans css/device.css : elle
+ * suit le mode de support et non la largeur, pour valoir aussi quand le
+ * téléphone est couché et dépasse alors ce palier. Ce bloc-ci ne traite que
+ * l'intérieur de la fenêtre. Les retraits de sécurité y gardent le contenu à
+ * l'écart des coins arrondis et de la découpe.
+ */
+@media (max-width: 560px) {
+    /*
+     * L'en-tête tenait sur une ligne : le titre, son sous-titre — le chemin du
+     * fichier affiché — et les deux boutons. Sans passage à la ligne, le titre
+     * était comprimé jusqu'à disparaître au profit des boutons, qui ne se
+     * réduisent pas. Réparti sur deux lignes, chacun garde sa largeur.
+     */
+    .docs-header {
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        padding: 0.85rem 1rem;
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
+    }
+
+    .docs-heading {
+        gap: 0.6rem;
+        /* La ligne entière, pour que les boutons descendent en dessous plutôt
+           que de disputer la place au titre. */
+        flex: 1 1 100%;
+    }
+
+    .docs-heading-texte h2 {
+        font-size: 1rem;
+    }
+
+    /* Le chemin du fichier est déjà rappelé dans la page ; sur deux lignes
+       d'en-tête, il ne fait que repousser la lecture vers le bas. */
+    .docs-subtitle {
+        display: none;
+    }
+
+    /*
+     * Les flèches encadrent la page et lui prennent leur largeur de chaque
+     * côté. Ramenées au strict nécessaire — la cible tactile de 44 px imposée
+     * par device.css reste le plancher — elles rendent une trentaine de pixels
+     * au texte, qui n'en a pas de trop.
+     */
+    .docs-reader {
+        padding: 0.6rem 0.15rem;
+        gap: 0.1rem;
+    }
+
+    .docs-nav {
+        width: 44px;
+    }
+
+    .docs-nav svg {
+        width: 22px;
+        height: 22px;
+    }
+
+    .docs-sheet {
+        padding: 1rem 0.9rem 1.9rem;
+    }
+
+    .docs-footer {
+        padding: 0.6rem 1rem;
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
+        font-size: 0.72rem;
+    }
+}

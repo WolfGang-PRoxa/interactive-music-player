@@ -1,0 +1,457 @@
+# Guide utilisateur — Bot Musique Interactive
+
+Ce guide détaille l'utilisation du bot au sein de Discord ainsi que la
+manipulation de son tableau de bord web.
+
+Pour la documentation d'ingénierie, voir [docs/technique/](technique/README.md).
+
+---
+
+## Sommaire
+
+- [Premiers pas](#premiers-pas)
+- [Accès au tableau de bord](#accès-au-tableau-de-bord)
+- [Commandes Discord](#référence-complète-des-commandes-discord)
+- [Tableau de bord web](#utilisation-du-tableau-de-bord-web)
+- [Scénarios types](#scénarios-dutilisation-types)
+- [FAQ](#questions-fréquemment-posées)
+
+---
+
+## Premiers pas
+
+### 1. Démarrage du bot
+
+Le bot doit tourner sur votre machine pour répondre aux commandes. Sous Windows,
+il suffit de double-cliquer sur `Start bot.vbs`, à la racine du projet.
+
+Pour ne plus avoir à ouvrir ce dossier, créez-vous un raccourci une fois pour
+toutes : double-cliquez sur `Create shortcut.vbs` à la racine du projet,
+choisissez l'emplacement voulu dans l'assistant, et le raccourci s'y installe.
+Un double-clic dessus démarre ensuite le bot et ouvre le tableau de bord.
+
+Le bot démarre **en tâche de fond** : aucune fenêtre de terminal ne s'ouvre et
+rien n'apparaît dans la barre des tâches. Une petite fenêtre vous montre où en
+est le lancement, coche les étapes au fur et à mesure, puis disparaît toute
+seule dès que le bot est prêt — le tableau de bord s'ouvre juste après dans
+votre navigateur. Si quelque chose bloque, elle reste affichée et vous dit quoi
+faire : installer Node.js, renseigner votre jeton Discord dans `.env`, ou
+consulter les journaux. Le premier lancement est plus long que les suivants :
+il installe les dépendances.
+
+**Pour arrêter le bot**, utilisez le bouton d'extinction du tableau de bord :
+c'est lui qui remplace la fermeture de la console. Le bouton de redémarrage y
+est également disponible.
+
+Si le bot tourne déjà lorsque vous le relancez, la petite fenêtre vous le dit
+au lieu d'en démarrer un second, et vous propose sur place d'ouvrir le tableau
+de bord, de redémarrer ou d'éteindre. L'ouverture du tableau de bord vérifie
+d'abord qu'un onglet n'y est pas déjà connecté, pour ne pas en empiler un de
+plus ; l'extinction, elle, demande confirmation.
+
+En ligne de commande, l'équivalent du démarrage est `npm start` depuis le
+dossier du projet — avec, cette fois, une console et ses journaux en direct.
+
+### 2. Connexion à un salon vocal
+
+Avant de solliciter le bot, connectez-vous à l'un des salons vocaux de votre
+serveur Discord. Le bot requiert votre présence dans un salon vocal pour pouvoir
+s'y connecter et y diffuser des flux audio.
+
+### 3. Lancement d'une piste audio
+
+Saisissez la commande slash suivante dans n'importe quel salon textuel autorisé :
+
+```
+/play query:nom du morceau ou URL
+```
+
+Le bot effectue alors les opérations suivantes :
+
+1. Connexion automatique à votre salon vocal actuel.
+2. Recherche et récupération des métadonnées du morceau.
+3. Initialisation de la lecture audio.
+4. Envoi d'un encadré récapitulatif contenant le titre, l'auteur, la durée et la
+   miniature du morceau.
+
+---
+
+## Accès au tableau de bord
+
+Le tableau de bord est protégé par un **jeton d'accès**. Sans lui, la page
+affiche « Accès refusé ».
+
+### Récupérer le jeton
+
+Il est créé au premier démarrage et vous est proposé de trois façons :
+
+- le bot **ouvre automatiquement votre navigateur** sur la bonne adresse, jeton
+  compris, cinq secondes après le démarrage ;
+- l'adresse complète est affichée dans la console au démarrage, si le bot a été
+  lancé depuis un terminal — le raccourci, lui, démarre sans console ;
+- le jeton est enregistré dans le fichier `data/dashboard-token`.
+
+Une fois la page ouverte avec le jeton, celui-ci est mémorisé dans un cookie :
+les visites suivantes ne nécessitent plus rien. L'adresse est ensuite nettoyée
+automatiquement pour que le jeton n'apparaisse pas dans la barre d'adresse.
+
+Pour ouvrir manuellement le tableau de bord :
+
+```
+http://localhost:3000/?token=VOTRE_JETON
+```
+
+### Accéder depuis un autre appareil
+
+Par défaut, le tableau de bord n'est accessible **que depuis la machine qui
+héberge le bot**. Pour le consulter depuis un téléphone ou un autre ordinateur du
+réseau local, ajoutez cette ligne au fichier `.env`, puis redémarrez :
+
+```
+HOST=0.0.0.0
+```
+
+Le jeton d'accès protège alors l'accès depuis le réseau. Ne rendez pas le
+tableau de bord accessible depuis Internet sans protection supplémentaire.
+
+### Lire des fichiers stockés ailleurs
+
+Le bot ne diffuse au navigateur que les fichiers situés dans ses propres
+dossiers. Pour écouter une bibliothèque personnelle, déclarez ses dossiers dans
+`.env` :
+
+```
+MEDIA_ROOTS=D:\Musique;E:\Films
+```
+
+Sans cette déclaration, la lecture depuis Discord fonctionne, mais le lecteur du
+navigateur affichera une erreur pour ces fichiers.
+
+---
+
+## Référence complète des commandes Discord
+
+### Lecture et listes de lecture
+
+#### `/play`
+
+Recherche une piste ou lit un fichier spécifique.
+
+- **Recherche textuelle** : `/play query:nom de l'artiste ou du morceau`
+  (recherche par défaut sur YouTube).
+- **Lien direct** : `/play query:https://www.youtube.com/watch?v=...`
+- **Fichier local** : `/play query:C:\musiques\titre.mp3` (chemin absolu sur la
+  machine hébergeant le bot).
+
+Plateformes prises en charge : **YouTube**, **Spotify**, **SoundCloud** et
+**Apple Music**. Pour Spotify et Apple Music, le bot récupère les métadonnées et
+lit l'équivalent audio depuis YouTube.
+
+> Deezer et Qobuz ne sont pas pris en charge, malgré la présence de variables
+> correspondantes dans le fichier de configuration.
+
+#### `/playlist`
+
+Charge en file d'attente l'intégralité des fichiers audio d'un répertoire local.
+
+- Commande standard : `/playlist path:C:\musiques\mon_album`
+- Lecture aléatoire : `/playlist path:C:\musiques\mon_album shuffle:true`
+
+Formats reconnus : MP3, FLAC, WAV, OGG, M4A, OPUS, AAC, WMA.
+
+---
+
+### Contrôle de la lecture
+
+| Commande | Action |
+|---|---|
+| `/pause` | Met en pause la lecture en cours. |
+| `/resume` | Relance la lecture de la piste suspendue. |
+| `/skip` | Passe à la piste suivante de la file d'attente. |
+| `/stop` | Arrête la musique et vide la file d'attente. |
+| `/nowplaying` | Affiche le morceau en cours avec une barre de progression. |
+
+---
+
+### File d'attente
+
+#### `/queue`
+
+Consulte les pistes programmées. La liste est paginée par groupes de dix.
+
+- Première page : `/queue`
+- Page précise : `/queue page:2`
+
+Ajouter une piste via `/play` pendant une lecture l'insère en fin de file.
+
+---
+
+### Volume sonore
+
+#### `/volume`
+
+Règle le niveau sonore général (0 à 100).
+
+```
+/volume level:60
+```
+
+Cette valeur sert de **référence**. Le ducking calcule l'atténuation en
+appliquant un pourcentage sur cette base : avec un volume de 70 et un niveau de
+ducking de 20 %, la musique descend à 14 pendant les prises de parole.
+
+---
+
+### Ducking — atténuation automatique
+
+Le ducking est le cœur fonctionnel du bot : il diminue temporairement le volume
+de la musique lorsque des utilisateurs parlent, puis le restaure après un temps
+de silence.
+
+| Commande | Effet |
+|---|---|
+| `/ducking status` | Affiche l'état et l'ensemble des paramètres du serveur. |
+| `/ducking toggle` | Active ou désactive l'atténuation automatique. |
+| `/ducking level percent:<0-100>` | Pourcentage du volume conservé pendant la parole. |
+| `/ducking delay ms:<n>` | Délai de silence avant restauration. |
+| `/ducking fade ms:<n>` | Durée de la transition entre les deux volumes. |
+
+**Choisir un niveau** — `15` pour une baisse forte, `50` pour une atténuation de
+moitié, `0` pour une coupure complète pendant les prises de parole.
+
+**Choisir un délai** — `400` ms pour un retour réactif, `800` ms en standard,
+`1500` ms pour un rétablissement progressif. Un délai suffisant évite l'effet de
+pompage lors des courtes pauses de respiration au milieu d'une phrase.
+
+**Choisir un fondu** — `100` ms pour une transition franche, `200` ms en
+standard, `500` ms pour un effet très doux.
+
+---
+
+### Diffusion et salons privés
+
+La commande `/broadcast`, **réservée aux administrateurs**, modifie le canal de
+destination :
+
+- **Mode public (`everyone`)** — la musique est diffusée dans le salon vocal
+  commun. Tout le monde écoute le même flux et le ducking s'applique.
+- **Mode privé (`personal`)** — la musique est diffusée **dans votre
+  navigateur**, par le lecteur du tableau de bord. Le bot reste présent dans le
+  salon vocal sans y émettre de son. Le bot sait également créer un salon vocal
+  privé temporaire, nommé `🎵 <votre nom>`, supprimé automatiquement à votre
+  déconnexion.
+
+---
+
+## Utilisation du tableau de bord web
+
+### Contrôles généraux
+
+- **Contrôle média** — les boutons centraux suspendent, relancent ou arrêtent la
+  lecture. Le bouton « suivant » dispose d'un verrouillage de deux secondes
+  contre le clic répété. Un sélecteur à trois positions permet de choisir :
+  - *Normal* — lecture séquentielle de la file d'attente ;
+  - *Recommencer l'historique* — replace les morceaux déjà lus dans la file et
+    vide l'historique ;
+  - *Boucle* — répète indéfiniment la piste courante.
+- **Déplacement dans la piste** — cliquez ou faites glisser le curseur de la
+  barre de progression.
+- **Sélecteur de salon vocal** — bascule instantanément le bot d'un salon à un
+  autre. Chaque salon conserve sa propre file d'attente et son historique.
+- **Salon favori** — un salon peut être marqué comme favori ; le tableau de bord
+  s'y positionne automatiquement à l'ouverture.
+
+### Activité vocale
+
+La section dédiée affiche les membres connectés au salon sélectionné. Lorsqu'un
+membre parle, son profil s'illumine en temps réel. Vous pouvez **exclure un
+membre de la détection** : sa voix n'atténuera plus la musique, ce qui est utile
+pour un micro bruyant ou une source audio permanente.
+
+### Playlists
+
+Le tableau de bord gère des playlists **communes à tous vos serveurs**,
+organisées en onglets. Vous pouvez les créer, les renommer, les réordonner et
+les supprimer, y ajouter des pistes par glisser-déposer, et définir une playlist
+comme source de lecture active à la place de la file d'attente.
+
+### File d'attente et historique
+
+- **Glisser-déposer** — réorganisez l'ordre de passage en faisant glisser les
+  pistes. Vous pouvez aussi faire glisser une piste depuis l'historique, depuis
+  une playlist ou depuis la vignette de lecture en cours.
+- **Lecture immédiate** — l'icône de lecture de chaque élément joue le titre
+  sur-le-champ, sans nouvelle requête réseau.
+- **Suppression et nettoyage** — retirez un élément précis ou videz
+  intégralement la file ou l'historique.
+
+### Import de fichiers
+
+Déposez un fichier audio ou vidéo sur l'interface pour l'ajouter à la file, à
+une playlist, ou le lire immédiatement. Le bot **détecte les doublons** : un
+fichier déjà importé n'est pas stocké une seconde fois.
+
+La taille maximale est de 1 Go par défaut, ajustable par `MAX_UPLOAD_MB`.
+
+**Qualité d'import** — deux menus, sous le champ d'ajout, fixent la qualité des
+médias récupérés depuis une source distante :
+
+- **Audio** : débit du fichier mis en cache (320 à 96 kbps) ;
+- **Vidéo** : définition du flux vidéo affiché (2160p à 360p).
+
+Ces réglages ne s'appliquent **pas aux fichiers locaux**, importés tels quels
+sans réencodage. Lorsque vous saisissez un chemin local dans le champ d'ajout,
+les deux menus se grisent pour le signaler.
+
+### Téléchargement
+
+Chaque piste peut être téléchargée dans une trentaine de formats et qualités :
+MP3, M4A, FLAC, WAV, OGG, OPUS, WEBM, ainsi que MP4 pour la vidéo. La conversion
+est effectuée à la volée.
+
+### Vidéo
+
+Lorsqu'une piste possède une vidéo associée, le tableau de bord peut l'afficher
+en fond. Les fichiers audio locaux bénéficient d'un visualiseur graphique.
+
+### Vitesse et enchaînement
+
+- **Vitesse de lecture** — réglable de 0,20× à 3,05×, par pas de 0,01.
+- **Enchaînement type DJ** — fondu automatique entre deux pistes, avec deux
+  variantes : fondu de volume seul, ou fondu accompagné d'un effet de filtre.
+- **Fondus d'entrée et de sortie** — activables séparément, avec durée réglable.
+
+### Préchargement
+
+Les pistes à venir sont téléchargées à l'avance en arrière-plan. Un indicateur
+de progression apparaît sur chaque piste. Cela rend le démarrage instantané et
+la lecture résistante aux coupures réseau. Le nombre de pistes préchargées est
+réglable pour la file, l'historique et les playlists.
+
+### Journaux et statistiques
+
+Un terminal intégré affiche les journaux du bot en temps réel, filtrables par
+niveau (info, avertissement, erreur, succès, débogage). Un panneau latéral
+présente la consommation mémoire, le temps de fonctionnement et l'activité
+réseau.
+
+**Copier des lignes de journal**
+
+| Geste | Effet |
+|---|---|
+| Survol d'une ligne | Fait apparaître un bouton de copie à sa droite |
+| Clic sur une ligne | La sélectionne |
+| **Maj + clic** sur une autre | Sélectionne toute la plage entre les deux |
+| **Ctrl + clic** (Cmd sur Mac) | Ajoute ou retire une ligne isolée |
+| **Ctrl + C** | Copie la sélection |
+| **Échap** | Annule la sélection |
+
+Dès qu'une ligne est sélectionnée, une barre apparaît en bas de la fenêtre avec
+le nombre de lignes et un bouton **Copier**. Le bouton en haut de la fenêtre
+copie d'un coup **toutes les lignes affichées**, filtres actifs compris — un
+niveau masqué n'est jamais copié.
+
+La sélection de texte à la souris reste disponible : un glissement qui
+sélectionne du texte n'est pas interprété comme un clic de sélection.
+
+### Maintenance
+
+Le menu d'alimentation permet de **redémarrer** ou d'**éteindre** le bot depuis
+l'interface. L'extinction applique un fondu de sortie et sauvegarde l'état de
+lecture, qui sera restauré au démarrage suivant.
+
+### Personnalisation visuelle
+
+- **Styles** — *Glassmorphism* (panneaux translucides), *Neon Cyberpunk*
+  (bordures néon), *Minimalist* (aplats sobres), *Retro Synthwave* (dégradés
+  chauds).
+- **Mode clair / sombre** — l'ensemble des styles s'adapte.
+- **Langues** — français, anglais, espagnol, allemand.
+- **Disposition** — la disposition des panneaux peut être réorganisée et
+  enregistrée.
+
+Ces préférences sont conservées dans votre navigateur.
+
+---
+
+## Scénarios d'utilisation types
+
+### Jeu en ligne coopératif
+
+Volume modéré pour ne pas masquer les signaux du jeu, ducking réactif :
+
+```
+/volume level:50
+/ducking level percent:20
+/ducking delay ms:500
+/ducking fade ms:150
+```
+
+### Session de travail ou de révision
+
+Musique d'ambiance très discrète, s'estompant presque intégralement lors des
+échanges :
+
+```
+/volume level:30
+/ducking level percent:5
+/ducking delay ms:2000
+/ducking fade ms:500
+```
+
+### Écoute musicale dédiée
+
+Priorité au signal musical, avec une atténuation légère pour que les
+interventions restent audibles :
+
+```
+/volume level:85
+/ducking level percent:70
+/ducking delay ms:300
+/ducking fade ms:100
+```
+
+---
+
+## Questions fréquemment posées
+
+**Le bot prend-il en charge les liens Spotify ?**
+Oui. Le bot extrait les métadonnées de la piste et recherche automatiquement
+l'équivalent audio sur YouTube. Renseigner `SPOTIFY_CLIENT_ID` et
+`SPOTIFY_CLIENT_SECRET` améliore la fiabilité de la résolution.
+
+**Pourquoi le volume met-il du temps à remonter après une phrase ?**
+C'est le délai de restauration. Il empêche le volume de remonter pendant les
+courtes pauses au milieu d'une phrase. Abaissez-le avec
+`/ducking delay ms:200` ou depuis le tableau de bord.
+
+**Le ducking s'applique-t-il aussi à ma propre voix ?**
+Oui, à tous les participants non-bots du salon. Vous pouvez toutefois exclure
+un membre précis de la détection depuis le tableau de bord.
+
+**Puis-je écouter de la musique seul sans déranger le serveur ?**
+Oui, en mode `personal` : la musique est diffusée dans votre navigateur et non
+dans le salon vocal. Le bot peut également créer un salon vocal privé
+temporaire.
+
+**Les réglages sont-ils conservés après un redémarrage ?**
+Oui. Volume, ducking, mode de diffusion et playlists sont enregistrés dans des
+fichiers JSON locaux (`data/settings.json`). L'état de lecture est également
+restauré : le bot reprend la piste interrompue à sa position exacte. Les
+préférences visuelles du tableau de bord sont conservées dans votre navigateur.
+
+**J'ai perdu le jeton du tableau de bord.**
+Il figure dans `data/dashboard-token` et dans la console au démarrage. Vous
+pouvez aussi en imposer un de votre choix par la variable `DASHBOARD_TOKEN` du
+fichier `.env`.
+
+**Le lecteur du navigateur affiche une erreur sur mes fichiers locaux.**
+Le bot ne diffuse que les fichiers situés dans ses dossiers ou dans les
+répertoires déclarés par `MEDIA_ROOTS`. Voir
+[Lire des fichiers stockés ailleurs](#lire-des-fichiers-stockés-ailleurs).
+
+**Le dossier `data/` occupe beaucoup d'espace.**
+`data/cache` contient les pistes préchargées. Il se purge selon la pertinence
+mais n'a pas de plafond de taille : vous pouvez le vider sans risque, bot
+arrêté. `data/uploads` contient vos imports — les supprimer rendra les playlists
+qui les référencent inopérantes.

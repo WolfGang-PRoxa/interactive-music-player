@@ -1,0 +1,571 @@
+/*
+ * device.css — Mises en page tablette et téléphone, et retour visuel du
+ * glisser-déposer au doigt.
+ *
+ * Toutes les règles sont cantonnées sous `[data-device-mode]` ou
+ * `[data-touch-mode]`, posés sur `<html>` par js/deviceMode.js. Le mode
+ * ordinateur ne peut donc pas être affecté par ce fichier : c'est ce qui rend
+ * l'ajout sûr sur une interface déjà en place.
+ *
+ * Le repli en une colonne double volontairement la media query de layout.css.
+ * Celle-ci suit la largeur de la fenêtre ; ces règles-ci suivent le mode. Sans
+ * elles, forcer « téléphone » depuis les paramètres sur un grand écran
+ * changerait les interactions sans changer la mise en page.
+ */
+
+/* --- Aperçu de l'élément déplacé --------------------------------------- */
+
+/*
+ * Commun aux deux modes : au doigt il suit le contact, à la souris il sert de
+ * vignette à `setDragImage`. Voir js/dragPreview.js.
+ *
+ * L'élément resté en place est estompé par `.is-dragging` ; l'aperçu, lui,
+ * montre ce qui sera déposé, et doit donc rester net.
+ */
+.drag-preview {
+    transform-origin: top left;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    border-radius: 12px;
+    overflow: hidden;
+    will-change: transform;
+    /* L'aperçu doit coller au pointeur, pas le poursuivre. */
+    transition: none !important;
+    animation: none !important;
+    /* Un fond opaque garantit la lisibilité : plusieurs cartes du tableau de
+       bord sont translucides et laisseraient voir au travers. */
+    background-color: var(--bg-card, rgba(30, 32, 44, 0.98));
+    backdrop-filter: none !important;
+}
+
+/* Au doigt seulement : un léger agrandissement signale que l'élément a bien
+   été saisi. À la souris, la vignette est photographiée une fois pour toutes,
+   une mise à l'échelle n'y apporterait rien. */
+body.touch-dragging .drag-preview {
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+    outline: 2px solid var(--c-primary, #5865f2);
+    outline-offset: -2px;
+}
+
+.touch-drag-source {
+    opacity: 0.35;
+    filter: grayscale(0.4);
+}
+
+/*
+ * Pendant la saisie uniquement. Neutraliser la sélection et les gestes en
+ * permanence casserait le défilement de toutes les listes.
+ */
+body.touch-dragging {
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+    overscroll-behavior: contain;
+}
+
+body.touch-dragging * {
+    cursor: grabbing !important;
+}
+
+/* --- Modes tactiles, tablette et téléphone confondus -------------------- */
+
+/*
+ * Cible d'au moins 44 px : en deçà, la pulpe du doigt couvre plusieurs
+ * commandes à la fois et l'appui devient un pari.
+ */
+[data-touch-mode="true"] button:not(.card-resize-handle),
+[data-touch-mode="true"] .maint-btn,
+[data-touch-mode="true"] .switch,
+[data-touch-mode="true"] select,
+[data-touch-mode="true"] .styled-select,
+/*
+ * Les deux dernières commandes de l'en-tête — GitHub et le don — sont des
+ * liens, pas des boutons : elles ouvrent un site, et `<a>` est la bonne balise
+ * pour ça. Sélectionner sur `button` les laissait donc de côté, alors qu'au
+ * doigt un lien se vise exactement comme un bouton.
+ *
+ * Le résultat était visible : GitHub, qui recevait bien la largeur minimale
+ * par sa classe, prenait 44 px de large pour 38 de haut — un rectangle au
+ * milieu de carrés — et le bouton de don, absent des deux règles, restait à
+ * 38 × 38, plus petit que tous ses voisins. Les deux se rangent maintenant
+ * par leur classe, qui décrit leur rôle et non leur balise.
+ */
+[data-touch-mode="true"] .theme-toggle-btn,
+[data-touch-mode="true"] .btn-coffee-donate {
+    min-height: 44px;
+}
+
+/*
+ * La même cible, sur l'autre axe.
+ *
+ * La règle ci-dessus n'imposait qu'une hauteur, et ce déséquilibre se payait
+ * partout : le « + » des playlists, rond de 30 px, devenait un ovale de 30 × 44 ;
+ * les corbeilles des files et des playlists, les boutons de la doc technique et
+ * ceux des réglages s'étiraient de la même façon. Une cible haute et étroite
+ * n'est pas plus facile à viser qu'une cible petite — la pulpe du doigt est
+ * ronde.
+ *
+ * La largeur minimale règle du même coup l'écrasement dont ces boutons
+ * souffraient dans les rangées serrées. `min-width` est un plancher que la
+ * répartition flex ne peut pas franchir : elle continue de comprimer ce qui
+ * l'entoure, mais s'arrête à 44 px sur le bouton. Il n'y a donc rien à figer
+ * avec `flex-shrink`, qui aurait fait déborder les boutons larges au lieu de
+ * les laisser se réduire jusqu'à cette limite.
+ *
+ * Les deux entrées par classe couvrent GitHub et le don, qui sont des liens et
+ * qu'aucun sélecteur sur `button` n'atteint.
+ */
+[data-touch-mode="true"] button:not(.card-resize-handle),
+[data-touch-mode="true"] .theme-toggle-btn,
+[data-touch-mode="true"] .btn-coffee-donate {
+    min-width: 44px;
+}
+
+/*
+ * Exception du switch, qui ne peut pas grandir d'un bloc.
+ *
+ * Son rail — `.switch-slider` — remplit l'étiquette en absolu (`top` et
+ * `bottom` à 0) : la hauteur imposée juste au-dessus lui est donc transmise.
+ * À 44 px de haut pour 44 px de large, un rail arrondi à 34 px n'est plus un
+ * ovale mais un disque, et le curseur, calé sur `bottom`, tombe au ras du bord
+ * inférieur. Le switch prenait ainsi l'apparence d'un bouton rond sur
+ * téléphone et sur tablette, alors qu'il reste ovale sur ordinateur.
+ *
+ * L'étiquette garde ses 44 px : c'est elle qui reçoit l'appui, et la cible ne
+ * doit rien perdre. Seul le rail retrouve sa hauteur d'origine et se centre
+ * dedans ; le curseur, positionné par rapport au rail, suit sans autre réglage.
+ *
+ * La hauteur passe par une variable pour que `.switch-mini`, qui a son propre
+ * gabarit, la redéfinisse par héritage plutôt que par une cascade à départager.
+ */
+[data-touch-mode="true"] .switch {
+    --switch-rail-height: 24px;
+}
+
+[data-touch-mode="true"] .switch-mini {
+    --switch-rail-height: 18px;
+}
+
+[data-touch-mode="true"] .switch > .switch-slider,
+[data-touch-mode="true"] .switch > .slider {
+    top: 50%;
+    bottom: auto;
+    height: var(--switch-rail-height);
+    transform: translateY(-50%);
+}
+
+/* Les infobulles au survol n'ont pas de sens sans souris : elles restent
+   collées après l'appui et masquent ce qu'on vient de toucher. */
+[data-touch-mode="true"] .tooltip-container,
+[data-touch-mode="true"] #tooltip-layer {
+    display: none !important;
+}
+
+/* Poignée de redimensionnement des cartes : sans pointeur fin, elle ne sert
+   qu'à déclencher des saisies involontaires. */
+[data-touch-mode="true"] .card-resize-handle {
+    display: none !important;
+}
+
+/* Indice de saisie sur les éléments déplaçables : rien ne signale autrement
+   qu'un appui long les prend. */
+[data-touch-mode="true"] [draggable="true"] {
+    -webkit-touch-callout: none;
+}
+
+/* --- Budget de composition ---------------------------------------------- */
+
+/*
+ * Chaque ligne de file, d'historique et de playlist porte trois barres
+ * superposées — préchargement, progression, requalification — et chacune
+ * déclare `will-change: transform`. Le navigateur promeut donc trois calques
+ * de composition par ligne : soixante pour une liste de vingt titres.
+ *
+ * Sur mobile, ce budget est vite épuisé, et Firefox cesse alors simplement de
+ * peindre : les lignes gardent le fond et la bordure de leur conteneur, mais
+ * perdent numéro, vignette, titre et boutons. La pénurie déborde même sur des
+ * éléments sans rapport — le texte des menus déroulants disparaissait aussi.
+ *
+ * `will-change` n'est qu'une indication d'optimisation : la retirer ne change
+ * rien au rendu ni aux animations, seulement à ce que le navigateur prépare
+ * d'avance. La documentation déconseille d'ailleurs explicitement de la poser
+ * sur des éléments répétés, ce qui est exactement le cas ici.
+ *
+ * L'indication est conservée sur ordinateur, où elle sert sans nuire.
+ */
+[data-touch-mode="true"] .preload-fill-bar,
+[data-touch-mode="true"] .playback-fill-bar,
+[data-touch-mode="true"] .requalify-fill-bar,
+/* Les reflets animés de ces mêmes barres la déclarent aussi. */
+[data-touch-mode="true"] .is-preloading .preload-fill-bar::after,
+[data-touch-mode="true"] .is-playing-now .playback-fill-bar::after,
+[data-touch-mode="true"] .is-requalifying .requalify-fill-bar::after {
+    will-change: auto;
+}
+
+/*
+ * Même pénurie pour les menus déroulants, par un autre chemin.
+ *
+ * `.custom-select-trigger` porte son propre `backdrop-filter`, et la page en
+ * compte onze — choix du serveur, du salon, du style, de la langue, du mode
+ * d'affichage, des qualités d'import, du format de téléchargement… Ce sont
+ * onze calques de verre permanents, là où les barres de liste ne coûtent que
+ * le temps d'une liste affichée. Le texte du choix sélectionné n'était alors
+ * plus peint sous une certaine limite.
+ *
+ * Le flou est remplacé par un fond opaque plutôt que simplement retiré : le
+ * déclencheur ne doit sa visibilité qu'à lui — `--bg-select` vaut
+ * rgba(255,255,255,0.03) sur le thème par défaut, soit presque rien.
+ * `--bg-dropdown` est opaque sur les huit thèmes et sert déjà de fond au
+ * panneau déroulé : le déclencheur et sa liste s'accordent donc naturellement.
+ *
+ * Le panneau ouvert perd aussi son flou, son fond étant déjà opaque.
+ */
+[data-touch-mode="true"] .custom-select-trigger,
+[data-touch-mode="true"] .custom-select-trigger:hover {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--bg-dropdown, rgba(10, 9, 15, 0.96));
+}
+
+[data-touch-mode="true"] .custom-select-options {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+/* --- Plus de défilement dans le défilement ----------------------------- */
+
+/*
+ * Sur mobile, le contenu de ces listes cessait d'être peint à partir d'une
+ * limite horizontale nette : les lignes gardaient leur fond et leur bordure,
+ * mais numéro, vignette, titre et boutons manquaient. La limite tombait à une
+ * position d'écran, pas à une frontière d'élément, et se révélait quand la
+ * barre du navigateur se rétractait.
+ *
+ * Le point commun des zones touchées — file d'attente, historique, pistes de
+ * playlist, onglets — n'est pas d'être déplaçables, c'est d'avoir leur propre
+ * défilement. Firefox mobile les peint dans des calques séparés, bornés à la
+ * hauteur de fenêtre connue avant la rétractation ; la bande révélée n'y est
+ * jamais peinte, alors que le calque principal, lui, l'est.
+ *
+ * Supprimer le défilement interne fait rentrer ces listes dans le flux normal
+ * de la page, donc dans le calque principal. C'est aussi la bonne pratique au
+ * doigt : deux défilements imbriqués obligent l'utilisateur à viser, et l'un
+ * des deux part toujours de travers.
+ *
+ * En contrepartie, une playlist très fournie allonge d'autant sa carte. C'est
+ * le comportement attendu sur téléphone, où l'on fait défiler la page entière.
+ */
+[data-touch-mode="true"] .playlist-queue,
+[data-touch-mode="true"] .playlist-history,
+[data-touch-mode="true"] .playlist-tracks-list,
+[data-touch-mode="true"] .speakers-list {
+    max-height: none;
+    /* Les deux axes ensemble : `overflow-y: visible` avec un `overflow-x`
+       différent de `visible` est ramené à `auto` par le navigateur, et le
+       calque de défilement subsisterait. */
+    overflow-x: visible;
+    overflow-y: visible;
+}
+
+/*
+ * La bande d'onglets de playlists fait exception et garde son défilement.
+ *
+ * Elle passait ici à la ligne, pour éviter d'imposer un balayage latéral. À
+ * l'usage c'est le contraire qui s'est vérifié : cinq playlists occupaient deux
+ * étages et repoussaient d'autant le contenu de la carte, alors qu'un balayage
+ * horizontal est un geste naturel sur une rangée d'onglets — c'est celui de
+ * toutes les applications qui en affichent.
+ *
+ * Le risque de peinture décrit plus haut ne se transpose pas : il concernait
+ * des listes hautes, bornées à la hauteur de fenêtre connue avant rétractation
+ * de la barre du navigateur. Cette bande-ci ne fait qu'une ligne de haut et ne
+ * défile que sur l'axe horizontal.
+ *
+ * Le défilement lui-même vient de queue.css et vaut pour tous les supports ;
+ * il n'y a donc rien à rétablir ici, seulement à ne plus le neutraliser. Les
+ * repères de bord et le défilement à la molette sont dans
+ * js/playlistTabsScroll.js.
+ */
+
+/* --- Repli en une colonne, piloté par le mode -------------------------- */
+
+[data-device-mode="tablet"] .dashboard-grid,
+[data-device-mode="phone"] .dashboard-grid {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+}
+
+[data-device-mode="tablet"] .card,
+[data-device-mode="phone"] .card {
+    grid-column: 1 / -1 !important;
+    grid-row: auto !important;
+    width: 100% !important;
+    height: auto !important;
+}
+
+/* --- Téléphone --------------------------------------------------------- */
+
+[data-device-mode="phone"] .dashboard-grid {
+    gap: 12px;
+}
+
+/*
+ * Gouttières resserrées.
+ *
+ * Les 1,5 rem de `.app-container` sont une marge d'écran large : sur un
+ * téléphone tenu debout, elles prennent 48 px des 390 disponibles, soit un
+ * huitième de la largeur, pour n'entourer qu'une seule colonne de cartes.
+ * 1 rem suffit à détacher les cartes du bord sans manger la place du contenu.
+ *
+ * Le plancher de sécurité reste indispensable et prime toujours : couché, le
+ * même téléphone réclame une cinquantaine de pixels de ce côté-là, faute de
+ * quoi le bord des cartes disparaît sous la découpe. `max()` choisit donc le
+ * plus contraignant des deux, et cette règle ne change rien en paysage.
+ */
+[data-device-mode="phone"] .app-container {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+}
+
+/*
+ * Écarts resserrés dans les commandes de lecture, pour que le repli en deux
+ * étages tombe juste.
+ *
+ * Les quatre boutons de transport pèsent 215 px à eux seuls ; avec les 1,5 rem
+ * de player.css, leur étage en réclame 287. Un téléphone étroit — 375 px de
+ * large, soit 285 px dans la carte — n'en offre pas tout à fait autant, et le
+ * bouton « suivant » basculait seul sur un troisième étage.
+ *
+ * À 1 rem, l'étage revient à 263 px et les quatre boutons tiennent ensemble
+ * partout. L'écart vertical reste au-dessus des ~10 px dont déborde
+ * l'étiquette du pad de vitesse.
+ */
+[data-device-mode="phone"] .media-controls {
+    gap: 1rem;
+}
+
+/*
+ * « Ajouter » sur toute la largeur de son étage.
+ *
+ * Sur téléphone, le repli de `.search-box` est acquis d'avance : le bouton
+ * n'aura jamais sa place sur la ligne du champ. Autant le lui demander
+ * franchement plutôt que de laisser le calcul de largeur en décider, et lui
+ * donner la largeur entière tant qu'à occuper une ligne — c'est l'action
+ * principale de la carte, et une cible pleine largeur se vise sans regarder.
+ */
+[data-device-mode="phone"] .search-box .primary-btn {
+    flex: 1 1 100%;
+    justify-content: center;
+}
+
+[data-device-mode="phone"] .header-select,
+[data-device-mode="phone"] .styled-select {
+    min-width: 0;
+    width: 100%;
+}
+
+/*
+ * En-tête : chaque groupe sur sa propre ligne.
+ *
+ * `.main-header` passe déjà à la ligne de lui-même — voir layout.css. Cela
+ * suffit à ce qu'il ne déborde plus, mais les deux menus déroulants restent
+ * alors à leur largeur de bureau, soit 240 px pour le salon, au milieu d'une
+ * ligne à moitié vide. Leur donner la ligne entière est ce qui rend la cible
+ * confortable au doigt : c'est la commande la plus utilisée de l'en-tête.
+ *
+ * `.style-selector-wrapper` est imbriqué dans `.theme-controls-wrapper`, qu'on
+ * autorise à se replier juste en dessous ; sans cela, la ligne entière que le
+ * menu réclame pousserait les boutons hors du cadre au lieu de les faire
+ * descendre.
+ */
+[data-device-mode="phone"] .guild-selector-wrapper,
+[data-device-mode="phone"] .style-selector-wrapper {
+    flex: 1 1 100%;
+    min-width: 0;
+}
+
+/*
+ * Les deux menus déroulants de l'en-tête sur un même axe vertical.
+ *
+ * Empilés l'un sous l'autre, « SALON : » et « STYLE : » trahissaient qu'ils
+ * viennent de deux groupes distincts, écrits à des moments différents : leurs
+ * libellés n'ont ni la même longueur — sept caractères contre six — ni le même
+ * écart avec leur menu, 0,8 rem pour l'un et 0,5 rem pour l'autre. Le second
+ * menu commençait donc une douzaine de pixels à gauche du premier, un décalage
+ * que rien ne justifie et que l'œil accroche d'autant plus qu'ils sont voisins.
+ *
+ * Une largeur minimale commune donne aux deux libellés la même colonne, et le
+ * même écart les sépare désormais de leur menu : les deux menus partent du même
+ * point et finissent au même. 4,75 rem couvre le plus long libellé des cinq
+ * langues, « CHANNEL : » ; au-delà, un libellé plus large s'accommoderait
+ * simplement de sa propre largeur, sans rien casser d'autre que l'alignement.
+ *
+ * `flex: 0 0 auto` empêche par ailleurs le libellé de se laisser comprimer par
+ * le menu, qui réclame toute la largeur disponible.
+ */
+[data-device-mode="phone"] .header-style-group {
+    flex: 1 1 100%;
+}
+
+[data-device-mode="phone"] .guild-selector-wrapper,
+[data-device-mode="phone"] .style-selector-wrapper {
+    gap: 0.8rem;
+}
+
+[data-device-mode="phone"] .guild-selector-wrapper > label,
+[data-device-mode="phone"] .style-selector-wrapper > label {
+    flex: 0 0 auto;
+    min-width: 4.75rem;
+    white-space: nowrap;
+}
+
+[data-touch-mode="true"] .theme-controls-wrapper {
+    flex-wrap: wrap;
+}
+
+/* Le titre est ce qui se comprime en premier faute de place ; réduit, il tient
+   sur une ligne et rend la sienne aux commandes. */
+[data-device-mode="phone"] .main-header h1 {
+    font-size: 1.4rem;
+}
+
+/* Les lignes de réglage passent en colonne : côte à côte, le libellé et sa
+   commande se disputent une largeur qui n'existe pas. */
+[data-device-mode="phone"] .setting-item-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+}
+
+/*
+ * Les rangées à curseur des réglages, qui débordaient de leur cadre.
+ *
+ * Chacune aligne un curseur, sa valeur et un bouton de remise au défaut dans un
+ * cadre arrondi. Rien n'y était prévu pour manquer de place : le curseur est le
+ * seul élément extensible, mais un `input[type="range"]` a une largeur minimale
+ * intrinsèque d'environ 130 px sous laquelle il refuse de descendre. Passé ce
+ * plancher, ce sont les autres qui sortaient — le bouton s'affichait à cheval
+ * sur la bordure du cadre, puis au-delà.
+ *
+ * Deux réponses complémentaires. Le passage à la ligne d'abord : si les trois
+ * ne tiennent pas, le bouton descend, ce qui reste lisible. `min-width: 0`
+ * ensuite, qui lève le plancher du curseur et lui permet de se réduire pour
+ * éviter ce report tant qu'il reste de quoi le manipuler.
+ */
+[data-device-mode="phone"] .scroll-input-wrapper {
+    flex-wrap: wrap;
+}
+
+[data-device-mode="phone"] .scroll-input-wrapper .scroll-range,
+[data-device-mode="phone"] .scroll-input-wrapper input[type="range"] {
+    flex: 1 1 120px;
+    min-width: 0;
+}
+
+/*
+ * Ce qui est une fenêtre sur ordinateur cesse d'en être une ici.
+ *
+ * Les paramètres et la doc technique se posent sur le tableau de bord comme des
+ * fenêtres : cadre arrondi, marge tout autour, arrière-plan qui transparaît.
+ * Cette mise en scène se paie en largeur, et sur un téléphone elle n'achète
+ * rien — la marge ne laisse rien voir d'utile derrière, et des coins arrondis
+ * ne dessinent une fenêtre que s'il y a quelque chose autour.
+ *
+ * Les deux prennent donc l'écran entier. Ce que la marge, les coins et la marge
+ * intérieure retenaient revient au contenu : une soixantaine de pixels de
+ * largeur pour les paramètres, où chaque rangée de réglage tient déjà à
+ * l'étroit — c'est elle qui faisait déborder les boutons de leur cadre.
+ *
+ * Les retraits de sécurité restent, eux : plein écran ne veut pas dire sous la
+ * découpe.
+ */
+[data-device-mode="phone"] .settings-modal-box {
+    /*
+     * `!important` n'est pas un choix de style : `.settings-modal-box` porte
+     * lui-même `width: 94% !important` et `padding: 2.2rem !important`. Sans
+     * cela, ces déclarations seraient ignorées quelle que soit leur spécificité,
+     * et la boîte resterait une fenêtre de 94 % centrée.
+     */
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 1.1rem !important;
+    padding-top: max(1.1rem, env(safe-area-inset-top)) !important;
+    padding-right: max(1.1rem, env(safe-area-inset-right)) !important;
+    padding-bottom: max(1.1rem, env(safe-area-inset-bottom)) !important;
+    padding-left: max(1.1rem, env(safe-area-inset-left)) !important;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+
+/* La boîte a désormais une hauteur imposée et non plus un simple plafond :
+   c'est au corps de la remplir et de défiler seul, sinon il la déborderait. */
+[data-device-mode="phone"] .settings-modal-body {
+    flex: 1;
+    min-height: 0;
+}
+
+/*
+ * Les menus déroulants des réglages, qui sortaient de la page.
+ *
+ * Ils portent deux largeurs minimales fixes, écrites pour un écran large :
+ * 280 px pour tout menu d'en-tête, et 500 px pour ceux des rangées de réglage.
+ * Cette seconde valeur dépasse à elle seule la largeur d'un téléphone tenu
+ * debout — 402 px de fenêtre, dont environ 370 utiles dans la boîte. Le menu
+ * débordait donc de 130 px, et comme le corps de la boîte défile déjà
+ * verticalement, le débordement horizontal le rendait défilable des deux côtés :
+ * la page glissait latéralement, et les libellés se retrouvaient tronqués à
+ * gauche pendant que les menus dépassaient à droite.
+ *
+ * Une largeur minimale n'a de sens que là où il y a une largeur à défendre.
+ * Ici, il n'y en a qu'une : celle de l'écran. Les menus la prennent toute.
+ *
+ * Le menu de l'en-tête de page est visé lui aussi : ses 280 px passaient de
+ * justesse à 402 px de large, mais un téléphone plus étroit les aurait vus
+ * déborder de la même façon.
+ */
+[data-device-mode="phone"] .header-select-container,
+[data-device-mode="phone"] .setting-item-row .header-select-container {
+    min-width: 0;
+    width: 100%;
+}
+
+/* Le palier « petit écran » de docs.css ajuste l'intérieur de la fenêtre ; sa
+   mise à plein écran est ici, pour valoir aussi en position couchée, où le
+   téléphone dépasse la largeur de ce palier. */
+[data-device-mode="phone"] .docs-window {
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+
+/* La fenêtre vidéo flottante n'a nulle part où flotter sur un téléphone. */
+[data-device-mode="phone"] #video-window {
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    transform: none !important;
+}
+
+/* --- Tablette ---------------------------------------------------------- */
+
+[data-device-mode="tablet"] .dashboard-grid {
+    gap: 14px;
+}
+
+/*
+ * Le tiroir occupe une part fixe de l'écran au bureau. Sur tablette en
+ * portrait, cette part le rend inutilisable.
+ */
+[data-device-mode="tablet"] .drawer-panel,
+[data-device-mode="phone"] .drawer-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+}

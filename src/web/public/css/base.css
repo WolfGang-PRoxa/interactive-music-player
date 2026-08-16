@@ -1,0 +1,299 @@
+/* Style System — Tableau de bord premium glassmorphic pour bot musique */
+
+:root {
+    /* Default Dark Glassmorphism */
+    --bg-main: #0a090f;
+    --bg-card: rgba(255, 255, 255, 0.03);
+    --border-card: rgba(255, 255, 255, 0.06);
+    --border-card-hover: rgba(255, 255, 255, 0.12);
+    
+    --c-primary: #5865F2; /* Blurple Discord */
+    --c-accent: #EB459E;  /* Neon pink */
+    --c-violet: #8e44ad;  /* Glow violet */
+    --c-success: #57F287; /* Green status */
+    --c-error: #ED4245;   /* Red alert */
+    
+    --text-main: #f5f4f8;
+    --text-muted: #8c899d;
+    --text-dark: #1e1b29;
+    
+    --font-primary: 'Outfit', sans-serif;
+    --blur-val: 16px;
+
+    --decor-opacity: 0.25;
+    --bg-dropdown: rgba(10, 9, 15, 0.96);
+    --bg-select: rgba(255, 255, 255, 0.03);
+    --bg-hover: rgba(255, 255, 255, 0.06);
+    --shadow-card: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+/* Light Glassmorphism */
+html[data-theme="light"][data-style="glassmorphism"] {
+    --bg-main: #f0edf6;
+    --bg-card: rgba(255, 255, 255, 0.45);
+    --border-card: rgba(0, 0, 0, 0.08);
+    --border-card-hover: rgba(0, 0, 0, 0.15);
+    --text-main: #1b1626;
+    --text-muted: #625f73;
+    --text-dark: #f5f4f8;
+    --blur-val: 20px;
+    --decor-opacity: 0.12;
+    --bg-dropdown: rgba(240, 237, 246, 0.96);
+    --bg-select: rgba(0, 0, 0, 0.02);
+    --bg-hover: rgba(0, 0, 0, 0.05);
+    --shadow-card: 0 20px 40px rgba(31, 38, 135, 0.08);
+}
+
+/* Cyberpunk Dark */
+html[data-style="neon-cyberpunk"] {
+    --blur-val: 0px;
+}
+html[data-theme="dark"][data-style="neon-cyberpunk"] {
+    --bg-main: #05010c;
+    --bg-card: rgba(5, 1, 12, 0.95);
+    --border-card: #00f0ff;
+    --border-card-hover: #ff007f;
+    --c-primary: #00f0ff;
+    --c-accent: #ff007f;
+    --c-violet: #d600ff;
+    --c-success: #39ff14;
+    --c-error: #ff073a;
+    --text-main: #00f0ff;
+    --text-muted: #a100ff;
+    --text-dark: #05010c;
+    --decor-opacity: 0.15;
+    --bg-dropdown: rgba(5, 1, 12, 0.98);
+    --bg-select: rgba(0, 240, 255, 0.03);
+    --bg-hover: rgba(0, 240, 255, 0.1);
+    --shadow-card: 0 0 15px rgba(0, 240, 255, 0.25), inset 0 0 15px rgba(0, 240, 255, 0.1);
+}
+
+/* Cyberpunk Light */
+html[data-theme="light"][data-style="neon-cyberpunk"] {
+    --bg-main: #f6f8fa;
+    --bg-card: #ffffff;
+    --border-card: #00b4d8;
+    --border-card-hover: #ff006e;
+    --c-primary: #00b4d8;
+    --c-accent: #ff006e;
+    --c-violet: #8338ec;
+    --c-success: #38b000;
+    --c-error: #d90429;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --text-dark: #ffffff;
+    --decor-opacity: 0.08;
+    --bg-dropdown: #ffffff;
+    --bg-select: rgba(0, 180, 216, 0.05);
+    --bg-hover: rgba(0, 180, 216, 0.08);
+    --shadow-card: 0 8px 20px rgba(0, 180, 216, 0.15);
+}
+
+/* Minimalist Dark */
+html[data-style="minimalist"] {
+    --blur-val: 0px;
+    --decor-opacity: 0;
+}
+html[data-theme="dark"][data-style="minimalist"] {
+    --bg-main: #0f0f11;
+    --bg-card: #161619;
+    --border-card: #232329;
+    --border-card-hover: #3d3d47;
+    --c-primary: #e4e4e7;
+    --c-accent: #a1a1aa;
+    --c-violet: #3f3f46;
+    --c-success: #52525b;
+    --c-error: #7f1d1d;
+    --text-main: #e4e4e7;
+    --text-muted: #71717a;
+    --text-dark: #000000;
+    --bg-dropdown: #161619;
+    --bg-select: #1b1b20;
+    --bg-hover: #232329;
+    --shadow-card: none;
+}
+
+/* Minimalist Light */
+html[data-theme="light"][data-style="minimalist"] {
+    --bg-main: #f4f4f5;
+    --bg-card: #ffffff;
+    --border-card: #e4e4e7;
+    --border-card-hover: #d4d4d8;
+    --c-primary: #18181b;
+    --c-accent: #71717a;
+    --c-violet: #d4d4d8;
+    --c-success: #d4d4d8;
+    --c-error: #fee2e2;
+    --text-main: #18181b;
+    --text-muted: #71717a;
+    --text-dark: #ffffff;
+    --bg-dropdown: #ffffff;
+    --bg-select: #f4f4f5;
+    --bg-hover: #e4e4e7;
+    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* Retro Synthwave Dark */
+html[data-theme="dark"][data-style="retro-synthwave"] {
+    --bg-main: #17072b;
+    --bg-card: rgba(32, 10, 58, 0.7);
+    --border-card: #ff5e62;
+    --border-card-hover: #ff9966;
+    --c-primary: #ff5e62;
+    --c-accent: #ff9966;
+    --c-violet: #ff007f;
+    --c-success: #00ffcc;
+    --c-error: #ff3366;
+    --text-main: #ffe3e3;
+    --text-muted: #b89dbd;
+    --text-dark: #17072b;
+    --blur-val: 12px;
+    --decor-opacity: 0.2;
+    --bg-dropdown: rgba(23, 7, 43, 0.98);
+    --bg-select: rgba(255, 94, 98, 0.05);
+    --bg-hover: rgba(255, 94, 98, 0.12);
+    --shadow-card: 0 8px 25px rgba(255, 94, 98, 0.15);
+}
+
+/* Retro Synthwave Light */
+html[data-theme="light"][data-style="retro-synthwave"] {
+    --bg-main: #fff0f5;
+    --bg-card: rgba(255, 255, 255, 0.75);
+    --border-card: #ff9a9e;
+    --border-card-hover: #fecfef;
+    --c-primary: #ff758c;
+    --c-accent: #ff7eb3;
+    --c-violet: #c33764;
+    --c-success: #48c9b0;
+    --c-error: #ec7063;
+    --text-main: #4a0e2e;
+    --text-muted: #8b5a74;
+    --text-dark: #ffffff;
+    --blur-val: 12px;
+    --decor-opacity: 0.12;
+    --bg-dropdown: rgba(255, 240, 245, 0.98);
+    --bg-select: rgba(255, 117, 140, 0.05);
+    --bg-hover: rgba(255, 117, 140, 0.08);
+    --shadow-card: 0 8px 25px rgba(255, 117, 140, 0.08);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    /* Compatibilité scrollbar Firefox */
+    scrollbar-width: auto;
+    scrollbar-color: var(--border-card) transparent;
+}
+
+/* Scrollbars personnalisées WebKit (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: var(--border-card);
+    border-radius: 20px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: var(--text-muted);
+    border-radius: 20px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+body {
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    font-family: var(--font-primary);
+    min-height: 100vh;
+    /* Suit la hauteur réellement visible quand la barre du navigateur
+       se rétracte ; ignoré par les navigateurs qui ne connaissent pas dvh. */
+    min-height: 100dvh;
+    overflow-x: hidden;
+    position: relative;
+    transition: background-color 0.3s ease, background 0.3s ease, color 0.3s ease !important;
+}
+
+/*
+ * Page figée derrière une fenêtre modale. Posé par js/scrollLock.js.
+ *
+ * `position: fixed` et non un simple `overflow: hidden` : sur iOS, `body` en
+ * `overflow: hidden` continue de défiler, et le geste traverse le voile pour
+ * emporter le tableau de bord pendant qu'on lit la doc ou qu'on règle un
+ * paramètre. Sortir la page du flux est le seul moyen de la rendre réellement
+ * immobile, sur tous les navigateurs.
+ *
+ * En contrepartie, une page hors flux repart en tête : c'est le script qui
+ * reporte ici, par `top`, la position de défilement du moment, et qui la rend
+ * à la fermeture.
+ */
+body.scroll-locked {
+    position: fixed;
+    left: 0;
+    right: 0;
+    width: 100%;
+    overflow: hidden;
+    /* Le rebond élastique subsiste même hors flux, et laisse entrevoir le vide
+       au-delà des bords. */
+    overscroll-behavior: none;
+}
+
+/* Background Glowing Elements */
+.background-decor {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    /*
+     * lvh plutôt que vh : ce calque ne porte aucun contenu, il doit seulement
+     * couvrir. Sur mobile, la barre du navigateur se rétracte au défilement et
+     * révèle une bande que 100vh ne couvrait pas — on y voyait alors le fond
+     * uni du body, sans les halos, ce qui se lisait comme une partie du tableau
+     * de bord restée à charger.
+     *
+     * La hauteur maximale possible règle le cas dans les deux sens : barre
+     * affichée, le débordement passe derrière elle et ne se voit pas ; barre
+     * rétractée, la bande est déjà couverte.
+     */
+    height: 100vh;
+    height: 100lvh;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.circle {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(140px);
+    opacity: var(--decor-opacity, 0.25);
+    transition: opacity 0.5s ease;
+}
+
+.circle-1 {
+    top: -10%;
+    left: 10%;
+    width: 50vw;
+    height: 50vw;
+    background: radial-gradient(circle, var(--c-primary) 0%, transparent 70%);
+}
+
+.circle-2 {
+    bottom: -10%;
+    right: 5%;
+    width: 45vw;
+    height: 45vw;
+    background: radial-gradient(circle, var(--c-accent) 0%, transparent 70%);
+}
+
+/* App Container */

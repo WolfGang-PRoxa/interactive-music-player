@@ -1,0 +1,15 @@
+/* Style System */
+@import './css/base.css';
+@import './css/layout.css';
+@import './css/components.css';
+@import './css/video.css';
+@import './css/player.css';
+@import './css/queue.css';
+@import './css/quality.css';
+@import './css/modals.css';
+@import './css/docs.css';
+@import './css/logs.css';
+@import './css/drawer.css';
+/* En dernier : ses règles doivent primer sur celles des modules ci-dessus,
+   dont elles corrigent la mise en page selon le mode de support. */
+@import './css/device.css';

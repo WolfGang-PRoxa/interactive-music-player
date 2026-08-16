@@ -1,0 +1,461 @@
+/* Progress Bar */
+.progress-container {
+    margin-bottom: 1.8rem;
+}
+
+/* Lecture immobile : le salon vocal visé est désert, le bot n'y est pas entré. */
+.playback-wait-notice {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.7rem;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid rgba(240, 178, 50, 0.35);
+    border-radius: 10px;
+    background: rgba(240, 178, 50, 0.1);
+    color: #f0b232;
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.playback-wait-notice svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+html[data-theme="light"] .playback-wait-notice {
+    background: rgba(240, 178, 50, 0.16);
+    color: #96590a;
+}
+
+.progress-bar-wrapper {
+    position: relative;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 5px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: height 0.15s ease, background 0.15s ease;
+}
+
+.progress-bar-wrapper:hover {
+    height: 8px;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.progress-buffer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 0%;
+    background: rgba(255, 255, 255, 0.22);
+    border-radius: 5px;
+    transition: none;
+    pointer-events: none;
+    z-index: 1;
+}
+
+html[data-theme="light"] .progress-buffer {
+    background: rgba(0, 0, 0, 0.15);
+}
+
+html[data-style="neon-cyberpunk"] .progress-buffer {
+    background: rgba(0, 240, 255, 0.25);
+}
+
+html[data-theme="light"][data-style="neon-cyberpunk"] .progress-buffer {
+    background: rgba(0, 180, 216, 0.25);
+}
+
+html[data-style="retro-synthwave"] .progress-buffer {
+    background: rgba(255, 153, 102, 0.25);
+}
+
+.progress-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, var(--c-primary) 0%, var(--c-accent) 100%);
+    border-radius: 5px;
+    transform-origin: left center;
+    transform: scaleX(0);
+    transition: none !important;
+    will-change: transform;
+    z-index: 2;
+    pointer-events: none;
+}
+
+.time-displays {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+/* Media Controls Area */
+.media-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /*
+     * Deux étages dès que la largeur manque.
+     *
+     * Cette rangée aligne six commandes de gabarit fixe — arrêt, précédent,
+     * lecture, suivant, pad de vitesse, sélecteur de mode — soit près de 550 px
+     * avec les écarts. La carte « En cours de lecture » n'en offre qu'environ
+     * 310 sur un téléphone tenu debout.
+     *
+     * Sans passage à la ligne, les éléments flexibles se compriment : les
+     * boutons, qui tiennent leur rondeur d'une largeur égale à leur hauteur,
+     * s'écrasent en ovales, et ce qui dépasse encore est rogné par
+     * l'`overflow: hidden` de la carte — les commandes des deux extrémités
+     * disparaissaient purement et simplement.
+     *
+     * Autorisée à se replier, la rangée place les quatre boutons de transport
+     * sur le premier étage et la vitesse avec le mode de lecture sur le second.
+     * Le repli ne se déclenche que faute de place : sur un écran large, ou sur
+     * une carte qu'on a élargie, la rangée unique est conservée telle quelle.
+     *
+     * L'écart vertical est plus serré que l'horizontal, mais reste supérieur
+     * aux ~10 px dont l'étiquette du pad de vitesse — « CLASSIQUE », hors flux —
+     * déborde vers le haut, sans quoi elle viendrait couvrir l'étage du dessus.
+     */
+    flex-wrap: wrap;
+    gap: 1rem 1.5rem;
+}
+
+/*
+ * Aucune de ces commandes ne se comprime : toutes tirent leur lisibilité d'un
+ * gabarit fixe. C'est la rangée qui cède en passant à la ligne, pas elles.
+ *
+ * Utile même avec `flex-wrap` : un élément plus large à lui seul que la carte
+ * — le pad de vitesse et ses 140 px, sur une carte réduite au minimum — serait
+ * sinon comprimé faute de pouvoir être reporté ailleurs.
+ */
+.media-controls > * {
+    flex-shrink: 0;
+}
+
+.control-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-card);
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-main);
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.control-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+.control-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    transform: scale(1.08);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.control-btn:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+    background: rgba(255, 255, 255, 0.01) !important;
+    border-color: rgba(255, 255, 255, 0.03) !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.control-btn.play-main-btn {
+    width: 65px;
+    height: 65px;
+    background: var(--text-main);
+    color: var(--text-dark);
+    border: none;
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.15);
+}
+
+.control-btn.play-main-btn svg {
+    width: 24px;
+    height: 24px;
+}
+
+.control-btn.play-main-btn:hover {
+    background: #ffffff;
+    box-shadow: 0 0 25px rgba(255, 255, 255, 0.3);
+    transform: scale(1.08);
+}
+
+/* Add / Search Morceau */
+.search-box {
+    display: flex;
+    /*
+     * Même repli que les commandes de lecture, et pour la même raison : le
+     * champ de saisie, le bouton de fichier et le bouton « Ajouter » réclament
+     * ensemble plus que la carte n'offre sur un téléphone. Le champ y perdait
+     * l'essentiel de sa largeur au profit d'un bouton qu'on aurait pu reporter.
+     *
+     * L'ordre du repli tombe juste sans rien forcer : le champ garde sa largeur
+     * intrinsèque, le bouton de fichier le suit, et « Ajouter » — le plus large
+     * des trois — est le premier à ne plus tenir. Il descend donc seul au
+     * second étage, où le champ, lui, s'étire pour occuper ce qui reste du
+     * premier.
+     */
+    flex-wrap: wrap;
+    gap: 0.8rem;
+}
+
+/*
+ * Les deux boutons ne se compriment pas : leur largeur tient à leur contenu,
+ * et c'est au champ de saisie, seul élément extensible, de céder la place.
+ *
+ * La hauteur minimale, elle, répare un effet de bord du repli. Ces boutons
+ * n'ont pas de marge intérieure verticale : sur une seule ligne, ils tenaient
+ * leur hauteur de l'étirement sur celle du champ de saisie. Reporté seul à
+ * l'étage du dessous, « Ajouter » n'a plus rien à quoi s'aligner et retomberait
+ * à la hauteur de son texte, soit une vingtaine de pixels. 48 px reprend la
+ * hauteur du champ ; sur une ligne partagée, l'étirement continue de primer et
+ * rien ne change.
+ */
+.search-box .file-btn,
+.search-box .primary-btn {
+    flex-shrink: 0;
+    min-height: 48px;
+}
+
+.search-box input {
+    flex-grow: 1;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-card);
+    border-radius: 12px;
+    padding: 0.9rem 1.2rem;
+    color: var(--text-main);
+    font-family: var(--font-primary);
+    font-size: 0.95rem;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.search-box input:focus {
+    border-color: var(--c-primary);
+    box-shadow: 0 0 10px rgba(88, 101, 242, 0.15);
+}
+
+.primary-btn {
+    background: var(--c-primary);
+    border: none;
+    border-radius: 12px;
+    color: #ffffff;
+    padding: 0 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--font-primary);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.primary-btn:hover {
+    background: #4752c4;
+    box-shadow: 0 0 15px rgba(88, 101, 242, 0.35);
+}
+
+.file-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-card);
+    border-radius: 12px;
+    color: var(--text-main);
+    padding: 0 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.file-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--c-primary);
+    color: var(--c-primary);
+    box-shadow: 0 0 10px rgba(88, 101, 242, 0.2);
+}
+
+.icon-clip {
+    width: 20px;
+    height: 20px;
+}
+
+.search-card.dragover {
+    border-color: var(--c-primary) !important;
+    box-shadow: 0 0 20px rgba(88, 101, 242, 0.25) !important;
+    background: rgba(88, 101, 242, 0.05) !important;
+}
+
+.player-card.dragover {
+    border-color: var(--c-primary) !important;
+    box-shadow: 0 0 20px rgba(88, 101, 242, 0.25) !important;
+    background: rgba(88, 101, 242, 0.05) !important;
+}
+
+.icon-add {
+    width: 1.1rem;
+    height: 1.1rem;
+}
+
+/* Settings Card Rows */
+.setting-row {
+    margin-bottom: 1.5rem;
+}
+
+.setting-row:last-child {
+    margin-bottom: 0;
+}
+
+.setting-label {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 0.8rem;
+    color: var(--text-main);
+}
+
+.setting-label svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    color: var(--text-muted);
+}
+
+.setting-label small {
+    display: block;
+    font-weight: 400;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.1rem;
+}
+
+/* Sliders */
+.slider-container {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.slider-container input[type="range"] {
+    flex-grow: 1;
+    -webkit-appearance: none;
+    height: 6px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.06);
+    outline: none;
+}
+
+.slider-container input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--c-primary);
+    cursor: pointer;
+    box-shadow: 0 0 8px var(--c-primary);
+    transition: transform 0.1s ease;
+}
+
+.slider-container input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.25);
+}
+
+.value-display {
+    min-width: 50px;
+    text-align: right;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+/* Styled Select */
+.styled-select {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-card);
+    border-radius: 12px;
+    padding: 0.8rem 1.2rem;
+    color: var(--text-main);
+    font-family: var(--font-primary);
+    font-size: 0.95rem;
+    outline: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.styled-select:focus {
+    border-color: var(--c-primary);
+}
+
+/* Switch Toggle Custom */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.switch-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.08);
+    transition: .3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    border-radius: 34px;
+    border: 1px solid var(--border-card);
+}
+
+.switch-slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background-color: var(--text-muted);
+    transition: .3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    border-radius: 50%;
+}
+
+input:checked + .switch-slider {
+    background-color: rgba(235, 69, 158, 0.1);
+    border-color: var(--c-accent);
+}
+
+input:checked + .switch-slider:before {
+    transform: translateX(20px);
+    background-color: var(--c-accent);
+    box-shadow: 0 0 8px var(--c-accent);
+}
+
+/* Active speakers and User list */
+.speakers-list {
+}
