@@ -129,23 +129,47 @@ html[data-theme="light"] .video-header-opacity {
     font-family: var(--font-mono);
 }
 
+/*
+ * Fermeture de la fenêtre : même recette que les commandes de l'en-tête des
+ * logs, dont css/logs.css porte le détail. Les deux fenêtres flottantes se
+ * répondent, elles ne peuvent pas habiller leur en-tête chacune à sa façon.
+ */
 .video-control-btn {
-    background: none;
-    border: none;
+    background: var(--bg-select);
+    border: 1px solid var(--border-card);
     color: var(--text-muted);
-    width: 26px;
-    height: 26px;
-    border-radius: 6px;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+/*
+ * Sans dimension, un `<svg>` retombe sur le `100%` que lui donne sa
+ * spécification : la croix était tracée d'un bord à l'autre du bouton, plus
+ * lourde que toutes les autres icônes du lecteur, qui tiennent en 15 px.
+ * L'oubli ne se voyait pas tant que le bouton n'avait ni fond ni bordure pour
+ * donner l'échelle.
+ */
+.video-control-btn svg {
+    width: 15px;
+    height: 15px;
 }
 
 .video-control-btn:hover {
     background: rgba(237, 66, 69, 0.2);
-    color: #ed4245;
+    border-color: var(--c-error);
+    color: var(--c-error);
+    transform: scale(1.05);
+}
+
+.video-control-btn:active {
+    transform: scale(0.95);
 }
 
 .video-window-body {

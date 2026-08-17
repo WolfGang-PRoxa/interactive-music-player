@@ -220,20 +220,38 @@ pièce vide.
 | Retour avant la fin du délai | Départ annulé, rien ne bouge. |
 
 Le **salon rattaché** est, dans l'ordre : le rattachement en cours
-(`queue.activeChannelId`), le salon favori (`defaultVoiceChannelId`), le salon
-où le bot se trouve, le dernier salon utilisé. Le bot ne suit donc pas les
-auditeurs de salon en salon — il sert le salon qu'on lui a désigné. Faute de tout
-rattachement (première utilisation), il se pose dans le premier salon où
-quelqu'un apparaît.
+(`queue.activeChannelId`), le salon où le bot se trouve, le dernier salon
+utilisé. Trois façons de dire « celui qu'on lui a désigné », de la plus récente
+à la plus ancienne : le bot ne suit donc pas les auditeurs de salon en salon.
+Faute de tout rattachement (première utilisation), il se pose dans le premier
+salon où quelqu'un apparaît.
 
-Le rattachement en cours passe **avant** le favori, parce que c'est la dernière
-volonté exprimée : c'est ce que le tableau de bord écrit en changeant de salon.
-Dans l'autre ordre, ce changement restait sans effet — le bot quittait le salon,
-puis le premier mouvement vocal le ramenait au favori où il reprenait la lecture
-que la bascule venait de suspendre, si bien que le tableau de bord ne pouvait
-jamais l'éloigner de son favori. Celui-ci garde son rôle de valeur par défaut,
-et la restauration au démarrage lui donne toujours la priorité — en inscrivant
-ensuite le salon rejoint comme rattachement, pour que les deux s'accordent.
+Le **salon favori n'y figure pas**, et c'est délibéré : il ne vaut qu'au
+démarrage (voir ci-dessous). Consulté ici, il s'appliquait à chaque mouvement
+vocal et toutes les 30 secondes ; dès que le rattachement manquait — file créée
+par `/play`, par un import, ou restaurée sans salon —, il ramenait le bot chez
+lui, et le premier auditeur entrant dans le favori l'y rappelait quel que soit
+le salon où on l'avait installé. Un salon marqué d'une étoile devenait ainsi une
+prison : plus moyen de travailler durablement ailleurs.
+
+### Le salon favori : une valeur de démarrage, et rien d'autre
+
+Le favori (`defaultVoiceChannelId`) désigne le salon sur lequel le bot et le
+tableau de bord se posent quand le process démarre ou redémarre. Il est lu à
+deux endroits, tous deux au démarrage :
+
+- [`Database.appliquerSalonFavori()`](../../src/database/Database.js), appelé une
+  fois à `ClientReady`, en fait le **salon courant** (`setLastVoiceChannel`) ;
+- [`PlaybackStateManager.restoreAll()`](../../src/database/PlaybackStateManager.js)
+  lui donne la priorité pour choisir le salon à restaurer, puis inscrit ce choix
+  comme rattachement — y compris quand le salon est désert et que la connexion
+  est remise à plus tard, sans quoi la règle de présence irait chercher le bot
+  ailleurs que là où le tableau de bord l'annonce en attente.
+
+Passé ce point, plus personne ne le lit. Marquer un salon d'une étoile en pleine
+session ne déplace donc rien : le réglage est noté pour le prochain démarrage.
+Tout le reste — règle de présence, sélecteur de salon, `getState` — ne suit que
+le salon courant, que chaque changement de salon met à jour.
 
 ### La lecture figée
 

@@ -130,16 +130,19 @@ class PresenceManager {
      *
      * Le rattachement en cours (`activeChannelId`) prime : c'est la dernière
      * volonté exprimée, et c'est ce que le tableau de bord écrit en changeant de
-     * salon. Le faire passer après le salon favori rendait ce changement sans
-     * effet — le bot quittait bien le salon quitté, puis le premier mouvement
-     * vocal le ramenait au favori, où il reprenait la lecture que la bascule
-     * venait de suspendre. Le tableau de bord ne pouvait alors jamais éloigner
-     * le bot de son salon favori.
+     * salon. Viennent ensuite le salon où le bot se trouve, puis le dernier
+     * salon visité — trois façons de dire « celui qu'on lui a désigné », de la
+     * plus récente à la plus ancienne.
      *
-     * Le favori garde son rôle de valeur par défaut, quand rien n'est rattaché :
-     * première utilisation, ou file créée hors du tableau de bord. Au démarrage,
-     * c'est la restauration d'état qui lui donne la priorité, en amont de cette
-     * liste — et qui inscrit ensuite le salon rejoint comme rattachement.
+     * Le salon favori n'y figure pas, et c'est essentiel. Consulté ici, il
+     * s'appliquait à chaque mouvement vocal et toutes les 30 secondes : dès que
+     * le rattachement manquait — file créée par la commande `/play`, par un
+     * import, ou restaurée sans salon —, il ramenait le bot chez lui, et le
+     * premier auditeur entrant dans le favori l'y rappelait quel que soit le
+     * salon où on l'avait installé. Le favori ne vaut qu'au démarrage, où
+     * `Database.appliquerSalonFavori()` en fait le salon courant une fois pour
+     * toutes ; la restauration d'état l'inscrit ensuite comme rattachement, et
+     * c'est à ce titre — et non comme favori — qu'il est retrouvé ici.
      *
      * @param {string} guildId
      * @returns {import('discord.js').VoiceBasedChannel|null}
@@ -153,7 +156,6 @@ class PresenceManager {
 
         const candidats = [
             queue?.activeChannelId,
-            settings.defaultVoiceChannelId,
             queue?.channel?.id,
             settings.lastVoiceChannelId,
         ];

@@ -335,6 +335,11 @@ function registerPlayerEvents(player, client) {
         // de démonter le ducking et la connexion vocale.
         if (webServer.relancerPlaylistBouclee(queue.guild.id)) return;
 
+        // Playlist achevée sans bouclage : ce que la file d'attente gardait de
+        // côté pendant sa lecture prend la main, plutôt que de rester en plan
+        // sous les yeux de l'utilisateur.
+        if (webServer.enchainerSurLaFile(queue.guild.id)) return;
+
         // Le ducking n'est pas démonté ici, et ne l'était que dans un seul mode
         // de diffusion. C'est pourtant lui qui porte l'écoute de la parole : le
         // tableau de bord cessait d'animer les auditeurs dès la dernière piste

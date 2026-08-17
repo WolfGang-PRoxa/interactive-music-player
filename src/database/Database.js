@@ -256,6 +256,32 @@ class GuildDatabase {
         }
     }
 
+    /**
+     * Fait du salon favori le salon courant. À n'appeler qu'au démarrage.
+     *
+     * C'est là tout le rôle du favori : désigner le salon sur lequel le bot et
+     * le tableau de bord se posent quand le process démarre ou redémarre. Passé
+     * ce point il ne vaut plus rien de particulier, et tout le monde ne suit
+     * plus que le dernier salon choisi.
+     *
+     * L'écrire ici plutôt que de le consulter partout est ce qui rend cette
+     * règle tenable : chaque lecture du favori ailleurs dans le code en faisait
+     * une préférence permanente, qui ramenait sans fin le bot et le tableau de
+     * bord sur lui — impossible alors de s'installer durablement ailleurs.
+     *
+     * Il n'y a qu'un favori, tous serveurs confondus (cf. `updateSettings`).
+     *
+     * @returns {{ guildId: string, channelId: string }|null} Le salon appliqué.
+     */
+    appliquerSalonFavori() {
+        for (const [guildId, settings] of this.cache.entries()) {
+            if (!settings.defaultVoiceChannelId) continue;
+            this.setLastVoiceChannel(guildId, settings.defaultVoiceChannelId);
+            return { guildId, channelId: settings.defaultVoiceChannelId };
+        }
+        return null;
+    }
+
     // --- Qualite souhaitee par piste (commune a tous les salons) ---
 
     /**

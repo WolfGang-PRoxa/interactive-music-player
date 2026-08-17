@@ -14,7 +14,9 @@
     "smoke": "node tests/smoke.js",
     "test:device": "node tests/deviceMode.js",
     "test:drag": "node tests/dragPreview.js",
-    "test": "node tests/deviceMode.js && node tests/dragPreview.js && node tests/smoke.js"
+    "test:enchainement": "node tests/enchainementFile.js",
+    "test:favori": "node tests/salonFavori.js",
+    "test": "node tests/deviceMode.js && node tests/dragPreview.js && node tests/enchainementFile.js && node tests/salonFavori.js && node tests/smoke.js"
   },
   "keywords": [
     "discord",

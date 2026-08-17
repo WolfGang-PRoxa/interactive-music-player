@@ -122,8 +122,8 @@ chaque lecture.
 | `baseVolume` | `70` | Volume hors parole |
 | `broadcastMode` | `'everyone'` | Mode de diffusion |
 | `playbackSpeed` | `'1.0'` | Vitesse de lecture |
-| `defaultVoiceChannelId` | `null` | Salon favori — un seul, tous serveurs confondus |
-| `lastVoiceChannelId` | `null` | Dernier salon visité |
+| `defaultVoiceChannelId` | `null` | Salon favori — un seul, tous serveurs confondus ; lu au démarrage seulement |
+| `lastVoiceChannelId` | `null` | Dernier salon visité — c'est lui que tout le monde suit en session |
 | `mixEnabled` | `false` | Enchaînement type DJ |
 | `mixDuration` | `5` | Durée de l'enchaînement, en secondes |
 | `mixType` | `'volume'` | `'volume'` ou `'effects'` |
@@ -147,6 +147,15 @@ deux formes distinctes, et changer de mode faisait lire l'interface dans une
 sauvegarde vide — la file paraissait perdue. Les anciennes formes
 (`{ tracks }`, `{ virtualCurrentTrack, virtualTracks }`) restent acceptées en
 lecture.
+
+`activePlaybackSource` ne revient pas à `'queue'` sur la seule décision de
+l'utilisateur : une playlist qui s'achève sans bouclage rend la main à la file
+mise de côté, qui repart alors sur son premier titre
+(`WebServer.enchainerSurLaFile()`). La bascule est tentée aux deux points
+d'épuisement — la file virtuelle du mode personnel et l'événement `emptyQueue`
+du mode commun —, toujours après la relance en boucle : c'est cet ordre, et non
+un test sur `loopPlaylist`, qui donne la priorité à la boucle. Une file mise de
+côté vide laisse la lecture s'arrêter, comme auparavant.
 
 Le sous-objet `preloading` (`enabled`, `queueCount`, `historyCount`,
 `playlistCount`) n'est pas déclaré dans `_defaults()` : il est écrit par le

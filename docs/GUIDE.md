@@ -258,8 +258,11 @@ destination :
   barre de progression.
 - **Sélecteur de salon vocal** — bascule instantanément le bot d'un salon à un
   autre. Chaque salon conserve sa propre file d'attente et son historique.
-- **Salon favori** — un salon peut être marqué comme favori ; le tableau de bord
-  s'y positionne automatiquement à l'ouverture.
+- **Salon favori** — un salon peut être marqué comme favori (l'étoile, dans le
+  sélecteur) ; c'est là que le bot et le tableau de bord se placent au démarrage
+  du bot. Le marquer ne déplace rien sur le moment, et ne vous retient pas :
+  changez de salon quand vous voulez, le favori ne reprendra la main qu'au
+  prochain démarrage. Il n'y en a qu'un, tous serveurs confondus.
 
 ### Activité vocale
 
@@ -274,6 +277,13 @@ Le tableau de bord gère des playlists **communes à tous vos serveurs**,
 organisées en onglets. Vous pouvez les créer, les renommer, les réordonner et
 les supprimer, y ajouter des pistes par glisser-déposer, et définir une playlist
 comme source de lecture active à la place de la file d'attente.
+
+Une playlist qui joue met la file d'attente de côté — elle reste affichée, mais
+rien n'en part tant que la playlist dure. **Sa dernière piste terminée, la file
+reprend la main d'elle-même** et enchaîne sur son premier titre, sans rien vous
+demander. La lecture ne s'arrête donc que si la file est vide. La lecture en
+boucle passe avant : tant qu'elle est active, la playlist repart de son premier
+titre et la file continue d'attendre son tour.
 
 ### File d'attente et historique
 

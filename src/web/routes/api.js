@@ -419,26 +419,21 @@ function createApiRouter(webServer) {
 
     router.get('/state', (req, res) => {
         let targetGuildId = null;
-        let defaultChannelId = null;
+        // Nommé `defaultChannelId` tant qu'il portait le salon favori. Il porte
+        // désormais le salon courant, ce qui n'est pas la même chose : le favori
+        // n'est plus lu qu'au démarrage du bot, où il devient précisément ce
+        // salon courant. Le relire ici le ferait primer sur toute sélection
+        // ultérieure — un tableau de bord ne pourrait plus en changer.
+        let salonCourantId = null;
 
-        // 1. Rechercher s'il y a un salon par défaut (FAVORI) global défini
-        for (const [gId, settings] of database.cache.entries()) {
-            if (settings.defaultVoiceChannelId) {
-                targetGuildId = gId;
-                defaultChannelId = settings.defaultVoiceChannelId;
-                break;
-            }
-        }
-
-        // 2. Si aucun salon par défaut (FAVORI) n'est défini, retomber sur le dernier salon visité
-        if (!targetGuildId || !defaultChannelId) {
-            const lastChannelInfo = database.getLastVoiceChannel();
-            if (lastChannelInfo.guildId && lastChannelInfo.channelId) {
-                const guild = webServer.client.guilds.cache.get(lastChannelInfo.guildId);
-                if (guild && guild.channels.cache.has(lastChannelInfo.channelId)) {
-                    targetGuildId = lastChannelInfo.guildId;
-                    defaultChannelId = lastChannelInfo.channelId;
-                }
+        // Le dernier salon visité, comme à l'ouverture d'un tableau de bord
+        // (cf. `WebServer._initClient`).
+        const lastChannelInfo = database.getLastVoiceChannel();
+        if (lastChannelInfo.guildId && lastChannelInfo.channelId) {
+            const guild = webServer.client.guilds.cache.get(lastChannelInfo.guildId);
+            if (guild && guild.channels.cache.has(lastChannelInfo.channelId)) {
+                targetGuildId = lastChannelInfo.guildId;
+                salonCourantId = lastChannelInfo.channelId;
             }
         }
 
@@ -447,7 +442,7 @@ function createApiRouter(webServer) {
         }
 
         if (!targetGuildId) return res.status(400).json({ error: 'Bot non connecté aux serveurs Discord' });
-        res.json(webServer.getState(targetGuildId, defaultChannelId));
+        res.json(webServer.getState(targetGuildId, salonCourantId));
     });
 
     router.get('/stream', async (req, res) => {

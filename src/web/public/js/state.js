@@ -221,8 +221,9 @@ window.MusicPlayer.dureeFonduOuverture = function(state, positionSecs) {
  * le silence — soit à enchaîner sur un morceau de la file sans aucun rapport.
  *
  * La règle reprend celle du serveur (WebServer.handleVirtualSkip) : le titre
- * suivant de la playlist, et le retour au premier quand la lecture en boucle
- * est demandée.
+ * suivant de la playlist, le retour au premier quand la lecture en boucle est
+ * demandée, et à défaut la file d'attente — c'est-à-dire, précisément, ce
+ * `state.queue` dont il fallait se méfier tant que la playlist durait.
  *
  * @param {object} [state] - État courant ; celui du lecteur par défaut.
  * @returns {object|null} La piste suivante, ou null s'il n'y en a pas.
@@ -239,8 +240,11 @@ window.MusicPlayer.pisteSuivante = function(state) {
         const index = typeof etat.playlistCurrentIndex === 'number' ? etat.playlistCurrentIndex : 0;
         if (index + 1 < pistes.length) return pistes[index + 1];
 
-        // Dernier titre : seule la lecture en boucle enchaîne, sur le premier.
-        return etat.loopPlaylist ? pistes[0] : null;
+        // Dernier titre : la lecture en boucle enchaîne sur le premier. Sinon
+        // la playlist est finie, et la file d'attente prend le relais — le
+        // serveur bascule alors la source (WebServer.enchainerSurLaFile), si
+        // bien que le titre préparé ici est bien celui qu'il jouera.
+        if (etat.loopPlaylist) return pistes[0];
     }
 
     return (etat.queue && etat.queue[0]) || null;

@@ -65,7 +65,7 @@ html[data-theme="light"] .logs-window-header {
     gap: 8px;
     font-size: 0.85rem;
     font-weight: 700;
-    color: var(--text-primary);
+    color: var(--text-main);
     letter-spacing: 0.5px;
 }
 
@@ -96,7 +96,7 @@ html[data-theme="light"] .log-filter-btn {
 }
 
 .log-filter-btn:hover {
-    color: var(--text-primary);
+    color: var(--text-main);
     background: rgba(255, 255, 255, 0.15);
 }
 
@@ -186,18 +186,44 @@ html[data-theme="light"] .logs-header-opacity {
     gap: 6px;
 }
 
+/*
+ * Commandes de l'en-tête : copier, effacer, fermer.
+ *
+ * Elles avaient un style à elles — fond transparent, aucune bordure, coins à
+ * 6 px, survol d'un blanc translucide écrit en dur — quand partout ailleurs le
+ * tableau de bord encadre ses boutons-icônes : fond `--bg-select`, bordure
+ * `--border-card`, coins arrondis, léger agrandissement au survol. C'est ce que
+ * font la croix des réglages, celle du tiroir et les boutons de la
+ * documentation. Les trois commandes reprennent donc cette recette, à un
+ * gabarit réduit (28 px) parce que l'en-tête loge déjà les six filtres et le
+ * curseur d'opacité.
+ *
+ * Passer par les variables plutôt que par des valeurs littérales fait suivre
+ * les thèmes du même coup : le survol s'éclaircissait en blanc même en thème
+ * clair, et le rouge de la fermeture ignorait le `--c-error` des styles
+ * cyberpunk et synthwave.
+ */
 .logs-control-btn {
-    background: transparent;
-    border: none;
+    background: var(--bg-select);
+    border: 1px solid var(--border-card);
     color: var(--text-muted);
-    width: 26px;
-    height: 26px;
-    border-radius: 6px;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: all 0.2s ease;
+    /*
+     * Un en-tête étroit ne doit pas les aplatir. Sans ce plancher, la
+     * répartition flex rabote les trois carrés en même temps que les filtres,
+     * et une bordure sur un carré devenu rectangle se voit bien plus qu'une
+     * simple icône serrée. La pression retombe sur les filtres, qui sont du
+     * texte et se compriment sans se déformer — même raisonnement que pour
+     * `.clear-btn` et `.card-lock-btn`.
+     */
+    flex-shrink: 0;
 }
 
 .logs-control-btn svg {
@@ -206,17 +232,26 @@ html[data-theme="light"] .logs-header-opacity {
 }
 
 .logs-control-btn:hover {
-    color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--bg-hover);
+    border-color: var(--border-card-hover);
+    color: var(--text-main);
+    transform: scale(1.05);
 }
 
-html[data-theme="light"] .logs-control-btn:hover {
-    background: rgba(0, 0, 0, 0.08);
+.logs-control-btn:active {
+    transform: scale(0.95);
 }
 
+/*
+ * Les deux commandes destructrices annoncent leur couleur au survol, comme la
+ * croix des réglages et celle du tiroir. Au repos elles restent neutres : un
+ * en-tête de fenêtre n'a pas à porter deux boutons rouges en permanence.
+ */
+.logs-control-btn.btn-clear-logs:hover,
 .logs-control-btn.btn-close-logs:hover {
-    color: #ff0055;
-    background: rgba(255, 0, 85, 0.15);
+    background: rgba(237, 66, 69, 0.2);
+    border-color: var(--c-error);
+    color: var(--c-error);
 }
 
 /* Body & Terminal Container */

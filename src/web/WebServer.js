@@ -81,7 +81,7 @@ class WebServer {
         });
         this.client = null;
         this.port = 3000;
-        this.host = '127.0.0.1';
+        this.host = '127.0.0.1';
         /**
          * Tableau de bord pilote de chaque serveur : guildId → WebSocket.
          *
@@ -367,28 +367,24 @@ class WebServer {
         let selectedGuildId = null;
         let selectedChannelId = null;
 
-        // 1. Rechercher s'il y a un salon par défaut global (FAVORI) défini sur l'un des serveurs
-        for (const [gId, settings] of database.cache.entries()) {
-            if (settings.defaultVoiceChannelId) {
-                selectedGuildId = gId;
-                selectedChannelId = settings.defaultVoiceChannelId;
-                break;
+        // 1. Le dernier salon visité. Le salon favori n'est plus consulté ici :
+        //    il est appliqué une fois au démarrage du bot
+        //    (`Database.appliquerSalonFavori`), ce qui en fait précisément ce
+        //    dernier salon visité tant que personne n'en a choisi d'autre. Le
+        //    lire à chaque connexion en faisait tout autre chose : un tableau de
+        //    bord rouvert — ou simplement reconnecté après une coupure réseau —
+        //    revenait au favori, effaçant le salon que l'utilisateur venait de
+        //    sélectionner.
+        const lastChannelInfo = database.getLastVoiceChannel();
+        if (lastChannelInfo.guildId && lastChannelInfo.channelId) {
+            const guild = this.client.guilds.cache.get(lastChannelInfo.guildId);
+            if (guild && guild.channels.cache.has(lastChannelInfo.channelId)) {
+                selectedGuildId = lastChannelInfo.guildId;
+                selectedChannelId = lastChannelInfo.channelId;
             }
         }
 
-        // 2. Si aucun salon par défaut (FAVORI) n'est défini, retomber sur le dernier salon visité (lastVoiceChannel)
-        if (!selectedGuildId || !selectedChannelId) {
-            const lastChannelInfo = database.getLastVoiceChannel();
-            if (lastChannelInfo.guildId && lastChannelInfo.channelId) {
-                const guild = this.client.guilds.cache.get(lastChannelInfo.guildId);
-                if (guild && guild.channels.cache.has(lastChannelInfo.channelId)) {
-                    selectedGuildId = lastChannelInfo.guildId;
-                    selectedChannelId = lastChannelInfo.channelId;
-                }
-            }
-        }
-
-        // 3. Fallback standard s'il n'y a ni favori ni dernier salon disponible
+        // 2. Fallback standard s'il n'y a pas de dernier salon disponible
         if (!selectedGuildId) {
             selectedGuildId = this._getFirstGuildId();
             if (selectedGuildId) {
@@ -396,7 +392,7 @@ class WebServer {
                 const { useMainPlayer } = require('discord-player');
                 const player = useMainPlayer();
                 const queue = player.queues.get(selectedGuildId);
-                selectedChannelId = queue?.channel?.id || settings.defaultVoiceChannelId || settings.lastVoiceChannelId;
+                selectedChannelId = queue?.channel?.id || settings.lastVoiceChannelId;
                 if (!selectedChannelId) {
                     const guild = this.client.guilds.cache.get(selectedGuildId);
                     if (guild) {
@@ -890,8 +886,13 @@ class WebServer {
         const player = useMainPlayer();
         const queue = player.queues.get(guildId);
 
-        // Prioriser la sélection client, puis le salon actif de la queue, puis le salon connecté, puis le salon favori, puis le dernier salon utilisé
-        let activeVoiceChannelId = selectedVoiceChannelId || queue?.activeChannelId || queue?.channel?.id || settings.defaultVoiceChannelId || settings.lastVoiceChannelId;
+        // Prioriser la sélection client, puis le salon actif de la queue, puis
+        // le salon connecté, puis le dernier salon utilisé. Le favori n'entre
+        // pas dans cette liste : appliqué au démarrage, il est déjà le dernier
+        // salon utilisé tant que rien d'autre n'a été choisi — et l'y consulter
+        // en propre le ferait ressurgir bien après, à la moindre absence de
+        // rattachement.
+        let activeVoiceChannelId = selectedVoiceChannelId || queue?.activeChannelId || queue?.channel?.id || settings.lastVoiceChannelId;
         if (!activeVoiceChannelId) {
             const lastChannelInfo = database.getLastVoiceChannel();
             if (lastChannelInfo.guildId === guildId && lastChannelInfo.channelId) {
@@ -1359,6 +1360,10 @@ class WebServer {
             // La playlist a été rechargée depuis son premier titre : rien à
             // arrêter, la lecture se poursuit.
             return;
+        } else if (this.enchainerSurLaFile(guildId, startProgressMs)) {
+            // La file d'attente a repris la main : la lecture se poursuit
+            // également, sur son premier titre.
+            return;
         } else {
             queue.virtualCurrentTrack = null;
             queue.virtualIsPlaying = false;
@@ -1408,6 +1413,124 @@ class WebServer {
                 playbackStateManager.saveState(useMainPlayer());
             })
             .catch(err => log.error('[WebServer] Erreur de relance de playlist :', err.message));
+
+        return true;
+    }
+
+    /**
+     * Passe à la file d'attente lorsqu'une playlist vient de s'achever.
+     *
+     * Une playlist qui prend le lecteur y met la file d'attente de côté le
+     * temps de sa lecture (voir [setAsideQueue](../utils/setAsideQueue.js)).
+     * Sa dernière piste finie, la lecture s'arrêtait : ce qui patientait dans
+     * la file y restait jusqu'à ce qu'on revienne l'y chercher à la main, alors
+     * même que le tableau de bord continuait de l'afficher. Elle reprend
+     * désormais la main d'elle-même, exactement comme si la source avait été
+     * rebasculée sur « file d'attente ».
+     *
+     * Appelée aux deux mêmes points d'épuisement que
+     * `relancerPlaylistBouclee()` — la file virtuelle du mode personnel et
+     * l'événement `emptyQueue` du mode commun — et toujours **après** elle :
+     * une playlist qui reboucle n'est pas une playlist terminée. C'est cet
+     * ordre, et non un second test sur `loopPlaylist`, qui porte la règle. Une
+     * playlist supprimée en cours de route retombe ainsi ici plutôt que de
+     * laisser le lecteur muet, alors qu'elle était pourtant en boucle.
+     *
+     * @param {string} guildId
+     * @param {number} [startProgressMs=0] - Position déjà atteinte dans le
+     *   premier titre de la file. Non nulle quand l'enchaînement mix l'a lancé
+     *   avant la fin du dernier titre de la playlist.
+     * @returns {boolean} true si la file a pris la main
+     */
+    enchainerSurLaFile(guildId, startProgressMs = 0) {
+        const settings = database.getSettings(guildId);
+
+        const source = settings.activePlaybackSource;
+        if (!source || !source.startsWith('playlist_')) return false;
+
+        // Lue avant la bascule : `readSetAsideQueue()` choisit sa sauvegarde
+        // d'après le mode de diffusion, que rien ne change ici, mais la source
+        // ne doit plus être une playlist une fois la file reprise.
+        const enAttente = readSetAsideQueue(settings);
+        if (enAttente.length === 0) return false;
+
+        const { useMainPlayer, Track } = require('discord-player');
+        const player = useMainPlayer();
+        const queue = player.queues.get(guildId);
+        if (!queue) return false;
+
+        // Basculer la source rend la sauvegarde inatteignable : elle n'est plus
+        // consultée dès que la source vaut « queue ». Si le lecteur n'a plus de
+        // salon où jouer — bot retiré d'un salon désert —, la file passerait
+        // donc pour vide et l'utilisateur la verrait disparaître. Mieux vaut
+        // laisser la lecture s'arrêter sur la playlist : il retrouvera sa file,
+        // et pourra y revenir lui-même.
+        if (settings.broadcastMode !== 'personal' && !queue.channel) {
+            log.info('[WebServer] Fin de playlist : la file d\'attente garde sa place, '
+                + 'le lecteur n\'a plus de salon où la jouer.');
+            return false;
+        }
+
+        log.info(`[WebServer] Fin de playlist : la file d'attente prend la main `
+            + `(${enAttente.length} titre(s)).`);
+
+        // `playlistCurrentIndex` est ramené à zéro comme le fait la bascule
+        // manuelle : laissé sur la dernière piste, il ferait repartir la
+        // playlist par sa fin au prochain retour vers elle.
+        database.updateSettings(guildId, {
+            activePlaybackSource: 'queue',
+            playlistCurrentIndex: 0,
+        });
+
+        const [premiere, ...suite] = enAttente;
+
+        if (settings.broadcastMode === 'personal') {
+            queue.virtualCurrentTrack = premiere;
+            queue.virtualTracks = suite;
+            queue.virtualProgressMs = startProgressMs;
+            queue.virtualIsPlaying = true;
+            queue.virtualIsPaused = false;
+            queue.virtualLastUpdated = Date.now();
+
+            this.broadcastState(guildId);
+            playbackStateManager.saveState(player);
+            return true;
+        }
+
+        const versPiste = (t) => {
+            const piste = new Track(player, {
+                title: t.title,
+                author: t.author || 'Inconnu',
+                duration: t.duration || '0:00',
+                thumbnail: t.thumbnail || null,
+                url: t.url,
+                queryType: t.queryType || (t.url && t.url.startsWith('http') ? 'youtube' : 'file'),
+                raw: t.raw || {},
+            });
+            if (t.extractorName) {
+                piste.extractor = player.extractors.store.get(t.extractorName) || null;
+            }
+            return piste;
+        };
+
+        // La playlist a vidé la liste physique en s'achevant ; ce nettoyage
+        // couvre le cas où l'un de ses titres y aurait survécu, faute de quoi
+        // il se glisserait devant la file qu'on vient de rappeler.
+        queue.tracks.clear();
+
+        queue.play(versPiste(premiere), {
+            nodeOptions: {
+                metadata: { channel: null },
+                selfDeaf: false,
+                volume: settings.baseVolume,
+            },
+        })
+            .then(() => {
+                if (suite.length > 0) queue.addTrack(suite.map(versPiste));
+                this.broadcastState(guildId);
+                playbackStateManager.saveState(player);
+            })
+            .catch(err => log.error('[WebServer] Erreur de passage à la file :', err.message));
 
         return true;
     }

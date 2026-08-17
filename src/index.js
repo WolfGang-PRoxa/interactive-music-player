@@ -381,6 +381,16 @@ client.once(Events.ClientReady, async (readyClient) => {
     // raison de la garder.
     versioning.nettoyerTemporaires();
 
+    // Le salon favori vaut ici, et nulle part ailleurs : il devient le salon
+    // courant le temps d'un démarrage, puis s'efface derrière les choix de
+    // l'utilisateur. C'est ce qui lui permet de désigner le salon d'ouverture
+    // sans pour autant retenir le bot — et le tableau de bord — prisonniers de
+    // ce salon pour le reste de la session.
+    const favori = database.appliquerSalonFavori();
+    if (favori) {
+        log.info(`[Startup] Salon favori appliqué : ${favori.channelId} (serveur ${favori.guildId}).`);
+    }
+
     // Démarrer le serveur Web intégré pour le Dashboard
     const port = process.env.PORT || 3000;
     const host = process.env.HOST || '127.0.0.1';

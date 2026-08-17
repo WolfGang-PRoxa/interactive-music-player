@@ -390,6 +390,12 @@ class PlaybackStateManager {
                     };
                 }
 
+                // Le seul autre endroit où le salon favori est lu, avec
+                // `Database.appliquerSalonFavori()` — et pour la même raison :
+                // on démarre. Il désigne le salon sur lequel se poser, avant
+                // celui qui jouait à l'arrêt. Partout ailleurs dans le projet,
+                // le favori n'a plus cours ; c'est le rattachement inscrit
+                // ci-dessous qui porte ce choix pour le reste de la session.
                 const defaultChannelId = settings.defaultVoiceChannelId;
                 const channelId = defaultChannelId || activeChannelId || settings.lastVoiceChannelId;
 
@@ -432,9 +438,16 @@ class PlaybackStateManager {
                         });
                     }
 
-                    // Stocker le cache des salons et le salon vocal actif
+                    // Stocker le cache des salons et le salon vocal actif.
+                    //
+                    // Le rattachement retient le salon que la restauration vient
+                    // de désigner, et non celui qui jouait à l'arrêt : c'est là
+                    // que le favori passe le relais. Sur un salon désert, où la
+                    // connexion est remise à plus tard, garder l'ancien aurait
+                    // envoyé la règle de présence chercher le bot ailleurs que
+                    // là où le tableau de bord l'annonce en attente.
                     queue.channelStates = channels;
-                    queue.activeChannelId = activeChannelId || null;
+                    queue.activeChannelId = channelId || activeChannelId || null;
 
                     // Connexion déplacée ICI, hors de la condition activeChannelState
                     if (salonAccessible) {
