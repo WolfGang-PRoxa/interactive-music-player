@@ -357,6 +357,20 @@ function createApiRouter(webServer) {
      * la vie du process, et le pied du tiroir doit pouvoir l'afficher sans
      * attendre qu'un serveur Discord soit sélectionné.
      */
+    /**
+     * Lien d'invitation du bot sur un nouveau serveur Discord.
+     *
+     * Route à part, et non un champ de l'état : `/api/state` refuse de répondre
+     * tant que le bot n'a rejoint aucun serveur, et c'est précisément là qu'on a
+     * besoin de ce lien. Le tableau de bord doit pouvoir inviter le bot depuis
+     * une installation qui ne connaît encore aucun serveur.
+     */
+    router.get('/invite', (req, res) => {
+        const url = webServer.lienInvitation();
+        if (!url) return res.status(503).json({ error: 'Bot non connecté à Discord' });
+        res.json({ inviteUrl: url });
+    });
+
     router.get('/version', (req, res) => {
         const versioning = require('../../versioning');
         const courante = versioning.versionCourante();

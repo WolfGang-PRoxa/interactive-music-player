@@ -40,8 +40,6 @@ const ICONE_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 const ICONE_LIEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>';
 const ICONE_DOSSIER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>';
 const ICONE_COPIE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
-const ICONE_DOSSIER_OUVERT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v2"></path><path d="M2 19l2.6-7.1A2 2 0 0 1 6.5 10.5H22l-2.7 7.3A2 2 0 0 1 17.4 20"></path></svg>';
-const ICONE_SORTIE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>';
 
 let menuEl = null;
 let sousMenuEl = null;
@@ -313,66 +311,6 @@ function construireBoutonSource(track) {
     return btn;
 }
 
-/**
- * Construit le bouton d'ouverture du dossier contenant le fichier.
- *
- * Réservé aux fichiers locaux : une piste distante n'a pas de dossier, et le
- * bouton de source y copie déjà un lien qui s'ouvre d'un clic ailleurs. Le
- * dossier s'ouvre sur la machine qui héberge le bot — c'est elle qui détient le
- * fichier —, laquelle affiche aussi le tableau de bord en usage normal.
- *
- * Le libellé ne se change qu'en « Ouverture… » : la fenêtre s'ouvre sur une
- * autre machine que le navigateur dans les cas où le bot est déporté, et rien
- * ici ne permet d'affirmer qu'elle est apparue. Un échec, lui, remonte du
- * serveur sous forme de notification.
- *
- * @param {object} track
- * @returns {HTMLElement}
- */
-function construireBoutonOuvrirDossier(track) {
-    const btn = document.createElement('button');
-    btn.className = 'quality-menu-item quality-menu-source quality-menu-reveal';
-
-    const icone = document.createElement('span');
-    icone.className = 'quality-menu-icon';
-    icone.innerHTML = ICONE_DOSSIER_OUVERT;
-
-    const libelle = document.createElement('span');
-    libelle.className = 'quality-menu-label';
-    const libelleRepos = t('quality_menu_open_folder', 'Ouvrir le dossier');
-    libelle.textContent = libelleRepos;
-
-    // Le dossier visé plutôt que le fichier : c'est ce qui va s'ouvrir.
-    const dossier = String(track.url || '').replace(/[\\/][^\\/]*$/, '');
-    btn.dataset.tooltip = dossier || track.url || '';
-
-    const marque = document.createElement('span');
-    marque.className = 'quality-menu-arrow quality-menu-open-mark';
-    marque.innerHTML = ICONE_SORTIE;
-
-    btn.appendChild(icone);
-    btn.appendChild(libelle);
-    btn.appendChild(marque);
-
-    btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (typeof window.MusicPlayer.sendWS === 'function') {
-            window.MusicPlayer.sendWS({ type: 'revealTrackFile', data: { url: track.url } });
-        }
-
-        btn.classList.add('is-opening');
-        libelle.textContent = t('quality_menu_opening', 'Ouverture…');
-
-        clearTimeout(btn._retour);
-        btn._retour = setTimeout(() => {
-            btn.classList.remove('is-opening');
-            libelle.textContent = libelleRepos;
-        }, 1500);
-    });
-
-    return btn;
-}
-
 /** Ouvre (ou referme) le sous-menu de choix rattaché à un bouton. */
 function basculerSousMenu(type, btn) {
     if (sousMenuOuvert === type) {
@@ -549,12 +487,6 @@ function rendreMenu(forcer) {
     // règle pas. Elle vaut aussi pour un fichier local, dont c'est même le seul
     // bouton — sa qualité, elle, n'est pas négociable.
     menuEl.appendChild(construireBoutonSource(track));
-
-    // Juste sous la copie du chemin : les deux boutons décrivent la même chose,
-    // l'un pour l'emporter ailleurs, l'autre pour y aller directement.
-    if (!sourceEstUnLien(track)) {
-        menuEl.appendChild(construireBoutonOuvrirDossier(track));
-    }
 
     if (track.isLocal) return;
 

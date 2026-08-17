@@ -6,7 +6,6 @@
  */
 const database = require('../../../database/Database');
 const playbackStateManager = require('../../../database/PlaybackStateManager');
-const { resolveMediaPath } = require('../../../utils/mediaPaths');
 const log = require('../../../utils/logger');
 
 function handleRequestState(ctx) {
@@ -51,102 +50,6 @@ function handleClientLog(ctx) {
             const tag = data.source ? `[${data.source}]` : '[Client Log]';
             log.info(`${tag} ${data.message}`);
         }
-}
-
-/**
- * Commande d'ouverture de l'explorateur de fichiers sur un fichier donné.
- *
- * Le fichier est mis en évidence dans son dossier là où le système le permet —
- * c'est ce que fait un « Afficher dans le dossier » ailleurs, et cela évite de
- * chercher le titre parmi des centaines. Aucun environnement de bureau Linux
- * n'offre d'équivalent portable : `xdg-open` y ouvre donc le dossier seul.
- *
- * @param {string} fichier - Chemin absolu déjà validé
- * @returns {{ commande: string, args: string[], options: object }|null} null si
- *   la plateforme n'est pas gérée
- */
-function commandeExplorateur(fichier) {
-    const path = require('path');
-    switch (process.platform) {
-        case 'win32':
-            // Deux exigences d'explorer.exe, qui se contredisent presque :
-            // tout ce qui suit la virgule est le chemin — pas d'espace entre
-            // l'option et sa valeur —, et un chemin contenant des espaces doit
-            // porter ses propres guillemets. Or Node, voyant un argument à
-            // espaces, encadrerait `/select,<chemin>` en entier : explorer n'y
-            // reconnaît plus son option et n'ouvre rien, sans se plaindre.
-            // `windowsVerbatimArguments` rend la ligne de commande telle
-            // quelle, à nous de placer les guillemets au bon endroit. Un nom de
-            // fichier Windows ne peut pas contenir de guillemet : rien ne peut
-            // s'en échapper.
-            return {
-                commande: 'explorer.exe',
-                args: [`/select,"${fichier}"`],
-                options: { windowsVerbatimArguments: true }
-            };
-        case 'darwin':
-            return { commande: 'open', args: ['-R', fichier], options: {} };
-        case 'linux':
-            return { commande: 'xdg-open', args: [path.dirname(fichier)], options: {} };
-        default:
-            return null;
-    }
-}
-
-/**
- * Ouvre le dossier contenant un fichier local, depuis le menu contextuel d'une
- * piste.
- *
- * Le dossier s'ouvre sur la machine qui héberge le bot : c'est elle qui détient
- * le fichier. En usage normal c'est aussi celle qui affiche le tableau de bord,
- * les deux ne font qu'un.
- *
- * Le chemin reçu du client ne sert pas tel quel : `resolveMediaPath()` le
- * canonise et refuse tout ce qui sort des racines média autorisées. Il est
- * ensuite passé en argument à part entière, jamais concaténé dans une ligne de
- * commande interprétée par un shell.
- */
-function handleRevealTrackFile(ctx) {
-    const { ws, data } = ctx;
-
-    const erreur = (message) => {
-        try {
-            ws.send(JSON.stringify({ type: 'error', data: { message } }));
-        } catch (e) {}
-    };
-
-    const fichier = resolveMediaPath(data && data.url);
-    if (!fichier) {
-        log.warn(`[WebServer] Ouverture du dossier refusée pour : ${data && data.url}`);
-        return erreur('Fichier introuvable ou hors des dossiers autorisés.');
-    }
-
-    const commande = commandeExplorateur(fichier);
-    if (!commande) {
-        return erreur(`Ouverture du dossier non prise en charge sur ${process.platform}.`);
-    }
-
-    try {
-        const { spawn } = require('child_process');
-        const processus = spawn(commande.commande, commande.args, {
-            detached: true,
-            stdio: 'ignore',
-            ...commande.options
-        });
-
-        // L'explorateur Windows sort en code 1 même quand il a bien ouvert la
-        // fenêtre : seul l'échec de lancement est une erreur exploitable.
-        processus.on('error', (err) => {
-            log.error(`[WebServer] Échec de l'ouverture du dossier : ${err.message}`);
-            erreur("Impossible d'ouvrir le dossier.");
-        });
-        processus.unref();
-
-        log.info(`[WebServer] Dossier ouvert dans l'explorateur pour : ${fichier}`);
-    } catch (err) {
-        log.error(`[WebServer] Échec de l'ouverture du dossier : ${err.message}`);
-        erreur("Impossible d'ouvrir le dossier.");
-    }
 }
 
 /**
@@ -286,7 +189,6 @@ module.exports = {
     handleStartupFadeinConsumed,
     handleMemoryStream,
     handleClientLog,
-    handleRevealTrackFile,
     handleRestartBot,
     handleShutdownBot,
     redemarrerProcessus,

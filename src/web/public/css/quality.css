@@ -277,26 +277,6 @@
     color: var(--c-success);
 }
 
-/* --- Ouverture du dossier (fichiers locaux) --- */
-
-.quality-menu-open-mark svg {
-    width: 13px;
-    height: 13px;
-}
-
-/* Mise en évidence pendant que la demande part vers le serveur. Neutre, et non
-   verte comme la copie : rien ici ne prouve que la fenêtre s'est ouverte. */
-.quality-menu-reveal.is-opening,
-.quality-menu-reveal.is-opening:hover {
-    background: rgba(255, 255, 255, 0.12);
-}
-
-.quality-menu-reveal.is-opening .quality-menu-label,
-.quality-menu-reveal.is-opening .quality-menu-icon,
-.quality-menu-reveal.is-opening .quality-menu-open-mark {
-    color: var(--text-main);
-}
-
 /* --- Sous-menu de choix --- */
 
 .quality-submenu {

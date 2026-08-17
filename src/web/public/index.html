@@ -992,7 +992,16 @@
                         <h4 class="setting-sub-title" data-i18n="manage_servers">Gérer les serveurs</h4>
                         <div class="setting-item-row" style="margin-bottom: 0.8rem;">
                             <span data-i18n="add_bot_server">Ajouter le bot à un serveur :</span>
-                            <a href="https://discord.com/oauth2/authorize?client_id=1460596395350327318&permissions=8&scope=bot" target="_blank" rel="noopener noreferrer" class="maint-btn primary external-link-btn">
+                            <!--
+                                L'adresse est posée à l'exécution par
+                                js/settingsModal.js, depuis `GET /api/invite` :
+                                elle porte l'identifiant de l'application
+                                réellement connectée. Écrite en dur ici, elle
+                                désignait une autre application et Discord
+                                répondait « application inconnue ». Le lien reste
+                                inerte (`is-unavailable`) tant qu'elle manque.
+                            -->
+                            <a id="link-invite-bot" target="_blank" rel="noopener noreferrer" class="maint-btn primary external-link-btn is-unavailable">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
                                 <span data-i18n="invite_bot">Inviter le bot</span>
                             </a>

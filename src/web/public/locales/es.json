@@ -273,8 +273,6 @@
     "quality_menu_copy_path": "Copiar la ruta del archivo",
     "quality_menu_copied": "Copiado",
     "quality_menu_copy_failed": "No se pudo copiar",
-    "quality_menu_open_folder": "Abrir la carpeta",
-    "quality_menu_opening": "Abriendo…",
     "drawer_blur_label": "Desenfoque de fondo",
     "drawer_bandwidth_title": "Consumo de red (sesión)",
     "drawer_memory_title": "Memoria del bot (en vivo)",

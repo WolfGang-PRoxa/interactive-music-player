@@ -273,8 +273,6 @@
     "quality_menu_copy_path": "Copier le chemin d'accès",
     "quality_menu_copied": "Copié",
     "quality_menu_copy_failed": "Copie impossible",
-    "quality_menu_open_folder": "Ouvrir le dossier",
-    "quality_menu_opening": "Ouverture…",
     "drawer_blur_label": "Flou d'arrière-plan (Blur)",
     "drawer_bandwidth_title": "Consommation Réseau (Session)",
     "drawer_memory_title": "Mémoire du Bot (Temps Réel)",

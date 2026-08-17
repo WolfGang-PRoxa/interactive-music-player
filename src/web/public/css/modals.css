@@ -246,6 +246,14 @@
     background: var(--bg-hover, rgba(255, 255, 255, 0.06));
 }
 
+/* Étoile "salon par défaut" : collée à droite, juste avant la flèche du menu */
+.trigger-default-star {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+}
+
 .custom-select-trigger::after {
     content: "";
     width: 0;
@@ -1656,6 +1664,16 @@ input[type="range"]::-moz-range-thumb:hover {
 .external-link-btn svg {
     width: 14px;
     height: 14px;
+}
+
+/*
+ * Lien d'invitation dont l'adresse n'est pas encore connue : elle est posée par
+ * app.js au premier état reçu du bot. Le rendre inerte d'ici là évite un clic
+ * qui n'irait nulle part, le temps de l'aller-retour WebSocket.
+ */
+.external-link-btn.is-unavailable {
+    opacity: 0.5;
+    pointer-events: none;
 }
 
 /* Card Bounce Class */

@@ -250,6 +250,28 @@ window.MusicPlayer.pisteSuivante = function(state) {
     return (etat.queue && etat.queue[0]) || null;
 };
 
+/**
+ * Un serveur masqué depuis les réglages doit disparaître partout.
+ *
+ * L'interrupteur n'agissait que sur sa propre liste : le serveur restait
+ * proposé dans le sélecteur de salons, y compris après un rechargement, ce qui
+ * rendait le réglage inopérant. Le masquage est un choix d'affichage propre à
+ * cet appareil — il vit dans le localStorage et ne touche pas au bot, qui reste
+ * membre du serveur et continue d'y jouer si on l'y a laissé.
+ *
+ * @param {string} guildId
+ * @returns {boolean}
+ */
+window.MusicPlayer.estServeurVisible = function(guildId) {
+    const etats = (window.MusicPlayer.dashboardSettings || {}).guildsActiveState || {};
+    return etats[guildId] !== false;
+};
+
+/** Filtre une liste de serveurs sur leur visibilité. */
+window.MusicPlayer.serveursVisibles = function(guilds) {
+    return (guilds || []).filter(g => window.MusicPlayer.estServeurVisible(g.id));
+};
+
 window.MusicPlayer.checkIsDefaultChannel = function(guildId, channelId) {
     const state = window.MusicPlayer.state;
     if (!state || !state.guilds) return false;

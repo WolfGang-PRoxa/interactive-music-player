@@ -198,6 +198,34 @@ window.MusicPlayer.setupToastInteractions = function() {
     }
 };
 
+/**
+ * Renseigne l'adresse du bouton « Inviter le bot ».
+ *
+ * Elle porte l'identifiant de l'application réellement connectée, que seul le
+ * bot connaît : écrite en dur dans la page, elle a fini par désigner une autre
+ * application et Discord répondait « application inconnue ».
+ *
+ * Elle est demandée à `/api/invite` plutôt que lue dans l'état diffusé : tant
+ * que le bot n'a rejoint aucun serveur, aucun état n'est envoyé — or c'est
+ * exactement la situation où ce bouton est le seul recours.
+ */
+window.MusicPlayer.chargerLienInvitation = async function() {
+    const lien = document.getElementById('link-invite-bot');
+    if (!lien || !lien.classList.contains('is-unavailable')) return;
+
+    try {
+        const reponse = await fetch('/api/invite', { credentials: 'same-origin' });
+        if (!reponse.ok) return;
+        const donnees = await reponse.json();
+        if (!donnees || !donnees.inviteUrl) return;
+
+        lien.href = donnees.inviteUrl;
+        lien.classList.remove('is-unavailable');
+    } catch (e) {
+        // Bot pas encore prêt : la prochaine ouverture des réglages réessaiera.
+    }
+};
+
 window.MusicPlayer.renderConnectedGuildsList = function() {
     const container = document.getElementById('settings-guilds-list');
     if (!container) return;
@@ -206,7 +234,9 @@ window.MusicPlayer.renderConnectedGuildsList = function() {
     const dashboardSettings = window.MusicPlayer.dashboardSettings;
     const translations = window.translations || {};
     const dict = translations[dashboardSettings.language] || translations['fr'] || {};
-    const state = window.MusicPlayer.state;
+    // Une instance qui n'a rejoint aucun serveur ne reçoit aucun état : la liste
+    // doit tout de même s'afficher, vide, avec le bouton d'invitation au-dessus.
+    const state = window.MusicPlayer.state || {};
 
     if (!state.guilds || state.guilds.length === 0) {
         container.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 0.5rem;">${dict.no_connected_servers || 'Aucun serveur disponible'}</div>`;
@@ -240,6 +270,11 @@ window.MusicPlayer.renderConnectedGuildsList = function() {
         chk.addEventListener('change', () => {
             dashboardSettings.guildsActiveState[guild.id] = chk.checked;
             window.MusicPlayer.saveDashboardSettings();
+            // Le sélecteur de salons doit suivre sur-le-champ : ce réglage est
+            // local, aucun état ne sera diffusé pour l'y pousser.
+            if (typeof window.MusicPlayer.rafraichirInterface === 'function') {
+                window.MusicPlayer.rafraichirInterface();
+            }
             const statusStr = chk.checked ? (dict.server_enabled || 'activé') : (dict.server_disabled || 'désactivé');
             window.MusicPlayer.showToast(window.MusicPlayer.t('toast_server_status_updated').replace('{name}', guild.name).replace('{status}', statusStr));
         });
@@ -329,13 +364,24 @@ window.MusicPlayer.openServerDeleteConfirmModal = function(guildId, guildName) {
 
     if (btnConfirm) {
         btnConfirm.onclick = () => {
-            if (inputName.value.trim() === targetDeleteGuildName) {
-                if (confirmModal) confirmModal.classList.add('hidden');
-                window.MusicPlayer.dashboardSettings.guildsActiveState[targetDeleteGuildId] = false;
-                window.MusicPlayer.saveDashboardSettings();
-                window.MusicPlayer.showToast(window.MusicPlayer.t('toast_server_removed').replace('{name}', targetDeleteGuildName));
-                window.MusicPlayer.renderConnectedGuildsList();
+            if (inputName.value.trim() !== targetDeleteGuildName) return;
+            if (confirmModal) confirmModal.classList.add('hidden');
+
+            // Le bot quitte réellement le serveur : le masquer dans un coin du
+            // localStorage le laissait membre, et il réapparaissait au premier
+            // rechargement ou sur un autre appareil. Le serveur disparaîtra de
+            // lui-même des listes au prochain état diffusé.
+            if (typeof window.MusicPlayer.sendWS === 'function') {
+                window.MusicPlayer.sendWS({ type: 'leaveGuild', data: { guildId: targetDeleteGuildId } });
             }
+
+            // La préférence de visibilité n'a plus d'objet : la conserver
+            // masquerait d'emblée le serveur s'il était réinvité un jour.
+            delete window.MusicPlayer.dashboardSettings.guildsActiveState[targetDeleteGuildId];
+            window.MusicPlayer.saveDashboardSettings();
+
+            window.MusicPlayer.showToast(window.MusicPlayer.t('toast_server_removed').replace('{name}', targetDeleteGuildName));
+            window.MusicPlayer.renderConnectedGuildsList();
         };
     }
 
@@ -358,6 +404,7 @@ window.MusicPlayer.initSettingsModal = function() {
     }
 
     window.MusicPlayer.setupToastInteractions();
+    window.MusicPlayer.chargerLienInvitation();
 
     if (btnOpenSettings && settingsModal) {
         btnOpenSettings.addEventListener('click', (e) => {
@@ -367,6 +414,8 @@ window.MusicPlayer.initSettingsModal = function() {
             } catch (gErr) {
                 console.error('[SettingsModal] Erreur render connected guilds :', gErr);
             }
+            // Nouvelle tentative si le bot n'était pas encore prêt au chargement.
+            window.MusicPlayer.chargerLienInvitation();
             settingsModal.classList.remove('hidden');
             localStorage.setItem('music_player_settings_open', 'true');
         });

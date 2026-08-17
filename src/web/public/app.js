@@ -20,6 +20,9 @@
     let dashboardSettings = window.MusicPlayer.dashboardSettings;
     const saveDashboardSettings = window.MusicPlayer.saveDashboardSettings;
 
+    /** Empreinte des serveurs connus, pour ne redessiner leur liste qu'utilement. */
+    let signatureServeurs = '';
+
     // DOM Elements
     const statusDot = document.querySelector('.status-dot');
     const statusText = document.querySelector('.status-text');
@@ -583,6 +586,17 @@
     window.MusicPlayer.state = state;
     window.MusicPlayer.t = t;
 
+    /**
+     * Redessine l'interface à partir de l'état déjà en mémoire.
+     *
+     * Utile aux réglages purement locaux — la visibilité d'un serveur, par
+     * exemple — qui ne provoquent aucun échange avec le bot : sans cela, leur
+     * effet n'apparaîtrait qu'à la prochaine diffusion d'état.
+     */
+    window.MusicPlayer.rafraichirInterface = function() {
+        if (state) updateUI();
+    };
+
     function syncVideoVolume(volume) {
         if (typeof window.MusicPlayer.syncVideoVolume === 'function') {
             window.MusicPlayer.syncVideoVolume(volume);
@@ -656,7 +670,12 @@
                 return `${c.name} (${status})`;
             };
 
-            const channelStructure = (state.guilds || []).map(g => {
+            // Les serveurs masqués depuis les réglages sont écartés d'emblée :
+            // leur absence entre ainsi dans la signature ci-dessous, et basculer
+            // l'interrupteur reconstruit bien la liste.
+            const serveursAffiches = window.MusicPlayer.serveursVisibles(state.guilds);
+
+            const channelStructure = serveursAffiches.map(g => {
                 return `${g.id}:${g.defaultVoiceChannelId || 'none'}[${(g.voiceChannels || []).map(c => c.id).join(',')}]`;
             }).join('|');
 
@@ -667,8 +686,8 @@
                 const prevValue = guildSelect.value;
                 guildSelect.innerHTML = '';
 
-                if (state.guilds && state.guilds.length > 0) {
-                    state.guilds.forEach(g => {
+                if (serveursAffiches.length > 0) {
+                    serveursAffiches.forEach(g => {
                         const group = document.createElement('optgroup');
                         group.label = g.name;
 
@@ -701,7 +720,7 @@
                 }
             } else {
                 // Just update text contents
-                (state.guilds || []).forEach(g => {
+                serveursAffiches.forEach(g => {
                     (g.voiceChannels || []).forEach(c => {
                         const opt = document.getElementById(`opt-${c.id}`);
                         if (opt) {
@@ -723,6 +742,20 @@
             }
             if (customGuildSelect) {
                 customGuildSelect.sync();
+            }
+        }
+
+        // La liste des serveurs des réglages n'est dressée qu'à l'ouverture du
+        // modal : sans ce rappel, un serveur que le bot vient de quitter y
+        // resterait affiché. L'empreinte évite de la reconstruire chaque
+        // seconde, ce qui interromprait l'appui prolongé sur une corbeille.
+        const empreinte = (state.guilds || []).map(g => `${g.id}:${g.name}`).join('|');
+        if (empreinte !== signatureServeurs) {
+            signatureServeurs = empreinte;
+            const modalReglages = document.getElementById('settings-modal');
+            if (modalReglages && !modalReglages.classList.contains('hidden')
+                && typeof window.MusicPlayer.renderConnectedGuildsList === 'function') {
+                window.MusicPlayer.renderConnectedGuildsList();
             }
         }
 

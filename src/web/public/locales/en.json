@@ -273,8 +273,6 @@
     "quality_menu_copy_path": "Copy file path",
     "quality_menu_copied": "Copied",
     "quality_menu_copy_failed": "Copy failed",
-    "quality_menu_open_folder": "Open containing folder",
-    "quality_menu_opening": "Opening…",
     "drawer_blur_label": "Background blur",
     "drawer_bandwidth_title": "Network usage (session)",
     "drawer_memory_title": "Bot memory (live)",

@@ -317,6 +317,64 @@ function handleSetDefaultChannel(ctx) {
         webServer.broadcastState(currentGuildId);
 }
 
+/**
+ * Retire un serveur Discord de l'instance : le bot le quitte pour de bon.
+ *
+ * Le tableau de bord ne faisait jusqu'ici que masquer le serveur de ses propres
+ * listes — le bot y restait membre, et le serveur réapparaissait sur un autre
+ * appareil ou après une réinstallation. Le départ est donc demandé ici à
+ * Discord, seule opération qui « supprime » réellement le serveur.
+ *
+ * La file de lecture est détruite avant le départ : la quitter d'autorité
+ * laisserait une connexion vocale orpheline dans discord-player, qui continue
+ * de décoder pour un salon devenu inaccessible.
+ *
+ * Les réglages du serveur ne sont pas effacés : ils ne coûtent rien, et une
+ * réinvitation retrouve ainsi son salon favori et ses niveaux de ducking.
+ */
+async function handleLeaveGuild(ctx) {
+    const { ws, data, webServer } = ctx;
+
+    const erreur = (message) => {
+        try {
+            ws.send(JSON.stringify({ type: 'error', data: { message } }));
+        } catch (e) {}
+    };
+
+    const guildId = data && data.guildId;
+    const guild = guildId ? webServer.client?.guilds.cache.get(guildId) : null;
+    if (!guild) {
+        log.warn(`[WebServer] Départ refusé : serveur ${guildId} introuvable.`);
+        return erreur('Serveur introuvable — le bot n\'en fait plus partie.');
+    }
+
+    // Un bot propriétaire de son serveur ne peut pas le quitter : Discord
+    // refuserait, autant le dire tout de suite.
+    if (guild.ownerId === webServer.client.user?.id) {
+        return erreur(`Le bot est propriétaire de « ${guild.name} » : il ne peut pas le quitter.`);
+    }
+
+    const nom = guild.name;
+
+    try {
+        const { useMainPlayer } = require('discord-player');
+        const queue = useMainPlayer().queues.get(guildId);
+        if (queue) queue.delete();
+    } catch (err) {
+        log.warn(`[WebServer] File de ${nom} non détruite avant le départ : ${err.message}`);
+    }
+
+    try {
+        await guild.leave();
+        log.info(`[WebServer] Le bot a quitté le serveur « ${nom} » (${guildId}).`);
+    } catch (err) {
+        log.error(`[WebServer] Échec du départ de « ${nom} » : ${err.message}`);
+        return erreur(`Impossible de quitter « ${nom} » : ${err.message}`);
+    }
+
+    webServer.reattribuerClients(guildId);
+}
+
 async function handleUpdateSettings(ctx) {
     const { ws, data, webServer, player, currentGuildId } = ctx;
     let queue = ctx.queue;
@@ -594,6 +652,7 @@ function handleToggleVoiceDetection(ctx) {
 module.exports = {
     handleSelectChannel,
     handleSetDefaultChannel,
+    handleLeaveGuild,
     handleUpdateSettings,
     handleToggleVoiceDetection,
 };

@@ -39,6 +39,7 @@ Toutes sont protégées par le jeton ([07 — Sécurité](07-securite.md)).
 | Route | Rôle |
 |---|---|
 | `GET /api/state` | État complet, en secours si le WebSocket est indisponible |
+| `GET /api/invite` | Lien d'invitation du bot sur un nouveau serveur Discord |
 | `GET /api/stream` | Flux audio d'une piste, pour le lecteur du navigateur |
 | `GET /api/download` | Téléchargement transcodé, 32 combinaisons format/qualité (MP3, M4A, FLAC, WAV, OGG, OPUS, WEBM, MP4) |
 | `GET /api/video-info` | Résolution d'une URL vidéo via yt-dlp, cache mémoire d'une heure |
@@ -52,6 +53,13 @@ donc celle du code qui tourne. Les identifiants renvoyés forment la liste
 blanche du service de contenu — celui-ci ne construit jamais de chemin à partir
 de la requête, il cherche l'identifiant dans l'inventaire qu'il vient d'établir.
 C'est ce qui met une remontée de dossier hors sujet plutôt que hors la loi.
+
+`/api/invite` assemble l'adresse depuis l'application réellement connectée
+(`client.generateInvite`, portées `bot` et `applications.commands`) : un
+identifiant écrit en dur dans la page finit par désigner une autre application,
+et Discord répond alors « application inconnue ». C'est une route HTTP et non un
+champ de l'état, car `/api/state` refuse de répondre tant que le bot n'a rejoint
+aucun serveur — précisément le cas où ce lien est le seul recours.
 
 `/api/stream` sert, dans l'ordre : le fichier de cache de préchargement s'il
 existe, sinon le fichier local s'il est sous une racine autorisée, sinon un
@@ -99,16 +107,22 @@ préchargement alimente le cache.
 | Lecture | `play`, `pause`, `resume`, `skip`, `previous`, `stop`, `seek`, `setPlayMode`, `syncProgress` |
 | File d'attente | `removeTrack`, `playNow`, `moveOrInsertTrack`, `clearQueue`, `removeFromHistory`, `clearHistory` |
 | Playlists | `createPlaylist`, `renamePlaylist`, `deletePlaylist`, `reorderPlaylists`, `addPlaylistTrack`, `addTrackToPlaylist`, `removeTrackFromPlaylist`, `movePlaylistTrack`, `setActivePlaybackSource` |
-| Serveur Discord | `selectChannel`, `setDefaultChannel`, `updateSettings`, `toggleVoiceDetection` |
-| Piste | `setTrackQuality`, `revealTrackFile` |
+| Serveur Discord | `selectChannel`, `setDefaultChannel`, `updateSettings`, `toggleVoiceDetection`, `leaveGuild` |
+| Piste | `setTrackQuality` |
 | Système | `requestState`, `clientLog`, `memoryStream`, `startupFadeinConsumed`, `restartBot`, `shutdownBot` |
 
-`revealTrackFile` ouvre l'explorateur de fichiers **de la machine du bot** sur le
-fichier d'une piste locale, mis en évidence dans son dossier (`explorer /select`,
-`open -R`, `xdg-open` à défaut). Le chemin reçu passe par
-[`resolveMediaPath()`](../../src/utils/mediaPaths.js), le même filtre que
-`/api/stream` : hors des racines média autorisées, la demande est refusée. Il est
-ensuite passé en argument à `spawn()`, jamais à un shell.
+`leaveGuild` fait quitter au bot un serveur Discord — la corbeille des réglages,
+après confirmation du nom. La file de lecture est détruite avant le départ, puis
+les tableaux de bord restés sur ce serveur sont rebasculés sur un autre
+(`WebServer.reattribuerClients`), faute de quoi ils ne recevraient plus aucun
+état. À distinguer de l'interrupteur voisin, qui ne fait que masquer le serveur
+dans les listes de ce navigateur — un réglage local, sans effet sur le bot.
+
+Le menu contextuel d'une piste locale n'ouvre pas son dossier : un navigateur ne
+peut pas commander l'explorateur de fichiers de la machine qui l'affiche. Il
+propose à la place « Copier le chemin d'accès », qui met `track.url` dans le
+presse-papiers — l'utilisateur colle ce chemin où il veut. Tout est côté client,
+aucun message WebSocket n'est échangé.
 
 ### Structure de l'état
 

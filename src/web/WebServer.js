@@ -98,6 +98,9 @@ class WebServer {
          */
         this.pilotes = new Map();
 
+        /** Lien d'invitation, construit une fois le bot prêt. Voir lienInvitation(). */
+        this._lienInvitation = null;
+
         // Flux mémoire haute cadence : voir setFluxMemoire.
         this._abonnesMemoire = new Set();
         this._minuteurMesureMemoire = null;
@@ -1201,6 +1204,82 @@ class WebServer {
 
     _getFirstGuildId() {
         return this.client?.guilds?.cache?.first()?.id || null;
+    }
+
+    /**
+     * Lien d'invitation du bot sur un nouveau serveur Discord.
+     *
+     * Construit à partir de l'application réellement connectée : un identifiant
+     * écrit en dur dans la page finit par désigner une autre application que
+     * celle dont on tient le jeton, et Discord répond alors « application
+     * inconnue ». `generateInvite` n'appelle rien à distance, il assemble
+     * l'URL — le résultat est néanmoins retenu, la portée étant fixe pour toute
+     * la durée de vie du process.
+     *
+     * La portée `applications.commands` accompagne `bot` : sans elle, le
+     * serveur invité n'accepterait pas l'enregistrement des commandes slash que
+     * `npm run deploy` y publie.
+     *
+     * @returns {string|null} null tant que le bot n'est pas prêt
+     */
+    lienInvitation() {
+        if (this._lienInvitation) return this._lienInvitation;
+        if (!this.client || !this.client.application?.id) return null;
+
+        try {
+            const { OAuth2Scopes, PermissionsBitField } = require('discord.js');
+            this._lienInvitation = this.client.generateInvite({
+                scopes: [OAuth2Scopes.Bot, OAuth2Scopes.ApplicationsCommands],
+                permissions: [PermissionsBitField.Flags.Administrator]
+            });
+        } catch (err) {
+            log.warn(`[WebServer] Lien d'invitation indisponible : ${err.message}`);
+            return null;
+        }
+
+        return this._lienInvitation;
+    }
+
+    /**
+     * Rebascule les tableaux de bord restés sur un serveur que le bot a quitté.
+     *
+     * `broadcastState` ne s'adresse qu'aux clients dont c'est le serveur
+     * courant : sans ce rattachement, ceux qui regardaient le serveur disparu
+     * ne recevraient plus rien et resteraient sur un affichage figé.
+     *
+     * @param {string} guildIdQuitte
+     */
+    reattribuerClients(guildIdQuitte) {
+        const remplacant = this._getFirstGuildId();
+        const guild = remplacant ? this.client.guilds.cache.get(remplacant) : null;
+        const salon = guild ? this._findActiveVoiceChannel(guild) : null;
+
+        // Sans serveur de repli, l'état est demandé sur celui qui vient d'être
+        // quitté : il n'existe plus dans le cache Discord, la liste des serveurs
+        // part donc vide — ce qu'il faut afficher — sans créer d'entrée de
+        // réglages pour un identifiant nul.
+        const idEtat = remplacant || guildIdQuitte;
+
+        this.wss.clients.forEach(client => {
+            if (client.readyState !== 1 || client.selectedGuildId !== guildIdQuitte) return;
+
+            client.selectedGuildId = remplacant;
+            client.selectedVoiceChannelId = salon ? salon.id : null;
+            client._lastStateSignature = null;
+
+            try {
+                client.send(JSON.stringify({
+                    type: 'state',
+                    data: {
+                        ...this.getState(idEtat, client.selectedVoiceChannelId),
+                        pilote: remplacant ? this.estPilote(client, remplacant) : false
+                    }
+                }));
+            } catch (e) {}
+        });
+
+        this.pilotes.delete(guildIdQuitte);
+        if (remplacant) this._assurerPilote(remplacant);
     }
 
     _findActiveVoiceChannel(guild) {

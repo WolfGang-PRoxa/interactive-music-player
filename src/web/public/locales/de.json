@@ -273,8 +273,6 @@
     "quality_menu_copy_path": "Dateipfad kopieren",
     "quality_menu_copied": "Kopiert",
     "quality_menu_copy_failed": "Kopieren fehlgeschlagen",
-    "quality_menu_open_folder": "Ordner öffnen",
-    "quality_menu_opening": "Wird geöffnet…",
     "drawer_blur_label": "Hintergrundunschärfe",
     "drawer_bandwidth_title": "Netzwerkverbrauch (Sitzung)",
     "drawer_memory_title": "Bot-Speicher (Echtzeit)",
