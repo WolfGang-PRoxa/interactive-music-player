@@ -37,9 +37,9 @@
 const { Readable } = require('stream');
 
 const {
-    OCTETS_PAR_TRAME,
-    VALEURS_PAR_TRAME,
-    ECHANTILLONS_PAR_TRAME,
+    BYTES_PER_FRAME,
+    VALUES_PER_FRAME,
+    SAMPLES_PER_FRAME,
     MIN_16,
     MAX_16,
 } = require('./format');
@@ -51,23 +51,23 @@ const {
  * et le ducking comme le volume doivent se faire entendre sans délai. La marge
  * contre les à-coups réseau est prise en amont, dans le tampon des sources.
  */
-const TRAMES_AVANCE = 4;
+const LEAD_FRAMES = 4;
 
 class MixBus extends Readable {
     constructor() {
-        super({ highWaterMark: OCTETS_PAR_TRAME * TRAMES_AVANCE });
+        super({ highWaterMark: BYTES_PER_FRAME * LEAD_FRAMES });
 
         /** @type {import('./MixSource')[]} Sources actuellement mixées */
         this.sources = [];
 
         /** Gain appliqué à la somme, 0 à 1. */
-        this._gainMaitre = 1;
+        this._masterGain = 1;
 
         /** Gain de la trame précédente, pour interpoler et éviter les paliers. */
-        this._gainMaitrePrecedent = 1;
+        this._previousMasterGain = 1;
 
         /** Appelé après chaque trame produite : l'horloge du moteur. */
-        this._surTrame = null;
+        this._onFrame = null;
 
         /**
          * Trames fabriquées depuis l'ouverture du bus.
@@ -77,7 +77,7 @@ class MixBus extends Readable {
          * à ce que le lecteur a réellement émis donne cette avance, et c'est la
          * seule façon de savoir où en est vraiment ce qu'on entend.
          */
-        this.tramesProduites = 0;
+        this.framesProduced = 0;
 
         /**
          * Le lecteur accepte-t-il encore des trames ?
@@ -91,9 +91,9 @@ class MixBus extends Readable {
          * et tout ce qui est déjà mixé étant hors de portée, un
          * repositionnement ne s'entendait qu'au bout de ce délai.
          */
-        this._place = true;
+        this._slot = true;
 
-        this._ferme = false;
+        this._closed = false;
     }
 
     // ─── Sources ──────────────────────────────────────────────────────────
@@ -106,15 +106,15 @@ class MixBus extends Readable {
      *
      * @param {import('./MixSource')} source
      */
-    ajouter(source) {
-        if (this._ferme || this.sources.includes(source)) return;
+    add(source) {
+        if (this._closed || this.sources.includes(source)) return;
         this.sources.push(source);
-        source.on('donnees', this._relancer);
-        this._produire();
+        source.on('donnees', this._restart);
+        this._produce();
     }
 
     /** Le bus mixe-t-il déjà cette source ? */
-    contient(source) {
+    contains(source) {
         return this.sources.includes(source);
     }
 
@@ -122,16 +122,16 @@ class MixBus extends Readable {
      * Retire une source du mixage, sans la fermer.
      * @param {import('./MixSource')} source
      */
-    retirer(source) {
+    remove(source) {
         const index = this.sources.indexOf(source);
         if (index === -1) return;
         this.sources.splice(index, 1);
-        source.removeListener('donnees', this._relancer);
+        source.removeListener('donnees', this._restart);
     }
 
     /** Une source vient de recevoir du son : de quoi débloquer une famine. */
-    _relancer = () => {
-        this._produire();
+    _restart = () => {
+        this._produce();
     };
 
     // ─── Réglages ─────────────────────────────────────────────────────────
@@ -140,29 +140,29 @@ class MixBus extends Readable {
      * Gain appliqué à la somme des sources.
      * @param {number} valeur - 0 à 1
      */
-    definirGainMaitre(valeur) {
-        this._gainMaitre = Math.max(0, Math.min(1, valeur));
+    setMasterGain(value) {
+        this._masterGain = Math.max(0, Math.min(1, value));
     }
 
     /** @returns {number} */
-    get gainMaitre() {
-        return this._gainMaitre;
+    get masterGain() {
+        return this._masterGain;
     }
 
     /**
      * Enregistre l'horloge du moteur : appelée après chaque trame produite.
      * @param {Function|null} rappel
      */
-    surTrame(rappel) {
-        this._surTrame = rappel;
+    onFrame(callback) {
+        this._onFrame = callback;
     }
 
     // ─── Production ───────────────────────────────────────────────────────
 
     /** Le lecteur redemande : la place rouvre, et la production reprend. */
     _read() {
-        this._place = true;
-        this._produire();
+        this._slot = true;
+        this._produce();
     }
 
     /**
@@ -176,29 +176,29 @@ class MixBus extends Readable {
      * demande est retenue et servie au tour suivant. Sans cela, le bus
      * s'arrêterait précisément à l'instant du passage d'un morceau à l'autre.
      */
-    _produire() {
-        if (this._ferme) return;
-        if (this._enProduction) {
-            this._relanceDemandee = true;
+    _produce() {
+        if (this._closed) return;
+        if (this._producing) {
+            this._restartRequested = true;
             return;
         }
-        this._enProduction = true;
+        this._producing = true;
 
         try {
-            let reprendre = true;
-            while (reprendre) {
-                reprendre = false;
-                this._relanceDemandee = false;
+            let resume = true;
+            while (resume) {
+                resume = false;
+                this._restartRequested = false;
 
-                while (this._place) {
-                    const trame = this._melanger();
-                    if (!trame) break;
-                    this.tramesProduites++;
-                    this._place = this.push(trame);
+                while (this._slot) {
+                    const frame = this._mix();
+                    if (!frame) break;
+                    this.framesProduced++;
+                    this._slot = this.push(frame);
 
-                    if (this._surTrame) {
+                    if (this._onFrame) {
                         try {
-                            this._surTrame();
+                            this._onFrame();
                         } catch (err) {
                             this.emit('erreurMoteur', err);
                         }
@@ -207,10 +207,10 @@ class MixBus extends Readable {
 
                 // Le lecteur en accepte encore, et une source est arrivée entre
                 // temps : il y a de nouveau de quoi produire.
-                if (this._place && this._relanceDemandee && !this._ferme) reprendre = true;
+                if (this._slot && this._restartRequested && !this._closed) resume = true;
             }
         } finally {
-            this._enProduction = false;
+            this._producing = false;
         }
     }
 
@@ -220,7 +220,7 @@ class MixBus extends Readable {
      * @returns {Buffer|null} `null` si une source n'est pas prête — il faut
      *   alors attendre plutôt que de produire une trame incomplète.
      */
-    _melanger() {
+    _mix() {
         if (this.sources.length === 0) return null;
 
         // Toutes les sources sont interrogées avant qu'aucune ne soit lue : une
@@ -228,38 +228,38 @@ class MixBus extends Readable {
         // être fabriquée. Consommer les autres en attendant les décalerait
         // définitivement d'une trame par rapport à la retardataire.
         for (const source of this.sources) {
-            if (!source.peutAvancer) return null;
+            if (!source.canAdvance) return null;
         }
 
-        const trames = [];
-        const epuisees = [];
+        const frames = [];
+        const exhaustedSources = [];
 
         for (const source of this.sources) {
-            const trame = source.lireTrame();
-            if (trame) trames.push(trame);
-            else epuisees.push(source);
+            const frame = source.readFrame();
+            if (frame) frames.push(frame);
+            else exhaustedSources.push(source);
         }
 
-        for (const source of epuisees) {
-            this.retirer(source);
+        for (const source of exhaustedSources) {
+            this.remove(source);
             this.emit('sourceEpuisee', source);
         }
-        if (trames.length === 0) return null;
+        if (frames.length === 0) return null;
 
-        const gainDebut = this._gainMaitrePrecedent;
-        const gainFin = this._gainMaitre;
-        this._gainMaitrePrecedent = gainFin;
+        const startGain = this._previousMasterGain;
+        const endGain = this._masterGain;
+        this._previousMasterGain = endGain;
 
         // Chemin rapide : une seule source à plein gain, volume nominal, aucun
         // fondu. Les octets sont alors transmis tels quels — le son diffusé est
         // exactement celui que FFmpeg a décodé, sans un arrondi de plus.
-        if (trames.length === 1
-            && gainDebut === 1 && gainFin === 1
-            && trames[0].gainDebut === 1 && trames[0].gainFin === 1) {
-            return trames[0].pcm;
+        if (frames.length === 1
+            && startGain === 1 && endGain === 1
+            && frames[0].startGain === 1 && frames[0].endGain === 1) {
+            return frames[0].pcm;
         }
 
-        return this._sommer(trames, gainDebut, gainFin);
+        return this._sum(frames, startGain, endGain);
     }
 
     /**
@@ -274,31 +274,31 @@ class MixBus extends Readable {
      * @param {number} maitreFin
      * @returns {Buffer}
      */
-    _sommer(trames, maitreDebut, maitreFin) {
-        const sortie = Buffer.allocUnsafe(OCTETS_PAR_TRAME);
-        const nombre = trames.length;
+    _sum(frames, masterStart, masterEnd) {
+        const output = Buffer.allocUnsafe(BYTES_PER_FRAME);
+        const count = frames.length;
 
-        for (let i = 0; i < VALEURS_PAR_TRAME; i++) {
-            const octet = i << 1;
+        for (let i = 0; i < VALUES_PER_FRAME; i++) {
+            const byte = i << 1;
             // Une position par échantillon, partagée par les deux canaux : les
             // rampes gauche et droite restent ainsi rigoureusement identiques.
-            const t = (i >> 1) / ECHANTILLONS_PAR_TRAME;
+            const t = (i >> 1) / SAMPLES_PER_FRAME;
 
-            let somme = 0;
-            for (let s = 0; s < nombre; s++) {
-                const trame = trames[s];
-                const gain = trame.gainDebut + (trame.gainFin - trame.gainDebut) * t;
+            let sum = 0;
+            for (let s = 0; s < count; s++) {
+                const frame = frames[s];
+                const gain = frame.startGain + (frame.endGain - frame.startGain) * t;
                 if (gain === 0) continue;
-                somme += trame.pcm.readInt16LE(octet) * gain;
+                sum += frame.pcm.readInt16LE(byte) * gain;
             }
 
-            somme *= maitreDebut + (maitreFin - maitreDebut) * t;
+            sum *= masterStart + (masterEnd - masterStart) * t;
 
-            const valeur = Math.round(somme);
-            sortie.writeInt16LE(valeur < MIN_16 ? MIN_16 : (valeur > MAX_16 ? MAX_16 : valeur), octet);
+            const value = Math.round(sum);
+            output.writeInt16LE(value < MIN_16 ? MIN_16 : (value > MAX_16 ? MAX_16 : value), byte);
         }
 
-        return sortie;
+        return output;
     }
 
     // ─── Fermeture ────────────────────────────────────────────────────────
@@ -309,11 +309,11 @@ class MixBus extends Readable {
      * Le flux est terminé proprement plutôt que détruit : le lecteur joue ce
      * qui reste en tampon avant de se déclarer inactif.
      */
-    fermer() {
-        if (this._ferme) return;
-        this._ferme = true;
-        for (const source of [...this.sources]) this.retirer(source);
-        this._surTrame = null;
+    close() {
+        if (this._closed) return;
+        this._closed = true;
+        for (const source of [...this.sources]) this.remove(source);
+        this._onFrame = null;
         this.push(null);
     }
 }

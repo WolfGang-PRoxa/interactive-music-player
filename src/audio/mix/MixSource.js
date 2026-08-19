@@ -33,13 +33,13 @@ const cp = require('child_process');
 const ffmpeg = require('ffmpeg-static');
 
 const {
-    FREQUENCE,
-    CANAUX,
-    OCTETS_PAR_TRAME,
-    OCTETS_PAR_MS,
-    octetsVersMs,
+    SAMPLE_RATE,
+    CHANNELS,
+    BYTES_PER_FRAME,
+    BYTES_PER_MS,
+    bytesToMs,
 } = require('./format');
-const { resoudreEntree, estUrl } = require('./entree');
+const { resolveInput, isUrl } = require('./input');
 const log = require('../../utils/logger');
 
 /**
@@ -50,10 +50,10 @@ const log = require('../../utils/logger');
  * annoncée dans les métadonnées se trompe parfois — survienne avant le point de
  * fondu des durées d'enchaînement courantes.
  */
-const TAMPON_MAX_MS = 12000;
+const MAX_BUFFER_MS = 12000;
 
 /** Son décodé exigé avant de considérer la source prête à jouer. */
-const TAMPON_AMORCAGE_MS = 400;
+const PRIMING_BUFFER_MS = 400;
 
 /**
  * Délai au-delà duquel un décodeur muet est déclaré perdu.
@@ -62,13 +62,13 @@ const TAMPON_AMORCAGE_MS = 400;
  * plus laisserait la mise en lecture attendre indéfiniment : la file ne
  * repartirait jamais, et rien ne signalerait pourquoi.
  */
-const DELAI_AMORCAGE_MAX_MS = 20000;
+const MAX_PRIMING_DELAY_MS = 20000;
 
 /** Fréquence de coupure au plus bas du balayage de filtre, en Hz. */
-const COUPURE_BASSE_HZ = 400;
+const LOW_CUTOFF_HZ = 400;
 
 /** Au-delà, le filtre est jugé transparent et n'est plus appliqué. */
-const COUPURE_TRANSPARENTE_HZ = 16000;
+const TRANSPARENT_CUTOFF_HZ = 16000;
 
 /**
  * Chaîne `atempo` couvrant une vitesse quelconque.
@@ -80,8 +80,8 @@ const COUPURE_TRANSPARENTE_HZ = 16000;
  * @param {number} vitesse
  * @returns {string|null}
  */
-function chaineTempo(vitesse) {
-    const v = Math.round(vitesse * 100) / 100;
+function tempoChain(speed) {
+    const v = Math.round(speed * 100) / 100;
     if (!v || v === 1) return null;
     if (v < 0.5) return `atempo=0.5,atempo=${Math.round((v / 0.5) * 100) / 100}`;
     if (v > 2) return `atempo=2.0,atempo=${Math.round((v / 2) * 100) / 100}`;
@@ -93,8 +93,8 @@ function chaineTempo(vitesse) {
  * @param {number} coupureHz
  * @returns {number}
  */
-function coefficientPasseBas(coupureHz) {
-    return 1 - Math.exp((-2 * Math.PI * coupureHz) / FREQUENCE);
+function lowPassCoefficient(cutoffHz) {
+    return 1 - Math.exp((-2 * Math.PI * cutoffHz) / SAMPLE_RATE);
 }
 
 class MixSource extends EventEmitter {
@@ -106,44 +106,44 @@ class MixSource extends EventEmitter {
      * @param {number} [options.vitesse] - Multiplicateur de vitesse
      * @param {number} [options.gain] - Gain initial, 0 à 1
      */
-    constructor(piste, { player, departMs = 0, vitesse = 1, gain = 1 } = {}) {
+    constructor(track, { player, startMs = 0, speed = 1, gain = 1 } = {}) {
         super();
 
-        this.piste = piste;
+        this.track = track;
         this.player = player;
-        this.departMs = Math.max(0, departMs || 0);
-        this.vitesse = vitesse > 0 ? vitesse : 1;
+        this.startMs = Math.max(0, startMs || 0);
+        this.speed = speed > 0 ? speed : 1;
 
         /** Morceaux de PCM décodé en attente d'être lus. */
-        this._tampon = [];
-        this._disponible = 0;
+        this._buffer = [];
+        this._available = 0;
 
         /** Octets déjà rendus au bus : c'est ce qui donne la position exacte. */
-        this._octetsEmis = 0;
+        this._bytesEmitted = 0;
 
-        this._processus = null;
-        this._fluxEntree = null;
-        this._fluxTermine = false;
-        this._epuisee = false;
-        this._arretee = false;
-        this._enPause = false;
+        this._process = null;
+        this._inputStream = null;
+        this._streamEnded = false;
+        this._exhausted = false;
+        this._halted = false;
+        this._paused = false;
 
         // --- Enveloppe de gain ---
         this._gain = gain;
-        this._gainDepart = gain;
-        this._gainCible = gain;
-        this._tramesFondu = 0;
-        this._trameFondu = 0;
-        this._courbeFondu = 'puissance';
-        this._auTermeDuFondu = null;
+        this._startGain = gain;
+        this._targetGain = gain;
+        this._fadeFrames = 0;
+        this._fadeFrame = 0;
+        this._fadeCurve = 'puissance';
+        this._onFadeComplete = null;
 
         // --- Balayage de filtre (enchaînement « effets ») ---
-        this._filtreActif = false;
-        this._coupureDepart = COUPURE_TRANSPARENTE_HZ;
-        this._coupureCible = COUPURE_TRANSPARENTE_HZ;
-        this._etatFiltre = [[0, 0], [0, 0]];
+        this._filterActive = false;
+        this._startCutoff = TRANSPARENT_CUTOFF_HZ;
+        this._targetCutoff = TRANSPARENT_CUTOFF_HZ;
+        this._filterState = [[0, 0], [0, 0]];
 
-        this._amorcee = null;
+        this._primed = null;
     }
 
     // ─── Cycle de vie ─────────────────────────────────────────────────────
@@ -158,15 +158,15 @@ class MixSource extends EventEmitter {
      *
      * @returns {Promise<void>}
      */
-    async demarrer() {
-        const { entree, flux } = await resoudreEntree(this.piste, this.player);
-        if (this._arretee) {
-            try { flux?.destroy(); } catch (e) {}
+    async start() {
+        const { input, stream } = await resolveInput(this.track, this.player);
+        if (this._halted) {
+            try { stream?.destroy(); } catch (e) {}
             return;
         }
 
-        this._lancerFfmpeg(entree, flux);
-        await this._attendreAmorcage();
+        this._spawnFfmpeg(input, stream);
+        await this._awaitPriming();
     }
 
     /**
@@ -180,41 +180,41 @@ class MixSource extends EventEmitter {
      * @param {number} [vitesse]
      * @returns {Promise<void>}
      */
-    async repositionner(positionMs, vitesse = this.vitesse) {
-        this._fermerProcessus();
+    async seek(positionMs, speed = this.speed) {
+        this._closeProcess();
 
-        this.departMs = Math.max(0, positionMs);
-        this.vitesse = vitesse > 0 ? vitesse : 1;
-        this._tampon = [];
-        this._disponible = 0;
-        this._octetsEmis = 0;
-        this._fluxTermine = false;
-        this._epuisee = false;
-        this._enPause = false;
-        this._amorcee = null;
-        this._etatFiltre = [[0, 0], [0, 0]];
+        this.startMs = Math.max(0, positionMs);
+        this.speed = speed > 0 ? speed : 1;
+        this._buffer = [];
+        this._available = 0;
+        this._bytesEmitted = 0;
+        this._streamEnded = false;
+        this._exhausted = false;
+        this._paused = false;
+        this._primed = null;
+        this._filterState = [[0, 0], [0, 0]];
 
-        await this.demarrer();
+        await this.start();
     }
 
     /** Ferme le décodeur et libère tout ce qui en dépend. */
-    arreter() {
-        this._arretee = true;
-        this._fermerProcessus();
-        this._tampon = [];
-        this._disponible = 0;
-        this._epuisee = true;
+    stop() {
+        this._halted = true;
+        this._closeProcess();
+        this._buffer = [];
+        this._available = 0;
+        this._exhausted = true;
     }
 
-    _fermerProcessus() {
-        if (this._processus) {
-            try { this._processus.stdout?.removeAllListeners(); } catch (e) {}
-            try { this._processus.kill('SIGKILL'); } catch (e) {}
-            this._processus = null;
+    _closeProcess() {
+        if (this._process) {
+            try { this._process.stdout?.removeAllListeners(); } catch (e) {}
+            try { this._process.kill('SIGKILL'); } catch (e) {}
+            this._process = null;
         }
-        if (this._fluxEntree) {
-            try { this._fluxEntree.destroy(); } catch (e) {}
-            this._fluxEntree = null;
+        if (this._inputStream) {
+            try { this._inputStream.destroy(); } catch (e) {}
+            this._inputStream = null;
         }
     }
 
@@ -222,10 +222,10 @@ class MixSource extends EventEmitter {
      * @param {string} entree
      * @param {import('stream').Readable|null} flux
      */
-    _lancerFfmpeg(entree, flux) {
+    _spawnFfmpeg(input, stream) {
         const args = ['-hide_banner', '-loglevel', 'error', '-nostdin'];
 
-        if (estUrl(entree)) {
+        if (isUrl(input)) {
             args.push('-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5');
         }
 
@@ -233,120 +233,123 @@ class MixSource extends EventEmitter {
         // FFmpeg ne décode pas ce qui précède, et sur une adresse réseau il ne le
         // télécharge même pas. `-accurate_seek`, actif par défaut sous cette
         // forme, ramène ensuite la coupure à l'échantillon près.
-        if (this.departMs > 0) {
-            args.push('-ss', (this.departMs / 1000).toFixed(6));
+        if (this.startMs > 0) {
+            args.push('-ss', (this.startMs / 1000).toFixed(6));
         }
 
-        args.push('-i', entree, '-vn');
+        args.push('-i', input, '-vn');
 
-        const tempo = chaineTempo(this.vitesse);
+        const tempo = tempoChain(this.speed);
         if (tempo) args.push('-af', tempo);
 
-        args.push('-f', 's16le', '-ar', String(FREQUENCE), '-ac', String(CANAUX), 'pipe:1');
+        args.push('-f', 's16le', '-ar', String(SAMPLE_RATE), '-ac', String(CHANNELS), 'pipe:1');
 
-        const processus = cp.spawn(ffmpeg, args, {
+        const ffmpegProcess = cp.spawn(ffmpeg, args, {
             stdio: ['pipe', 'pipe', 'pipe'],
             windowsHide: true
         });
-        this._processus = processus;
-        this._fluxEntree = flux || null;
+        this._process = ffmpegProcess;
+        this._inputStream = stream || null;
 
-        const journal = [];
-        processus.stderr?.on('data', (d) => {
+        // Nom distinct de celui du module de journalisation, importé plus haut :
+        // `const log = []` le masquerait dans toute cette fonction, et les
+        // `log.error` ci-dessous s'adresseraient à un tableau.
+        const ffmpegLog = [];
+        ffmpegProcess.stderr?.on('data', (d) => {
             const message = d.toString().trim();
-            if (message) journal.push(message);
+            if (message) ffmpegLog.push(message);
         });
 
-        processus.stdout.on('data', (morceau) => this._recevoir(morceau));
-        processus.stdout.on('end', () => this._terminerFlux());
+        ffmpegProcess.stdout.on('data', (track) => this._receive(track));
+        ffmpegProcess.stdout.on('end', () => this._endStream());
 
-        processus.on('error', (err) => {
-            log.error(`[MixSource] FFmpeg n'a pas pu démarrer pour ${this.piste?.title} :`, err.message);
-            this._terminerFlux();
+        ffmpegProcess.on('error', (err) => {
+            log.error(`[MixSource] FFmpeg n'a pas pu démarrer pour ${this.track?.title} :`, err.message);
+            this._endStream();
             this.emit('erreur', err);
         });
 
-        processus.on('close', (code) => {
-            if (code !== 0 && !this._arretee) {
-                log.error(`[MixSource] FFmpeg s'est arrêté en ${code} pour ${this.piste?.title} :`,
-                    journal.slice(-5).join(' | '));
+        ffmpegProcess.on('close', (code) => {
+            if (code !== 0 && !this._halted) {
+                log.error(`[MixSource] FFmpeg s'est arrêté en ${code} pour ${this.track?.title} :`,
+                    ffmpegLog.slice(-5).join(' | '));
             }
-            this._terminerFlux();
+            this._endStream();
         });
 
-        processus.stdin?.on('error', () => {
+        ffmpegProcess.stdin?.on('error', () => {
             // EPIPE attendu quand FFmpeg referme son entrée avant la fin du flux
         });
 
-        if (flux) {
-            flux.on('error', (err) => {
-                log.error(`[MixSource] Flux amont interrompu pour ${this.piste?.title} :`, err.message);
-                this._terminerFlux();
+        if (stream) {
+            stream.on('error', (err) => {
+                log.error(`[MixSource] Flux amont interrompu pour ${this.track?.title} :`, err.message);
+                this._endStream();
             });
-            flux.pipe(processus.stdin);
+            stream.pipe(ffmpegProcess.stdin);
         }
     }
 
     // ─── Tampon ───────────────────────────────────────────────────────────
 
-    _recevoir(morceau) {
-        if (this._arretee) return;
+    _receive(track) {
+        if (this._halted) return;
 
-        this._tampon.push(morceau);
-        this._disponible += morceau.length;
+        this._buffer.push(track);
+        this._available += track.length;
 
         // Le décodage court plus vite que la lecture : sans ce frein, FFmpeg
         // décoderait un morceau entier en mémoire dès son ouverture.
-        if (this._disponible >= TAMPON_MAX_MS * OCTETS_PAR_MS && !this._enPause) {
-            this._enPause = true;
-            try { this._processus?.stdout?.pause(); } catch (e) {}
+        if (this._available >= MAX_BUFFER_MS * BYTES_PER_MS && !this._paused) {
+            this._paused = true;
+            try { this._process?.stdout?.pause(); } catch (e) {}
         }
 
         this.emit('donnees');
     }
 
-    _terminerFlux() {
-        if (this._fluxTermine) return;
-        this._fluxTermine = true;
-        if (this._disponible === 0) this._epuisee = true;
+    _endStream() {
+        if (this._streamEnded) return;
+        this._streamEnded = true;
+        if (this._available === 0) this._exhausted = true;
         this.emit('donnees');
     }
 
-    _reprendreDecodage() {
-        if (!this._enPause) return;
-        if (this._disponible >= (TAMPON_MAX_MS / 2) * OCTETS_PAR_MS) return;
-        this._enPause = false;
-        try { this._processus?.stdout?.resume(); } catch (e) {}
+    _resumeDecoding() {
+        if (!this._paused) return;
+        if (this._available >= (MAX_BUFFER_MS / 2) * BYTES_PER_MS) return;
+        this._paused = false;
+        try { this._process?.stdout?.resume(); } catch (e) {}
     }
 
     /** @returns {Promise<void>} */
-    _attendreAmorcage() {
-        if (this._amorcee) return this._amorcee;
+    _awaitPriming() {
+        if (this._primed) return this._primed;
 
-        this._amorcee = new Promise((resolve, rejeter) => {
-            const requis = TAMPON_AMORCAGE_MS * OCTETS_PAR_MS;
+        this._primed = new Promise((resolve, reject) => {
+            const required = PRIMING_BUFFER_MS * BYTES_PER_MS;
 
-            const conclure = (erreur) => {
-                clearTimeout(echeance);
-                this.removeListener('donnees', verifier);
-                if (erreur) rejeter(erreur); else resolve();
+            const finish = (error) => {
+                clearTimeout(deadline);
+                this.removeListener('donnees', check);
+                if (error) reject(error); else resolve();
             };
 
-            const verifier = () => {
-                if (this._arretee || this._fluxTermine || this._disponible >= requis) conclure();
+            const check = () => {
+                if (this._halted || this._streamEnded || this._available >= required) finish();
             };
 
-            const echeance = setTimeout(() => {
-                if (this._disponible > 0) conclure();
-                else conclure(new Error(`Aucun son décodé après ${DELAI_AMORCAGE_MAX_MS / 1000} s.`));
-            }, DELAI_AMORCAGE_MAX_MS);
-            if (echeance.unref) echeance.unref();
+            const deadline = setTimeout(() => {
+                if (this._available > 0) finish();
+                else finish(new Error(`Aucun son décodé après ${MAX_PRIMING_DELAY_MS / 1000} s.`));
+            }, MAX_PRIMING_DELAY_MS);
+            if (deadline.unref) deadline.unref();
 
-            this.on('donnees', verifier);
-            verifier();
+            this.on('donnees', check);
+            check();
         });
 
-        return this._amorcee;
+        return this._primed;
     }
 
     // ─── Lecture par le bus ───────────────────────────────────────────────
@@ -360,33 +363,33 @@ class MixSource extends EventEmitter {
      *
      * @returns {{ pcm: Buffer, gainDebut: number, gainFin: number }|null}
      */
-    lireTrame() {
-        if (this._epuisee) return null;
+    readFrame() {
+        if (this._exhausted) return null;
 
         let pcm;
-        if (this._disponible >= OCTETS_PAR_TRAME) {
-            pcm = this._prelever(OCTETS_PAR_TRAME);
-        } else if (this._fluxTermine) {
+        if (this._available >= BYTES_PER_FRAME) {
+            pcm = this._take(BYTES_PER_FRAME);
+        } else if (this._streamEnded) {
             // Dernière trame, complétée de silence : la trame doit rester
             // entière pour que l'encodeur Opus reste aligné.
-            pcm = Buffer.alloc(OCTETS_PAR_TRAME);
-            if (this._disponible > 0) {
-                this._prelever(this._disponible).copy(pcm);
+            pcm = Buffer.alloc(BYTES_PER_FRAME);
+            if (this._available > 0) {
+                this._take(this._available).copy(pcm);
             }
-            this._epuisee = true;
+            this._exhausted = true;
         } else {
             return null;
         }
 
-        this._octetsEmis += OCTETS_PAR_TRAME;
-        this._reprendreDecodage();
+        this._bytesEmitted += BYTES_PER_FRAME;
+        this._resumeDecoding();
 
-        const gainDebut = this._gain;
-        const gainFin = this._avancerEnveloppe();
+        const startGain = this._gain;
+        const endGain = this._advanceEnvelope();
 
-        if (this._filtreActif) this._appliquerFiltre(pcm);
+        if (this._filterActive) this._applyFilter(pcm);
 
-        return { pcm, gainDebut, gainFin };
+        return { pcm, startGain, endGain };
     }
 
     /**
@@ -394,33 +397,33 @@ class MixSource extends EventEmitter {
      * @param {number} taille
      * @returns {Buffer}
      */
-    _prelever(taille) {
+    _take(size) {
         // Cas courant : le premier morceau suffit à lui seul.
-        if (this._tampon.length > 0 && this._tampon[0].length >= taille) {
-            const premier = this._tampon[0];
-            const extrait = premier.subarray(0, taille);
-            if (premier.length === taille) this._tampon.shift();
-            else this._tampon[0] = premier.subarray(taille);
-            this._disponible -= taille;
-            return extrait;
+        if (this._buffer.length > 0 && this._buffer[0].length >= size) {
+            const first = this._buffer[0];
+            const extracted = first.subarray(0, size);
+            if (first.length === size) this._buffer.shift();
+            else this._buffer[0] = first.subarray(size);
+            this._available -= size;
+            return extracted;
         }
 
-        const morceaux = [];
-        let restant = taille;
-        while (restant > 0 && this._tampon.length > 0) {
-            const premier = this._tampon[0];
-            if (premier.length <= restant) {
-                morceaux.push(premier);
-                restant -= premier.length;
-                this._tampon.shift();
+        const tracks = [];
+        let remaining = size;
+        while (remaining > 0 && this._buffer.length > 0) {
+            const first = this._buffer[0];
+            if (first.length <= remaining) {
+                tracks.push(first);
+                remaining -= first.length;
+                this._buffer.shift();
             } else {
-                morceaux.push(premier.subarray(0, restant));
-                this._tampon[0] = premier.subarray(restant);
-                restant = 0;
+                tracks.push(first.subarray(0, remaining));
+                this._buffer[0] = first.subarray(remaining);
+                remaining = 0;
             }
         }
-        this._disponible -= taille - restant;
-        return Buffer.concat(morceaux, taille - restant);
+        this._available -= size - remaining;
+        return Buffer.concat(tracks, size - remaining);
     }
 
     // ─── Enveloppe de gain ────────────────────────────────────────────────
@@ -437,56 +440,56 @@ class MixSource extends EventEmitter {
      *   une courbe carrée, mieux adaptée à une entrée en fondu isolée.
      * @param {Function} [options.auTerme]
      */
-    fondre(cible, dureeMs, { courbe = 'puissance', auTerme = null } = {}) {
-        const borne = Math.max(0, Math.min(1, cible));
-        this._gainDepart = this._gain;
-        this._gainCible = borne;
-        this._courbeFondu = courbe;
-        this._auTermeDuFondu = auTerme;
-        this._trameFondu = 0;
-        this._tramesFondu = Math.max(0, Math.round(dureeMs / 20));
+    fade(target, durationMs, { curve = 'puissance', atEnd = null } = {}) {
+        const clamp = Math.max(0, Math.min(1, target));
+        this._startGain = this._gain;
+        this._targetGain = clamp;
+        this._fadeCurve = curve;
+        this._onFadeComplete = atEnd;
+        this._fadeFrame = 0;
+        this._fadeFrames = Math.max(0, Math.round(durationMs / 20));
 
-        if (this._tramesFondu === 0) {
-            this._gain = borne;
-            if (auTerme) {
-                this._auTermeDuFondu = null;
-                auTerme();
+        if (this._fadeFrames === 0) {
+            this._gain = clamp;
+            if (atEnd) {
+                this._onFadeComplete = null;
+                atEnd();
             }
         }
     }
 
     /** Fixe le gain sans transition. */
-    definirGain(valeur) {
-        this._gain = Math.max(0, Math.min(1, valeur));
-        this._gainDepart = this._gain;
-        this._gainCible = this._gain;
-        this._tramesFondu = 0;
-        this._auTermeDuFondu = null;
+    setGain(value) {
+        this._gain = Math.max(0, Math.min(1, value));
+        this._startGain = this._gain;
+        this._targetGain = this._gain;
+        this._fadeFrames = 0;
+        this._onFadeComplete = null;
     }
 
     /** @returns {number} Gain après avancement d'une trame. */
-    _avancerEnveloppe() {
-        if (this._tramesFondu === 0) return this._gain;
+    _advanceEnvelope() {
+        if (this._fadeFrames === 0) return this._gain;
 
-        this._trameFondu++;
-        const t = Math.min(1, this._trameFondu / this._tramesFondu);
+        this._fadeFrame++;
+        const t = Math.min(1, this._fadeFrame / this._fadeFrames);
 
-        if (this._courbeFondu === 'perceptif') {
-            this._gain = this._gainDepart + (this._gainCible - this._gainDepart) * t * t;
+        if (this._fadeCurve === 'perceptif') {
+            this._gain = this._startGain + (this._targetGain - this._startGain) * t * t;
         } else {
             // Interpolation linéaire de la puissance : deux sources croisées
             // avec cette loi conservent une somme de puissances constante.
-            const a = this._gainDepart * this._gainDepart;
-            const b = this._gainCible * this._gainCible;
+            const a = this._startGain * this._startGain;
+            const b = this._targetGain * this._targetGain;
             this._gain = Math.sqrt(Math.max(0, a + (b - a) * t));
         }
 
         if (t >= 1) {
-            this._gain = this._gainCible;
-            this._tramesFondu = 0;
-            const auTerme = this._auTermeDuFondu;
-            this._auTermeDuFondu = null;
-            if (auTerme) auTerme();
+            this._gain = this._targetGain;
+            this._fadeFrames = 0;
+            const atEnd = this._onFadeComplete;
+            this._onFadeComplete = null;
+            if (atEnd) atEnd();
         }
 
         return this._gain;
@@ -505,21 +508,21 @@ class MixSource extends EventEmitter {
      *
      * @param {'ferme'|'ouvre'} sens
      */
-    balayerFiltre(sens) {
-        this._filtreActif = true;
-        if (sens === 'ferme') {
-            this._coupureDepart = COUPURE_TRANSPARENTE_HZ;
-            this._coupureCible = COUPURE_BASSE_HZ;
+    sweepFilter(direction) {
+        this._filterActive = true;
+        if (direction === 'ferme') {
+            this._startCutoff = TRANSPARENT_CUTOFF_HZ;
+            this._targetCutoff = LOW_CUTOFF_HZ;
         } else {
-            this._coupureDepart = COUPURE_BASSE_HZ;
-            this._coupureCible = COUPURE_TRANSPARENTE_HZ;
+            this._startCutoff = LOW_CUTOFF_HZ;
+            this._targetCutoff = TRANSPARENT_CUTOFF_HZ;
         }
     }
 
     /** Rend la source transparente au filtre. */
-    couperFiltre() {
-        this._filtreActif = false;
-        this._etatFiltre = [[0, 0], [0, 0]];
+    cutFilter() {
+        this._filterActive = false;
+        this._filterState = [[0, 0], [0, 0]];
     }
 
     /**
@@ -531,25 +534,25 @@ class MixSource extends EventEmitter {
      *
      * @param {Buffer} pcm
      */
-    _appliquerFiltre(pcm) {
-        const t = this._tramesFondu === 0 ? 1 : Math.min(1, this._trameFondu / this._tramesFondu);
-        const coupure = this._coupureDepart
-            * Math.pow(this._coupureCible / this._coupureDepart, t);
+    _applyFilter(pcm) {
+        const t = this._fadeFrames === 0 ? 1 : Math.min(1, this._fadeFrame / this._fadeFrames);
+        const cutoff = this._startCutoff
+            * Math.pow(this._targetCutoff / this._startCutoff, t);
 
-        if (coupure >= COUPURE_TRANSPARENTE_HZ) return;
+        if (cutoff >= TRANSPARENT_CUTOFF_HZ) return;
 
-        const alpha = coefficientPasseBas(coupure);
-        const etat = this._etatFiltre;
+        const alpha = lowPassCoefficient(cutoff);
+        const state = this._filterState;
 
         for (let i = 0; i < pcm.length; i += 2) {
-            const canal = (i >> 1) & 1;
-            let valeur = pcm.readInt16LE(i);
-            const sections = etat[canal];
+            const channel = (i >> 1) & 1;
+            let value = pcm.readInt16LE(i);
+            const sections = state[channel];
             for (let s = 0; s < sections.length; s++) {
-                sections[s] += alpha * (valeur - sections[s]);
-                valeur = sections[s];
+                sections[s] += alpha * (value - sections[s]);
+                value = sections[s];
             }
-            pcm.writeInt16LE(Math.max(-32768, Math.min(32767, Math.round(valeur))), i);
+            pcm.writeInt16LE(Math.max(-32768, Math.min(32767, Math.round(value))), i);
         }
     }
 
@@ -557,12 +560,12 @@ class MixSource extends EventEmitter {
 
     /** Position atteinte dans le morceau d'origine, en millisecondes. */
     get positionMs() {
-        return this.departMs + octetsVersMs(this._octetsEmis) * this.vitesse;
+        return this.startMs + bytesToMs(this._bytesEmitted) * this.speed;
     }
 
     /** Le tampon est vidé et le décodeur a fini : plus rien à rendre. */
-    get epuisee() {
-        return this._epuisee;
+    get exhausted() {
+        return this._exhausted;
     }
 
     /**
@@ -574,13 +577,13 @@ class MixSource extends EventEmitter {
      *
      * @returns {boolean}
      */
-    get peutAvancer() {
-        return this._epuisee || this._fluxTermine || this._disponible >= OCTETS_PAR_TRAME;
+    get canAdvance() {
+        return this._exhausted || this._streamEnded || this._available >= BYTES_PER_FRAME;
     }
 
     /** Le décodeur a fini d'écrire, mais le tampon peut encore contenir du son. */
-    get fluxTermine() {
-        return this._fluxTermine;
+    get streamEnded() {
+        return this._streamEnded;
     }
 
     /**
@@ -592,13 +595,13 @@ class MixSource extends EventEmitter {
      *
      * @returns {boolean}
      */
-    get aDuSon() {
-        return this._disponible > 0 || this._octetsEmis > 0 || !this._fluxTermine;
+    get hasSound() {
+        return this._available > 0 || this._bytesEmitted > 0 || !this._streamEnded;
     }
 
     /** Millisecondes de son déjà décodées et pas encore rendues. */
-    get avanceMs() {
-        return octetsVersMs(this._disponible);
+    get leadMs() {
+        return bytesToMs(this._available);
     }
 
     /** Gain courant, 0 à 1. */
@@ -607,8 +610,8 @@ class MixSource extends EventEmitter {
     }
 
     /** Un fondu est-il en cours ? */
-    get enFondu() {
-        return this._tramesFondu > 0;
+    get isFading() {
+        return this._fadeFrames > 0;
     }
 }
 

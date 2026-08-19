@@ -141,11 +141,11 @@ const TooltipSystem = (() => {
             if (holdKey) {
                 const ds = (window.MusicPlayer && window.MusicPlayer.dashboardSettings) || {};
                 const holds = ds.holdDuration || {};
-                const duree = holds[holdKey] !== undefined ? parseFloat(holds[holdKey]) : 1.5;
-                if (!isNaN(duree)) {
+                const duration = holds[holdKey] !== undefined ? parseFloat(holds[holdKey]) : 1.5;
+                if (!isNaN(duration)) {
                     // \b en fin de motif : « 3 secondes » ne doit pas être pris
                     // pour une durée en secondes abrégée.
-                    text = text.replace(/\d+(?:[.,]\d+)?\s*s\b/gi, `${duree}s`);
+                    text = text.replace(/\d+(?:[.,]\d+)?\s*s\b/gi, `${duration}s`);
                 }
             }
         } catch (e) {}

@@ -45,10 +45,10 @@ window.MusicPlayer.updateBufferUI = function() {
     const state = window.MusicPlayer.state;
     if (buffers.length === 0) return;
 
-    const appliquer = (largeur) => buffers.forEach(b => { b.style.width = largeur; });
+    const apply = (width) => buffers.forEach(b => { b.style.width = width; });
 
     if (!state || !state.currentTrack) {
-        appliquer('0%');
+        apply('0%');
         return;
     }
 
@@ -64,7 +64,7 @@ window.MusicPlayer.updateBufferUI = function() {
         // Diffusion personnelle : le son passe par le navigateur, la barre suit
         // donc la mise en mémoire tampon réelle de l'élément audio.
         const bufferPercent = window.MusicPlayer.getAudioBufferPercent(activeAudio);
-        appliquer(`${Math.max(bufferPercent, fillPercent)}%`);
+        apply(`${Math.max(bufferPercent, fillPercent)}%`);
     } else {
         // Diffusion « tout le monde » : rien ne transite par le navigateur, il n'y
         // a aucun tampon local à représenter. Ce que la barre indique alors, c'est
@@ -74,7 +74,7 @@ window.MusicPlayer.updateBufferUI = function() {
         const preloadPercent = track.isPreloaded
             ? 100
             : (parseFloat(track.preloadProgress) || 0);
-        appliquer(`${Math.max(preloadPercent, fillPercent)}%`);
+        apply(`${Math.max(preloadPercent, fillPercent)}%`);
     }
 };
 
@@ -99,20 +99,20 @@ function isLocalFile(track) {
  * @param {{enLecture: boolean, salon: string|null}|null} attente
  * @param {(cle: string) => string} t
  */
-function afficherAttenteAuditeur(attente, t) {
+function showListenerWait(wait, t) {
     const notice = document.getElementById('playback-wait-notice');
-    const texte = document.getElementById('playback-wait-text');
-    if (!notice || !texte) return;
+    const text = document.getElementById('playback-wait-text');
+    if (!notice || !text) return;
 
-    if (!attente) {
+    if (!wait) {
         notice.classList.add('hidden');
         return;
     }
 
-    const salon = attente.salon || t('wait_listener_channel_fallback');
-    const cle = attente.enLecture ? 'wait_listener_playing' : 'wait_listener_paused';
-    const message = t(cle).replace('{salon}', salon);
-    if (texte.textContent !== message) texte.textContent = message;
+    const channelName = wait.channelName || t('wait_listener_channel_fallback');
+    const key = wait.playing ? 'wait_listener_playing' : 'wait_listener_paused';
+    const message = t(key).replace('{salon}', channelName);
+    if (text.textContent !== message) text.textContent = message;
     notice.classList.remove('hidden');
 }
 
@@ -197,18 +197,18 @@ window.MusicPlayer.updatePlayerCard = function(displayedTrack) {
     // déclarée en cours — elle repartira toute seule —, mais rien n'avance. Le
     // dire, et suspendre ce qui figure le mouvement : une pochette qui tourne
     // au-dessus d'une barre arrêtée ne laisse imaginer qu'une panne.
-    const attenteAuditeur = state.attenteAuditeur || null;
-    afficherAttenteAuditeur(attenteAuditeur, t);
-    const lectureVisible = state.isPlaying && !state.isPaused && !attenteAuditeur;
+    const listenerWait = state.listenerWait || null;
+    showListenerWait(listenerWait, t);
+    const playbackVisible = state.isPlaying && !state.isPaused && !listenerWait;
 
     // Disc rotation & Thumbnail animation state
     const nowPlayingThumbnail = document.getElementById('now-playing-thumbnail');
     if (nowPlayingThumbnail) {
-        if (lectureVisible) nowPlayingThumbnail.classList.add('playing');
+        if (playbackVisible) nowPlayingThumbnail.classList.add('playing');
         else nowPlayingThumbnail.classList.remove('playing');
     }
     if (iconDisc) {
-        if (lectureVisible) iconDisc.classList.add('playing');
+        if (playbackVisible) iconDisc.classList.add('playing');
         else iconDisc.classList.remove('playing');
     }
 
@@ -238,15 +238,15 @@ window.MusicPlayer.updatePlayerCard = function(displayedTrack) {
             // c'en est une, l'historique quand la lecture vient de la file.
             // Les additionner promettait un retour en arrière que la playlist
             // ne pouvait pas tenir — le clic ne faisait alors rien de visible.
-            const sourceEstPlaylist = typeof state.activePlaybackSource === 'string'
+            const sourceIsPlaylist = typeof state.activePlaybackSource === 'string'
                 && state.activePlaybackSource.startsWith('playlist_');
 
-            const peutReculer = sourceEstPlaylist
+            const canGoBack = sourceIsPlaylist
                 ? (typeof state.playlistCurrentIndex === 'number'
                     && (state.playlistCurrentIndex > 0 || !!state.loopPlaylist))
                 : !!(state.history && state.history.length > 0);
 
-            if (peutReculer) {
+            if (canGoBack) {
                 btnPrevious.disabled = false;
                 btnPrevious.dataset.tooltip = t('tooltip_previous');
             } else {
@@ -275,20 +275,20 @@ window.MusicPlayer.updatePlayerCard = function(displayedTrack) {
     // file d'attente, l'option n'est pas seulement inutile, elle n'aurait
     // aucun effet observable. Le réglage est conservé mais tenu pour inactif,
     // de sorte qu'un aller-retour vers la file laisse toujours un mode actif.
-    const sourceEstPlaylist = typeof state.activePlaybackSource === 'string'
+    const sourceIsPlaylist = typeof state.activePlaybackSource === 'string'
         && state.activePlaybackSource.startsWith('playlist_');
-    const boucleActive = !!state.loopPlaylist && sourceEstPlaylist;
+    const loopActive = !!state.loopPlaylist && sourceIsPlaylist;
 
     document.querySelectorAll('.mode-switch-btn').forEach(btn => {
         const btnMode = btn.getAttribute('data-mode');
 
         if (btnMode === 'loop_playlist') {
-            btn.classList.toggle('hidden', !sourceEstPlaylist);
+            btn.classList.toggle('hidden', !sourceIsPlaylist);
         }
 
         if (btnMode === 'loop_track') btn.classList.toggle('active', repeatMode === 1);
-        else if (btnMode === 'loop_playlist') btn.classList.toggle('active', boucleActive);
-        else if (btnMode === 'default') btn.classList.toggle('active', repeatMode !== 1 && !boucleActive);
+        else if (btnMode === 'loop_playlist') btn.classList.toggle('active', loopActive);
+        else if (btnMode === 'default') btn.classList.toggle('active', repeatMode !== 1 && !loopActive);
         else btn.classList.remove('active');
     });
 

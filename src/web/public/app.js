@@ -21,7 +21,7 @@
     const saveDashboardSettings = window.MusicPlayer.saveDashboardSettings;
 
     /** Empreinte des serveurs connus, pour ne redessiner leur liste qu'utilement. */
-    let signatureServeurs = '';
+    let guildsSignature = '';
 
     // DOM Elements
     const statusDot = document.querySelector('.status-dot');
@@ -77,10 +77,10 @@
      * changement de morceau et rechargerait par-dessus celle qui joue — une
      * coupure nette, juste après la transition.
      */
-    let mixEnAttenteConfirmation = null;
-    let mixAttenteDepuisMs = 0;
+    let mixAwaitingConfirmation = null;
+    let mixWaitingSinceMs = 0;
     /** Au-delà, l'attente est abandonnée : mieux vaut resynchroniser que se figer. */
-    const ATTENTE_CONFIRMATION_MAX_MS = 5000;
+    const MAX_CONFIRMATION_WAIT_MS = 5000;
 
     /**
      * Enchaînement mix en cours côté serveur, en diffusion commune.
@@ -92,7 +92,7 @@
      *
      * @type {{sortante: object|null, entrante: object, recuLe: number}|null}
      */
-    let transitionServeur = null;
+    let guildTransition = null;
 
     /**
      * Progression respective des deux morceaux d'un enchaînement mix.
@@ -109,25 +109,25 @@
      * @returns {{sortante: {url: string, ratio: number}|null,
      *            entrante: {url: string, ratio: number}}|null}
      */
-    window.MusicPlayer.etatTransitionMix = function() {
-        const entrante = mixTransition ? mixTransition.entrante : mixEnAttenteConfirmation;
-        if (entrante) {
-            const progression = (part) => {
+    window.MusicPlayer.mixTransitionState = function() {
+        const incoming = mixTransition ? mixTransition.incoming : mixAwaitingConfirmation;
+        if (incoming) {
+            const progressOf = (part) => {
                 const el = part.element;
-                const duree = el ? el.duration : NaN;
-                const ratio = (el && !isNaN(duree) && duree > 0)
-                    ? Math.min(1, Math.max(0, el.currentTime / duree))
+                const mediaDuration = el ? el.duration : NaN;
+                const ratio = (el && !isNaN(mediaDuration) && mediaDuration > 0)
+                    ? Math.min(1, Math.max(0, el.currentTime / mediaDuration))
                     : 0;
                 return { url: part.url, ratio };
             };
 
             return {
-                sortante: mixTransition ? progression(mixTransition.sortante) : null,
-                entrante: progression(entrante)
+                outgoing: mixTransition ? progressOf(mixTransition.outgoing) : null,
+                incoming: progressOf(incoming)
             };
         }
 
-        return etatTransitionServeur();
+        return guildTransitionState();
     };
 
     /**
@@ -141,22 +141,22 @@
      * @returns {{sortante: {url: string, ratio: number}|null,
      *            entrante: {url: string, ratio: number}}|null}
      */
-    function etatTransitionServeur() {
-        if (!transitionServeur) return null;
+    function guildTransitionState() {
+        if (!guildTransition) return null;
 
         const speed = parseFloat((state.settings && state.settings.playbackSpeed) || '1.0');
-        const ecouleMs = (performance.now() - transitionServeur.recuLe) * speed;
+        const ecouleMs = (performance.now() - guildTransition.recuLe) * speed;
 
-        const progression = (part) => {
+        const progressOf = (part) => {
             if (!part) return null;
             const position = part.positionMs + ecouleMs;
-            const ratio = part.dureeMs > 0 ? Math.min(1, Math.max(0, position / part.dureeMs)) : 0;
+            const ratio = part.durationMs > 0 ? Math.min(1, Math.max(0, position / part.durationMs)) : 0;
             return { url: part.url, ratio };
         };
 
         return {
-            sortante: progression(transitionServeur.sortante),
-            entrante: progression(transitionServeur.entrante)
+            outgoing: progressOf(guildTransition.outgoing),
+            incoming: progressOf(guildTransition.incoming)
         };
     }
     /**
@@ -175,7 +175,7 @@
      * lui qu'il faut recaler, pas l'inverse. Retombe dès que les deux horloges
      * concordent ou qu'une nouvelle piste est chargée.
      */
-    let positionClientPrioritaire = false;
+    let clientPositionWins = false;
     const btnRestartBot = document.getElementById('btn-restart-bot');
     const btnSaveDefaultLayout = document.getElementById('btn-save-default-layout');
     const restartOverlay = document.getElementById('restart-overlay');
@@ -290,10 +290,10 @@
      * depuis là ouvrait une boucle de plus à chaque fois — elles s'accumulaient
      * sans que rien ne les referme.
      */
-    function boucleProgression() {
+    function progressLoop() {
         renderSmoothProgress();
         if (isTrackPlaying || (personalAudio && !personalAudio.paused)) {
-            animFrameId = requestAnimationFrame(boucleProgression);
+            animFrameId = requestAnimationFrame(progressLoop);
         } else {
             animFrameId = null;
         }
@@ -301,7 +301,7 @@
 
     function startProgressLoop() {
         if (!animFrameId) {
-            animFrameId = requestAnimationFrame(boucleProgression);
+            animFrameId = requestAnimationFrame(progressLoop);
         }
     }
 
@@ -409,7 +409,7 @@
                 // prioritaire le temps qu'il en tienne compte, sinon le premier
                 // état reçu nous ferait revenir en arrière.
                 if (personalAudio && personalAudio.src && !personalAudio.paused) {
-                    positionClientPrioritaire = true;
+                    clientPositionWins = true;
                     window.MusicPlayer.sendWS({
                         type: 'syncProgress',
                         data: { progressMs: Math.round(personalAudio.currentTime * 1000) }
@@ -478,7 +478,7 @@
             // L'attente d'un auditeur va et vient au rythme de la position :
             // l'omettre ici laisserait l'explication affichée après le retour
             // du bot, ou absente jusqu'à la prochaine diffusion complète.
-            state.attenteAuditeur = data.attenteAuditeur || null;
+            state.listenerWait = data.listenerWait || null;
             if (!isRecentClick) {
                 state.isPlaying = data.isPlaying;
                 state.isPaused = data.isPaused;
@@ -593,7 +593,7 @@
      * exemple — qui ne provoquent aucun échange avec le bot : sans cela, leur
      * effet n'apparaîtrait qu'à la prochaine diffusion d'état.
      */
-    window.MusicPlayer.rafraichirInterface = function() {
+    window.MusicPlayer.refreshInterface = function() {
         if (state) updateUI();
     };
 
@@ -673,9 +673,9 @@
             // Les serveurs masqués depuis les réglages sont écartés d'emblée :
             // leur absence entre ainsi dans la signature ci-dessous, et basculer
             // l'interrupteur reconstruit bien la liste.
-            const serveursAffiches = window.MusicPlayer.serveursVisibles(state.guilds);
+            const displayedGuilds = window.MusicPlayer.visibleGuilds(state.guilds);
 
-            const channelStructure = serveursAffiches.map(g => {
+            const channelStructure = displayedGuilds.map(g => {
                 return `${g.id}:${g.defaultVoiceChannelId || 'none'}[${(g.voiceChannels || []).map(c => c.id).join(',')}]`;
             }).join('|');
 
@@ -686,8 +686,8 @@
                 const prevValue = guildSelect.value;
                 guildSelect.innerHTML = '';
 
-                if (serveursAffiches.length > 0) {
-                    serveursAffiches.forEach(g => {
+                if (displayedGuilds.length > 0) {
+                    displayedGuilds.forEach(g => {
                         const group = document.createElement('optgroup');
                         group.label = g.name;
 
@@ -720,7 +720,7 @@
                 }
             } else {
                 // Just update text contents
-                serveursAffiches.forEach(g => {
+                displayedGuilds.forEach(g => {
                     (g.voiceChannels || []).forEach(c => {
                         const opt = document.getElementById(`opt-${c.id}`);
                         if (opt) {
@@ -749,11 +749,11 @@
         // modal : sans ce rappel, un serveur que le bot vient de quitter y
         // resterait affiché. L'empreinte évite de la reconstruire chaque
         // seconde, ce qui interromprait l'appui prolongé sur une corbeille.
-        const empreinte = (state.guilds || []).map(g => `${g.id}:${g.name}`).join('|');
-        if (empreinte !== signatureServeurs) {
-            signatureServeurs = empreinte;
-            const modalReglages = document.getElementById('settings-modal');
-            if (modalReglages && !modalReglages.classList.contains('hidden')
+        const fingerprint = (state.guilds || []).map(g => `${g.id}:${g.name}`).join('|');
+        if (fingerprint !== guildsSignature) {
+            guildsSignature = fingerprint;
+            const settingsModal = document.getElementById('settings-modal');
+            if (settingsModal && !settingsModal.classList.contains('hidden')
                 && typeof window.MusicPlayer.renderConnectedGuildsList === 'function') {
                 window.MusicPlayer.renderConnectedGuildsList();
             }
@@ -762,7 +762,7 @@
         // Enchaînement mené par le bus de mixage : on retient les positions et
         // l'instant où elles ont été relevées, de quoi les prolonger jusqu'au
         // message suivant.
-        transitionServeur = state.mixTransition
+        guildTransition = state.mixTransition
             ? { ...state.mixTransition, recuLe: performance.now() }
             : null;
 
@@ -773,14 +773,14 @@
         // deux modes de diffusion : il est déjà audible, et la file du serveur
         // ne le déclarera courant qu'au terme de la superposition.
         const displayedTrack = mixTransitionNextTrack
-            || (transitionServeur && transitionServeur.entrante.track)
+            || (guildTransition && guildTransition.incoming.track)
             || state.currentTrack;
         window.MusicPlayer.updatePlayerCard(displayedTrack);
 
         // Progress & Time (interpolation 60 FPS fluide sans saccades)
-        if (transitionServeur) {
-            baseProgressMs = transitionServeur.entrante.positionMs || 0;
-            baseTotalMs = transitionServeur.entrante.dureeMs || 0;
+        if (guildTransition) {
+            baseProgressMs = guildTransition.incoming.positionMs || 0;
+            baseTotalMs = guildTransition.incoming.durationMs || 0;
         } else {
             baseProgressMs = (state.progress && state.progress.currentMs) || 0;
             baseTotalMs = (state.progress && state.progress.totalMs) || 0;
@@ -791,7 +791,7 @@
         // pas dans le salon. L'interpoler ferait avancer la barre d'une seconde
         // que la position figée du serveur reprendrait aussitôt, indéfiniment.
         isTrackPlaying = !!(state.isPlaying && !state.isPaused && state.currentTrack
-            && !state.attenteAuditeur);
+            && !state.listenerWait);
 
         renderSmoothProgress();
         if (isTrackPlaying || (personalAudio && !personalAudio.paused)) {
@@ -847,15 +847,15 @@
         // afficherait la valeur par défaut et la renverrait au premier réglage
         // touché, effaçant celle du serveur.
         if (state.settings.presenceDepartureDelay !== undefined) {
-            const secondes = state.settings.presenceDepartureDelay;
-            const curseur = document.getElementById('setting-departure-delay');
+            const seconds = state.settings.presenceDepartureDelay;
+            const cursor = document.getElementById('setting-departure-delay');
             const affichage = document.getElementById('val-setting-departure-delay');
-            if (curseur && document.activeElement !== curseur) {
-                curseur.value = secondes;
-                if (affichage) affichage.textContent = `${secondes}s`;
+            if (cursor && document.activeElement !== cursor) {
+                cursor.value = seconds;
+                if (affichage) affichage.textContent = `${seconds}s`;
             }
-            const reglages = window.MusicPlayer.dashboardSettings;
-            if (reglages) reglages.presenceDepartureDelay = secondes;
+            const settings = window.MusicPlayer.dashboardSettings;
+            if (settings) settings.presenceDepartureDelay = seconds;
         }
 
         // --- Mix settings synchronization ---
@@ -1229,15 +1229,15 @@
      * ou protocole file://. Tout le reste — URL http(s) ou simple recherche —
      * sera récupéré à distance, donc transcodé.
      */
-    function estSourceLocale(valeur) {
-        const v = (valeur || '').trim().replace(/^["']|["']$/g, '');
+    function estSourceLocale(value) {
+        const v = (value || '').trim().replace(/^["']|["']$/g, '');
         if (!v) return false;
         if (/^https?:\/\//i.test(v)) return false;
         return /^[a-zA-Z]:[\\/]/.test(v) || v.startsWith('\\\\') || v.startsWith('/') || /^file:\/\//i.test(v);
     }
 
     /** Grise les sélecteurs quand la saisie désigne un fichier local. */
-    function majApplicabiliteQualite() {
+    function updateQualityApplicability() {
         if (!importQualityRow) return;
         const local = estSourceLocale(searchInput ? searchInput.value : '');
         importQualityRow.classList.toggle('not-applicable', local);
@@ -1250,7 +1250,7 @@
     }
 
     if (searchInput) {
-        searchInput.addEventListener('input', majApplicabiliteQualite);
+        searchInput.addEventListener('input', updateQualityApplicability);
     }
 
     if (importAudioQualitySelect) {
@@ -1606,7 +1606,7 @@
             // position restaurée n'a pas été appliquée à l'élément, la remonter
             // reviendrait à lui annoncer un retour au début de la piste.
             const now = Date.now();
-            if (!audio.positionInitialeEnAttente && now - lastSyncTime >= 1000) {
+            if (!audio.pendingInitialPosition && now - lastSyncTime >= 1000) {
                 lastSyncTime = now;
                 sendWS({
                     type: 'syncProgress',
@@ -1644,7 +1644,7 @@
             // serveur. Enchaîner ici reviendrait à annoncer une fin de piste que
             // le serveur écarterait, et à faire jouer deux morceaux ensemble sur
             // un appareil qui n'a pas la main.
-            if (state.pilote === false) {
+            if (state.pilot === false) {
                 // rien : la lecture suit ce que le pilote décide
             } else if (state.settings.mixEnabled && state.repeatMode !== 1 && !isNaN(duration) && duration > 0 && remaining <= mixDuration && remaining > 0 && !audio.isMixFadingOut) {
                 audio.isMixFadingOut = true;
@@ -1684,7 +1684,7 @@
 
                 // La piste suivante dépend de la source active : file d'attente
                 // ou playlist. Voir MusicPlayer.pisteSuivante.
-                const nextTrack = window.MusicPlayer.pisteSuivante(state);
+                const nextTrack = window.MusicPlayer.nextTrackOf(state);
                 if (nextTrack) {
                     const nextUrl = `${window.location.protocol === 'https:' ? 'https:' : 'http:'}//${window.location.host}/api/stream?guildId=${state.guildId}&trackUrl=${encodeURIComponent(nextTrack.url)}`;
                     nextAudio.currentTrackUrl = nextTrack.url;
@@ -1722,11 +1722,11 @@
                     // Les deux morceaux jouent désormais ensemble : les listes
                     // de lecture animent leurs deux lignes jusqu'à la fin du fondu.
                     mixTransition = {
-                        sortante: {
+                        outgoing: {
                             url: fadeAudio.currentTrackUrl || (state.currentTrack && state.currentTrack.url) || null,
                             element: fadeAudio
                         },
-                        entrante: { url: nextTrack.url, element: nextAudio }
+                        incoming: { url: nextTrack.url, element: nextAudio }
                     };
                     updateUI();
 
@@ -1761,8 +1761,8 @@
                             // entrante reste annoncée — à l'affichage comme aux
                             // gardes — jusqu'à ce qu'il l'ait confirmée.
                             mixTransition = null;
-                            mixEnAttenteConfirmation = { url: nextTrack.url, element: nextAudio };
-                            mixAttenteDepuisMs = Date.now();
+                            mixAwaitingConfirmation = { url: nextTrack.url, element: nextAudio };
+                            mixWaitingSinceMs = Date.now();
 
                             console.log('[Audio Mix] Transition complétée, envoi skip.');
                             sendWS({
@@ -1831,7 +1831,7 @@
         audio.addEventListener('ended', () => {
             // Le fragment silencieux du déverrouillage se termine aussitôt : ni
             // trace ni saut ne doivent en découler.
-            if (audio.deverrouillageEnCours) return;
+            if (audio.unlockInProgress) return;
 
             // Tracé même lorsque le garde écarte l'envoi : savoir qu'un élément
             // s'est terminé sans provoquer de saut vaut autant que l'inverse.
@@ -1848,7 +1848,7 @@
             });
             // Seul le pilote annonce les fins de piste — voir le déclenchement du
             // fondu plus haut, et l'élection côté serveur.
-            if (state.settings.broadcastMode === 'personal' && audio === activeAudio && state.pilote !== false) {
+            if (state.settings.broadcastMode === 'personal' && audio === activeAudio && state.pilot !== false) {
                 console.log('[Audio] ended, skipping to next track');
                 sendWS({
                     type: 'skip',
@@ -1882,39 +1882,39 @@
     const SILENCE_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=';
     let audioDeverrouille = false;
 
-    function deverrouillerAudio() {
+    function unlockAudio() {
         if (audioDeverrouille) return;
         audioDeverrouille = true;
 
         [primaryAudio, secondaryAudio].forEach((el) => {
             if (!el || el.src) return;
-            el.deverrouillageEnCours = true;
+            el.unlockInProgress = true;
             el.muted = true;
             el.src = SILENCE_WAV;
             const promesse = el.play();
-            const nettoyer = () => {
+            const cleanup = () => {
                 try { el.pause(); } catch (e) {}
                 el.removeAttribute('src');
                 el.load();
                 el.muted = false;
-                el.deverrouillageEnCours = false;
+                el.unlockInProgress = false;
             };
             if (promesse && typeof promesse.then === 'function') {
-                promesse.then(nettoyer).catch(() => {
-                    nettoyer();
+                promesse.then(cleanup).catch(() => {
+                    cleanup();
                     sendWS({
                         type: 'clientLog',
                         data: { source: 'Mix', message: 'DEVERROUILLAGE refuse pour un element audio' }
                     });
                 });
             } else {
-                nettoyer();
+                cleanup();
             }
         });
     }
 
     ['pointerdown', 'touchstart', 'keydown'].forEach((evt) => {
-        document.addEventListener(evt, deverrouillerAudio, { once: true, capture: true });
+        document.addEventListener(evt, unlockAudio, { once: true, capture: true });
     });
 
     /**
@@ -1932,36 +1932,36 @@
      *   tout de suite s'il n'y a rien à rattraper, ou en cas d'échec du
      *   chargement, afin qu'aucun traitement en attente ne reste bloqué.
      */
-    function appliquerPositionInitiale(audio, secondes, quandPret) {
+    function applyInitialPosition(audio, seconds, quandPret) {
         const signaler = () => {
             if (typeof quandPret === 'function') quandPret();
         };
 
         // En deçà d'une seconde, rien à rattraper : la piste commence à son début.
-        if (!(secondes > 1)) {
-            audio.positionInitialeEnAttente = false;
+        if (!(seconds > 1)) {
+            audio.pendingInitialPosition = false;
             signaler();
             return;
         }
 
-        audio.positionInitialeEnAttente = true;
+        audio.pendingInitialPosition = true;
 
         const abandonner = () => {
-            audio.removeEventListener('loadedmetadata', appliquer);
+            audio.removeEventListener('loadedmetadata', apply);
             audio.removeEventListener('error', abandonner);
-            audio.positionInitialeEnAttente = false;
+            audio.pendingInitialPosition = false;
             signaler();
         };
 
-        const appliquer = () => {
+        const apply = () => {
             audio.removeEventListener('error', abandonner);
-            audio.removeEventListener('loadedmetadata', appliquer);
+            audio.removeEventListener('loadedmetadata', apply);
             try {
-                audio.currentTime = secondes;
+                audio.currentTime = seconds;
             } catch (e) {
                 console.warn('[Audio] Repositionnement impossible :', e);
             }
-            audio.positionInitialeEnAttente = false;
+            audio.pendingInitialPosition = false;
             signaler();
         };
 
@@ -1970,9 +1970,9 @@
         // ne charge pas, le drapeau doit retomber : sinon la remontée de position
         // resterait muette jusqu'au prochain morceau.
         if (audio.readyState >= 1) {
-            appliquer();
+            apply();
         } else {
-            audio.addEventListener('loadedmetadata', appliquer);
+            audio.addEventListener('loadedmetadata', apply);
             audio.addEventListener('error', abandonner);
         }
     }
@@ -1998,12 +1998,12 @@
      * @param {number} durationSecs
      */
     function armerFonduEntree(audio, durationSecs) {
-        let demarree = false;
+        let started = false;
 
         const startFade = () => {
-            if (demarree) return;
-            demarree = true;
-            clearTimeout(secours);
+            if (started) return;
+            started = true;
+            clearTimeout(fallback);
             audio.removeEventListener('playing', startFade);
 
             const targetVol = (state.volume || 100) / 100;
@@ -2030,7 +2030,7 @@
         // automatique refusée par le navigateur, flux en erreur — l'élément
         // resterait muet pour toujours, `isMixFadingIn` gelant au passage la
         // synchronisation du volume par le ducking client.
-        const secours = setTimeout(startFade, 5000);
+        const fallback = setTimeout(startFade, 5000);
 
         if (!audio.paused && audio.readyState >= 3) {
             startFade();
@@ -2046,7 +2046,7 @@
         if (!isPersonal || !state.currentTrack) {
             mixTransitionNextTrack = null;
             mixTransition = null;
-            mixEnAttenteConfirmation = null;
+            mixAwaitingConfirmation = null;
             fadeAudio = null;
             [primaryAudio, secondaryAudio].forEach(audio => {
                 if (audio && (audio.src || !audio.paused)) {
@@ -2067,26 +2067,26 @@
         // Le serveur a-t-il rattrapé la piste que le navigateur joue déjà ?
         // L'attente est bornée : une confirmation qui ne viendrait jamais
         // figerait la synchronisation pour le reste de la session.
-        if (mixEnAttenteConfirmation) {
-            const confirmee = state.currentTrack.url === mixEnAttenteConfirmation.url;
-            const expiree = Date.now() - mixAttenteDepuisMs > ATTENTE_CONFIRMATION_MAX_MS;
+        if (mixAwaitingConfirmation) {
+            const confirmee = state.currentTrack.url === mixAwaitingConfirmation.url;
+            const expiree = Date.now() - mixWaitingSinceMs > MAX_CONFIRMATION_WAIT_MS;
             if (confirmee || expiree) {
                 if (!confirmee) {
                     console.warn('[Audio Mix] Confirmation du serveur non reçue, resynchronisation.');
                 }
-                mixEnAttenteConfirmation = null;
+                mixAwaitingConfirmation = null;
                 mixTransitionNextTrack = null;
             }
         }
 
         // Only load/synchronize the new track source if we are not in the middle of a mix transition
-        const isMixTransitioning = (fadeAudio !== null || activeAudio.isMixFadingIn || mixEnAttenteConfirmation !== null);
+        const isMixTransitioning = (fadeAudio !== null || activeAudio.isMixFadingIn || mixAwaitingConfirmation !== null);
         const isNewTrack = personalAudio.currentTrackUrl !== state.currentTrack.url;
-        const positionRepriseSecs = ((state.progress && state.progress.currentMs) || 0) / 1000;
+        const resumePositionSecs = ((state.progress && state.progress.currentMs) || 0) / 1000;
 
         // Fondu d'ouverture du Mix DJ, nul s'il n'a pas lieu d'être.
         // Voir MusicPlayer.dureeFonduOuverture.
-        const fonduMix = window.MusicPlayer.dureeFonduOuverture(state, positionRepriseSecs);
+        const mixFade = window.MusicPlayer.openingFadeMs(state, resumePositionSecs);
 
         // Fade-in de démarrage du bot mis en attente par le serveur : en diffusion
         // personnelle le son sort d'ici, il ne pouvait donc pas être joué avant que
@@ -2104,20 +2104,20 @@
 
             // Piste rechargée depuis zéro : plus rien à faire valoir face au
             // serveur, c'est lui qui dit où reprendre.
-            positionClientPrioritaire = false;
+            clientPositionWins = false;
 
             // Reset fading out flag
             personalAudio.isMixFadingOut = false;
 
             // Le fondu de démarrage du bot prime : il se rapporte au bot et non
             // à la piste, et s'applique donc où qu'elle reprenne.
-            const dureeFondu = fadeinDemarrage > 0 ? fadeinDemarrage : fonduMix;
+            const fadeDuration = fadeinDemarrage > 0 ? fadeinDemarrage : mixFade;
 
             // Le volume tombe à zéro dès maintenant, mais la rampe n'est armée
             // qu'une fois la position restaurée appliquée : le repositionnement
             // met le flux en tampon, et une rampe lancée avant s'écoulerait
             // pendant ce silence — la piste entrerait alors à plein volume.
-            if (dureeFondu > 0) preparerFonduEntree(personalAudio);
+            if (fadeDuration > 0) preparerFonduEntree(personalAudio);
 
             if (fadeinDemarrage > 0) {
                 startupFadeinJoue = true;
@@ -2129,11 +2129,11 @@
             // bas ne suffit pas : il est neutralisé pendant un fondu d'entrée,
             // exactement le cas d'un démarrage avec fade-in activé.
             const elementCharge = personalAudio;
-            appliquerPositionInitiale(
+            applyInitialPosition(
                 elementCharge,
-                positionRepriseSecs,
+                resumePositionSecs,
                 () => {
-                    if (dureeFondu > 0) armerFonduEntree(elementCharge, dureeFondu);
+                    if (fadeDuration > 0) armerFonduEntree(elementCharge, fadeDuration);
                 }
             );
         } else if (fadeinDemarrage > 0 && !isMixTransitioning) {
@@ -2181,7 +2181,7 @@
             const serverSecs = state.progress.currentMs / 1000;
             const clientSecs = personalAudio.currentTime;
             if (Math.abs(clientSecs - serverSecs) > 2) {
-                if (positionClientPrioritaire) {
+                if (clientPositionWins) {
                     // Reconnexion après une coupure du serveur : le navigateur n'a
                     // jamais cessé de jouer, sa position fait foi. Se recaler sur
                     // celle du serveur, figée pendant l'interruption, ferait sauter
@@ -2195,7 +2195,7 @@
                 }
             } else {
                 // Les deux horloges concordent : le serveur redevient la référence.
-                positionClientPrioritaire = false;
+                clientPositionWins = false;
             }
         }
     }
@@ -2413,7 +2413,7 @@
         importVideoQualitySelect.dataset.customSelectInit = 'true';
         customImportVideoSelect = new CustomSelect(importVideoQualitySelect);
     }
-    majApplicabiliteQualite();
+    updateQualityApplicability();
 
     // Initialisation de la mise en page
     window.MusicPlayer.initLayoutPersistence();

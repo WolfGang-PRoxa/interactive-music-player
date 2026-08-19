@@ -136,11 +136,11 @@ piste B ──► FFmpeg ──► PCM ──┘   (somme,     (permanente)
 | Module | Rôle |
 |---|---|
 | [`format.js`](../../src/audio/mix/format.js) | Format d'échange : PCM s16le, 48 kHz, stéréo, trames de 20 ms |
-| [`entree.js`](../../src/audio/mix/entree.js) | Ramène une piste à une entrée FFmpeg (cache, fichier local, extracteur) |
+| [`input.js`](../../src/audio/mix/input.js) | Ramène une piste à une entrée FFmpeg (cache, fichier local, extracteur) |
 | [`MixSource.js`](../../src/audio/mix/MixSource.js) | Un morceau décodé : tampon, enveloppe de gain, balayage de filtre |
 | [`MixBus.js`](../../src/audio/mix/MixBus.js) | Le flux permanent : somme les sources trame par trame |
 | [`MixEngine.js`](../../src/audio/mix/MixEngine.js) | Orchestration par serveur, pilotage de la file discord-player |
-| [`pontLecteur.js`](../../src/audio/mix/pontLecteur.js) | Enveloppe les méthodes de `GuildQueuePlayerNode` pour les router vers le bus |
+| [`playerBridge.js`](../../src/audio/mix/playerBridge.js) | Enveloppe les méthodes de `GuildQueuePlayerNode` pour les router vers le bus |
 
 **Horloge.** Le bus ne produit une trame que lorsque le lecteur vocal en réclame
 une, soit toutes les 20 ms. Toutes les sources avancent donc du même nombre exact
@@ -170,7 +170,7 @@ FFmpeg de discord-player est en revanche repris par le bus : volume et ducking
 (gain maître), pause, repositionnement, vitesse de lecture, et la position de
 lecture — désormais comptée en échantillons émis plutôt qu'estimée.
 
-**Repli.** `moteurActif()` rend `null` quand aucun bus n'est monté, et chaque
+**Repli.** `activeEngine()` rend `null` quand aucun bus n'est monté, et chaque
 méthode enveloppée retombe alors sur l'implémentation d'origine. La diffusion
 personnelle, où le son sort du navigateur, ne monte jamais de bus.
 

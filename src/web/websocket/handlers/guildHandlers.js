@@ -9,8 +9,8 @@ const broadcastManager = require('../../../broadcast/BroadcastManager');
 const presenceManager = require('../../../audio/PresenceManager');
 const playbackStateManager = require('../../../database/PlaybackStateManager');
 const { restoreHistory } = require('../../../utils/historyOrder');
-const { assurerMoteur } = require('../../../audio/mix');
-const { appliquerVitesse, annulerEffetsMix } = require('../../../audio/reglagesLecture');
+const { ensureEngine } = require('../../../audio/mix');
+const { applySpeed, cancelMixEffects } = require('../../../audio/playbackSettings');
 const log = require('../../../utils/logger');
 
 async function handleSelectChannel(ctx) {
@@ -127,10 +127,10 @@ async function handleSelectChannel(ctx) {
                         // file est chargée depuis l'instantané du salon et
                         // attend en l'état — l'arrivée du premier auditeur
                         // amènera le bot et relancera la lecture.
-                        if (!presenceManager.connexionAutorisee(voiceChannel)) {
+                        if (!presenceManager.connectionAllowed(voiceChannel)) {
                             log.info(`[WebServer] Salon « ${voiceChannel.name} » désert : `
                                 + 'le bot y viendra à l\'arrivée d\'un auditeur.');
-                            presenceManager.detacher(targetGuildId);
+                            presenceManager.detach(targetGuildId);
 
                             const isPersonal = settings.broadcastMode === 'personal';
                             if (isPersonal) {
@@ -141,9 +141,9 @@ async function handleSelectChannel(ctx) {
                                 queue.virtualIsPaused = !!savedState?.isPaused;
                                 queue.virtualTracks = savedState?.queue || [];
                                 queue.virtualHistory = savedState?.history || [];
-                                presenceManager.marquerAbsent(queue);
+                                presenceManager.markAbsent(queue);
                             } else {
-                                presenceManager.chargerEtatFige(queue, channelId);
+                                presenceManager.loadFrozenState(queue, channelId);
                             }
 
                             webServer.broadcastState(targetGuildId);
@@ -153,7 +153,7 @@ async function handleSelectChannel(ctx) {
 
                         // Le salon est habité : les branches ci-dessous s'y
                         // connectent toutes, la lecture n'est donc plus figée.
-                        queue.absentSalonVide = false;
+                        queue.absentEmptyChannel = false;
 
                         // 2. Charger le nouvel état du salon cible s'il existe
                         const savedState = queue.channelStates[channelId];
@@ -335,7 +335,7 @@ function handleSetDefaultChannel(ctx) {
 async function handleLeaveGuild(ctx) {
     const { ws, data, webServer } = ctx;
 
-    const erreur = (message) => {
+    const fail = (message) => {
         try {
             ws.send(JSON.stringify({ type: 'error', data: { message } }));
         } catch (e) {}
@@ -345,34 +345,34 @@ async function handleLeaveGuild(ctx) {
     const guild = guildId ? webServer.client?.guilds.cache.get(guildId) : null;
     if (!guild) {
         log.warn(`[WebServer] Départ refusé : serveur ${guildId} introuvable.`);
-        return erreur('Serveur introuvable — le bot n\'en fait plus partie.');
+        return fail('Serveur introuvable — le bot n\'en fait plus partie.');
     }
 
     // Un bot propriétaire de son serveur ne peut pas le quitter : Discord
     // refuserait, autant le dire tout de suite.
     if (guild.ownerId === webServer.client.user?.id) {
-        return erreur(`Le bot est propriétaire de « ${guild.name} » : il ne peut pas le quitter.`);
+        return fail(`Le bot est propriétaire de « ${guild.name} » : il ne peut pas le quitter.`);
     }
 
-    const nom = guild.name;
+    const name = guild.name;
 
     try {
         const { useMainPlayer } = require('discord-player');
         const queue = useMainPlayer().queues.get(guildId);
         if (queue) queue.delete();
     } catch (err) {
-        log.warn(`[WebServer] File de ${nom} non détruite avant le départ : ${err.message}`);
+        log.warn(`[WebServer] File de ${name} non détruite avant le départ : ${err.message}`);
     }
 
     try {
         await guild.leave();
-        log.info(`[WebServer] Le bot a quitté le serveur « ${nom} » (${guildId}).`);
+        log.info(`[WebServer] Le bot a quitté le serveur « ${name} » (${guildId}).`);
     } catch (err) {
-        log.error(`[WebServer] Échec du départ de « ${nom} » : ${err.message}`);
-        return erreur(`Impossible de quitter « ${nom} » : ${err.message}`);
+        log.error(`[WebServer] Échec du départ de « ${name} » : ${err.message}`);
+        return fail(`Impossible de quitter « ${name} » : ${err.message}`);
     }
 
-    webServer.reattribuerClients(guildId);
+    webServer.reassignClients(guildId);
 }
 
 async function handleUpdateSettings(ctx) {
@@ -413,17 +413,17 @@ async function handleUpdateSettings(ctx) {
                         // Salon désert : la file bascule quand même en lecture
                         // commune, mais figée — le bot n'ira l'y jouer qu'à
                         // l'arrivée de quelqu'un.
-                        const salonDesert = !presenceManager.connexionAutorisee(voiceChannel);
-                        if (salonDesert) {
+                        const emptyChannel = !presenceManager.connectionAllowed(voiceChannel);
+                        if (emptyChannel) {
                             // Le rattachement doit être inscrit avant de couper
                             // la connexion : `queue.channel` disparaît avec elle,
                             // et le tableau de bord ne saurait plus à quel salon
                             // rapporter la lecture figée — ni donc l'expliquer.
                             queue.activeChannelId = voiceChannel.id;
-                            presenceManager.detacher(currentGuildId);
-                            presenceManager.marquerAbsent(queue, {
+                            presenceManager.detach(currentGuildId);
+                            presenceManager.markAbsent(queue, {
                                 positionMs: queue.virtualProgressMs || 0,
-                                enLecture: !!queue.virtualIsPlaying,
+                                playing: !!queue.virtualIsPlaying,
                             });
                         } else if (queue.channel?.id !== voiceChannel.id || !queue.connection || !queue.dispatcher) {
                             await queue.connect(voiceChannel);
@@ -433,8 +433,8 @@ async function handleUpdateSettings(ctx) {
                             // lecteur de discord-player — celui-ci ne produit
                             // plus rien en diffusion commune.
                             try {
-                                const moteur = assurerMoteur(queue);
-                                if (moteur) log.info('[WebServer] Bus de mixage raccroché à la connexion vocale.');
+                                const engine = ensureEngine(queue);
+                                if (engine) log.info('[WebServer] Bus de mixage raccroché à la connexion vocale.');
                             } catch (subErr) {
                                 log.error('[WebServer] Erreur de raccrochage du bus de mixage :', subErr.message);
                             }
@@ -466,14 +466,14 @@ async function handleUpdateSettings(ctx) {
                             // pas encore eu lieu, le lecteur ne sait rien de la piste).
                             // Sans connexion, il n'y a pas de transition à mener :
                             // la piste est simplement posée comme piste courante.
-                            if (!salonDesert) {
+                            if (!emptyChannel) {
                                 queue.transitioningToEveryone = true;
                                 queue.transitionTargetProgress = progress;
                                 queue.transitionTrack = track;
                             }
 
                             try {
-                                if (salonDesert) {
+                                if (emptyChannel) {
                                     queue.__current = track;
                                 } else {
                                     await queue.play(track, {
@@ -562,9 +562,9 @@ async function handleUpdateSettings(ctx) {
             // laisserait le bot dans le salon indéfiniment ou l'en ferait
             // sortir sans cesse. Bornée aux 5 minutes du curseur.
             if (data.presenceDepartureDelay !== undefined) {
-                const secondes = Number(data.presenceDepartureDelay);
-                if (Number.isFinite(secondes)) {
-                    data.presenceDepartureDelay = Math.min(300, Math.max(0, Math.round(secondes)));
+                const seconds = Number(data.presenceDepartureDelay);
+                if (Number.isFinite(seconds)) {
+                    data.presenceDepartureDelay = Math.min(300, Math.max(0, Math.round(seconds)));
                     log.info(`[Presence] Départ d'un salon vide fixé à ${data.presenceDepartureDelay}s.`);
                 } else {
                     delete data.presenceDepartureDelay;
@@ -577,7 +577,7 @@ async function handleUpdateSettings(ctx) {
             // réarmer fait valoir le nouveau réglage sans attendre le prochain
             // salon vidé.
             if (data.presenceDepartureDelay !== undefined) {
-                presenceManager.reprogrammerDepart(currentGuildId);
+                presenceManager.rescheduleDeparture(currentGuildId);
             }
 
             // Mettre à jour le lecteur en cours de lecture
@@ -587,7 +587,7 @@ async function handleUpdateSettings(ctx) {
 
             // Mettre à jour la vitesse de lecture
             if (queue && data.playbackSpeed !== undefined) {
-                appliquerVitesse(queue, data.playbackSpeed);
+                applySpeed(queue, data.playbackSpeed);
             }
 
             // Désactivation du mix en cours de route
@@ -595,7 +595,7 @@ async function handleUpdateSettings(ctx) {
                 queue.isMixFadingOut = false;
                 const baseVol = data.baseVolume !== undefined ? data.baseVolume : oldSettings.baseVolume;
                 queue.node.setVolume(baseVol);
-                annulerEffetsMix(queue);
+                cancelMixEffects(queue);
             }
 
             // Mettre à jour le ducking manager s'il existe

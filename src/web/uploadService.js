@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const database = require('../database/Database');
-const { switchToQueueSourceIfNeeded, ajouterALaFileEnAttente } = require('./websocket/handlerUtils');
+const { switchToQueueSourceIfNeeded, addToSetAsideQueue } = require('./websocket/handlerUtils');
 const { formatMs } = require('../utils/duration');
 const log = require('../utils/logger');
 
@@ -291,7 +291,7 @@ async function processUploadedFile(filePath, fileName, playlistId, currentGuildI
                     queue.virtualLastUpdated = Date.now();
                     webServer.broadcastState(currentGuildId);
                 } else {
-                    if (!ajouterALaFileEnAttente(currentGuildId, settings, trk)) {
+                    if (!addToSetAsideQueue(currentGuildId, settings, trk)) {
                         await webServer._addVirtualTracks(currentGuildId, searchResult.tracks, false);
                     }
                     webServer.broadcastState(currentGuildId);
@@ -303,12 +303,12 @@ async function processUploadedFile(filePath, fileName, playlistId, currentGuildI
             if (track) {
                 track.title = fileName;
                 await ensureTrackDuration(track, filePath);
-                if (target !== 'play' && ajouterALaFileEnAttente(currentGuildId, settings, track)) {
+                if (target !== 'play' && addToSetAsideQueue(currentGuildId, settings, track)) {
                     webServer.broadcastState(currentGuildId);
                     return;
                 }
                 const presenceManager = require('../audio/PresenceManager');
-                if (!await presenceManager.connecterSiHabite(queue, voiceChannel)) {
+                if (!await presenceManager.connectIfInhabited(queue, voiceChannel)) {
                     // Salon désert : la piste attend dans la file, que le bot
                     // lancera en arrivant.
                     if (target === 'play') queue.insertTrack(track, 0);

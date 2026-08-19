@@ -42,7 +42,7 @@ const { GuildQueueEvent } = require('discord-player');
 
 const MixBus = require('./MixBus');
 const MixSource = require('./MixSource');
-const { DUREE_TRAME_MS } = require('./format');
+const { FRAME_DURATION_MS } = require('./format');
 const database = require('../../database/Database');
 const log = require('../../utils/logger');
 
@@ -54,21 +54,21 @@ const log = require('../../utils/logger');
  * l'aléa d'un démarrage de FFmpeg. C'est aussi ce qui rend l'enchaînement sans
  * blanc quand l'effet mix est désactivé.
  */
-const AVANCE_PREPARATION_MS = 4000;
+const PREPARATION_LEAD_MS = 4000;
 
 /** Fondu appliqué à un morceau qui démarre seul, quand l'effet mix est actif. */
-const COURBE_ENTREE_ISOLEE = 'perceptif';
+const ISOLATED_FADE_IN_CURVE = 'perceptif';
 
 /**
  * Durée d'une piste en millisecondes, 0 si elle est inconnue.
  * @param {object} piste
  * @returns {number}
  */
-function dureeMs(piste) {
-    if (!piste) return 0;
-    if (piste.durationMS) return piste.durationMS;
-    if (typeof piste.duration === 'string') {
-        const parts = piste.duration.split(':').map(Number);
+function trackDurationMs(track) {
+    if (!track) return 0;
+    if (track.durationMS) return track.durationMS;
+    if (typeof track.duration === 'string') {
+        const parts = track.duration.split(':').map(Number);
         if (parts.some(isNaN)) return 0;
         if (parts.length === 2) return (parts[0] * 60 + parts[1]) * 1000;
         if (parts.length === 3) return (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000;
@@ -87,7 +87,7 @@ function dureeMs(piste) {
  * @param {object} b
  * @returns {boolean}
  */
-function memePiste(a, b) {
+function sameTrack(a, b) {
     if (!a || !b) return false;
     if (a === b) return true;
     if (a.id && a.id === b.id) return true;
@@ -104,24 +104,24 @@ class MixEngine {
 
         this.bus = null;
         this.resource = null;
-        this.lecteur = null;
-        this.abonnement = null;
-        this.connexion = null;
+        this.player = null;
+        this.subscription = null;
+        this.connection = null;
 
         /** @type {MixSource|null} Morceau courant */
         this._source = null;
 
         /** @type {MixSource|null} Morceau suivant, préparé puis superposé */
-        this._entrante = null;
+        this._incoming = null;
 
         /** @type {object|null} Piste correspondant à `_entrante` */
-        this._pisteEntrante = null;
+        this._incomingTrack = null;
 
         /** Préparation du morceau suivant en cours. */
         this._preparation = null;
 
         /** Le fondu enchaîné a-t-il déjà été lancé pour le morceau courant ? */
-        this._fonduLance = false;
+        this._fadeStarted = false;
 
         /**
          * Incrémentée à chaque demande de lecture.
@@ -142,12 +142,12 @@ class MixEngine {
          * une commande arrivée entretemps — un saut de piste — l'aura déjà fait
          * avancer, et ce témoin évite d'enchaîner deux fois.
          */
-        this._finEnAttente = null;
+        this._pendingEnd = null;
 
-        this._reglagesCache = null;
-        this._reglagesLus = 0;
+        this._settingsCache = null;
+        this._settingsRead = 0;
 
-        this._arrete = false;
+        this._stopped = false;
     }
 
     // ─── Cycle de vie ─────────────────────────────────────────────────────
@@ -161,16 +161,16 @@ class MixEngine {
      *
      * @returns {boolean} true si le moteur est en place
      */
-    demarrer() {
+    start() {
         if (this.bus) return true;
 
         const dispatcher = this.queue.dispatcher;
-        const connexion = dispatcher?.voiceConnection;
-        if (!connexion) return false;
+        const connection = dispatcher?.voiceConnection;
+        if (!connection) return false;
 
         this.bus = new MixBus();
-        this.bus.surTrame(() => this._horloge());
-        this.bus.on('sourceEpuisee', (source) => this._surSourceEpuisee(source));
+        this.bus.onFrame(() => this._clock());
+        this.bus.on('sourceEpuisee', (source) => this._onSourceExhausted(source));
         this.bus.on('erreurMoteur', (err) => {
             log.error('[MixEngine] Erreur dans l\'horloge du bus :', err.message);
         });
@@ -184,7 +184,7 @@ class MixEngine {
             metadata: null,
         });
 
-        this.lecteur = createAudioPlayer({
+        this.player = createAudioPlayer({
             behaviors: {
                 noSubscriber: NoSubscriberBehavior.Pause,
                 // Un creux d'alimentation ne doit jamais arrêter la ressource :
@@ -195,7 +195,7 @@ class MixEngine {
             },
         });
 
-        this.lecteur.on('error', (err) => {
+        this.player.on('error', (err) => {
             log.error('[MixEngine] Erreur du lecteur audio :', err.message);
         });
 
@@ -203,21 +203,21 @@ class MixEngine {
         // sinon à plein régime le temps que le contrôleur de volume soit monté,
         // et une reprise muette — restauration au démarrage, retour en diffusion
         // commune — laisserait échapper un éclat sonore.
-        const reglages = database.getSettings(this.guildId);
-        const muet = !!this.queue.restorePaused || !!this.queue.transitioningToEveryone;
-        this.definirVolume(muet ? 0 : (reglages.baseVolume ?? 100));
+        const settings = database.getSettings(this.guildId);
+        const muted = !!this.queue.restorePaused || !!this.queue.transitioningToEveryone;
+        this.setVolume(muted ? 0 : (settings.baseVolume ?? 100));
 
-        this._arreterDiffuseurSilence();
-        this._prendreLAbonnement(connexion);
+        this._stopSilenceBroadcaster();
+        this._takeSubscription(connection);
 
-        this.lecteur.play(this.resource);
+        this.player.play(this.resource);
 
         // La ressource tient lieu de celle qu'aurait créée discord-player :
         // `queue.currentTrack` la consulte, et le répartiteur la transmet à ses
         // propres écouteurs quand on lui signale une fin de morceau.
         dispatcher.audioResource = this.resource;
 
-        dispatcher.once('destroyed', () => this.arreter());
+        dispatcher.once('destroyed', () => this.stop());
 
         log.info(`[MixEngine] Bus de mixage ouvert pour la guild ${this.guildId}.`);
         return true;
@@ -227,24 +227,24 @@ class MixEngine {
      * Détache le lecteur de discord-player et met le nôtre à sa place.
      * @param {import('@discordjs/voice').VoiceConnection} connexion
      */
-    _prendreLAbonnement(connexion) {
+    _takeSubscription(connection) {
         try {
-            connexion.state?.subscription?.unsubscribe();
+            connection.state?.subscription?.unsubscribe();
         } catch (e) {}
-        this.abonnement = connexion.subscribe(this.lecteur);
+        this.subscription = connection.subscribe(this.player);
 
-        if (this.connexion !== connexion) {
-            this.connexion = connexion;
+        if (this.connection !== connection) {
+            this.connection = connection;
             // Le répartiteur n'émet « destroyed » que lorsqu'on le détruit
             // explicitement : une connexion coupée par ailleurs — départ d'un
             // salon vide, arrêt du bot — laisserait sinon le bus tourner dans
             // le vide, décodeurs compris.
-            connexion.once(VoiceConnectionStatus.Destroyed, () => this.arreter());
+            connection.once(VoiceConnectionStatus.Destroyed, () => this.stop());
             // Une reconnexion remonte l'abonnement d'origine, celui du lecteur
             // de discord-player, qui ne produit plus rien : le son se tairait
             // sans que rien ne le signale.
-            connexion.on(VoiceConnectionStatus.Ready, () => {
-                if (!this._arrete) this.verifierAbonnement();
+            connection.on(VoiceConnectionStatus.Ready, () => {
+                if (!this._stopped) this.checkSubscription();
             });
         }
     }
@@ -256,12 +256,12 @@ class MixEngine {
      * discord-player, qui ne diffuse rien : le son se tairait sans que rien ne
      * le signale.
      */
-    verifierAbonnement() {
-        const connexion = this.queue.dispatcher?.voiceConnection;
-        if (!connexion || this._arrete) return;
-        if (connexion.state?.subscription === this.abonnement) return;
+    checkSubscription() {
+        const connection = this.queue.dispatcher?.voiceConnection;
+        if (!connection || this._stopped) return;
+        if (connection.state?.subscription === this.subscription) return;
         log.info('[MixEngine] Abonnement vocal repris par le bus de mixage.');
-        this._prendreLAbonnement(connexion);
+        this._takeSubscription(connection);
     }
 
     /**
@@ -270,7 +270,7 @@ class MixEngine {
      * Il s'abonne lui aussi à la connexion : le laisser tourner déposséderait
      * le bus de sa sortie audio dès le premier changement de mode.
      */
-    _arreterDiffuseurSilence() {
+    _stopSilenceBroadcaster() {
         const queue = this.queue;
         if (queue.silencePlayer) {
             try { queue.silencePlayer.stop(true); } catch (e) {}
@@ -283,19 +283,19 @@ class MixEngine {
     }
 
     /** Referme le bus et libère tout ce qui en dépend. */
-    arreter() {
-        if (this._arrete) return;
-        this._arrete = true;
+    stop() {
+        if (this._stopped) return;
+        this._stopped = true;
 
-        this._abandonnerEntrante();
+        this._abandonIncoming();
         if (this._source) {
-            this._source.arreter();
+            this._source.stop();
             this._source = null;
         }
 
-        try { this.bus?.fermer(); } catch (e) {}
-        try { this.lecteur?.stop(true); } catch (e) {}
-        try { this.abonnement?.unsubscribe(); } catch (e) {}
+        try { this.bus?.close(); } catch (e) {}
+        try { this.player?.stop(true); } catch (e) {}
+        try { this.subscription?.unsubscribe(); } catch (e) {}
 
         if (this.queue.dispatcher?.audioResource === this.resource) {
             this.queue.dispatcher.audioResource = null;
@@ -303,15 +303,15 @@ class MixEngine {
 
         this.bus = null;
         this.resource = null;
-        this.lecteur = null;
-        this.abonnement = null;
+        this.player = null;
+        this.subscription = null;
 
         log.info(`[MixEngine] Bus de mixage refermé pour la guild ${this.guildId}.`);
     }
 
     /** @returns {boolean} */
-    get actif() {
-        return !this._arrete && !!this.bus;
+    get active() {
+        return !this._stopped && !!this.bus;
     }
 
     // ─── Lecture ──────────────────────────────────────────────────────────
@@ -330,77 +330,77 @@ class MixEngine {
      * @param {number} [options.seek] - Position de départ, en millisecondes
      * @returns {Promise<void>}
      */
-    async jouer(piste, { seek = 0 } = {}) {
-        if (!this.actif || !piste) return;
+    async play(track, { seek = 0 } = {}) {
+        if (!this.active || !track) return;
 
         const generation = ++this._generation;
-        this._finEnAttente = null;
-        this._definirPisteCourante(piste);
+        this._pendingEnd = null;
+        this._setCurrentTrack(track);
 
         // Le morceau attendu est celui que le fondu enchaîné a déjà lancé :
         // il joue, il est à sa place, il n'y a qu'à en faire le morceau courant.
-        if (this._entrante && memePiste(this._pisteEntrante, piste) && !seek) {
-            this._promouvoirEntrante();
-            this._signalerDemarrage();
+        if (this._incoming && sameTrack(this._incomingTrack, track) && !seek) {
+            this._promoteIncoming();
+            this._signalStart();
             return;
         }
 
-        this._abandonnerEntrante();
+        this._abandonIncoming();
         if (this._source) {
-            this.bus.retirer(this._source);
-            this._source.arreter();
+            this.bus.remove(this._source);
+            this._source.stop();
             this._source = null;
         }
 
-        const reglages = this._reglages();
-        const source = new MixSource(piste, {
+        const settings = this._settings();
+        const source = new MixSource(track, {
             player: this.queue.player,
-            departMs: seek,
-            vitesse: this._vitesse(reglages),
+            startMs: seek,
+            speed: this._speed(settings),
             gain: 1,
         });
 
         try {
-            await source.demarrer();
+            await source.start();
         } catch (err) {
-            log.error(`[MixEngine] Impossible de décoder « ${piste?.title} » :`, err.message);
-            source.arreter();
-            if (generation === this._generation) this._echouerPiste(piste, err);
+            log.error(`[MixEngine] Impossible de décoder « ${track?.title} » :`, err.message);
+            source.stop();
+            if (generation === this._generation) this._failTrack(track, err);
             return;
         }
 
         // Une autre demande est passée pendant le décodage : celle-ci n'a plus
         // lieu d'être, et sa source n'a jamais rejoint le bus.
-        if (generation !== this._generation || !this.actif) {
-            source.arreter();
+        if (generation !== this._generation || !this.active) {
+            source.stop();
             return;
         }
 
         // Le décodeur a rendu la main sans un octet : la source est
         // introuvable. Passer au titre suivant vaut mieux que d'annoncer une
         // lecture muette dont rien ne signalerait jamais la fin.
-        if (!source.aDuSon) {
-            source.arreter();
-            this._echouerPiste(piste, new Error('Le décodage n\'a produit aucun son.'));
+        if (!source.hasSound) {
+            source.stop();
+            this._failTrack(track, new Error('Le décodage n\'a produit aucun son.'));
             return;
         }
 
-        this._fonduLance = false;
+        this._fadeStarted = false;
         this._source = source;
 
         // Entrée en fondu d'un morceau qui démarre seul — un démarrage manuel,
         // un saut de piste. L'enchaînement de fin de morceau, lui, amène le
         // suivant déjà monté à plein gain : y ajouter un fondu le ferait
         // repartir de zéro.
-        if (reglages.mixEnabled) {
-            const duree = this._dureeFondu(reglages);
-            source.definirGain(0);
-            source.fondre(1, duree, { courbe: COURBE_ENTREE_ISOLEE });
-            if (reglages.mixType === 'effects') source.balayerFiltre('ouvre');
+        if (settings.mixEnabled) {
+            const duration = this._fadeDuration(settings);
+            source.setGain(0);
+            source.fade(1, duration, { curve: ISOLATED_FADE_IN_CURVE });
+            if (settings.mixType === 'effects') source.sweepFilter('ouvre');
         }
 
-        this.bus.ajouter(source);
-        this._signalerDemarrage();
+        this.bus.add(source);
+        this._signalStart();
     }
 
     /**
@@ -414,20 +414,20 @@ class MixEngine {
      * plein milieu. Tant qu'il attend, il est conservé : c'est ce qui rend le
      * saut de piste immédiat plutôt que suspendu au démarrage d'un décodeur.
      */
-    passer() {
-        if (!this.actif) return false;
-        const piste = this.queue.currentTrack;
+    skip() {
+        if (!this.active) return false;
+        const track = this.queue.currentTrack;
 
-        this._finEnAttente = null;
-        if (this._fonduLance) this._abandonnerEntrante();
+        this._pendingEnd = null;
+        if (this._fadeStarted) this._abandonIncoming();
         if (this._source) {
-            this.bus.retirer(this._source);
-            this._source.arreter();
+            this.bus.remove(this._source);
+            this._source.stop();
             this._source = null;
         }
-        this._fonduLance = false;
+        this._fadeStarted = false;
 
-        this._terminerPiste(piste);
+        this._finishTrack(track);
         return true;
     }
 
@@ -437,18 +437,18 @@ class MixEngine {
      * Les sources sont retirées et leurs décodeurs fermés ; le flux reste ouvert
      * et prêt à reprendre, la connexion vocale n'a pas à être remontée.
      */
-    taire() {
-        if (!this.actif) return;
+    mute() {
+        if (!this.active) return;
         this._generation++;
-        this._finEnAttente = null;
-        this._abandonnerEntrante();
+        this._pendingEnd = null;
+        this._abandonIncoming();
         if (this._source) {
-            this.bus.retirer(this._source);
-            this._source.arreter();
+            this.bus.remove(this._source);
+            this._source.stop();
             this._source = null;
         }
-        this._fonduLance = false;
-        this._definirPisteCourante(null);
+        this._fadeStarted = false;
+        this._setCurrentTrack(null);
     }
 
     /**
@@ -456,22 +456,22 @@ class MixEngine {
      * @param {number} positionMs
      * @returns {Promise<boolean>}
      */
-    async repositionner(positionMs) {
-        if (!this.actif || !this._source) return false;
+    async seek(positionMs) {
+        if (!this.active || !this._source) return false;
 
         // Un fondu amorcé n'a plus de sens une fois qu'on a changé d'endroit
         // dans le morceau : le suivant n'est plus imminent.
-        this._abandonnerEntrante();
-        this._fonduLance = false;
+        this._abandonIncoming();
+        this._fadeStarted = false;
 
         const source = this._source;
         const generation = ++this._generation;
 
-        source.definirGain(1);
-        source.couperFiltre();
+        source.setGain(1);
+        source.cutFilter();
 
         try {
-            await source.repositionner(Math.max(0, positionMs));
+            await source.seek(Math.max(0, positionMs));
         } catch (err) {
             log.error('[MixEngine] Repositionnement impossible :', err.message);
             return false;
@@ -489,16 +489,16 @@ class MixEngine {
      * @param {number} vitesse
      * @returns {Promise<void>}
      */
-    async appliquerVitesse(vitesse) {
-        if (!this.actif || !this._source) return;
-        if (Math.abs(this._source.vitesse - vitesse) < 0.001) return;
+    async applySpeed(speed) {
+        if (!this.active || !this._source) return;
+        if (Math.abs(this._source.speed - speed) < 0.001) return;
 
         const position = this._source.positionMs;
-        this._abandonnerEntrante();
-        this._fonduLance = false;
+        this._abandonIncoming();
+        this._fadeStarted = false;
 
         try {
-            await this._source.repositionner(position, vitesse);
+            await this._source.seek(position, speed);
         } catch (err) {
             log.error('[MixEngine] Changement de vitesse impossible :', err.message);
         }
@@ -514,26 +514,26 @@ class MixEngine {
      * ce qui rend le déclenchement fiable : une pause, un creux d'alimentation
      * ou un ralentissement du processus ne décalent pas le point de fondu.
      */
-    _horloge() {
+    _clock() {
         const source = this._source;
-        if (!source || this._arrete) return;
+        if (!source || this._stopped) return;
 
-        const reglages = this._reglages();
-        const restant = this._restantMs(source);
-        if (restant === null) return;
+        const settings = this._settings();
+        const remaining = this._remainingMs(source);
+        if (remaining === null) return;
 
-        const dureeFondu = reglages.mixEnabled ? this._dureeFondu(reglages) : 0;
+        const fadeDuration = settings.mixEnabled ? this._fadeDuration(settings) : 0;
 
-        if (!this._entrante && !this._preparation && restant <= dureeFondu + AVANCE_PREPARATION_MS) {
-            this._preparerSuivante(reglages);
+        if (!this._incoming && !this._preparation && remaining <= fadeDuration + PREPARATION_LEAD_MS) {
+            this._prepareNext(settings);
         }
 
-        if (reglages.mixEnabled && !this._fonduLance && this._entrante && restant <= dureeFondu) {
+        if (settings.mixEnabled && !this._fadeStarted && this._incoming && remaining <= fadeDuration) {
             // Le fondu ne peut pas durer plus longtemps qu'il ne reste de
             // musique : une durée annoncée trop généreuse laisserait sinon le
             // morceau sortant se taire avant d'avoir fini de descendre, et
             // l'entrant terminer sa montée dans le vide.
-            this._lancerFondu(reglages, Math.min(dureeFondu, Math.max(500, restant)));
+            this._startFade(settings, Math.min(fadeDuration, Math.max(500, remaining)));
         }
     }
 
@@ -548,12 +548,12 @@ class MixEngine {
      * @param {MixSource} source
      * @returns {number|null} null si la durée reste inconnue
      */
-    _restantMs(source) {
-        if (source.fluxTermine) return source.avanceMs;
+    _remainingMs(source) {
+        if (source.streamEnded) return source.leadMs;
 
-        const duree = dureeMs(source.piste);
-        if (!duree) return null;
-        return Math.max(0, (duree - source.positionMs) / source.vitesse);
+        const duration = trackDurationMs(source.track);
+        if (!duration) return null;
+        return Math.max(0, (duration - source.positionMs) / source.speed);
     }
 
     /**
@@ -566,24 +566,24 @@ class MixEngine {
      *
      * @returns {object}
      */
-    _reglages() {
-        const maintenant = Date.now();
-        if (!this._reglagesCache || maintenant - this._reglagesLus > 200) {
-            this._reglagesCache = database.getSettings(this.guildId);
-            this._reglagesLus = maintenant;
+    _settings() {
+        const now = Date.now();
+        if (!this._settingsCache || now - this._settingsRead > 200) {
+            this._settingsCache = database.getSettings(this.guildId);
+            this._settingsRead = now;
         }
-        return this._reglagesCache;
+        return this._settingsCache;
     }
 
     /** @param {object} reglages */
-    _dureeFondu(reglages) {
-        return Math.max(500, (parseFloat(reglages.mixDuration) || 5) * 1000);
+    _fadeDuration(settings) {
+        return Math.max(500, (parseFloat(settings.mixDuration) || 5) * 1000);
     }
 
     /** @param {object} reglages */
-    _vitesse(reglages) {
-        const valeur = parseFloat(reglages.playbackSpeed || '1.0');
-        return valeur > 0 ? valeur : 1;
+    _speed(settings) {
+        const value = parseFloat(settings.playbackSpeed || '1.0');
+        return value > 0 ? value : 1;
     }
 
     /**
@@ -595,7 +595,7 @@ class MixEngine {
      *
      * @returns {object|null}
      */
-    _pisteSuivantePrevisible() {
+    _predictableNextTrack() {
         const queue = this.queue;
         if (queue.repeatMode === 1) return null;   // répétition du morceau
         if (queue.isShuffling) return null;
@@ -607,32 +607,32 @@ class MixEngine {
     }
 
     /** Ouvre le décodeur du morceau suivant, sans encore le verser dans le bus. */
-    _preparerSuivante(reglages) {
-        const suivante = this._pisteSuivantePrevisible();
-        if (!suivante) return;
+    _prepareNext(settings) {
+        const next = this._predictableNextTrack();
+        if (!next) return;
 
-        const source = new MixSource(suivante, {
+        const source = new MixSource(next, {
             player: this.queue.player,
-            vitesse: this._vitesse(reglages),
+            speed: this._speed(settings),
             gain: 0,
         });
 
-        const preparation = source.demarrer()
+        const preparation = source.start()
             .then(() => {
                 // `_abandonnerEntrante()` remet la préparation à zéro : c'est le
                 // signal que ce morceau-là n'est plus attendu — un saut de piste,
                 // un repositionnement.
-                if (this._arrete || this._preparation !== preparation) {
-                    source.arreter();
+                if (this._stopped || this._preparation !== preparation) {
+                    source.stop();
                     return;
                 }
-                this._entrante = source;
-                this._pisteEntrante = suivante;
-                log.debug(`[MixEngine] Morceau suivant prêt à être superposé : ${suivante.title}`);
+                this._incoming = source;
+                this._incomingTrack = next;
+                log.debug(`[MixEngine] Morceau suivant prêt à être superposé : ${next.title}`);
             })
             .catch((err) => {
-                log.error(`[MixEngine] Préparation impossible pour « ${suivante?.title} » :`, err.message);
-                source.arreter();
+                log.error(`[MixEngine] Préparation impossible pour « ${next?.title} » :`, err.message);
+                source.stop();
             })
             .finally(() => {
                 if (this._preparation === preparation) this._preparation = null;
@@ -642,56 +642,56 @@ class MixEngine {
     }
 
     /** Verse le morceau suivant dans le bus et croise les deux gains. */
-    _lancerFondu(reglages, dureeFondu) {
-        const sortante = this._source;
-        const entrante = this._entrante;
-        if (!sortante || !entrante) return;
+    _startFade(settings, fadeDuration) {
+        const outgoing = this._source;
+        const incoming = this._incoming;
+        if (!outgoing || !incoming) return;
 
-        this._fonduLance = true;
+        this._fadeStarted = true;
 
         // Loi de puissance constante des deux côtés : la somme des puissances
         // reste égale à un tout au long du croisement, là où deux rampes
         // linéaires creuseraient le niveau au milieu du fondu.
-        sortante.fondre(0, dureeFondu, { courbe: 'puissance' });
-        entrante.definirGain(0);
-        entrante.fondre(1, dureeFondu, { courbe: 'puissance' });
+        outgoing.fade(0, fadeDuration, { curve: 'puissance' });
+        incoming.setGain(0);
+        incoming.fade(1, fadeDuration, { curve: 'puissance' });
 
-        if (reglages.mixType === 'effects') {
-            sortante.balayerFiltre('ferme');
-            entrante.balayerFiltre('ouvre');
+        if (settings.mixType === 'effects') {
+            outgoing.sweepFilter('ferme');
+            incoming.sweepFilter('ouvre');
         }
 
-        this.bus.ajouter(entrante);
-        log.info(`[MixEngine] Fondu enchaîné de ${Math.round(dureeFondu / 1000)}s : `
-            + `« ${sortante.piste?.title} » → « ${entrante.piste?.title} ».`);
+        this.bus.add(incoming);
+        log.info(`[MixEngine] Fondu enchaîné de ${Math.round(fadeDuration / 1000)}s : `
+            + `« ${outgoing.track?.title} » → « ${incoming.track?.title} ».`);
     }
 
     /**
      * Une source vient d'être épuisée par le bus.
      * @param {MixSource} source
      */
-    _surSourceEpuisee(source) {
-        if (source !== this._source || this._arrete) return;
+    _onSourceExhausted(source) {
+        if (source !== this._source || this._stopped) return;
 
         // Aucun fondu n'a eu lieu — effet mix désactivé, ou durée inconnue —
         // mais le morceau suivant est décodé : il prend le relais sur la trame
         // suivante, donc sans blanc.
-        if (this._entrante && !this._fonduLance) {
-            this._entrante.definirGain(1);
-            this.bus.ajouter(this._entrante);
+        if (this._incoming && !this._fadeStarted) {
+            this._incoming.setGain(1);
+            this.bus.add(this._incoming);
         }
 
-        const piste = this.queue.currentTrack;
+        const track = this.queue.currentTrack;
         this._source = null;
-        this._finEnAttente = source;
-        source.arreter();
+        this._pendingEnd = source;
+        source.stop();
 
         // Sortir de la pile du flux avant de faire avancer la file : la suite
         // touche à la file d'attente, à l'historique et aux événements du bot.
         setImmediate(() => {
-            if (this._arrete || this._finEnAttente !== source) return;
-            this._finEnAttente = null;
-            this._terminerPiste(piste);
+            if (this._stopped || this._pendingEnd !== source) return;
+            this._pendingEnd = null;
+            this._finishTrack(track);
         });
     }
 
@@ -704,11 +704,11 @@ class MixEngine {
      *
      * @param {object} piste - Morceau qui s'achève
      */
-    _terminerPiste(piste) {
+    _finishTrack(track) {
         const dispatcher = this.queue.dispatcher;
         if (!dispatcher) return;
 
-        this._definirPisteCourante(piste);
+        this._setCurrentTrack(track);
         const generation = this._generation;
 
         try {
@@ -719,7 +719,7 @@ class MixEngine {
 
         // Personne n'a réclamé de nouveau morceau : la file est allée au bout.
         if (this._generation === generation && !this._source) {
-            this._definirPisteCourante(null);
+            this._setCurrentTrack(null);
         }
     }
 
@@ -728,9 +728,9 @@ class MixEngine {
      * @param {object} piste
      * @param {Error} erreur
      */
-    _echouerPiste(piste, erreur) {
+    _failTrack(track, error) {
         try {
-            this.queue.emit(GuildQueueEvent.PlayerError, this.queue, erreur, piste);
+            this.queue.emit(GuildQueueEvent.PlayerError, this.queue, error, track);
         } catch (e) {}
 
         // L'avancement est différé : l'échec survient au cœur de `jouer()`, que
@@ -739,32 +739,32 @@ class MixEngine {
         // file entière de pistes mortes finirait par saturer la pile.
         const generation = this._generation;
         setImmediate(() => {
-            if (this._arrete || this._generation !== generation) return;
-            this._terminerPiste(piste);
+            if (this._stopped || this._generation !== generation) return;
+            this._finishTrack(track);
         });
     }
 
     /** Fait du morceau superposé le morceau courant. */
-    _promouvoirEntrante() {
+    _promoteIncoming() {
         if (this._source) {
-            this.bus.retirer(this._source);
-            this._source.arreter();
+            this.bus.remove(this._source);
+            this._source.stop();
         }
 
-        this._source = this._entrante;
-        this._entrante = null;
-        this._pisteEntrante = null;
-        this._fonduLance = false;
+        this._source = this._incoming;
+        this._incoming = null;
+        this._incomingTrack = null;
+        this._fadeStarted = false;
 
         if (this._source) {
             // Le fondu s'est peut-être achevé avant la fin du morceau sortant :
             // dans le doute, le gain nominal est rétabli et le filtre relâché.
-            if (!this._source.enFondu) {
-                this._source.definirGain(1);
-                this._source.couperFiltre();
+            if (!this._source.isFading) {
+                this._source.setGain(1);
+                this._source.cutFilter();
             }
-            if (!this.bus.contient(this._source)) {
-                this.bus.ajouter(this._source);
+            if (!this.bus.contains(this._source)) {
+                this.bus.add(this._source);
             }
         }
     }
@@ -776,24 +776,24 @@ class MixEngine {
      * Désactiver l'effet mix pendant un fondu laisserait sinon le morceau à
      * mi-volume, ou étouffé, jusqu'à sa fin.
      */
-    annulerEnchainement() {
-        if (!this.actif) return;
-        this._abandonnerEntrante();
-        this._fonduLance = false;
+    cancelCrossfade() {
+        if (!this.active) return;
+        this._abandonIncoming();
+        this._fadeStarted = false;
         if (this._source) {
-            this._source.definirGain(1);
-            this._source.couperFiltre();
+            this._source.setGain(1);
+            this._source.cutFilter();
         }
     }
 
     /** Abandonne le morceau préparé, qu'il ait déjà rejoint le bus ou non. */
-    _abandonnerEntrante() {
+    _abandonIncoming() {
         this._preparation = null;
-        if (!this._entrante) return;
-        this.bus?.retirer(this._entrante);
-        this._entrante.arreter();
-        this._entrante = null;
-        this._pisteEntrante = null;
+        if (!this._incoming) return;
+        this.bus?.remove(this._incoming);
+        this._incoming.stop();
+        this._incoming = null;
+        this._incomingTrack = null;
     }
 
     /**
@@ -805,17 +805,17 @@ class MixEngine {
      *
      * @param {object|null} piste
      */
-    _definirPisteCourante(piste) {
-        if (this.resource) this.resource.metadata = piste || null;
+    _setCurrentTrack(track) {
+        if (this.resource) this.resource.metadata = track || null;
 
         // `queue.currentTrack` retombe sur `__current` dès que la ressource
         // disparaît — au départ d'un salon vide, par exemple. Le tenir à jour
         // ici évite que la piste figée s'évapore avec le bus.
-        this.queue.__current = piste || null;
+        this.queue.__current = track || null;
     }
 
     /** Émet le signal de démarrage attendu par discord-player. */
-    _signalerDemarrage() {
+    _signalStart() {
         try {
             this.queue.dispatcher?.emit('start', this.resource);
         } catch (err) {
@@ -830,11 +830,11 @@ class MixEngine {
      * @param {number} pourcent - 0 à 100
      * @returns {boolean}
      */
-    definirVolume(pourcent) {
-        if (!this.actif) return false;
-        const borne = Math.max(0, Math.min(100, Number(pourcent) || 0));
-        this._volume = borne;
-        this.bus.definirGainMaitre(borne / 100);
+    setVolume(percent) {
+        if (!this.active) return false;
+        const clamp = Math.max(0, Math.min(100, Number(percent) || 0));
+        this._volume = clamp;
+        this.bus.setMasterGain(clamp / 100);
         return true;
     }
 
@@ -852,9 +852,9 @@ class MixEngine {
      * @param {boolean} enPause
      * @returns {boolean}
      */
-    definirPause(enPause) {
-        if (!this.actif) return false;
-        return enPause ? this.lecteur.pause(true) : this.lecteur.unpause();
+    setPaused(paused) {
+        if (!this.active) return false;
+        return paused ? this.player.pause(true) : this.player.unpause();
     }
 
     /**
@@ -866,15 +866,15 @@ class MixEngine {
      *
      * @returns {boolean}
      */
-    enPause() {
-        if (!this.actif) return false;
-        return this.lecteur.state.status === AudioPlayerStatus.Paused;
+    paused() {
+        if (!this.active) return false;
+        return this.player.state.status === AudioPlayerStatus.Paused;
     }
 
     /** @returns {boolean} */
-    enLecture() {
-        if (!this.actif) return false;
-        return !!this._source && !this.enPause();
+    playing() {
+        if (!this.active) return false;
+        return !!this._source && !this.paused();
     }
 
     /**
@@ -892,10 +892,10 @@ class MixEngine {
      *
      * @returns {number}
      */
-    _avanceChaineMs() {
+    _chainLeadMs() {
         if (!this.bus || !this.resource) return 0;
-        const emises = Math.round((this.resource.playbackDuration || 0) / DUREE_TRAME_MS);
-        return Math.max(0, this.bus.tramesProduites - emises) * DUREE_TRAME_MS;
+        const emitted = Math.round((this.resource.playbackDuration || 0) / FRAME_DURATION_MS);
+        return Math.max(0, this.bus.framesProduced - emitted) * FRAME_DURATION_MS;
     }
 
     /**
@@ -918,13 +918,13 @@ class MixEngine {
 
         // L'avance est comptée en trames du bus, toutes sources confondues ;
         // rapportée au morceau, elle vaut ce que la vitesse de lecture en fait.
-        const recul = this._avanceChaineMs() * source.vitesse;
-        return Math.max(source.departMs, source.positionMs - recul);
+        const rewind = this._chainLeadMs() * source.speed;
+        return Math.max(source.startMs, source.positionMs - rewind);
     }
 
     /** Un fondu enchaîné est-il en cours ? */
-    get enFonduEnchaine() {
-        return this._fonduLance && !!this._entrante;
+    get isCrossfading() {
+        return this._fadeStarted && !!this._incoming;
     }
 
     /**
@@ -939,23 +939,23 @@ class MixEngine {
      *
      * @returns {{sortante: object, entrante: object}|null}
      */
-    etatFondu() {
-        if (!this.enFonduEnchaine || !this._source) return null;
+    fadeState() {
+        if (!this.isCrossfading || !this._source) return null;
 
-        const avance = this._avanceChaineMs();
-        const decrire = (source) => {
-            const position = Math.max(source.departMs, source.positionMs - avance * source.vitesse);
-            const duree = dureeMs(source.piste);
+        const lead = this._chainLeadMs();
+        const describe = (source) => {
+            const position = Math.max(source.startMs, source.positionMs - lead * source.speed);
+            const duration = trackDurationMs(source.track);
             return {
-                piste: source.piste,
-                url: source.piste?.url || null,
+                track: source.track,
+                url: source.track?.url || null,
                 positionMs: position,
-                dureeMs: duree,
-                ratio: duree > 0 ? Math.min(1, Math.max(0, position / duree)) : 0,
+                durationMs: duration,
+                ratio: duration > 0 ? Math.min(1, Math.max(0, position / duration)) : 0,
             };
         };
 
-        return { sortante: decrire(this._source), entrante: decrire(this._entrante) };
+        return { outgoing: describe(this._source), incoming: describe(this._incoming) };
     }
 
     /**
@@ -967,10 +967,10 @@ class MixEngine {
      *
      * @returns {number}
      */
-    get vitesse() {
-        if (this._source) return this._source.vitesse;
+    get speed() {
+        if (this._source) return this._source.speed;
         try {
-            return this._vitesse(database.getSettings(this.guildId));
+            return this._speed(database.getSettings(this.guildId));
         } catch (e) {
             return 1;
         }

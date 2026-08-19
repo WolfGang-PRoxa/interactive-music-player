@@ -21,10 +21,10 @@ let loadedCoverUrl = null;
  * un clignotement à la cadence des resyncs au lieu d'une vidéo. On compte les
  * repositionnements restés sans effet pour basculer sur le visualiseur.
  */
-let tempsVideoApresResync = -1;
-let horodatageDernierResync = 0;
+let videoTimeAfterResync = -1;
+let lastResyncAt = 0;
 let resyncsSansProgres = 0;
-let fluxVideoAbandonne = false;
+let videoStreamAbandoned = false;
 
 /** Nombre de resynchronisations infructueuses avant de renoncer au flux. */
 const RESYNCS_AVANT_ABANDON = 3;
@@ -57,7 +57,7 @@ const DERIVE_SAUT_S = 1.0;
  * franc que les 5 % habituels d'un lecteur classique : 15 % restent invisibles
  * à l'œil et résorbent une demi-seconde d'écart en trois secondes environ.
  */
-const CORRECTION_VITESSE_MAX = 0.15;
+const MAX_SPEED_CORRECTION = 0.15;
 
 /** Dérive à laquelle la correction atteint son maximum. */
 const DERIVE_CORRECTION_PLEINE_S = 0.5;
@@ -79,10 +79,10 @@ let resyncFrancDemande = false;
  * @param {HTMLVideoElement} videoElement
  * @param {number} vitesse
  */
-function appliquerVitesseVideo(videoElement, vitesse) {
-    const cible = Math.max(0.0625, Math.min(16, vitesse));
-    if (Math.abs(videoElement.playbackRate - cible) > 0.005) {
-        videoElement.playbackRate = cible;
+function applyVideoSpeed(videoElement, speed) {
+    const target = Math.max(0.0625, Math.min(16, speed));
+    if (Math.abs(videoElement.playbackRate - target) > 0.005) {
+        videoElement.playbackRate = target;
     }
 }
 
@@ -94,14 +94,14 @@ function appliquerVitesseVideo(videoElement, vitesse) {
  * mesurable. Sans ce garde-fou, une vidéo parfaitement lisible pourrait être
  * écartée sur trois coïncidences.
  */
-const DELAI_MIN_ENTRE_ECHECS_MS = 1000;
+const MIN_DELAY_BETWEEN_FAILURES_MS = 1000;
 
 /** Réarme la surveillance : appelé à chaque nouvelle source chargée. */
 function reinitialiserSurveillanceVideo() {
-    tempsVideoApresResync = -1;
-    horodatageDernierResync = 0;
+    videoTimeAfterResync = -1;
+    lastResyncAt = 0;
     resyncsSansProgres = 0;
-    fluxVideoAbandonne = false;
+    videoStreamAbandoned = false;
 }
 
 /**
@@ -109,9 +109,9 @@ function reinitialiserSurveillanceVideo() {
  * @param {HTMLVideoElement} videoElement
  * @param {string} raison
  */
-function abandonnerFluxVideo(videoElement, raison) {
-    if (fluxVideoAbandonne) return;
-    fluxVideoAbandonne = true;
+function abandonVideoStream(videoElement, raison) {
+    if (videoStreamAbandoned) return;
+    videoStreamAbandoned = true;
 
     console.warn(`[Video] Flux illisible par le navigateur (${raison}). Retour au visualiseur audio.`);
 
@@ -177,7 +177,7 @@ window.MusicPlayer.syncVideoSpeed = function(speedStr) {
 
     const videoElement = document.getElementById('video-element');
     if (videoElement && !videoElement.classList.contains('hidden')) {
-        appliquerVitesseVideo(videoElement, speedVal);
+        applyVideoSpeed(videoElement, speedVal);
     }
 
     return formattedSpeed;
@@ -193,7 +193,7 @@ window.MusicPlayer.syncVideoSpeed = function(speedStr) {
  *
  * @returns {object|null}
  */
-function pisteRoueQualite() {
+function qualityWheelTrack() {
     const state = window.MusicPlayer.state || {};
     const track = state.currentTrack;
     // Un fichier local n'est jamais transcodé : sa qualité ne se règle pas.
@@ -218,12 +218,12 @@ function rouesQualite() {
  * Actualise les roues de qualité selon la piste affichée.
  * @param {object|null} track
  */
-function majRoueQualite(track) {
-    const boutons = rouesQualite();
-    if (boutons.length === 0) return;
+function updateQualityWheel(track) {
+    const buttons = rouesQualite();
+    if (buttons.length === 0) return;
 
     const exploitable = !!(track && track.url && !track.isLocal);
-    boutons.forEach(b => b.classList.toggle('hidden', !exploitable));
+    buttons.forEach(b => b.classList.toggle('hidden', !exploitable));
 
     // Une roue qui s'efface emporte le menu qu'elle avait ouvert — il pointerait
     // sinon dans le vide. Mais le menu du clic droit sur un élément de liste
@@ -266,24 +266,24 @@ window.MusicPlayer.syncVideoProgress = function(currentMs, isExplicitSeek = fals
     if (videoElement && !videoElement.classList.contains('hidden')) {
         // Dérive signée : positive si la vidéo est en avance sur l'audio.
         const derive = videoElement.currentTime - seconds;
-        const ecart = Math.abs(derive);
+        const gap = Math.abs(derive);
 
-        const forcer = isExplicitSeek || resyncFrancDemande;
+        const force = isExplicitSeek || resyncFrancDemande;
         // À l'arrêt, la vitesse n'a aucune prise : seul un repositionnement
         // remet la vidéo en place, et il ne se voit pas sur une image figée.
-        const saut = forcer || ecart >= DERIVE_SAUT_S || (videoElement.paused && ecart > DERIVE_MORTE_S);
+        const saut = force || gap >= DERIVE_SAUT_S || (videoElement.paused && gap > DERIVE_MORTE_S);
 
         if (saut) {
             // Un repositionnement automatique qui n'a rien débloqué au
             // précédent passage signale un flux figé : insister ne ferait
             // qu'entretenir le clignotement image par image.
-            const maintenant = Date.now();
-            if (!forcer && !videoElement.paused && tempsVideoApresResync >= 0
-                && (maintenant - horodatageDernierResync) >= DELAI_MIN_ENTRE_ECHECS_MS) {
-                if (videoElement.currentTime <= tempsVideoApresResync + 0.2) {
+            const nowMs = Date.now();
+            if (!force && !videoElement.paused && videoTimeAfterResync >= 0
+                && (nowMs - lastResyncAt) >= MIN_DELAY_BETWEEN_FAILURES_MS) {
+                if (videoElement.currentTime <= videoTimeAfterResync + 0.2) {
                     resyncsSansProgres++;
                     if (resyncsSansProgres >= RESYNCS_AVANT_ABANDON) {
-                        abandonnerFluxVideo(videoElement, 'lecture bloquée après plusieurs resynchronisations');
+                        abandonVideoStream(videoElement, 'lecture bloquée après plusieurs resynchronisations');
                         return;
                     }
                 } else {
@@ -293,20 +293,20 @@ window.MusicPlayer.syncVideoProgress = function(currentMs, isExplicitSeek = fals
 
             try {
                 videoElement.currentTime = seconds;
-                tempsVideoApresResync = videoElement.currentTime;
-                horodatageDernierResync = maintenant;
+                videoTimeAfterResync = videoElement.currentTime;
+                lastResyncAt = nowMs;
             } catch (err) {}
             resyncFrancDemande = false;
-            appliquerVitesseVideo(videoElement, speed);
-        } else if (ecart <= DERIVE_MORTE_S) {
-            appliquerVitesseVideo(videoElement, speed);
+            applyVideoSpeed(videoElement, speed);
+        } else if (gap <= DERIVE_MORTE_S) {
+            applyVideoSpeed(videoElement, speed);
         } else {
             // Rattrapage progressif : on joue légèrement plus vite quand la
             // vidéo est en retard, plus lentement quand elle est en avance.
             // L'écart se résorbe sans jamais vider le décodeur, donc sans
             // coupure visible.
             const proportion = Math.max(-1, Math.min(1, derive / DERIVE_CORRECTION_PLEINE_S));
-            appliquerVitesseVideo(videoElement, speed * (1 - proportion * CORRECTION_VITESSE_MAX));
+            applyVideoSpeed(videoElement, speed * (1 - proportion * MAX_SPEED_CORRECTION));
         }
     }
 
@@ -610,7 +610,7 @@ window.MusicPlayer.updateVideoPlayer = async function(track) {
     // Les roues de qualité sont mises à jour avant toute sortie anticipée :
     // celle de la carte « En cours de lecture » doit rester utilisable même
     // lorsque le mode vidéo est coupé, ne serait-ce que pour l'audio.
-    majRoueQualite(track || state.currentTrack);
+    updateQualityWheel(track || state.currentTrack);
 
     const isVideoActive = toggleVideoMode.checked;
     if (!isVideoActive) {
@@ -660,8 +660,8 @@ window.MusicPlayer.updateVideoPlayer = async function(track) {
     // déjà chargé serait conservé indéfiniment et un changement de qualité
     // depuis la roue ou le menu contextuel resterait sans effet à l'écran.
     const qualiteVoulue = String(effectiveTrack.desiredVideoQuality || '');
-    const qualiteChargee = videoElement ? (videoElement.getAttribute('data-loaded-quality') || '') : '';
-    const memeQualite = qualiteVoulue === qualiteChargee;
+    const loadedQuality = videoElement ? (videoElement.getAttribute('data-loaded-quality') || '') : '';
+    const memeQualite = qualiteVoulue === loadedQuality;
 
     if (isSameTrack && memeQualite && videoElement && !videoElement.classList.contains('hidden')
         && videoElement.src && videoElement.readyState >= 1) {
@@ -778,7 +778,7 @@ window.MusicPlayer.updateVideoPlayer = async function(track) {
                         // Un flux déjà écarté ne doit pas être réaffiché à chaque
                         // passage : le visualiseur reste en place jusqu'à la
                         // piste suivante, qui réarmera la surveillance.
-                        if (!fluxVideoAbandonne) {
+                        if (!videoStreamAbandoned) {
                             if (videoCanvas) videoCanvas.classList.add('hidden');
                             videoElement.classList.remove('hidden');
                             if (state.isPlaying && !state.isPaused) {
@@ -838,7 +838,7 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
         videoElementSurveille.addEventListener('error', () => {
             if (!videoElementSurveille.getAttribute('data-loaded-src')) return;
             const code = videoElementSurveille.error && videoElementSurveille.error.code;
-            abandonnerFluxVideo(videoElementSurveille, `erreur de lecture (code ${code || '?'})`);
+            abandonVideoStream(videoElementSurveille, `erreur de lecture (code ${code || '?'})`);
         });
     }
 
@@ -1586,15 +1586,15 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
  * posée sur le bouton lui-même.
  */
 function brancherRoueQualite() {
-    rouesQualite().forEach((bouton) => {
-        if (bouton.dataset.qualityBound === 'true') return;
-        bouton.dataset.qualityBound = 'true';
+    rouesQualite().forEach((button) => {
+        if (button.dataset.qualityBound === 'true') return;
+        button.dataset.qualityBound = 'true';
 
-        bouton.addEventListener('click', (e) => {
+        button.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
 
-            const track = pisteRoueQualite();
+            const track = qualityWheelTrack();
             if (!track) {
                 console.warn('[Video] Roue de qualité sans piste exploitable '
                     + '(aucune lecture en cours, ou fichier local).');
@@ -1602,7 +1602,7 @@ function brancherRoueQualite() {
             }
             // Le menu s'ancre sur la roue pressée : ouvrir depuis l'une alors
             // que l'autre le tenait le déplace simplement, sans le refermer.
-            window.MusicPlayer.showTrackQualityMenuForElement(bouton, track);
+            window.MusicPlayer.showTrackQualityMenuForElement(button, track);
         });
     });
 }

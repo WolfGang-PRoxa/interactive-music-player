@@ -44,7 +44,7 @@ class VolumeController {
          * ne peuvent écraser la rampe : ce sont précisément ces interventions
          * qui empêchaient les fades d'atteindre le silence.
          */
-        this._fadeExclusif = false;
+        this._exclusiveFade = false;
 
         // Si la queue est en transition ou en restauration, commencer à volume 0
         const queue = queueNode?.queue;
@@ -60,7 +60,7 @@ class VolumeController {
         this.baseVolume = Math.max(0, Math.min(100, percent));
 
         // Si on n'est pas ducké et qu'aucun fade n'est en cours, appliquer immédiatement
-        if (!this.isDucked && !this._fadeInterval && !this._fadeExclusif) {
+        if (!this.isDucked && !this._fadeInterval && !this._exclusiveFade) {
             this._setVolumeImmediate(this.baseVolume);
         }
     }
@@ -90,13 +90,13 @@ class VolumeController {
      * @param {number} target Volume final (0-100).
      * @param {number} duration Durée en ms.
      */
-    fadeInDepuisSilence(target, duration) {
+    fadeInFromSilence(target, duration) {
         this._fadeTo(target, duration, {
-            depart: 0,
-            exposant: 2,
-            exclusif: true,
+            start: 0,
+            exponent: 2,
+            exclusive: true,
             // Le ducking reprend la main une fois le volume nominal atteint.
-            auTerme: () => this.libererFadeExclusif()
+            onComplete: () => this.releaseExclusiveFade()
         });
     }
 
@@ -108,14 +108,14 @@ class VolumeController {
      * d'abord neutraliser le ducking, sans quoi celui-ci réécrit le volume
      * par-dessus la descente et le silence final ne tient pas.
      */
-    reserverPourFadeExterne() {
+    reserveForExternalFade() {
         this._cancelFade();
-        this._fadeExclusif = true;
+        this._exclusiveFade = true;
     }
 
     /** Libère le verrou posé par un fade prioritaire. */
-    libererFadeExclusif() {
-        this._fadeExclusif = false;
+    releaseExclusiveFade() {
+        this._exclusiveFade = false;
     }
 
     /**
@@ -143,30 +143,30 @@ class VolumeController {
      * @param {Function} [options.auTerme] Appelé une fois la cible atteinte.
      */
     _fadeTo(target, duration, options = {}) {
-        const { depart, exposant = 1, exclusif = false, auTerme = null } = options;
+        const { start, exponent = 1, exclusive = false, onComplete = null } = options;
 
         // Un fade prioritaire en cours ne se laisse pas interrompre par le ducking.
-        if (this._fadeExclusif && !exclusif) return;
+        if (this._exclusiveFade && !exclusive) return;
 
         this._cancelFade();
 
-        const currentVol = (typeof depart === 'number') ? depart : this.currentVolume;
+        const currentVol = (typeof start === 'number') ? start : this.currentVolume;
         this.targetVolume = target;
-        if (exclusif) this._fadeExclusif = true;
+        if (exclusive) this._exclusiveFade = true;
 
         // Un départ imposé doit être appliqué même si l'écart est nul : c'est ce
         // qui coupe réellement le son avant une entrée en fondu.
-        if (typeof depart === 'number') this._setVolumeImmediate(depart);
+        if (typeof start === 'number') this._setVolumeImmediate(start);
 
-        const terminer = () => {
+        const finish = () => {
             this._setVolumeImmediate(target);
             this._cancelFade();
-            if (auTerme) auTerme();
+            if (onComplete) onComplete();
         };
 
         // Si la durée est très courte ou le changement est minime, appliquer immédiatement
         if (duration <= 0 || Math.abs(currentVol - target) < 1) {
-            terminer();
+            finish();
             return;
         }
 
@@ -177,12 +177,12 @@ class VolumeController {
         this._fadeInterval = setInterval(() => {
             currentStep++;
             if (currentStep >= steps) {
-                terminer();
+                finish();
                 return;
             }
 
-            const progression = Math.pow(currentStep / steps, exposant);
-            const newVol = currentVol + (target - currentVol) * progression;
+            const progress = Math.pow(currentStep / steps, exponent);
+            const newVol = currentVol + (target - currentVol) * progress;
             this._setVolumeImmediate(Math.max(0, Math.min(100, Math.round(newVol))));
         }, stepInterval);
     }
@@ -226,7 +226,7 @@ class VolumeController {
         // Un fade de démarrage ou d'extinction survit au changement de node : il
         // est déclenché précisément au moment où les pistes s'enchaînent, et
         // l'interrompre ici le faisait sauter à plein volume.
-        if (this._fadeExclusif) {
+        if (this._exclusiveFade) {
             this.queueNode = queueNode;
             this._setVolumeImmediate(this.currentVolume);
             return;

@@ -173,7 +173,7 @@ async function handleSetActivePlaybackSource(ctx) {
 
         const isPersonal = settings.broadcastMode === 'personal';
 
-        const versDonnees = (t) => {
+        const toData = (t) => {
             if (!t) return null;
             return {
                 title: t.title,
@@ -185,11 +185,11 @@ async function handleSetActivePlaybackSource(ctx) {
                 extractorName: t.extractor?.identifier || t.extractorName || null
             };
         };
-        const pisteEnCours = () => (isPersonal ? queue?.virtualCurrentTrack : queue?.currentTrack) || null;
+        const currentTrackOf = () => (isPersonal ? queue?.virtualCurrentTrack : queue?.currentTrack) || null;
 
         // Relevée avant la bascule : c'est en comparant après coup qu'on saura
         // si la nouvelle source a réellement pris la main.
-        const enCoursAvant = pisteEnCours();
+        const trackBefore = currentTrackOf();
 
         if (oldSource === 'queue') {
             // La piste en cours n'entre pas dans la file mise de côté : elle
@@ -197,8 +197,8 @@ async function handleSetActivePlaybackSource(ctx) {
             // ranger la ferait apparaître deux fois — une fois comme morceau
             // joué, une fois comme titre en attente. Elle n'y rejoindra sa
             // place que si la nouvelle source l'interrompt (voir plus bas).
-            const suite = isPersonal ? (queue?.virtualTracks || []) : (queue ? queue.tracks.toArray() : []);
-            writeSetAsideQueue(currentGuildId, suite.map(versDonnees), settings);
+            const rest = isPersonal ? (queue?.virtualTracks || []) : (queue ? queue.tracks.toArray() : []);
+            writeSetAsideQueue(currentGuildId, rest.map(toData), settings);
         }
 
         database.updateSettings(currentGuildId, {
@@ -209,13 +209,13 @@ async function handleSetActivePlaybackSource(ctx) {
         if (source === 'queue') {
             // Retour à la file : son premier titre redevient la piste courante,
             // dans les deux modes.
-            const misDeCote = readSetAsideQueue(settings);
+            const setAside = readSetAsideQueue(settings);
 
             if (isPersonal) {
-                if (queue && misDeCote.length > 0) {
-                    const [premiere, ...suite] = misDeCote;
-                    queue.virtualCurrentTrack = premiere;
-                    queue.virtualTracks = suite;
+                if (queue && setAside.length > 0) {
+                    const [first, ...rest] = setAside;
+                    queue.virtualCurrentTrack = first;
+                    queue.virtualTracks = rest;
                     queue.virtualProgressMs = 0;
                     queue.virtualIsPlaying = true;
                     queue.virtualIsPaused = false;
@@ -223,9 +223,9 @@ async function handleSetActivePlaybackSource(ctx) {
                 }
             } else if (queue) {
                 queue.tracks.clear();
-                if (misDeCote.length > 0) {
+                if (setAside.length > 0) {
                     const { Track } = require('discord-player');
-                    const tracksToRestore = misDeCote.map(tData => {
+                    const tracksToRestore = setAside.map(tData => {
                         const track = new Track(player, tData);
                         if (tData.extractorName) {
                             track.extractor = player.extractors.store.get(tData.extractorName) || null;
@@ -243,16 +243,16 @@ async function handleSetActivePlaybackSource(ctx) {
             // le couper. Quand elle prend malgré tout la main, la piste qu'elle
             // a interrompue ouvre la file mise de côté — c'est là qu'on la
             // retrouvera au retour, et à cet endroit seulement.
-            const enCoursApres = pisteEnCours();
-            const interrompue = enCoursAvant
-                && (!enCoursApres || !arePathsOrUrlsEqual(enCoursAvant.url, enCoursApres.url));
+            const trackAfter = currentTrackOf();
+            const interrupted = trackBefore
+                && (!trackAfter || !arePathsOrUrlsEqual(trackBefore.url, trackAfter.url));
 
-            if (interrompue) {
-                const reglages = database.getSettings(currentGuildId);
+            if (interrupted) {
+                const settings = database.getSettings(currentGuildId);
                 writeSetAsideQueue(
                     currentGuildId,
-                    [versDonnees(enCoursAvant), ...readSetAsideQueue(reglages)],
-                    reglages
+                    [toData(trackBefore), ...readSetAsideQueue(settings)],
+                    settings
                 );
             }
         }

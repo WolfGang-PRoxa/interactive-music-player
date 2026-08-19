@@ -188,7 +188,7 @@ window.MusicPlayer.setupToastInteractions = function() {
             const text = toastCycle.message || document.getElementById('error-toast-message')?.textContent || '';
             if (!text) return;
 
-            const copied = await window.MusicPlayer.copierDansPressePapier(text);
+            const copied = await window.MusicPlayer.copyToClipboard(text);
 
             if (copied) {
                 copyBtn.classList.add('copied');
@@ -209,18 +209,18 @@ window.MusicPlayer.setupToastInteractions = function() {
  * que le bot n'a rejoint aucun serveur, aucun état n'est envoyé — or c'est
  * exactement la situation où ce bouton est le seul recours.
  */
-window.MusicPlayer.chargerLienInvitation = async function() {
-    const lien = document.getElementById('link-invite-bot');
-    if (!lien || !lien.classList.contains('is-unavailable')) return;
+window.MusicPlayer.loadInviteLink = async function() {
+    const link = document.getElementById('link-invite-bot');
+    if (!link || !link.classList.contains('is-unavailable')) return;
 
     try {
-        const reponse = await fetch('/api/invite', { credentials: 'same-origin' });
-        if (!reponse.ok) return;
-        const donnees = await reponse.json();
-        if (!donnees || !donnees.inviteUrl) return;
+        const response = await fetch('/api/invite', { credentials: 'same-origin' });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!data || !data.inviteUrl) return;
 
-        lien.href = donnees.inviteUrl;
-        lien.classList.remove('is-unavailable');
+        link.href = data.inviteUrl;
+        link.classList.remove('is-unavailable');
     } catch (e) {
         // Bot pas encore prêt : la prochaine ouverture des réglages réessaiera.
     }
@@ -272,8 +272,8 @@ window.MusicPlayer.renderConnectedGuildsList = function() {
             window.MusicPlayer.saveDashboardSettings();
             // Le sélecteur de salons doit suivre sur-le-champ : ce réglage est
             // local, aucun état ne sera diffusé pour l'y pousser.
-            if (typeof window.MusicPlayer.rafraichirInterface === 'function') {
-                window.MusicPlayer.rafraichirInterface();
+            if (typeof window.MusicPlayer.refreshInterface === 'function') {
+                window.MusicPlayer.refreshInterface();
             }
             const statusStr = chk.checked ? (dict.server_enabled || 'activé') : (dict.server_disabled || 'désactivé');
             window.MusicPlayer.showToast(window.MusicPlayer.t('toast_server_status_updated').replace('{name}', guild.name).replace('{status}', statusStr));
@@ -404,7 +404,7 @@ window.MusicPlayer.initSettingsModal = function() {
     }
 
     window.MusicPlayer.setupToastInteractions();
-    window.MusicPlayer.chargerLienInvitation();
+    window.MusicPlayer.loadInviteLink();
 
     if (btnOpenSettings && settingsModal) {
         btnOpenSettings.addEventListener('click', (e) => {
@@ -415,7 +415,7 @@ window.MusicPlayer.initSettingsModal = function() {
                 console.error('[SettingsModal] Erreur render connected guilds :', gErr);
             }
             // Nouvelle tentative si le bot n'était pas encore prêt au chargement.
-            window.MusicPlayer.chargerLienInvitation();
+            window.MusicPlayer.loadInviteLink();
             settingsModal.classList.remove('hidden');
             localStorage.setItem('music_player_settings_open', 'true');
         });
@@ -598,8 +598,8 @@ window.MusicPlayer.initSettingsModal = function() {
             dashboardSettings.fadeinDuration = parseFloat(document.getElementById('setting-fadein-duration')?.value || 5);
             // Zéro est un réglage valide — départ immédiat —, que le `||`
             // employé au-dessus effacerait au profit de la valeur par défaut.
-            const delaiDepart = parseFloat(document.getElementById('setting-departure-delay')?.value);
-            dashboardSettings.presenceDepartureDelay = Number.isFinite(delaiDepart) ? delaiDepart : 30;
+            const departureDelay = parseFloat(document.getElementById('setting-departure-delay')?.value);
+            dashboardSettings.presenceDepartureDelay = Number.isFinite(departureDelay) ? departureDelay : 30;
             dashboardSettings.tooltipDelay = parseFloat(document.getElementById('setting-tooltip-delay')?.value || 0.25);
 
             dashboardSettings.toast = {
@@ -818,21 +818,21 @@ window.MusicPlayer.initDeviceModeSetting = function(select) {
     const refreshHint = () => {
         if (!hint) return;
 
-        const taille = `${window.innerWidth} × ${window.innerHeight}`;
+        const size = `${window.innerWidth} × ${window.innerHeight}`;
 
         if (deviceMode.getChoice() !== 'auto') {
-            hint.textContent = taille;
+            hint.textContent = size;
             return;
         }
         const t = window.MusicPlayer.t;
-        const libelle = typeof t === 'function'
+        const label = typeof t === 'function'
             ? t(`device_mode_${deviceMode.get()}`)
             : deviceMode.get();
-        const gabarit = typeof t === 'function' ? t('device_mode_detected') : '';
-        const detecte = gabarit && gabarit !== 'device_mode_detected'
-            ? gabarit.replace('{mode}', libelle)
-            : `→ ${libelle}`;
-        hint.textContent = `${detecte} — ${taille}`;
+        const template = typeof t === 'function' ? t('device_mode_detected') : '';
+        const detecte = template && template !== 'device_mode_detected'
+            ? template.replace('{mode}', label)
+            : `→ ${label}`;
+        hint.textContent = `${detecte} — ${size}`;
     };
 
     select.value = deviceMode.getChoice();
@@ -856,12 +856,12 @@ window.MusicPlayer.initDeviceModeSetting = function(select) {
 
         const t = window.MusicPlayer.t;
         if (typeof window.MusicPlayer.showToast === 'function' && typeof t === 'function') {
-            const libelle = t(`device_mode_${deviceMode.get()}`);
-            const gabarit = t('device_mode_applied');
+            const label = t(`device_mode_${deviceMode.get()}`);
+            const template = t('device_mode_applied');
             window.MusicPlayer.showToast(
-                gabarit && gabarit !== 'device_mode_applied'
-                    ? gabarit.replace('{mode}', libelle)
-                    : libelle
+                template && template !== 'device_mode_applied'
+                    ? template.replace('{mode}', label)
+                    : label
             );
         }
     });

@@ -7,7 +7,7 @@
 const database = require('../../../database/Database');
 const playbackStateManager = require('../../../database/PlaybackStateManager');
 const presenceManager = require('../../../audio/PresenceManager');
-const { searchLocalAwareTrack, playlistEstLaSource, ajouterALaFileEnAttente } = require('../handlerUtils');
+const { searchLocalAwareTrack, playlistIsSource, addToSetAsideQueue } = require('../handlerUtils');
 const { getCleanFilename } = require('../../../utils/paths');
 const log = require('../../../utils/logger');
 
@@ -60,7 +60,7 @@ async function handlePlay(ctx) {
             // ne décide pas de ce qu'on écoute. Si une playlist occupe le
             // lecteur, elle le reste, et les pistes rejoignent la file mise de
             // côté. Seul « Jouer maintenant » change la source de lecture.
-            const versFileEnAttente = playlistEstLaSource(settings);
+            const versFileEnAttente = playlistIsSource(settings);
 
             const fs = require('fs');
             const path = require('path');
@@ -90,7 +90,7 @@ async function handlePlay(ctx) {
                                 tracksToPlay.push(searchResult.tracks[0]);
                             }
                         }
-                        if (!ajouterALaFileEnAttente(currentGuildId, settings, tracksToPlay)) {
+                        if (!addToSetAsideQueue(currentGuildId, settings, tracksToPlay)) {
                             await webServer._addVirtualTracks(currentGuildId, tracksToPlay, true);
                         }
                         webServer.broadcastState(currentGuildId);
@@ -98,19 +98,19 @@ async function handlePlay(ctx) {
                         // Rangées d'un bloc en fin de parcours : les ajouter une
                         // par une réécrirait les réglages à chaque fichier du
                         // dossier.
-                        const aRanger = [];
+                        const toStore = [];
                         for (const filePath of audioFiles) {
                             const searchResult = await player.search(filePath, { searchEngine: QueryType.FILE });
                             const track = searchResult.tracks[0];
                             if (track) {
                                 track.title = getCleanFilename(filePath);
                                 if (versFileEnAttente) {
-                                    aRanger.push(track);
+                                    toStore.push(track);
                                     continue;
                                 }
                                 // Salon désert : la piste rejoint la file, qui
                                 // démarrera quand le bot y sera amené.
-                                if (!await presenceManager.connecterSiHabite(queue, voiceChannel)) {
+                                if (!await presenceManager.connectIfInhabited(queue, voiceChannel)) {
                                     queue.addTrack(track);
                                     continue;
                                 }
@@ -127,7 +127,7 @@ async function handlePlay(ctx) {
                                 });
                             }
                         }
-                        ajouterALaFileEnAttente(currentGuildId, settings, aRanger);
+                        addToSetAsideQueue(currentGuildId, settings, toStore);
                         webServer.broadcastState(currentGuildId);
                     }
                 } else if (LocalFilePlayer.isAudioFile(resolvedPath)) {
@@ -137,7 +137,7 @@ async function handlePlay(ctx) {
                         if (searchResult.tracks.length > 0) {
                             searchResult.tracks[0].title = getCleanFilename(resolvedPath);
                         }
-                        if (!ajouterALaFileEnAttente(currentGuildId, settings, searchResult.tracks[0])) {
+                        if (!addToSetAsideQueue(currentGuildId, settings, searchResult.tracks[0])) {
                             await webServer._addVirtualTracks(currentGuildId, searchResult.tracks, false);
                         }
                         webServer.broadcastState(currentGuildId);
@@ -146,11 +146,11 @@ async function handlePlay(ctx) {
                         const track = searchResult.tracks[0];
                         if (track) {
                             track.title = getCleanFilename(resolvedPath);
-                            if (ajouterALaFileEnAttente(currentGuildId, settings, track)) {
+                            if (addToSetAsideQueue(currentGuildId, settings, track)) {
                                 webServer.broadcastState(currentGuildId);
                                 return;
                             }
-                            if (!await presenceManager.connecterSiHabite(queue, voiceChannel)) {
+                            if (!await presenceManager.connectIfInhabited(queue, voiceChannel)) {
                                 queue.addTrack(track);
                                 webServer.broadcastState(currentGuildId);
                                 return;
@@ -182,18 +182,18 @@ async function handlePlay(ctx) {
                 }
 
                 if (isPersonal) {
-                    const aRanger = searchResult.playlist ? searchResult.tracks : searchResult.tracks[0];
-                    if (!ajouterALaFileEnAttente(currentGuildId, settings, aRanger)) {
+                    const toStore = searchResult.playlist ? searchResult.tracks : searchResult.tracks[0];
+                    if (!addToSetAsideQueue(currentGuildId, settings, toStore)) {
                         await webServer._addVirtualTracks(currentGuildId, searchResult.tracks, searchResult.playlist);
                     }
                     webServer.broadcastState(currentGuildId);
                 } else {
-                    const aRanger = searchResult.playlist ? searchResult.tracks : searchResult.tracks[0];
-                    if (ajouterALaFileEnAttente(currentGuildId, settings, aRanger)) {
+                    const toStore = searchResult.playlist ? searchResult.tracks : searchResult.tracks[0];
+                    if (addToSetAsideQueue(currentGuildId, settings, toStore)) {
                         webServer.broadcastState(currentGuildId);
                         return;
                     }
-                    if (!await presenceManager.connecterSiHabite(queue, voiceChannel)) {
+                    if (!await presenceManager.connectIfInhabited(queue, voiceChannel)) {
                         queue.addTrack(searchResult.playlist ? searchResult.tracks : searchResult.tracks[0]);
                         webServer.broadcastState(currentGuildId);
                         return;
@@ -238,7 +238,7 @@ function handlePause(ctx) {
             }
         } else {
             if (queue) {
-                if (!presenceManager.commanderFige(queue, 'pause')) {
+                if (!presenceManager.applyFrozenCommand(queue, 'pause')) {
                     try {
                         queue.node.setPaused(true);
                         log.debug(`[Player Debug] queue.node.setPaused(true) executed for guild ${currentGuildId}`);
@@ -269,7 +269,7 @@ function handleResume(ctx) {
         } else {
             if (queue) {
                 queue.restorePaused = false;
-                if (!presenceManager.commanderFige(queue, 'resume')) {
+                if (!presenceManager.applyFrozenCommand(queue, 'resume')) {
                     try {
                         queue.node.setPaused(false);
                         log.debug(`[Player Debug] queue.node.setPaused(false) executed for guild ${currentGuildId}`);
@@ -298,8 +298,8 @@ function handleSkip(ctx) {
         // d'autant de crans qu'il y avait d'appareils connectés. Seul le pilote
         // est entendu — mais les commandes explicites, elles, restent acceptées
         // de n'importe lequel.
-        const estAnnonceAutomatique = !!(data && (data.auto || data.startProgressMs > 0));
-        if (estAnnonceAutomatique && ws && !webServer.estPilote(ws, currentGuildId)) {
+        const isAutomaticAnnounce = !!(data && (data.auto || data.startProgressMs > 0));
+        if (isAutomaticAnnounce && ws && !webServer.isPilot(ws, currentGuildId)) {
             log.debug('[WebServer] Fin de piste annoncée par un tableau de bord non pilote : ignorée.');
             return;
         }
@@ -310,7 +310,7 @@ function handleSkip(ctx) {
                 webServer.handleVirtualSkip(queue, currentGuildId, data);
             }
         } else {
-            if (presenceManager.commanderFige(queue, 'skip')) {
+            if (presenceManager.applyFrozenCommand(queue, 'skip')) {
                 webServer.broadcastState(currentGuildId);
                 return;
             }
@@ -400,7 +400,7 @@ async function handlePrevious(ctx) {
                 }
             }
         } else {
-            if (presenceManager.commanderFige(queue, 'previous')) {
+            if (presenceManager.applyFrozenCommand(queue, 'previous')) {
                 webServer.broadcastState(currentGuildId);
                 playbackStateManager.saveState(player);
                 return;
@@ -484,7 +484,7 @@ async function handleStop(ctx) {
         } else {
             if (queue) {
                 try {
-                    if (presenceManager.commanderFige(queue, 'stop')) {
+                    if (presenceManager.applyFrozenCommand(queue, 'stop')) {
                         // rien à arrêter : la lecture est déjà à l'arrêt
                     } else if (queue.currentTrack) {
                         queue.node.setPaused(true);
@@ -514,7 +514,7 @@ async function handleSeek(ctx) {
             }
         } else {
             if (queue && typeof time === 'number') {
-                if (presenceManager.commanderFige(queue, 'seek', time)) {
+                if (presenceManager.applyFrozenCommand(queue, 'seek', time)) {
                     webServer.broadcastState(currentGuildId);
                     playbackStateManager.saveState(player);
                     return;

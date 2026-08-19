@@ -11,7 +11,7 @@ const database = require('../database/Database');
 const broadcastManager = require('../broadcast/BroadcastManager');
 const playbackStateManager = require('../database/PlaybackStateManager');
 const preloadManager = require('../audio/PreloadManager');
-const { moteurActif } = require('../audio/mix');
+const { activeEngine } = require('../audio/mix');
 const auth = require('./auth');
 const { arePathsOrUrlsEqual } = require('../utils/paths');
 const { readSetAsideQueue } = require('../utils/setAsideQueue');
@@ -32,7 +32,7 @@ const WS_MAX_PAYLOAD_BYTES = 1024 * 1024;
  * Les échantillons partent groupés : la résolution temporelle est celle de
  * l'échantillonnage, la charge réseau celle du regroupement.
  */
-const MEM_CADENCE_HZ = 60;
+const MEM_RATE_HZ = 60;
 /**
  * Le minuteur est volontairement réglé plus court que la période visée, et
  * c'est l'horloge qui décide de retenir ou non la mesure.
@@ -42,11 +42,11 @@ const MEM_CADENCE_HZ = 60;
  * que prévu. En se réveillant plus souvent et en filtrant sur le temps écoulé,
  * la cadence obtenue est la même quelle que soit la résolution du système.
  */
-const MEM_PERIODE_MINUTEUR_MS = 8;
-const MEM_ECART_MIN_MS = (1000 / MEM_CADENCE_HZ) * 0.6;
-const MEM_PERIODE_ENVOI_MS = 50;
+const MEM_SAMPLE_PERIOD_MS = 8;
+const MEM_MIN_GAP_MS = (1000 / MEM_RATE_HZ) * 0.6;
+const MEM_SEND_PERIOD_MS = 50;
 /** Garde-fou : plafonne le lot si un envoi venait à traîner. */
-const MEM_LOT_MAX = MEM_CADENCE_HZ * 4;
+const MEM_MAX_BATCH = MEM_RATE_HZ * 4;
 
 /**
  * Délai laissé au tableau de bord pour annoncer lui-même une fin de piste, en
@@ -60,7 +60,7 @@ const MEM_LOT_MAX = MEM_CADENCE_HZ * 4;
  * Deux secondes : largement au-delà d'un aller-retour WebSocket, largement en
  * deçà de ce qui s'entendrait si le navigateur venait réellement à se taire.
  */
-const FIN_AUTOMATIQUE_DELAI_MS = 2000;
+const AUTO_END_DELAY_MS = 2000;
 
 // Le logger écrit dans data/logs et applique la rétention ; le serveur web ne
 // fait que s'y abonner pour retransmettre les entrées au tableau de bord.
@@ -96,16 +96,16 @@ class WebServer {
          * restent acceptées de n'importe lequel : ce sont des intentions de
          * l'utilisateur, pas des constats de fin de piste.
          */
-        this.pilotes = new Map();
+        this.pilots = new Map();
 
         /** Lien d'invitation, construit une fois le bot prêt. Voir lienInvitation(). */
-        this._lienInvitation = null;
+        this._inviteLink = null;
 
         // Flux mémoire haute cadence : voir setFluxMemoire.
-        this._abonnesMemoire = new Set();
-        this._minuteurMesureMemoire = null;
-        this._minuteurEnvoiMemoire = null;
-        this._tamponMemoire = [];
+        this._memorySubscribers = new Set();
+        this._memorySampleTimer = null;
+        this._memorySendTimer = null;
+        this._memoryBuffer = [];
 
         WebServer.instance = this;
 
@@ -225,7 +225,7 @@ class WebServer {
                                 // un redémarrage du bot, voire enchaînerait des pistes que
                                 // personne n'a entendues. On la gèle et on repousse le
                                 // repère temporel pour repartir sans à-coup à la reconnexion.
-                                if (!this.aUnClientConnecte(guildId)) {
+                                if (!this.hasConnectedClient(guildId)) {
                                     queue.virtualLastUpdated = Date.now();
                                 } else {
                                     const speed = parseFloat(settings.playbackSpeed || '1.0');
@@ -250,7 +250,7 @@ class WebServer {
                                     // Cette avance n'est qu'une roue de secours, pour le
                                     // cas où le tableau de bord se tairait. Elle peut donc
                                     // attendre ; lui, non.
-                                    if (durationMs > 0 && queue.virtualProgressMs >= durationMs + FIN_AUTOMATIQUE_DELAI_MS) {
+                                    if (durationMs > 0 && queue.virtualProgressMs >= durationMs + AUTO_END_DELAY_MS) {
                                         log.warn('[WebServer] Fin de piste non annoncée par le tableau de bord : '
                                             + 'avance automatique de la file virtuelle.');
                                         this.handleVirtualSkip(queue, guildId);
@@ -418,7 +418,7 @@ class WebServer {
         ws.selectedVoiceChannelId = selectedChannelId;
 
         // Le premier connecté prend les commandes ; les suivants observent.
-        this._assurerPilote(selectedGuildId);
+        this._ensurePilot(selectedGuildId);
 
         // Envoyer l'état actuel lors de la connexion
         if (selectedGuildId) {
@@ -426,7 +426,7 @@ class WebServer {
                 type: 'state',
                 data: {
                     ...this.getState(selectedGuildId, ws.selectedVoiceChannelId),
-                    pilote: this.estPilote(ws, selectedGuildId),
+                    pilot: this.isPilot(ws, selectedGuildId),
                 }
             }));
         }
@@ -457,8 +457,8 @@ class WebServer {
         // Un client parti ne doit pas maintenir le flux mémoire en vie, ni
         // laisser la lecture sans pilote.
         ws.on('close', () => {
-            this.setFluxMemoire(ws, false);
-            this._retirerClient(ws);
+            this.setMemoryStream(ws, false);
+            this._removeClient(ws);
         });
     }
 
@@ -481,7 +481,7 @@ class WebServer {
                 // les enchaînements et annonce les fins de piste. La valeur entre
                 // dans la signature ci-dessous, de sorte qu'une réélection soit
                 // transmise même si rien d'autre n'a bougé.
-                state.pilote = this.estPilote(client, guildId);
+                state.pilot = this.isPilot(client, guildId);
 
                 // Mettre à jour le canal vocal sélectionné sur le client pour rester synchronisé avec l'état réel du bot
                 if (state.selectedVoiceChannelId) {
@@ -490,8 +490,8 @@ class WebServer {
 
                 // botStats change à chaque appel (horodatage, mémoire) : l'exclure
                 // de la comparaison, sinon aucun état ne serait jamais identique.
-                const { botStats, ...comparable } = state;
-                const signature = JSON.stringify(comparable);
+                const { botStats, ...withoutStats } = state;
+                const signature = JSON.stringify(withoutStats);
                 if (client._lastStateSignature === signature) return;
                 client._lastStateSignature = signature;
 
@@ -525,16 +525,16 @@ class WebServer {
         // Le bot n'écoute qu'un salon : la connexion fait foi. Un tableau de
         // bord qui en consulte un autre ne doit voir personne parler, sans quoi
         // il animerait des membres qu'il n'écoute pas.
-        const salonEcoute = queue?.channel?.id || duckingManager.channelId || null;
-        const locuteurs = Array.from(duckingManager.activeSpeakers);
+        const listeningChannel = queue?.channel?.id || duckingManager.channelId || null;
+        const speakerList = Array.from(duckingManager.activeSpeakers);
 
         this.wss.clients.forEach((client) => {
             if (client.readyState !== 1 || client.selectedGuildId !== guildId) return;
-            const concerne = !!salonEcoute && client.selectedVoiceChannelId === salonEcoute;
+            const matches = !!listeningChannel && client.selectedVoiceChannelId === listeningChannel;
             try {
                 client.send(JSON.stringify({
                     type: 'speakers',
-                    data: { speakers: concerne ? locuteurs : [] },
+                    data: { speakers: matches ? speakerList : [] },
                 }));
             } catch (e) {}
         });
@@ -546,8 +546,8 @@ class WebServer {
      * @param {string} guildId
      * @returns {boolean}
      */
-    estPilote(ws, guildId) {
-        return this.pilotes.get(guildId) === ws;
+    isPilot(ws, guildId) {
+        return this.pilots.get(guildId) === ws;
     }
 
     /**
@@ -561,28 +561,28 @@ class WebServer {
      * @param {string} guildId
      * @returns {import('ws').WebSocket|null}
      */
-    _assurerPilote(guildId) {
+    _ensurePilot(guildId) {
         if (!guildId) return null;
 
-        const actuel = this.pilotes.get(guildId);
-        if (actuel && actuel.readyState === 1) return actuel;
+        const currentPilot = this.pilots.get(guildId);
+        if (currentPilot && currentPilot.readyState === 1) return currentPilot;
 
         for (const client of this.wss.clients) {
             if (client.readyState === 1 && client.selectedGuildId === guildId) {
-                this.pilotes.set(guildId, client);
+                this.pilots.set(guildId, client);
                 log.info(`[WebServer] Tableau de bord pilote désigné pour la guild ${guildId} `
-                    + `(${this._compterClients(guildId)} connecté(s)).`);
+                    + `(${this._countClients(guildId)} connecté(s)).`);
                 this.broadcastState(guildId);
                 return client;
             }
         }
 
-        this.pilotes.delete(guildId);
+        this.pilots.delete(guildId);
         return null;
     }
 
     /** Nombre de tableaux de bord connectés sur une guilde. */
-    _compterClients(guildId) {
+    _countClients(guildId) {
         let n = 0;
         for (const client of this.wss.clients) {
             if (client.readyState === 1 && client.selectedGuildId === guildId) n++;
@@ -594,14 +594,14 @@ class WebServer {
      * Retire un tableau de bord et réélit un pilote s'il l'était.
      * @param {import('ws').WebSocket} ws
      */
-    _retirerClient(ws) {
-        for (const [guildId, pilote] of this.pilotes.entries()) {
-            if (pilote !== ws) continue;
-            this.pilotes.delete(guildId);
+    _removeClient(ws) {
+        for (const [guildId, pilot] of this.pilots.entries()) {
+            if (pilot !== ws) continue;
+            this.pilots.delete(guildId);
             log.info(`[WebServer] Le tableau de bord pilote de la guild ${guildId} s'est déconnecté.`);
             // Différé : à cet instant la connexion figure encore parmi les
             // clients, et se réélirait elle-même.
-            setImmediate(() => this._assurerPilote(guildId));
+            setImmediate(() => this._ensurePilot(guildId));
         }
     }
 
@@ -614,7 +614,7 @@ class WebServer {
      * @param {string} guildId
      * @returns {boolean}
      */
-    aUnClientConnecte(guildId) {
+    hasConnectedClient(guildId) {
         if (!this.wss || !this.wss.clients) return false;
         for (const client of this.wss.clients) {
             if (client.readyState === 1 && client.selectedGuildId === guildId) return true;
@@ -632,68 +632,68 @@ class WebServer {
      * @param {import('ws').WebSocket} ws
      * @param {boolean} actif
      */
-    setFluxMemoire(ws, actif) {
-        if (actif) {
-            this._abonnesMemoire.add(ws);
-            this._demarrerFluxMemoire();
+    setMemoryStream(ws, active) {
+        if (active) {
+            this._memorySubscribers.add(ws);
+            this._startMemoryStream();
         } else {
-            this._abonnesMemoire.delete(ws);
-            this._arreterFluxMemoireSiInutile();
+            this._memorySubscribers.delete(ws);
+            this._stopMemoryStreamIfIdle();
         }
     }
 
-    _demarrerFluxMemoire() {
-        if (this._minuteurMesureMemoire) return;
-        this._tamponMemoire = [];
+    _startMemoryStream() {
+        if (this._memorySampleTimer) return;
+        this._memoryBuffer = [];
 
-        let derniereMesure = 0;
-        this._minuteurMesureMemoire = setInterval(() => {
+        let lastSample = 0;
+        this._memorySampleTimer = setInterval(() => {
             const t = Date.now();
-            if (t - derniereMesure < MEM_ECART_MIN_MS) return;
-            derniereMesure = t;
+            if (t - lastSample < MEM_MIN_GAP_MS) return;
+            lastSample = t;
 
             const m = process.memoryUsage();
             // Tableau compact plutôt qu'objet nommé : à cette cadence, les noms
             // de champs pèseraient plus lourd que les valeurs elles-mêmes.
-            this._tamponMemoire.push([t, m.rss, m.heapUsed, m.heapTotal]);
-            if (this._tamponMemoire.length > MEM_LOT_MAX) {
-                this._tamponMemoire.splice(0, this._tamponMemoire.length - MEM_LOT_MAX);
+            this._memoryBuffer.push([t, m.rss, m.heapUsed, m.heapTotal]);
+            if (this._memoryBuffer.length > MEM_MAX_BATCH) {
+                this._memoryBuffer.splice(0, this._memoryBuffer.length - MEM_MAX_BATCH);
             }
-        }, MEM_PERIODE_MINUTEUR_MS);
+        }, MEM_SAMPLE_PERIOD_MS);
 
-        this._minuteurEnvoiMemoire = setInterval(() => {
-            if (this._tamponMemoire.length === 0) {
-                this._arreterFluxMemoireSiInutile();
+        this._memorySendTimer = setInterval(() => {
+            if (this._memoryBuffer.length === 0) {
+                this._stopMemoryStreamIfIdle();
                 return;
             }
-            const lot = this._tamponMemoire;
-            this._tamponMemoire = [];
-            const payload = JSON.stringify({ type: 'memory', data: { samples: lot } });
+            const batch = this._memoryBuffer;
+            this._memoryBuffer = [];
+            const payload = JSON.stringify({ type: 'memory', data: { samples: batch } });
 
-            for (const ws of Array.from(this._abonnesMemoire)) {
+            for (const ws of Array.from(this._memorySubscribers)) {
                 if (ws.readyState !== 1) {
-                    this._abonnesMemoire.delete(ws);
+                    this._memorySubscribers.delete(ws);
                     continue;
                 }
                 try { ws.send(payload); } catch (e) {}
             }
-            this._arreterFluxMemoireSiInutile();
-        }, MEM_PERIODE_ENVOI_MS);
+            this._stopMemoryStreamIfIdle();
+        }, MEM_SEND_PERIOD_MS);
 
-        log.debug(`[WebServer] Flux mémoire haute cadence démarré (${MEM_CADENCE_HZ} Hz).`);
+        log.debug(`[WebServer] Flux mémoire haute cadence démarré (${MEM_RATE_HZ} Hz).`);
     }
 
-    _arreterFluxMemoireSiInutile() {
-        if (this._abonnesMemoire.size > 0) return;
-        if (this._minuteurMesureMemoire) {
-            clearInterval(this._minuteurMesureMemoire);
-            this._minuteurMesureMemoire = null;
+    _stopMemoryStreamIfIdle() {
+        if (this._memorySubscribers.size > 0) return;
+        if (this._memorySampleTimer) {
+            clearInterval(this._memorySampleTimer);
+            this._memorySampleTimer = null;
         }
-        if (this._minuteurEnvoiMemoire) {
-            clearInterval(this._minuteurEnvoiMemoire);
-            this._minuteurEnvoiMemoire = null;
+        if (this._memorySendTimer) {
+            clearInterval(this._memorySendTimer);
+            this._memorySendTimer = null;
         }
-        this._tamponMemoire = [];
+        this._memoryBuffer = [];
     }
 
     /**
@@ -752,16 +752,16 @@ class WebServer {
 
         // Bot retiré d'un salon vide : son lecteur est démonté et ne rendrait
         // que des zéros. La session a relevé la position avant le départ.
-        if (queue && channelId && channelId === activeChannelId && queue.session.estGelee()) {
-            const attente = queue.session.attenteAuditeur();
+        if (queue && channelId && channelId === activeChannelId && queue.session.isFrozen()) {
+            const wait = queue.session.listenerWait();
             return {
-                progress: buildProgress(queue.positionFigeeMs, queue.currentTrack),
+                progress: buildProgress(queue.frozenPositionMs, queue.currentTrack),
                 isPlaying: queue.session.getIsPlaying(),
                 isPaused: queue.session.getIsPaused(),
                 // Le tableau de bord annoncerait sinon une lecture en cours sur
                 // une barre qui n'avance pas, sans rien qui l'explique.
-                attenteAuditeur: attente
-                    ? { ...attente, salon: this._nomSalon(queue.guild?.id, channelId) }
+                listenerWait: wait
+                    ? { ...wait, channelName: this._channelName(queue.guild?.id, channelId) }
                     : null,
             };
         }
@@ -780,7 +780,7 @@ class WebServer {
                 // les deux. En diffusion personnelle, le navigateur tient cette
                 // information lui-même — ses deux éléments audio sont sous sa
                 // main —, et le serveur n'a rien à en dire.
-                mixTransition: isPersonal ? null : etatFonduEnchaine(queue),
+                mixTransition: isPersonal ? null : crossfadeState(queue),
                 // La durée passe par `buildProgress` comme dans les autres
                 // branches, et non par `timestamp.total` : le lecteur y divise
                 // déjà la durée par la vitesse de lecture, alors que la position
@@ -798,7 +798,7 @@ class WebServer {
                 // La session porte la même logique de branchement, testée
                 isPlaying: queue.session.getIsPlaying(),
                 isPaused: queue.session.getIsPaused(),
-                attenteAuditeur: null,
+                listenerWait: null,
             };
         }
 
@@ -808,18 +808,18 @@ class WebServer {
                 progress: buildProgress(savedState.currentProgress, savedState.currentTrack),
                 isPlaying: !!savedState.isPlaying,
                 isPaused: !!savedState.isPaused,
-                attenteAuditeur: null,
+                listenerWait: null,
             };
         }
 
-        return { progress: null, isPlaying: false, isPaused: false, attenteAuditeur: null };
+        return { progress: null, isPlaying: false, isPaused: false, listenerWait: null };
     }
 
     /**
      * Nom lisible d'un salon vocal, pour les messages du tableau de bord.
      * @returns {string|null}
      */
-    _nomSalon(guildId, channelId) {
+    _channelName(guildId, channelId) {
         if (!guildId || !channelId) return null;
         const guild = this.client?.guilds?.cache?.get(guildId);
         return guild?.channels?.cache?.get(channelId)?.name || null;
@@ -921,8 +921,8 @@ class WebServer {
         // gestionnaire, qui ne serait qu'un reflet de plus à tenir à jour.
         let activeSpeakers = [];
         const duckingManager = this.client?.duckingManagers?.get(guildId);
-        const salonEcoute = queue?.channel?.id || duckingManager?.channelId || null;
-        if (duckingManager && salonEcoute && salonEcoute === activeVoiceChannelId) {
+        const listeningChannel = queue?.channel?.id || duckingManager?.channelId || null;
+        if (duckingManager && listeningChannel && listeningChannel === activeVoiceChannelId) {
             activeSpeakers = Array.from(duckingManager.activeSpeakers);
         }
 
@@ -972,7 +972,7 @@ class WebServer {
             isPaused: channelPlaybackState.isPaused,
             // Lecture immobile faute d'auditeur : de quoi l'expliquer plutôt
             // que de laisser le tableau de bord passer pour en panne.
-            attenteAuditeur: channelPlaybackState.attenteAuditeur || null,
+            listenerWait: channelPlaybackState.listenerWait || null,
             isTransitioning: !!queue?.isPendingTransition,
             repeatMode: queue ? queue.repeatMode : 0,
             volume: settings.baseVolume,
@@ -1001,7 +1001,7 @@ class WebServer {
             })),
             // Fade-in de démarrage laissé en attente parce que le son sort du
             // navigateur : le client le joue à sa connexion, puis le consomme.
-            startupFadein: queue?.fadeinDemarrageEnAttente || null,
+            startupFadein: queue?.pendingStartupFadein || null,
             activePlaybackSource: settings.activePlaybackSource || 'queue',
             playlistCurrentIndex: settings.playlistCurrentIndex || 0,
             loopPlaylist: !!settings.loopPlaylist,
@@ -1160,11 +1160,11 @@ class WebServer {
                     // Lecture figée : aucun lecteur où lancer la piste. Elle est
                     // posée comme piste courante, et démarrera vraiment quand
                     // l'arrivée d'un auditeur ramènera le bot dans le salon.
-                    if (queue.session.estGelee()) {
+                    if (queue.session.isFrozen()) {
                         queue.__current = targetTrack;
-                        queue.positionFigeeMs = 0;
-                        const suite = resolvedTracks.slice(startIndex + 1);
-                        if (suite.length > 0) queue.addTrack(suite);
+                        queue.frozenPositionMs = 0;
+                        const rest = resolvedTracks.slice(startIndex + 1);
+                        if (rest.length > 0) queue.addTrack(rest);
                         this.broadcastState(guildId);
                         playbackStateManager.saveState(player);
                         return;
@@ -1222,13 +1222,13 @@ class WebServer {
      *
      * @returns {string|null} null tant que le bot n'est pas prêt
      */
-    lienInvitation() {
-        if (this._lienInvitation) return this._lienInvitation;
+    inviteLink() {
+        if (this._inviteLink) return this._inviteLink;
         if (!this.client || !this.client.application?.id) return null;
 
         try {
             const { OAuth2Scopes, PermissionsBitField } = require('discord.js');
-            this._lienInvitation = this.client.generateInvite({
+            this._inviteLink = this.client.generateInvite({
                 scopes: [OAuth2Scopes.Bot, OAuth2Scopes.ApplicationsCommands],
                 permissions: [PermissionsBitField.Flags.Administrator]
             });
@@ -1237,7 +1237,7 @@ class WebServer {
             return null;
         }
 
-        return this._lienInvitation;
+        return this._inviteLink;
     }
 
     /**
@@ -1249,37 +1249,37 @@ class WebServer {
      *
      * @param {string} guildIdQuitte
      */
-    reattribuerClients(guildIdQuitte) {
-        const remplacant = this._getFirstGuildId();
-        const guild = remplacant ? this.client.guilds.cache.get(remplacant) : null;
-        const salon = guild ? this._findActiveVoiceChannel(guild) : null;
+    reassignClients(leftGuildId) {
+        const replacement = this._getFirstGuildId();
+        const guild = replacement ? this.client.guilds.cache.get(replacement) : null;
+        const activeChannel = guild ? this._findActiveVoiceChannel(guild) : null;
 
         // Sans serveur de repli, l'état est demandé sur celui qui vient d'être
         // quitté : il n'existe plus dans le cache Discord, la liste des serveurs
         // part donc vide — ce qu'il faut afficher — sans créer d'entrée de
         // réglages pour un identifiant nul.
-        const idEtat = remplacant || guildIdQuitte;
+        const stateId = replacement || leftGuildId;
 
         this.wss.clients.forEach(client => {
-            if (client.readyState !== 1 || client.selectedGuildId !== guildIdQuitte) return;
+            if (client.readyState !== 1 || client.selectedGuildId !== leftGuildId) return;
 
-            client.selectedGuildId = remplacant;
-            client.selectedVoiceChannelId = salon ? salon.id : null;
+            client.selectedGuildId = replacement;
+            client.selectedVoiceChannelId = activeChannel ? activeChannel.id : null;
             client._lastStateSignature = null;
 
             try {
                 client.send(JSON.stringify({
                     type: 'state',
                     data: {
-                        ...this.getState(idEtat, client.selectedVoiceChannelId),
-                        pilote: remplacant ? this.estPilote(client, remplacant) : false
+                        ...this.getState(stateId, client.selectedVoiceChannelId),
+                        pilot: replacement ? this.isPilot(client, replacement) : false
                     }
                 }));
             } catch (e) {}
         });
 
-        this.pilotes.delete(guildIdQuitte);
-        if (remplacant) this._assurerPilote(remplacant);
+        this.pilots.delete(leftGuildId);
+        if (replacement) this._ensurePilot(replacement);
     }
 
     _findActiveVoiceChannel(guild) {
@@ -1376,8 +1376,8 @@ class WebServer {
         // écartées. Un appui sur « suivant » ne porte pas ce marquage et reste
         // donc toujours honoré, y compris deux fois de suite.
         if (data && data.auto && data.finishedUrl) {
-            const courante = queue.virtualCurrentTrack?.url || null;
-            if (!courante || !arePathsOrUrlsEqual(courante, data.finishedUrl)) {
+            const currentUrl = queue.virtualCurrentTrack?.url || null;
+            if (!currentUrl || !arePathsOrUrlsEqual(currentUrl, data.finishedUrl)) {
                 log.debug('[WebServer] Fin de piste déjà traitée, annonce ignorée : '
                     + `« ${data.finishedUrl} » n'est plus la piste courante.`);
                 return;
@@ -1435,11 +1435,11 @@ class WebServer {
                     }
                 }
             }
-        } else if (this.relancerPlaylistBouclee(guildId, startProgressMs)) {
+        } else if (this.restartLoopedPlaylist(guildId, startProgressMs)) {
             // La playlist a été rechargée depuis son premier titre : rien à
             // arrêter, la lecture se poursuit.
             return;
-        } else if (this.enchainerSurLaFile(guildId, startProgressMs)) {
+        } else if (this.advanceToQueue(guildId, startProgressMs)) {
             // La file d'attente a repris la main : la lecture se poursuit
             // également, sur son premier titre.
             return;
@@ -1470,7 +1470,7 @@ class WebServer {
      *   reculer la lecture du navigateur, que le serveur recale sur lui.
      * @returns {boolean} true si un rebouclage a été enclenché
      */
-    relancerPlaylistBouclee(guildId, startProgressMs = 0) {
+    restartLoopedPlaylist(guildId, startProgressMs = 0) {
         const settings = database.getSettings(guildId);
         if (!settings.loopPlaylist) return false;
 
@@ -1521,7 +1521,7 @@ class WebServer {
      *   avant la fin du dernier titre de la playlist.
      * @returns {boolean} true si la file a pris la main
      */
-    enchainerSurLaFile(guildId, startProgressMs = 0) {
+    advanceToQueue(guildId, startProgressMs = 0) {
         const settings = database.getSettings(guildId);
 
         const source = settings.activePlaybackSource;
@@ -1530,8 +1530,8 @@ class WebServer {
         // Lue avant la bascule : `readSetAsideQueue()` choisit sa sauvegarde
         // d'après le mode de diffusion, que rien ne change ici, mais la source
         // ne doit plus être une playlist une fois la file reprise.
-        const enAttente = readSetAsideQueue(settings);
-        if (enAttente.length === 0) return false;
+        const pending = readSetAsideQueue(settings);
+        if (pending.length === 0) return false;
 
         const { useMainPlayer, Track } = require('discord-player');
         const player = useMainPlayer();
@@ -1551,7 +1551,7 @@ class WebServer {
         }
 
         log.info(`[WebServer] Fin de playlist : la file d'attente prend la main `
-            + `(${enAttente.length} titre(s)).`);
+            + `(${pending.length} titre(s)).`);
 
         // `playlistCurrentIndex` est ramené à zéro comme le fait la bascule
         // manuelle : laissé sur la dernière piste, il ferait repartir la
@@ -1561,11 +1561,11 @@ class WebServer {
             playlistCurrentIndex: 0,
         });
 
-        const [premiere, ...suite] = enAttente;
+        const [first, ...rest] = pending;
 
         if (settings.broadcastMode === 'personal') {
-            queue.virtualCurrentTrack = premiere;
-            queue.virtualTracks = suite;
+            queue.virtualCurrentTrack = first;
+            queue.virtualTracks = rest;
             queue.virtualProgressMs = startProgressMs;
             queue.virtualIsPlaying = true;
             queue.virtualIsPaused = false;
@@ -1576,8 +1576,8 @@ class WebServer {
             return true;
         }
 
-        const versPiste = (t) => {
-            const piste = new Track(player, {
+        const toTrack = (t) => {
+            const newTrack = new Track(player, {
                 title: t.title,
                 author: t.author || 'Inconnu',
                 duration: t.duration || '0:00',
@@ -1587,9 +1587,9 @@ class WebServer {
                 raw: t.raw || {},
             });
             if (t.extractorName) {
-                piste.extractor = player.extractors.store.get(t.extractorName) || null;
+                newTrack.extractor = player.extractors.store.get(t.extractorName) || null;
             }
-            return piste;
+            return newTrack;
         };
 
         // La playlist a vidé la liste physique en s'achevant ; ce nettoyage
@@ -1597,7 +1597,7 @@ class WebServer {
         // il se glisserait devant la file qu'on vient de rappeler.
         queue.tracks.clear();
 
-        queue.play(versPiste(premiere), {
+        queue.play(toTrack(first), {
             nodeOptions: {
                 metadata: { channel: null },
                 selfDeaf: false,
@@ -1605,7 +1605,7 @@ class WebServer {
             },
         })
             .then(() => {
-                if (suite.length > 0) queue.addTrack(suite.map(versPiste));
+                if (rest.length > 0) queue.addTrack(rest.map(toTrack));
                 this.broadcastState(guildId);
                 playbackStateManager.saveState(player);
             })
@@ -1637,21 +1637,21 @@ module.exports = new WebServer();
  * @param {object} queue
  * @returns {object|null}
  */
-function etatFonduEnchaine(queue) {
-    const moteur = moteurActif(queue);
-    const fondu = moteur?.etatFondu();
-    if (!fondu) return null;
+function crossfadeState(queue) {
+    const engine = activeEngine(queue);
+    const fade = engine?.fadeState();
+    if (!fade) return null;
 
-    const decrire = (part) => ({
+    const describe = (part) => ({
         url: part.url,
         positionMs: part.positionMs,
-        dureeMs: part.dureeMs,
+        durationMs: part.durationMs,
         ratio: part.ratio,
     });
 
     return {
-        sortante: decrire(fondu.sortante),
-        entrante: { ...decrire(fondu.entrante), track: formatTrackWithPreload(fondu.entrante.piste) },
+        outgoing: describe(fade.outgoing),
+        incoming: { ...describe(fade.incoming), track: formatTrackWithPreload(fade.incoming.track) },
     };
 }
 
@@ -1669,16 +1669,16 @@ function buildProgress(positionMs, track) {
 }
 
 function getTrackPreloadInfo(t) {
-    const vide = { isPreloaded: false, isPreloading: false, preloadProgress: 0, cachedAudioQuality: null, requalify: null };
-    if (!t) return vide;
+    const empty = { isPreloaded: false, isPreloading: false, preloadProgress: 0, cachedAudioQuality: null, requalify: null };
+    if (!t) return empty;
     if (t.queryType === 'file' || (t.url && fs.existsSync(t.url))) {
         // Fichier local : lu tel quel, jamais transcodé ni mis en cache.
-        return { ...vide, isPreloaded: true, preloadProgress: 100, isLocal: true };
+        return { ...empty, isPreloaded: true, preloadProgress: 100, isLocal: true };
     }
     if (typeof preloadManager.getPreloadStatus === 'function') {
         return preloadManager.getPreloadStatus(t);
     }
-    return { ...vide, isPreloaded: !!preloadManager.getCachedPath(t) };
+    return { ...empty, isPreloaded: !!preloadManager.getCachedPath(t) };
 }
 
 /**
@@ -1688,9 +1688,9 @@ function getTrackPreloadInfo(t) {
  *
  * @returns {{ audio: string, video: string }}
  */
-function reglagesImportCourants() {
-    const premier = database.cache.size > 0 ? [...database.cache.keys()][0] : null;
-    const settings = premier ? database.getSettings(premier) : {};
+function currentImportSettings() {
+    const firstGuildId = database.cache.size > 0 ? [...database.cache.keys()][0] : null;
+    const settings = firstGuildId ? database.getSettings(firstGuildId) : {};
     return {
         audio: String(settings.importAudioQuality || '320'),
         video: String(settings.importVideoQuality || '720')
@@ -1701,7 +1701,7 @@ function reglagesImportCourants() {
  * Une piste distante peut porter une vidéo ; un fichier local ou un envoi
  * passent par le visualiseur audio et n'ont pas de réglage vidéo à proposer.
  */
-function pisteAVideo(t) {
+function trackHasVideo(t) {
     const url = t?.url || '';
     if (!/^https?:\/\//i.test(url)) return false;
     return !url.includes('/uploads/');
@@ -1717,10 +1717,10 @@ function formatTrackWithPreload(t) {
     // pour tout l'historique.
     // Ce chemin est emprunté pour chaque piste à chaque diffusion d'état : on
     // ne calcule les réglages de repli que lorsque la piste n'est pas déjà figée.
-    let souhaitee = t.url ? database.getTrackQuality(t.url) : null;
-    if (!souhaitee || !souhaitee.audio || !souhaitee.video) {
-        souhaitee = t.url
-            ? database.ensureTrackQuality(t.url, reglagesImportCourants())
+    let desired = t.url ? database.getTrackQuality(t.url) : null;
+    if (!desired || !desired.audio || !desired.video) {
+        desired = t.url
+            ? database.ensureTrackQuality(t.url, currentImportSettings())
             : { audio: '320', video: '720' };
     }
 
@@ -1734,12 +1734,12 @@ function formatTrackWithPreload(t) {
         isPreloading: pInfo.isPreloading,
         preloadProgress: pInfo.preloadProgress,
         isLocal: !!pInfo.isLocal,
-        hasVideo: pisteAVideo(t),
+        hasVideo: trackHasVideo(t),
         // Qualité réellement présente en cache, quand elle est connue ; sinon
         // l'interface se rabat sur la qualité souhaitée.
         cachedAudioQuality: pInfo.cachedAudioQuality || null,
-        desiredAudioQuality: souhaitee.audio,
-        desiredVideoQuality: souhaitee.video,
+        desiredAudioQuality: desired.audio,
+        desiredVideoQuality: desired.video,
         requalify: pInfo.requalify || null
     };
 }

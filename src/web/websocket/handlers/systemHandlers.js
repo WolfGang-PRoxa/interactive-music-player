@@ -25,8 +25,8 @@ function handleRequestState(ctx) {
 function handleStartupFadeinConsumed(ctx) {
     const { queue, webServer, currentGuildId } = ctx;
 
-        if (queue && queue.fadeinDemarrageEnAttente) {
-            queue.fadeinDemarrageEnAttente = null;
+        if (queue && queue.pendingStartupFadein) {
+            queue.pendingStartupFadein = null;
             log.info('[WebServer] Fade-in de démarrage joué par le tableau de bord.');
             webServer.broadcastState(currentGuildId);
         }
@@ -40,7 +40,7 @@ function handleStartupFadeinConsumed(ctx) {
 function handleMemoryStream(ctx) {
     const { ws, data, webServer } = ctx;
 
-        webServer.setFluxMemoire(ws, !!(data && data.enabled));
+        webServer.setMemoryStream(ws, !!(data && data.enabled));
 }
 
 function handleClientLog(ctx) {
@@ -64,8 +64,8 @@ function handleClientLog(ctx) {
  * @param {object} webServer
  * @param {{ entree?: string }} [options]
  */
-function redemarrerProcessus(webServer, options = {}) {
-    const entree = options.entree || process.argv[1];
+function restartProcess(webServer, options = {}) {
+    const entryPoint = options.entryPoint || process.argv[1];
 
         try {
             const { useMainPlayer } = require('discord-player');
@@ -80,10 +80,10 @@ function redemarrerProcessus(webServer, options = {}) {
             webServer.wss.close();
             webServer.server.close();
 
-            log.info(`[WebServer] Serveur arrêté. Démarrage de la nouvelle instance : ${entree}`);
+            log.info(`[WebServer] Serveur arrêté. Démarrage de la nouvelle instance : ${entryPoint}`);
 
             const spawn = require('child_process').spawn;
-            const args = [entree, ...process.argv.slice(2)];
+            const args = [entryPoint, ...process.argv.slice(2)];
             const executor = process.argv[0];
 
             const child = spawn(executor, args, {
@@ -91,7 +91,7 @@ function redemarrerProcessus(webServer, options = {}) {
                 // fade-out, la musique n'est pas coupée. La nouvelle instance doit
                 // donc s'abstenir du fade-in de démarrage, qui en est la
                 // contrepartie et trahirait la coupure.
-                env: { ...process.env, IMP_REDEMARRAGE: '1' },
+                env: { ...process.env, IMP_RESTART: '1' },
                 cwd: process.cwd(),
                 detached: true,
                 stdio: 'ignore',
@@ -118,7 +118,7 @@ function handleRestartBot(ctx) {
             }
         });
 
-        redemarrerProcessus(webServer);
+        restartProcess(webServer);
 }
 
 async function handleShutdownBot(ctx) {
@@ -191,5 +191,5 @@ module.exports = {
     handleClientLog,
     handleRestartBot,
     handleShutdownBot,
-    redemarrerProcessus,
+    restartProcess,
 };

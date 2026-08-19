@@ -32,19 +32,19 @@
      * Le premier sélecteur sert à trouver les éléments à surveiller, le second
      * à décider s'ils recouvrent la page à cet instant.
      */
-    const VOILES = [
+    const OVERLAYS = [
         ['.maintenance-overlay', '.maintenance-overlay:not(.hidden)'],
         ['.restart-overlay', '.restart-overlay:not(.hidden)'],
         ['.docs-overlay', '.docs-overlay:not(.hidden)'],
         ['.drawer-backdrop', '.drawer-backdrop.active'],
     ];
 
-    const SELECTEUR_TOUS = VOILES.map((v) => v[0]).join(', ');
-    const SELECTEUR_OUVERTS = VOILES.map((v) => v[1]).join(', ');
+    const ALL_SELECTOR = OVERLAYS.map((v) => v[0]).join(', ');
+    const OPEN_SELECTOR = OVERLAYS.map((v) => v[1]).join(', ');
 
     /** Position de défilement au moment du verrouillage, à rendre après coup. */
-    let positionGelee = 0;
-    let verrouille = false;
+    let frozenScrollY = 0;
+    let locked = false;
 
     /**
      * Un voile recouvre-t-il la page en ce moment ?
@@ -55,32 +55,32 @@
      *
      * @returns {boolean}
      */
-    function unVoileEstOuvert() {
-        const candidats = document.querySelectorAll(SELECTEUR_OUVERTS);
-        for (const el of candidats) {
+    function anyOverlayOpen() {
+        const candidates = document.querySelectorAll(OPEN_SELECTOR);
+        for (const el of candidates) {
             if (window.getComputedStyle(el).display !== 'none') return true;
         }
         return false;
     }
 
     /** Sort la page du flux, à la position où elle se trouve. */
-    function verrouiller() {
-        if (verrouille) return;
-        positionGelee = window.scrollY || document.documentElement.scrollTop || 0;
-        document.body.style.top = `-${positionGelee}px`;
+    function lock() {
+        if (locked) return;
+        frozenScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+        document.body.style.top = `-${frozenScrollY}px`;
         document.body.classList.add('scroll-locked');
-        verrouille = true;
+        locked = true;
     }
 
     /** Remet la page dans le flux, là où elle était. */
-    function deverrouiller() {
-        if (!verrouille) return;
+    function unlock() {
+        if (!locked) return;
         document.body.classList.remove('scroll-locked');
         document.body.style.top = '';
-        verrouille = false;
+        locked = false;
         // Après le retour dans le flux, sans quoi la page n'a pas encore la
         // hauteur qui rend cette position atteignable.
-        window.scrollTo(0, positionGelee);
+        window.scrollTo(0, frozenScrollY);
     }
 
     /**
@@ -90,22 +90,22 @@
      * doc ouverte depuis les paramètres, une confirmation par-dessus — ne
      * doivent pas écraser la position mémorisée par la première.
      */
-    function reevaluer() {
-        if (unVoileEstOuvert()) verrouiller();
-        else deverrouiller();
+    function reevaluate() {
+        if (anyOverlayOpen()) lock();
+        else unlock();
     }
 
     function init() {
-        const observateur = new MutationObserver(reevaluer);
+        const observer = new MutationObserver(reevaluate);
 
         /** Surveille un voile, une seule fois. */
-        const surveiller = (el) => {
+        const watch = (el) => {
             if (el.dataset.scrollLockObserve === 'true') return;
             el.dataset.scrollLockObserve = 'true';
-            observateur.observe(el, { attributes: true, attributeFilter: ['class', 'style'] });
+            observer.observe(el, { attributes: true, attributeFilter: ['class', 'style'] });
         };
 
-        document.querySelectorAll(SELECTEUR_TOUS).forEach(surveiller);
+        document.querySelectorAll(ALL_SELECTOR).forEach(watch);
 
         /*
          * Tous les voiles sont aujourd'hui écrits dans index.html, mais rien ne
@@ -115,17 +115,17 @@
          * ne devienne silencieusement incomplet.
          */
         new MutationObserver(() => {
-            document.querySelectorAll(SELECTEUR_TOUS).forEach(surveiller);
-            reevaluer();
+            document.querySelectorAll(ALL_SELECTOR).forEach(watch);
+            reevaluate();
         }).observe(document.body, { childList: true });
 
-        reevaluer();
+        reevaluate();
     }
 
     window.MusicPlayer.scrollLock = {
         /** Recalcule l'état, pour un voile que l'observation n'aurait pas vu. */
-        refresh: reevaluer,
-        estVerrouille() { return verrouille; },
+        refresh: reevaluate,
+        isLocked() { return locked; },
     };
 
     if (document.readyState === 'loading') {

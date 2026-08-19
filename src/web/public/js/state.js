@@ -142,9 +142,9 @@ window.MusicPlayer.applyLanguage = async function(lang) {
     // et tooltips dont la clé dépend de l'état (verrouillé/déverrouillé,
     // détection activée/désactivée…).
     ['updatePlaylistsUI', 'updateQueueUI', 'updateHistoryUI', 'updateSpeakersUI',
-     'refreshDrawerLabels', 'refreshMemoryBreakdown'].forEach(nom => {
-        if (typeof window.MusicPlayer[nom] === 'function') {
-            try { window.MusicPlayer[nom](); } catch (e) {}
+     'refreshDrawerLabels', 'refreshMemoryBreakdown'].forEach(nameOf => {
+        if (typeof window.MusicPlayer[nameOf] === 'function') {
+            try { window.MusicPlayer[nameOf](); } catch (e) {}
         }
     });
 
@@ -202,13 +202,13 @@ const DEBUT_DE_PISTE_SEC = 1.5;
  * @param {number} positionSecs - Position à laquelle la piste va reprendre.
  * @returns {number} Durée du fondu en secondes, 0 pour aucun.
  */
-window.MusicPlayer.dureeFonduOuverture = function(state, positionSecs) {
-    const reglages = (state && state.settings) || {};
-    if (!reglages.mixEnabled) return 0;
+window.MusicPlayer.openingFadeMs = function(state, positionSecs) {
+    const settings = (state && state.settings) || {};
+    if (!settings.mixEnabled) return 0;
     if (!(Number(positionSecs) < DEBUT_DE_PISTE_SEC)) return 0;
 
-    const duree = parseFloat(reglages.mixDuration);
-    return duree > 0 ? duree : 5;
+    const duration = parseFloat(settings.mixDuration);
+    return duration > 0 ? duration : 5;
 };
 
 /**
@@ -228,26 +228,26 @@ window.MusicPlayer.dureeFonduOuverture = function(state, positionSecs) {
  * @param {object} [state] - État courant ; celui du lecteur par défaut.
  * @returns {object|null} La piste suivante, ou null s'il n'y en a pas.
  */
-window.MusicPlayer.pisteSuivante = function(state) {
-    const etat = state || window.MusicPlayer.state || {};
-    const source = etat.activePlaybackSource;
+window.MusicPlayer.nextTrackOf = function(state) {
+    const snapshot = state || window.MusicPlayer.state || {};
+    const source = snapshot.activePlaybackSource;
 
     if (source && source !== 'queue') {
-        const playlist = (etat.playlists || []).find(p => p.id === source);
-        const pistes = (playlist && playlist.tracks) || [];
-        if (pistes.length === 0) return null;
+        const playlist = (snapshot.playlists || []).find(p => p.id === source);
+        const tracks = (playlist && playlist.tracks) || [];
+        if (tracks.length === 0) return null;
 
-        const index = typeof etat.playlistCurrentIndex === 'number' ? etat.playlistCurrentIndex : 0;
-        if (index + 1 < pistes.length) return pistes[index + 1];
+        const index = typeof snapshot.playlistCurrentIndex === 'number' ? snapshot.playlistCurrentIndex : 0;
+        if (index + 1 < tracks.length) return tracks[index + 1];
 
         // Dernier titre : la lecture en boucle enchaîne sur le premier. Sinon
         // la playlist est finie, et la file d'attente prend le relais — le
         // serveur bascule alors la source (WebServer.enchainerSurLaFile), si
         // bien que le titre préparé ici est bien celui qu'il jouera.
-        if (etat.loopPlaylist) return pistes[0];
+        if (snapshot.loopPlaylist) return tracks[0];
     }
 
-    return (etat.queue && etat.queue[0]) || null;
+    return (snapshot.queue && snapshot.queue[0]) || null;
 };
 
 /**
@@ -262,14 +262,14 @@ window.MusicPlayer.pisteSuivante = function(state) {
  * @param {string} guildId
  * @returns {boolean}
  */
-window.MusicPlayer.estServeurVisible = function(guildId) {
-    const etats = (window.MusicPlayer.dashboardSettings || {}).guildsActiveState || {};
-    return etats[guildId] !== false;
+window.MusicPlayer.isGuildVisible = function(guildId) {
+    const states = (window.MusicPlayer.dashboardSettings || {}).guildsActiveState || {};
+    return states[guildId] !== false;
 };
 
 /** Filtre une liste de serveurs sur leur visibilité. */
-window.MusicPlayer.serveursVisibles = function(guilds) {
-    return (guilds || []).filter(g => window.MusicPlayer.estServeurVisible(g.id));
+window.MusicPlayer.visibleGuilds = function(guilds) {
+    return (guilds || []).filter(g => window.MusicPlayer.isGuildVisible(g.id));
 };
 
 window.MusicPlayer.checkIsDefaultChannel = function(guildId, channelId) {
@@ -291,26 +291,26 @@ window.MusicPlayer.checkIsDefaultChannel = function(guildId, channelId) {
  * @param {string} texte
  * @returns {Promise<boolean>} true si la copie a abouti
  */
-window.MusicPlayer.copierDansPressePapier = async function(texte) {
-    if (!texte) return false;
+window.MusicPlayer.copyToClipboard = async function(text) {
+    if (!text) return false;
 
     try {
         if (navigator.clipboard && window.isSecureContext) {
-            await navigator.clipboard.writeText(texte);
+            await navigator.clipboard.writeText(text);
             return true;
         }
     } catch (err) {}
 
     try {
-        const relais = document.createElement('textarea');
-        relais.value = texte;
-        relais.setAttribute('readonly', '');
-        relais.style.position = 'fixed';
-        relais.style.opacity = '0';
-        document.body.appendChild(relais);
-        relais.select();
+        const helper = document.createElement('textarea');
+        helper.value = text;
+        helper.setAttribute('readonly', '');
+        helper.style.position = 'fixed';
+        helper.style.opacity = '0';
+        document.body.appendChild(helper);
+        helper.select();
         const copie = document.execCommand('copy');
-        document.body.removeChild(relais);
+        document.body.removeChild(helper);
         return copie;
     } catch (err) {}
 

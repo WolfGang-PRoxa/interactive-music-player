@@ -16,31 +16,31 @@
  */
 
 /** Fréquence d'échantillonnage, en Hz. */
-const FREQUENCE = 48000;
+const SAMPLE_RATE = 48000;
 
 /** Nombre de canaux. */
-const CANAUX = 2;
+const CHANNELS = 2;
 
 /** Taille d'un échantillon mono, en octets. */
-const OCTETS_PAR_ECHANTILLON = 2;
+const BYTES_PER_SAMPLE = 2;
 
 /** Durée d'une trame, en millisecondes. */
-const DUREE_TRAME_MS = 20;
+const FRAME_DURATION_MS = 20;
 
 /** Échantillons par canal et par trame. */
-const ECHANTILLONS_PAR_TRAME = (FREQUENCE * DUREE_TRAME_MS) / 1000; // 960
+const SAMPLES_PER_FRAME = (SAMPLE_RATE * FRAME_DURATION_MS) / 1000; // 960
 
 /** Valeurs entrelacées dans une trame (échantillons × canaux). */
-const VALEURS_PAR_TRAME = ECHANTILLONS_PAR_TRAME * CANAUX; // 1920
+const VALUES_PER_FRAME = SAMPLES_PER_FRAME * CHANNELS; // 1920
 
 /** Taille d'une trame, en octets. */
-const OCTETS_PAR_TRAME = VALEURS_PAR_TRAME * OCTETS_PAR_ECHANTILLON; // 3840
+const BYTES_PER_FRAME = VALUES_PER_FRAME * BYTES_PER_SAMPLE; // 3840
 
 /** Octets de PCM correspondant à une milliseconde de son. */
-const OCTETS_PAR_MS = (FREQUENCE * CANAUX * OCTETS_PAR_ECHANTILLON) / 1000; // 192
+const BYTES_PER_MS = (SAMPLE_RATE * CHANNELS * BYTES_PER_SAMPLE) / 1000; // 192
 
 /** Trame muette, réutilisable : elle n'est jamais modifiée en place. */
-const TRAME_SILENCE = Buffer.alloc(OCTETS_PAR_TRAME);
+const SILENCE_FRAME = Buffer.alloc(BYTES_PER_FRAME);
 
 /** Bornes d'un échantillon 16 bits signé. */
 const MIN_16 = -32768;
@@ -51,8 +51,8 @@ const MAX_16 = 32767;
  * @param {number} octets
  * @returns {number}
  */
-function octetsVersMs(octets) {
-    return octets / OCTETS_PAR_MS;
+function bytesToMs(bytes) {
+    return bytes / BYTES_PER_MS;
 }
 
 /**
@@ -65,23 +65,23 @@ function octetsVersMs(octets) {
  * @param {number} ms
  * @returns {number}
  */
-function msVersOctets(ms) {
-    const brut = Math.round(ms * OCTETS_PAR_MS);
-    return brut - (brut % (CANAUX * OCTETS_PAR_ECHANTILLON));
+function msToBytes(ms) {
+    const raw = Math.round(ms * BYTES_PER_MS);
+    return raw - (raw % (CHANNELS * BYTES_PER_SAMPLE));
 }
 
 module.exports = {
-    FREQUENCE,
-    CANAUX,
-    OCTETS_PAR_ECHANTILLON,
-    DUREE_TRAME_MS,
-    ECHANTILLONS_PAR_TRAME,
-    VALEURS_PAR_TRAME,
-    OCTETS_PAR_TRAME,
-    OCTETS_PAR_MS,
-    TRAME_SILENCE,
+    SAMPLE_RATE,
+    CHANNELS,
+    BYTES_PER_SAMPLE,
+    FRAME_DURATION_MS,
+    SAMPLES_PER_FRAME,
+    VALUES_PER_FRAME,
+    BYTES_PER_FRAME,
+    BYTES_PER_MS,
+    SILENCE_FRAME,
     MIN_16,
     MAX_16,
-    octetsVersMs,
-    msVersOctets,
+    bytesToMs,
+    msToBytes,
 };

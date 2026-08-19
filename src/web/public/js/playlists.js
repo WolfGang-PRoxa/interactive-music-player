@@ -783,8 +783,8 @@ window.MusicPlayer.updatePlaylistsUI = function() {
         // Pendant un enchaînement mix, deux titres sonnent ensemble : l'index
         // du serveur, qui n'avance qu'au terme du fondu, ne désigne que le
         // sortant. La transition dit lequel s'achève et lequel démarre.
-        const transition = isCurrentPlaylistActive && typeof window.MusicPlayer.etatTransitionMix === 'function'
-            ? window.MusicPlayer.etatTransitionMix()
+        const transition = isCurrentPlaylistActive && typeof window.MusicPlayer.mixTransitionState === 'function'
+            ? window.MusicPlayer.mixTransitionState()
             : null;
 
         playlist.tracks.forEach((track, i) => {
@@ -818,10 +818,10 @@ window.MusicPlayer.updatePlaylistsUI = function() {
                 // fondu en cours, qui en anime deux, sinon l'index du serveur.
                 let ratio = null;
                 if (transition) {
-                    if (areUrlsEqual(track.url, transition.entrante.url)) {
-                        ratio = transition.entrante.ratio;
-                    } else if (transition.sortante && areUrlsEqual(track.url, transition.sortante.url)) {
-                        ratio = transition.sortante.ratio;
+                    if (areUrlsEqual(track.url, transition.incoming.url)) {
+                        ratio = transition.incoming.ratio;
+                    } else if (transition.outgoing && areUrlsEqual(track.url, transition.outgoing.url)) {
+                        ratio = transition.outgoing.ratio;
                     }
                 }
                 if (ratio === null && !transition && i === currentIdx
@@ -855,10 +855,10 @@ window.MusicPlayer.updatePlaylistsUI = function() {
 };
 
 /** Dernier enchaînement mix observé, pour en détecter le début et la fin. */
-let derniereTransitionMix = null;
+let lastMixTransition = null;
 
 function appliquerBarreLecture(item, ratio) {
-    const borne = Math.min(1, Math.max(0, ratio));
+    const clamp = Math.min(1, Math.max(0, ratio));
     let playbackBar = item.querySelector('.playback-fill-bar');
     if (!playbackBar) {
         playbackBar = document.createElement('div');
@@ -866,8 +866,8 @@ function appliquerBarreLecture(item, ratio) {
         playbackBar.style.width = '100%';
         item.appendChild(playbackBar);
     }
-    playbackBar.style.transform = `scaleX(${borne})`;
-    playbackBar.style.setProperty('--playback-scale', Math.max(0.0001, borne));
+    playbackBar.style.transform = `scaleX(${clamp})`;
+    playbackBar.style.setProperty('--playback-scale', Math.max(0.0001, clamp));
 }
 
 /**
@@ -880,59 +880,59 @@ function appliquerBarreLecture(item, ratio) {
  * l'instant près.
  */
 window.MusicPlayer.updateActivePlaylistTrackProgress = function(ratio) {
-    const liste = document.getElementById('playlist-tracks-list');
-    if (!liste) return;
+    const listEl = document.getElementById('playlist-tracks-list');
+    if (!listEl) return;
 
     const state = window.MusicPlayer.state || {};
-    const contenu = document.getElementById('active-playlist-content');
-    const playlistAffichee = contenu ? contenu.getAttribute('data-playlist-id') : null;
+    const content = document.getElementById('active-playlist-content');
+    const playlistAffichee = content ? content.getAttribute('data-playlist-id') : null;
     const afficheLaSource = !!playlistAffichee && playlistAffichee === state.activePlaybackSource;
 
-    const transition = afficheLaSource && typeof window.MusicPlayer.etatTransitionMix === 'function'
-        ? window.MusicPlayer.etatTransitionMix()
+    const transition = afficheLaSource && typeof window.MusicPlayer.mixTransitionState === 'function'
+        ? window.MusicPlayer.mixTransitionState()
         : null;
 
     if (!transition) {
         // Fin du fondu : la ligne sortante s'éteint sur-le-champ, sans
         // attendre que le serveur ait fait avancer son index de lecture.
-        if (derniereTransitionMix) {
-            const urlEntrante = derniereTransitionMix.entrante.url;
-            liste.querySelectorAll('.playlist-track-item.is-playing-now').forEach(item => {
+        if (lastMixTransition) {
+            const urlEntrante = lastMixTransition.incoming.url;
+            listEl.querySelectorAll('.playlist-track-item.is-playing-now').forEach(item => {
                 if (!areUrlsEqual(item.getAttribute('data-url'), urlEntrante)) {
                     item.classList.remove('is-playing-now', 'playing-active');
                     appliquerBarreLecture(item, 0);
                 }
             });
-            derniereTransitionMix = null;
+            lastMixTransition = null;
         }
 
-        const actif = liste.querySelector('.playlist-track-item.is-playing-now');
-        if (actif) appliquerBarreLecture(actif, ratio);
+        const active = listEl.querySelector('.playlist-track-item.is-playing-now');
+        if (active) appliquerBarreLecture(active, ratio);
         return;
     }
 
     // Début du fondu : la ligne entrante s'allume immédiatement.
-    const cle = (t) => `${t.sortante ? t.sortante.url : ''}|${t.entrante.url}`;
-    const debut = !derniereTransitionMix || cle(derniereTransitionMix) !== cle(transition);
-    if (debut) {
-        liste.querySelectorAll('.playlist-track-item').forEach(item => {
+    const key = (t) => `${t.outgoing ? t.outgoing.url : ''}|${t.incoming.url}`;
+    const startIdx = !lastMixTransition || key(lastMixTransition) !== key(transition);
+    if (startIdx) {
+        listEl.querySelectorAll('.playlist-track-item').forEach(item => {
             const url = item.getAttribute('data-url');
-            const concernee = areUrlsEqual(url, transition.entrante.url)
-                || (transition.sortante && areUrlsEqual(url, transition.sortante.url));
+            const concernee = areUrlsEqual(url, transition.incoming.url)
+                || (transition.outgoing && areUrlsEqual(url, transition.outgoing.url));
             if (concernee) {
                 item.classList.add('playing-active', 'is-playing-now');
                 item.classList.remove('is-played');
             }
         });
     }
-    derniereTransitionMix = transition;
+    lastMixTransition = transition;
 
-    liste.querySelectorAll('.playlist-track-item.is-playing-now').forEach(item => {
+    listEl.querySelectorAll('.playlist-track-item.is-playing-now').forEach(item => {
         const url = item.getAttribute('data-url');
-        if (areUrlsEqual(url, transition.entrante.url)) {
-            appliquerBarreLecture(item, transition.entrante.ratio);
-        } else if (transition.sortante && areUrlsEqual(url, transition.sortante.url)) {
-            appliquerBarreLecture(item, transition.sortante.ratio);
+        if (areUrlsEqual(url, transition.incoming.url)) {
+            appliquerBarreLecture(item, transition.incoming.ratio);
+        } else if (transition.outgoing && areUrlsEqual(url, transition.outgoing.url)) {
+            appliquerBarreLecture(item, transition.outgoing.ratio);
         } else {
             // Une transition en cours ne laisse jouer que ses deux morceaux :
             // toute autre ligne s'éteint. C'est par là que passe la sortante

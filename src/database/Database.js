@@ -273,7 +273,7 @@ class GuildDatabase {
      *
      * @returns {{ guildId: string, channelId: string }|null} Le salon appliqué.
      */
-    appliquerSalonFavori() {
+    applyFavoriteChannel() {
         for (const [guildId, settings] of this.cache.entries()) {
             if (!settings.defaultVoiceChannelId) continue;
             this.setLastVoiceChannel(guildId, settings.defaultVoiceChannelId);
@@ -310,20 +310,20 @@ class GuildDatabase {
      * @param {{ audio: string, video: string }} defauts - Reglages courants de la guild
      * @returns {{ audio: string, video: string }}
      */
-    ensureTrackQuality(url, defauts) {
-        if (!url) return defauts;
+    ensureTrackQuality(url, defaults) {
+        if (!url) return defaults;
         if (!this.globalData.trackQuality) this.globalData.trackQuality = {};
 
-        const existant = this.globalData.trackQuality[url];
-        if (existant && existant.audio && existant.video) return existant;
+        const existing = this.globalData.trackQuality[url];
+        if (existing && existing.audio && existing.video) return existing;
 
-        const fige = {
-            audio: existant?.audio || defauts.audio,
-            video: existant?.video || defauts.video
+        const pinned = {
+            audio: existing?.audio || defaults.audio,
+            video: existing?.video || defaults.video
         };
-        this.globalData.trackQuality[url] = fige;
+        this.globalData.trackQuality[url] = pinned;
         this._save();
-        return fige;
+        return pinned;
     }
 
     /**
@@ -332,14 +332,14 @@ class GuildDatabase {
      * @param {{ audio?: string, video?: string }} patch
      * @param {{ audio: string, video: string }} defauts - Repli si la piste n'etait pas figee
      */
-    setTrackQuality(url, patch, defauts) {
+    setTrackQuality(url, patch, defaults) {
         if (!url) return;
         if (!this.globalData.trackQuality) this.globalData.trackQuality = {};
 
-        const courant = this.globalData.trackQuality[url] || { ...defauts };
+        const currentQuality = this.globalData.trackQuality[url] || { ...defaults };
         this.globalData.trackQuality[url] = {
-            audio: patch.audio || courant.audio,
-            video: patch.video || courant.video
+            audio: patch.audio || currentQuality.audio,
+            video: patch.video || currentQuality.video
         };
         this._save();
     }
@@ -377,16 +377,16 @@ class GuildDatabase {
      * @param {string} resolue - URL diffusable retenue
      * @returns {string} L'URL effectivement retenue, ancienne ou nouvelle
      */
-    setBridge(url, resolue) {
-        if (!url || !resolue) return resolue;
+    setBridge(url, resolvedUrl) {
+        if (!url || !resolvedUrl) return resolvedUrl;
         if (!this.globalData.bridges) this.globalData.bridges = {};
 
-        const existant = this.globalData.bridges[url];
-        if (existant) return existant;
+        const existing = this.globalData.bridges[url];
+        if (existing) return existing;
 
-        this.globalData.bridges[url] = resolue;
+        this.globalData.bridges[url] = resolvedUrl;
         this._save();
-        return resolue;
+        return resolvedUrl;
     }
 
     /**

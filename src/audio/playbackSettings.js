@@ -8,7 +8,7 @@
  * savoir quel chemin audio est en vigueur.
  */
 
-const { moteurActif } = require('./mix');
+const { activeEngine } = require('./mix');
 const log = require('../utils/logger');
 
 /**
@@ -21,30 +21,30 @@ const log = require('../utils/logger');
  * @param {import('discord-player').GuildQueue} queue
  * @param {number|string} vitesse
  */
-function appliquerVitesse(queue, vitesse) {
+function applySpeed(queue, speed) {
     if (!queue) return;
 
-    const moteur = moteurActif(queue);
-    if (moteur) {
-        const valeur = parseFloat(vitesse) || 1;
-        moteur.appliquerVitesse(valeur).catch((err) => {
-            log.error('[ReglagesLecture] Changement de vitesse impossible :', err.message);
+    const engine = activeEngine(queue);
+    if (engine) {
+        const value = parseFloat(speed) || 1;
+        engine.applySpeed(value).catch((err) => {
+            log.error('[PlaybackSettings] Changement de vitesse impossible :', err.message);
         });
         return;
     }
 
     try {
-        const actifs = queue.filters.ffmpeg.getFiltersEnabled();
-        const sansVitesse = actifs.filter(f => !f.startsWith('speed_'));
+        const enabledFilters = queue.filters.ffmpeg.getFiltersEnabled();
+        const withoutSpeed = enabledFilters.filter(f => !f.startsWith('speed_'));
 
-        const arrondie = Math.round((parseFloat(vitesse) || 1) * 100) / 100;
-        const filtre = `speed_${String(arrondie).replace('.', '_')}`;
-        if (filtre !== 'speed_1' && filtre !== 'speed_1_0' && filtre !== 'speed_1_00') {
-            sansVitesse.push(filtre);
+        const rounded = Math.round((parseFloat(speed) || 1) * 100) / 100;
+        const filter = `speed_${String(rounded).replace('.', '_')}`;
+        if (filter !== 'speed_1' && filter !== 'speed_1_0' && filter !== 'speed_1_00') {
+            withoutSpeed.push(filter);
         }
-        queue.filters.ffmpeg.setFilters(sansVitesse);
+        queue.filters.ffmpeg.setFilters(withoutSpeed);
     } catch (err) {
-        log.error('[ReglagesLecture] Erreur d\'application du filtre de vitesse :', err.message);
+        log.error('[PlaybackSettings] Erreur d\'application du filtre de vitesse :', err.message);
     }
 }
 
@@ -57,21 +57,21 @@ function appliquerVitesse(queue, vitesse) {
  *
  * @param {import('discord-player').GuildQueue} queue
  */
-function annulerEffetsMix(queue) {
+function cancelMixEffects(queue) {
     if (!queue) return;
 
-    const moteur = moteurActif(queue);
-    if (moteur) {
-        moteur.annulerEnchainement();
+    const engine = activeEngine(queue);
+    if (engine) {
+        engine.cancelCrossfade();
         return;
     }
 
     try {
-        const actifs = queue.filters.ffmpeg.getFiltersEnabled();
-        queue.filters.ffmpeg.setFilters(actifs.filter(f => f !== 'muffled'));
+        const enabledFilters = queue.filters.ffmpeg.getFiltersEnabled();
+        queue.filters.ffmpeg.setFilters(enabledFilters.filter(f => f !== 'muffled'));
     } catch (err) {
         // Aucune chaîne de filtres montée : il n'y a rien à retirer
     }
 }
 
-module.exports = { appliquerVitesse, annulerEffetsMix };
+module.exports = { applySpeed, cancelMixEffects };

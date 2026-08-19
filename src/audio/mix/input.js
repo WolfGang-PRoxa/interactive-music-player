@@ -22,8 +22,8 @@ const log = require('../../utils/logger');
  * @param {string} valeur
  * @returns {boolean}
  */
-function estUrl(valeur) {
-    return typeof valeur === 'string' && /^https?:\/\//i.test(valeur);
+function isUrl(value) {
+    return typeof value === 'string' && /^https?:\/\//i.test(value);
 }
 
 /**
@@ -35,14 +35,14 @@ function estUrl(valeur) {
  * @param {*} brut
  * @returns {{ entree: string, flux: import('stream').Readable|null }|null}
  */
-function normaliserSortieExtracteur(brut) {
-    if (!brut) return null;
+function normalizeExtractorOutput(raw) {
+    if (!raw) return null;
 
-    if (estUrl(brut)) return { entree: brut, flux: null };
-    if (estUrl(brut?.url)) return { entree: brut.url, flux: null };
+    if (isUrl(raw)) return { input: raw, stream: null };
+    if (isUrl(raw?.url)) return { input: raw.url, stream: null };
 
-    if (typeof brut?.pipe === 'function') return { entree: 'pipe:0', flux: brut };
-    if (typeof brut?.stream?.pipe === 'function') return { entree: 'pipe:0', flux: brut.stream };
+    if (typeof raw?.pipe === 'function') return { input: 'pipe:0', stream: raw };
+    if (typeof raw?.stream?.pipe === 'function') return { input: 'pipe:0', stream: raw.stream };
 
     return null;
 }
@@ -58,14 +58,14 @@ function normaliserSortieExtracteur(brut) {
  * @param {object} piste
  * @returns {string|null}
  */
-function cheminLocal(piste) {
+function localPath(track) {
     try {
-        const cache = preloadManager.getCachedPath(piste);
+        const cache = preloadManager.getCachedPath(track);
         if (cache) return cache;
     } catch (e) {}
 
-    const url = piste?.url;
-    if (!url || estUrl(url)) return null;
+    const url = track?.url;
+    if (!url || isUrl(url)) return null;
     try {
         return fs.existsSync(url) ? url : null;
     } catch (e) {
@@ -84,36 +84,36 @@ function cheminLocal(piste) {
  * @param {import('discord-player').Player} player
  * @returns {Promise<{ entree: string, flux: import('stream').Readable|null }|null>}
  */
-async function viaExtracteurs(piste, player) {
+async function viaExtractors(track, player) {
     if (!player?.extractors) return null;
 
-    const tenter = async () => {
+    const attempt = async () => {
         try {
-            const resultat = await player.extractors.run(async (extracteur) => {
-                if (piste.extractor && extracteur.identifier !== piste.extractor.identifier) return false;
-                if (await extracteur.validate(piste.url, piste.queryType)) {
-                    return await extracteur.stream(piste);
+            const result = await player.extractors.run(async (extractor) => {
+                if (track.extractor && extractor.identifier !== track.extractor.identifier) return false;
+                if (await extractor.validate(track.url, track.queryType)) {
+                    return await extractor.stream(track);
                 }
                 return false;
             });
-            return normaliserSortieExtracteur(resultat?.result);
+            return normalizeExtractorOutput(result?.result);
         } catch (err) {
-            log.error(`[MixEntree] Échec de l'extraction pour ${piste?.title} :`, err.message);
+            log.error(`[MixEntree] Échec de l'extraction pour ${track?.title} :`, err.message);
             return null;
         }
     };
 
     if (player.extractors.context?.provide) {
-        let sortie = null;
+        let output = null;
         await player.extractors.context.provide({
             id: crypto.randomUUID(),
             attemptedExtractors: new Set(),
             bridgeAttemptedExtractors: new Set()
-        }, async () => { sortie = await tenter(); });
-        return sortie;
+        }, async () => { output = await attempt(); });
+        return output;
     }
 
-    return tenter();
+    return attempt();
 }
 
 /**
@@ -124,18 +124,18 @@ async function viaExtracteurs(piste, player) {
  * @returns {Promise<{ entree: string, flux: import('stream').Readable|null, local: boolean }>}
  * @throws {Error} Si aucune entrée n'a pu être obtenue.
  */
-async function resoudreEntree(piste, player) {
-    const local = cheminLocal(piste);
-    if (local) return { entree: local, flux: null, local: true };
+async function resolveInput(track, player) {
+    const local = localPath(track);
+    if (local) return { input: local, stream: null, local: true };
 
-    const distant = await viaExtracteurs(piste, player);
-    if (distant) return { ...distant, local: false };
+    const remote = await viaExtractors(track, player);
+    if (remote) return { ...remote, local: false };
 
     // Dernier recours : l'URL de la piste elle-même. FFmpeg sait ouvrir une
     // adresse HTTP directe, ce qui couvre les fichiers hébergés en clair.
-    if (estUrl(piste?.url)) return { entree: piste.url, flux: null, local: false };
+    if (isUrl(track?.url)) return { input: track.url, stream: null, local: false };
 
-    throw new Error(`Aucune entrée audio exploitable pour « ${piste?.title || '?'} »`);
+    throw new Error(`Aucune entrée audio exploitable pour « ${track?.title || '?'} »`);
 }
 
-module.exports = { resoudreEntree, estUrl };
+module.exports = { resolveInput, isUrl };

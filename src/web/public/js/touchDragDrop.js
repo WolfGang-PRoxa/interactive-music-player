@@ -128,15 +128,15 @@
         offsetX = touch.clientX - rect.left;
         offsetY = touch.clientY - rect.top;
 
-        const fixe = (prop, valeur) => node.style.setProperty(prop, valeur, 'important');
-        fixe('position', 'fixed');
-        fixe('left', '0');
-        fixe('top', '0');
-        fixe('z-index', '99999');
+        const fixed = (prop, value) => node.style.setProperty(prop, value, 'important');
+        fixed('position', 'fixed');
+        fixed('left', '0');
+        fixed('top', '0');
+        fixed('z-index', '99999');
         // Sans neutralisation des pointeurs, `elementFromPoint` ne verrait que
         // l'aperçu et jamais la cible qu'il recouvre. `build` la pose déjà,
         // elle est répétée ici parce que tout en dépend.
-        fixe('pointer-events', 'none');
+        fixed('pointer-events', 'none');
         return node;
     }
 
@@ -267,9 +267,9 @@
         // Avant la saisie : un mouvement franc signifie que l'utilisateur
         // voulait faire défiler, pas déplacer.
         if (pressTimer) {
-            const bouge = Math.abs(touch.clientX - startX) > MOVE_TOLERANCE_PX
+            const moved = Math.abs(touch.clientX - startX) > MOVE_TOLERANCE_PX
                 || Math.abs(touch.clientY - startY) > MOVE_TOLERANCE_PX;
-            if (bouge) cancelPress();
+            if (moved) cancelPress();
             return;
         }
         if (!source) return;

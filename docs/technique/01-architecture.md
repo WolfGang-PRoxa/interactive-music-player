@@ -20,14 +20,14 @@ src/
 │   ├── PresenceManager.js    Arrivée et départ du bot selon l'occupation du salon
 │   ├── PreloadManager.js     Cache disque des pistes distantes
 │   ├── LocalFilePlayer.js    Utilitaires de scan de dossiers audio
-│   ├── reglagesLecture.js    Vitesse et effets de mix, quel que soit le chemin audio
+│   ├── playbackSettings.js   Vitesse et effets de mix, quel que soit le chemin audio
 │   └── mix/                  Bus de mixage : la diffusion commune, deux pistes superposables
 │       ├── format.js         Format d'échange PCM et découpage en trames
-│       ├── entree.js         Résolution d'une piste en entrée FFmpeg
+│       ├── input.js          Résolution d'une piste en entrée FFmpeg
 │       ├── MixSource.js      Un morceau décodé, avec gain et filtre
 │       ├── MixBus.js         Le flux permanent envoyé à Discord
 │       ├── MixEngine.js      Orchestration par serveur et pilotage de la file
-│       ├── pontLecteur.js    Routage des méthodes du lecteur vers le bus
+│       ├── playerBridge.js   Routage des méthodes du lecteur vers le bus
 │       └── index.js          Registre des bus, un par serveur
 │
 ├── broadcast/

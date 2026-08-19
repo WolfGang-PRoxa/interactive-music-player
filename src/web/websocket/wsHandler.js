@@ -17,7 +17,7 @@ const log = require('../../utils/logger');
  * même quand le bot n'a rejoint aucun serveur — sans quoi on ne pourrait plus
  * changer de version depuis une installation qui n'en a pas encore.
  */
-const TYPES_SANS_SERVEUR = new Set(['listVersions', 'installVersion']);
+const GUILDLESS_TYPES = new Set(['listVersions', 'installVersion']);
 
 /**
  * Traite un message reçu d'un client du dashboard.
@@ -29,7 +29,7 @@ async function handleMessage(ws, payload, webServer) {
     const { type, guildId, data } = payload;
 
     const currentGuildId = guildId || ws.selectedGuildId || webServer._getFirstGuildId();
-    if (!currentGuildId && !TYPES_SANS_SERVEUR.has(type)) return;
+    if (!currentGuildId && !GUILDLESS_TYPES.has(type)) return;
 
     const handler = routes[type];
     if (!handler) {

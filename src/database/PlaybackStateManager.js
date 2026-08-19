@@ -62,7 +62,7 @@ class PlaybackStateManager {
         // plus toucher au volume à partir d'ici.
         queueFadeData.forEach(item => {
             if (item.volumeController) {
-                item.volumeController.reserverPourFadeExterne();
+                item.volumeController.reserveForExternalFade();
             }
         });
 
@@ -129,7 +129,7 @@ class PlaybackStateManager {
             // Départ imposé à 0 et courbe perceptive : le contrôleur ne se fie pas
             // à `queue.node.volume`, qui vaut 100 par défaut tant qu'aucun flux
             // n'est branché et faisait conclure qu'il n'y avait rien à monter.
-            volumeController.fadeInDepuisSilence(targetVol, fadeinDurationMs);
+            volumeController.fadeInFromSilence(targetVol, fadeinDurationMs);
             return;
         }
 
@@ -179,7 +179,7 @@ class PlaybackStateManager {
                 // et ne rendrait que des zéros. La position et l'état de lecture
                 // viennent alors de la session, qui les a relevés avant le
                 // départ ; le reste — piste, file, historique — n'a pas bougé.
-                const geleParAbsence = queue.session.estGelee();
+                const frozenByAbsence = queue.session.isFrozen();
 
                 // Si on a un salon actif, on synchronise son état en cours dans le cache des salons de la queue
                 if (activeChannelId) {
@@ -199,8 +199,8 @@ class PlaybackStateManager {
                     let currentProgress = 0;
                     if (isPersonal) {
                         currentProgress = queue.virtualProgressMs || 0;
-                    } else if (geleParAbsence) {
-                        currentProgress = queue.positionFigeeMs || 0;
+                    } else if (frozenByAbsence) {
+                        currentProgress = queue.frozenPositionMs || 0;
                     } else if (queue.currentTrack) {
                         try {
                             currentProgress = queue.node.getTimestamp().current.value;
@@ -267,14 +267,14 @@ class PlaybackStateManager {
         // entendre la coupure qu'on cherche justement à masquer. La variable est
         // retirée aussitôt lue : elle ne concerne que cette restauration, pas la
         // durée de vie du process.
-        const estRedemarrage = process.env.IMP_REDEMARRAGE === '1';
-        delete process.env.IMP_REDEMARRAGE;
+        const isRestart = process.env.IMP_RESTART === '1';
+        delete process.env.IMP_RESTART;
 
         const data = readJsonSafe(this.filepath, '[PlaybackState]');
         if (!data) return;
         try {
             log.info('[PlaybackState] Restauration des files de lecture...');
-            if (estRedemarrage) {
+            if (isRestart) {
                 log.info('[PlaybackState] Reprise après redémarrage : fade-in de démarrage ignoré.');
             }
 
@@ -303,7 +303,7 @@ class PlaybackStateManager {
                             try {
                                 const settings = require('./Database').getSettings(guildId);
                                 const targetVol = (settings.baseVolume !== undefined && settings.baseVolume !== null) ? settings.baseVolume : 100;
-                                const fadeinEnabled = !estRedemarrage && !!settings.fadeinEnabled;
+                                const fadeinEnabled = !isRestart && !!settings.fadeinEnabled;
                                 const fadeinDurationMs = (settings.fadeinDuration !== undefined ? parseFloat(settings.fadeinDuration) : 5) * 1000;
 
                                 if (!shouldBePaused) {
@@ -335,7 +335,7 @@ class PlaybackStateManager {
                             try {
                                 const settings = require('./Database').getSettings(guildId);
                                 const targetVol = (settings.baseVolume !== undefined && settings.baseVolume !== null) ? settings.baseVolume : 100;
-                                const fadeinEnabled = !estRedemarrage && !!settings.fadeinEnabled;
+                                const fadeinEnabled = !isRestart && !!settings.fadeinEnabled;
                                 const fadeinDurationMs = (settings.fadeinDuration !== undefined ? parseFloat(settings.fadeinDuration) : 5) * 1000;
 
                                 if (!shouldBePaused) {
@@ -408,9 +408,9 @@ class PlaybackStateManager {
                 // restaurée telle quelle, mais figée, et le bot n'arrivera qu'à
                 // l'entrée du premier auditeur.
                 const presenceManager = require('../audio/PresenceManager');
-                const salonAccessible = voiceChannel && presenceManager.connexionAutorisee(voiceChannel);
+                const channelReachable = voiceChannel && presenceManager.connectionAllowed(voiceChannel);
 
-                if (salonAccessible) {
+                if (channelReachable) {
                     if (defaultChannelId && defaultChannelId === voiceChannel.id) {
                         log.info(`[PlaybackState] Restauration de la connexion vocale pour la guilde ${guildId} sur le salon par défaut: ${voiceChannel.name}...`);
                     } else {
@@ -450,7 +450,7 @@ class PlaybackStateManager {
                     queue.activeChannelId = channelId || activeChannelId || null;
 
                     // Connexion déplacée ICI, hors de la condition activeChannelState
-                    if (salonAccessible) {
+                    if (channelReachable) {
                         if (queue.channel?.id !== voiceChannel.id) {
                             await queue.connect(voiceChannel);
                         }
@@ -465,12 +465,12 @@ class PlaybackStateManager {
                             client.setupDucking(guildId);
                         }
                     } else {
-                        presenceManager.marquerAbsent(queue);
+                        presenceManager.markAbsent(queue);
                     }
 
                     // S'assurer que le volume du node démarre à 0 si le fade-in est activé, ou au volume cible sinon
                     const targetBaseVol = (settings.baseVolume !== undefined && settings.baseVolume !== null) ? settings.baseVolume : 100;
-                    const initialQueueVol = (!estRedemarrage && settings.fadeinEnabled) ? 0 : targetBaseVol;
+                    const initialQueueVol = (!isRestart && settings.fadeinEnabled) ? 0 : targetBaseVol;
                     if (queue.node && typeof queue.node.setVolume === 'function') {
                         try {
                             queue.node.setVolume(initialQueueVol);
@@ -488,13 +488,13 @@ class PlaybackStateManager {
                     // bot : il n'y a rien à faire monter tant que le tableau de bord
                     // n'est pas ouvert. Le fade-in est donc mis en attente, et c'est
                     // le client qui le jouera à la connexion.
-                    if (isPersonal && settings.fadeinEnabled && !estRedemarrage) {
-                        const dureeSecondes = settings.fadeinDuration !== undefined
+                    if (isPersonal && settings.fadeinEnabled && !isRestart) {
+                        const durationSeconds = settings.fadeinDuration !== undefined
                             ? parseFloat(settings.fadeinDuration)
                             : 5;
-                        if (dureeSecondes > 0) {
-                            queue.fadeinDemarrageEnAttente = { durationMs: dureeSecondes * 1000 };
-                            log.info(`[PlaybackState] Fade-in de ${dureeSecondes}s mis en attente : `
+                        if (durationSeconds > 0) {
+                            queue.pendingStartupFadein = { durationMs: durationSeconds * 1000 };
+                            log.info(`[PlaybackState] Fade-in de ${durationSeconds}s mis en attente : `
                                 + 'il débutera à l\'ouverture du tableau de bord (diffusion personnelle).');
                         }
                     }
@@ -519,13 +519,13 @@ class PlaybackStateManager {
 
                         // Restaurer l'historique
                         if (activeChannelState.history && activeChannelState.history.length > 0) {
-                            const entrees = activeChannelState.history.filter(tData => tData && tData.title && tData.url);
+                            const entries = activeChannelState.history.filter(tData => tData && tData.title && tData.url);
                             if (isPersonal) {
                                 // Le lecteur virtuel range l'historique dans l'ordre
                                 // même du fichier d'état : une simple recopie suffit.
-                                entrees.forEach(tData => queue.virtualHistory.push(tData));
+                                entries.forEach(tData => queue.virtualHistory.push(tData));
                             } else {
-                                restoreHistory(queue, entrees, tData => {
+                                restoreHistory(queue, entries, tData => {
                                     const track = new Track(player, tData);
                                     track.queryType = tData.queryType || null;
                                     track.raw = tData.raw || {};
@@ -562,8 +562,8 @@ class PlaybackStateManager {
                             // s'est joué non plus.
                             let calculatedProgress = activeChannelState.currentProgress || 0;
                             const savedAt = activeChannelState.savedAt;
-                            const compenserArret = isPersonal ? estRedemarrage : salonAccessible;
-                            if (compenserArret && !activeChannelState.isPaused && activeChannelState.isPlaying && savedAt) {
+                            const compensateDowntime = isPersonal ? isRestart : channelReachable;
+                            if (compensateDowntime && !activeChannelState.isPaused && activeChannelState.isPlaying && savedAt) {
                                 const elapsedSinceSave = Date.now() - savedAt;
                                 if (elapsedSinceSave > 0 && elapsedSinceSave < 300000) {
                                     calculatedProgress += elapsedSinceSave;
@@ -578,16 +578,16 @@ class PlaybackStateManager {
                                 queue.virtualIsPlaying = activeChannelState.isPlaying !== undefined ? activeChannelState.isPlaying : false;
                                 queue.virtualLastUpdated = Date.now();
                                 log.info(`[PlaybackState] Restauration virtuelle terminée : ${track.title} à ${queue.virtualProgressMs}ms (pause: ${queue.virtualIsPaused})`);
-                            } else if (!salonAccessible) {
+                            } else if (!channelReachable) {
                                 // Pas de connexion vocale, donc pas de lecteur où
                                 // remonter la piste. Elle est posée directement
                                 // comme piste courante et la session tient lieu de
                                 // lecteur : le tableau de bord l'affiche à sa
                                 // position, et l'arrivée d'un auditeur la relancera.
                                 queue.__current = track;
-                                presenceManager.marquerAbsent(queue, {
+                                presenceManager.markAbsent(queue, {
                                     positionMs: calculatedProgress,
-                                    enLecture: !!activeChannelState.isPlaying && !activeChannelState.isPaused
+                                    playing: !!activeChannelState.isPlaying && !activeChannelState.isPaused
                                 });
                                 log.info(`[PlaybackState] Lecture figée à ${calculatedProgress}ms : `
                                     + `${track.title} reprendra à l'arrivée d'un auditeur.`);

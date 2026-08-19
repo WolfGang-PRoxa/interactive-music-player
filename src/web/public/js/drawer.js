@@ -10,19 +10,19 @@
     let totalBytesReceived = 0;
 
     /** Traduction avec repli sur la valeur française d'origine. */
-    function tr(cle, defaut) {
+    function tr(key, fallback) {
         const t = window.MusicPlayer && window.MusicPlayer.t;
-        const valeur = typeof t === 'function' ? t(cle) : null;
-        return (valeur && valeur !== cle) ? valeur : defaut;
+        const value = typeof t === 'function' ? t(key) : null;
+        return (value && value !== key) ? value : fallback;
     }
 
     /**
      * Symboles d'unités de taille. Ils diffèrent selon la langue : « Mo » en
      * français, « MB » en anglais, allemand et espagnol.
      */
-    function unites() {
+    function units() {
         return {
-            octet: tr('unit_bytes', 'octets'),
+            byte: tr('unit_bytes', 'octets'),
             ko: tr('unit_kb', 'Ko'),
             mo: tr('unit_mb', 'Mo'),
             go: tr('unit_gb', 'Go'),
@@ -31,13 +31,13 @@
 
     // Dynamic auto-scaling unit formatter (octets, Ko, Mo, Go)
     function formatBytes(bytes) {
-        const u = unites();
-        if (!bytes || bytes <= 0) return { val: '0.00', unit: u.ko, raw: `0 ${u.octet}` };
+        const u = units();
+        if (!bytes || bytes <= 0) return { val: '0.00', unit: u.ko, raw: `0 ${u.byte}` };
         if (bytes < 1024) {
-            return { val: bytes.toString(), unit: u.octet, raw: `${bytes} ${u.octet}` };
+            return { val: bytes.toString(), unit: u.byte, raw: `${bytes} ${u.byte}` };
         }
         if (bytes < 1024 * 1024) {
-            return { val: (bytes / 1024).toFixed(2), unit: u.ko, raw: `${bytes.toLocaleString()} ${u.octet}` };
+            return { val: (bytes / 1024).toFixed(2), unit: u.ko, raw: `${bytes.toLocaleString()} ${u.byte}` };
         }
         if (bytes < 1024 * 1024 * 1024) {
             return { val: (bytes / (1024 * 1024)).toFixed(2), unit: u.mo, raw: `${(bytes / 1024).toFixed(1)} ${u.ko}` };
@@ -116,46 +116,46 @@
             défilement continu à 60 ips sans compteur artificiel.
     ═══════════════════════════════════════════════════════════════ */
 
-    const MO = 1024 * 1024;
-    const DUREE_MIN_SEC = 10;
-    const DUREE_MAX_SEC = 3600;
+    const BYTES_PER_MB = 1024 * 1024;
+    const MIN_DURATION_SEC = 10;
+    const MAX_DURATION_SEC = 3600;
     /** Cadence réclamée au serveur pour le flux fin, tiroir ouvert. */
-    const CADENCE_FINE_HZ = 60;
+    const FINE_RATE_HZ = 60;
     /** Profondeur gardée à cadence fine ; au-delà l'historique 1 Hz prend le relais. */
-    const FENETRE_FINE_SEC = 120;
+    const FINE_WINDOW_SEC = 120;
     /** Marge de conservation au-delà de la plus large fenêtre possible. */
-    const MARGE_TAMPON_MS = 60 * 1000;
+    const BUFFER_MARGIN_MS = 60 * 1000;
     /** Pas d'agrégation plancher : inutile de descendre sous la trame d'affichage. */
-    const PAS_MIN_MS = Math.floor(1000 / CADENCE_FINE_HZ);
+    const MIN_STEP_MS = Math.floor(1000 / FINE_RATE_HZ);
     /** Un point de courbe tous les N pixels. */
-    const PX_PAR_POINT = 3;
+    const PX_PER_POINT = 3;
     const POINTS_MIN = 8;
     const POINTS_MAX = 400;
     // La marge droite loge la moitié du dernier libellé de temps (HH:MM:SS)
     // ainsi que la tête du tracé, qui vit exactement sur le bord.
-    const MARGE = { haut: 22, bas: 28, gauche: 64, droite: 26 };
-    const NIVEAUX_Y = 3;   // nombre d'intervalles → 4 graduations
-    const ECHELLES_TEMPS_SEC = [5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600];
+    const MARGIN = { top: 22, bottom: 28, left: 64, right: 26 };
+    const Y_LEVELS = 3;   // nombre d'intervalles → 4 graduations
+    const TIME_SCALES_SEC = [5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600];
 
     /** Mesures 1 Hz de `progress` : { t, rss, heapUsed, heapTotal }. */
-    const echantillonsLents = [];
+    const slowSamples = [];
     /** Mesures du flux haute cadence, même forme. */
-    const echantillonsFins = [];
+    const fineSamples = [];
     /** Horodatage de la dernière mesure agrégée, tous flux confondus. */
-    let dernierTIntegre = 0;
-    let dernierFinRecuMs = 0;
-    let derniereDemandeFluxMs = 0;
+    let lastIntegratedT = 0;
+    let lastEndReceivedMs = 0;
+    let lastStreamRequestMs = 0;
 
     /** Agrégats affichés, ordre chronologique. */
-    let paquets = [];
-    let pasPaquetMs = PAS_MIN_MS;
+    let buckets = [];
+    let bucketStepMs = MIN_STEP_MS;
 
-    let dureeFenetreSec = 30;
-    let maxAfficheMo = 100;
-    let derniereLargeurGraphe = 0;
+    let windowDurationSec = 30;
+    let maxDisplayedMB = 100;
+    let lastGraphWidth = 0;
 
     let animFrameId = null;
-    let derniereFrameMs = 0;
+    let lastFrameMs = 0;
 
     // Interactive Hover & Tooltip State
     let hoverX = -1;
@@ -165,7 +165,7 @@
      * Facteur d'interpolation corrigé du temps écoulé : un lissage réglé
      * pour 60 ips ne doit pas ralentir quand la fenêtre rame.
      */
-    function facteurLissage(dtSec, k60) {
+    function smoothingFactor(dtSec, k60) {
         const frames = Math.max(0.1, Math.min(6, dtSec * 60));
         return 1 - Math.pow(1 - k60, frames);
     }
@@ -177,29 +177,29 @@
      * le tableau à chaque mesure coûterait plus cher, à 60 Hz, que de laisser
      * vivre quelques éléments hors fenêtre — ils sont filtrés au tracé.
      */
-    function ajouterMesure(tampon, profondeurMs, rss, heapUsed, heapTotal, horodatage) {
-        const t = Number(horodatage) || Date.now();
-        const dernier = tampon[tampon.length - 1];
+    function addSample(buffer, depthMs, rss, heapUsed, heapTotal, timestamp) {
+        const t = Number(timestamp) || Date.now();
+        const last = buffer[buffer.length - 1];
         // Un horodatage qui n'avance pas ne doit pas créer de point.
-        if (dernier && t <= dernier.t) return;
+        if (last && t <= last.t) return;
 
-        tampon.push({
+        buffer.push({
             t,
             rss: Math.max(0, rss || 0),
             heapUsed: Math.max(0, heapUsed || 0),
             heapTotal: Math.max(0, heapTotal || 0)
         });
 
-        const limite = t - profondeurMs;
-        let obsoletes = 0;
-        while (obsoletes < tampon.length && tampon[obsoletes].t < limite) obsoletes++;
-        if (obsoletes > 64) tampon.splice(0, obsoletes);
+        const limit = t - depthMs;
+        let stale = 0;
+        while (stale < buffer.length && buffer[stale].t < limit) stale++;
+        if (stale > 64) buffer.splice(0, stale);
 
         // Les deux flux se recouvrent : n'agréger que ce qui fait avancer le
         // temps, pour ne pas compter deux fois le même instant.
-        if (t > dernierTIntegre) {
-            dernierTIntegre = t;
-            integrerAuxPaquets(tampon[tampon.length - 1]);
+        if (t > lastIntegratedT) {
+            lastIntegratedT = t;
+            integrateIntoBuckets(buffer[buffer.length - 1]);
         }
     }
 
@@ -208,64 +208,64 @@
      * historique 1 Hz au-delà. Le graphique garde ainsi son passé même quand
      * le flux rapide vient tout juste de démarrer.
      */
-    function fluxFusionne(depuis) {
-        const bascule = echantillonsFins.length > 0 ? echantillonsFins[0].t : Infinity;
-        const sortie = [];
-        for (const m of echantillonsLents) {
-            if (m.t >= depuis && m.t < bascule) sortie.push(m);
+    function mergedStream(from) {
+        const toggleEl = fineSamples.length > 0 ? fineSamples[0].t : Infinity;
+        const out = [];
+        for (const m of slowSamples) {
+            if (m.t >= from && m.t < toggleEl) out.push(m);
         }
-        for (const m of echantillonsFins) {
-            if (m.t >= depuis) sortie.push(m);
+        for (const m of fineSamples) {
+            if (m.t >= from) out.push(m);
         }
-        return sortie;
+        return out;
     }
 
     // ── Étage 2 : agrégation par pas de temps ───────────────────────
 
     /** Points de courbe tenables : la finesse que la largeur permet de rendre. */
-    function nombrePoints(largeurGraphe) {
-        return Math.max(POINTS_MIN, Math.min(POINTS_MAX, Math.floor(largeurGraphe / PX_PAR_POINT)));
+    function pointCount(graphWidth) {
+        return Math.max(POINTS_MIN, Math.min(POINTS_MAX, Math.floor(graphWidth / PX_PER_POINT)));
     }
 
-    function calculerPas(largeurGraphe) {
-        const brut = (dureeFenetreSec * 1000) / nombrePoints(largeurGraphe);
-        return Math.max(PAS_MIN_MS, Math.ceil(brut));
+    function computeStep(graphWidth) {
+        const raw = (windowDurationSec * 1000) / pointCount(graphWidth);
+        return Math.max(MIN_STEP_MS, Math.ceil(raw));
     }
 
-    function creerPaquet(debut, mesure) {
+    function createBucket(start, sample) {
         return {
-            debut,
-            fin: debut + pasPaquetMs,
-            tPremier: mesure.t,
-            tDernier: mesure.t,
-            sommeRss: mesure.rss,
-            sommeHeap: mesure.heapUsed,
-            sommeHeapTotal: mesure.heapTotal,
-            nb: 1,
+            start,
+            end: start + bucketStepMs,
+            tFirst: sample.t,
+            tLast: sample.t,
+            rssSum: sample.rss,
+            heapSum: sample.heapUsed,
+            heapTotalSum: sample.heapTotal,
+            count: 1,
             // Valeurs affichées, rattrapées par interpolation à chaque image.
-            dRss: mesure.rss,
-            dHeap: mesure.heapUsed,
-            dHeapTotal: mesure.heapTotal
+            dRss: sample.rss,
+            dHeap: sample.heapUsed,
+            dHeapTotal: sample.heapTotal
         };
     }
 
-    function cumuler(paquet, mesure) {
-        paquet.sommeRss += mesure.rss;
-        paquet.sommeHeap += mesure.heapUsed;
-        paquet.sommeHeapTotal += mesure.heapTotal;
-        paquet.nb++;
-        paquet.tDernier = mesure.t;
+    function accumulate(bucket, sample) {
+        bucket.rssSum += sample.rss;
+        bucket.heapSum += sample.heapUsed;
+        bucket.heapTotalSum += sample.heapTotal;
+        bucket.count++;
+        bucket.tLast = sample.t;
     }
 
-    function integrerAuxPaquets(mesure) {
-        const debut = Math.floor(mesure.t / pasPaquetMs) * pasPaquetMs;
-        const dernier = paquets[paquets.length - 1];
-        if (dernier && dernier.debut === debut) {
-            cumuler(dernier, mesure);
+    function integrateIntoBuckets(sample) {
+        const start = Math.floor(sample.t / bucketStepMs) * bucketStepMs;
+        const last = buckets[buckets.length - 1];
+        if (last && last.start === start) {
+            accumulate(last, sample);
         } else {
-            paquets.push(creerPaquet(debut, mesure));
+            buckets.push(createBucket(start, sample));
         }
-        elaguerPaquets();
+        pruneBuckets();
     }
 
     /**
@@ -273,41 +273,41 @@
      * pas change (curseur de durée, redimensionnement), donc jamais à chaque
      * image : le rendu ne fait ensuite que lire ces agrégats.
      */
-    function reconstruirePaquets(largeurGraphe) {
-        pasPaquetMs = calculerPas(largeurGraphe);
-        paquets = [];
+    function rebuildBuckets(graphWidth) {
+        bucketStepMs = computeStep(graphWidth);
+        buckets = [];
 
         // Inutile de reconstruire ce qui est déjà sorti par la gauche.
-        const depuis = Date.now() - dureeFenetreSec * 1000 - 2 * pasPaquetMs;
+        const from = Date.now() - windowDurationSec * 1000 - 2 * bucketStepMs;
 
-        let courant = null;
-        for (const mesure of fluxFusionne(depuis)) {
-            const debut = Math.floor(mesure.t / pasPaquetMs) * pasPaquetMs;
-            if (courant && courant.debut === debut) {
-                cumuler(courant, mesure);
+        let current = null;
+        for (const sample of mergedStream(from)) {
+            const start = Math.floor(sample.t / bucketStepMs) * bucketStepMs;
+            if (current && current.start === start) {
+                accumulate(current, sample);
             } else {
-                courant = creerPaquet(debut, mesure);
-                paquets.push(courant);
+                current = createBucket(start, sample);
+                buckets.push(current);
             }
         }
-        elaguerPaquets();
+        pruneBuckets();
     }
 
-    function elaguerPaquets() {
+    function pruneBuckets() {
         // Deux paquets de battement au-delà du bord gauche : le tracé doit
         // entrer dans le cadre plutôt que d'y commencer net.
-        const limite = Date.now() - dureeFenetreSec * 1000 - 2 * pasPaquetMs;
-        while (paquets.length > 0 && paquets[0].fin < limite) {
-            paquets.shift();
+        const limit = Date.now() - windowDurationSec * 1000 - 2 * bucketStepMs;
+        while (buckets.length > 0 && buckets[0].end < limit) {
+            buckets.shift();
         }
     }
 
-    function lisserValeurs(dtSec) {
-        const k = facteurLissage(dtSec, 0.15);
-        for (const p of paquets) {
-            p.dRss += (p.sommeRss / p.nb - p.dRss) * k;
-            p.dHeap += (p.sommeHeap / p.nb - p.dHeap) * k;
-            p.dHeapTotal += (p.sommeHeapTotal / p.nb - p.dHeapTotal) * k;
+    function smoothValues(dtSec) {
+        const k = smoothingFactor(dtSec, 0.15);
+        for (const p of buckets) {
+            p.dRss += (p.rssSum / p.count - p.dRss) * k;
+            p.dHeap += (p.heapSum / p.count - p.dHeap) * k;
+            p.dHeapTotal += (p.heapTotalSum / p.count - p.dHeapTotal) * k;
         }
     }
 
@@ -316,7 +316,7 @@
     // Auto-scale byte units into o, Ko, Mo, or Go
     function formatBytesWithUnit(bytes) {
         const val = Math.max(0, bytes || 0);
-        const u = unites();
+        const u = units();
         if (val >= 1024 * 1024 * 1024) {
             return `${(val / (1024 * 1024 * 1024)).toFixed(1)} ${u.go}`;
         }
@@ -330,50 +330,50 @@
     }
 
     /** Arrondit le sommet de l'axe Y à une valeur « ronde » lisible. */
-    function maxJoli(valeurMo) {
-        const base = Math.max(50, valeurMo);
-        const ordre = Math.pow(10, Math.floor(Math.log10(base)));
+    function niceMax(valueMB) {
+        const base = Math.max(50, valueMB);
+        const order = Math.pow(10, Math.floor(Math.log10(base)));
         for (const m of [1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 8]) {
-            if (base <= m * ordre) return m * ordre;
+            if (base <= m * order) return m * order;
         }
-        return 10 * ordre;
+        return 10 * order;
     }
 
-    function heureCourte(ms, avecSecondes) {
+    function shortTime(ms, withSeconds) {
         const d = new Date(ms);
         const hh = String(d.getHours()).padStart(2, '0');
         const mm = String(d.getMinutes()).padStart(2, '0');
-        if (!avecSecondes) return `${hh}:${mm}`;
+        if (!withSeconds) return `${hh}:${mm}`;
         return `${hh}:${mm}:${String(d.getSeconds()).padStart(2, '0')}`;
     }
 
     /** Intervalle des graduations de temps, choisi pour ne pas les tasser. */
-    function pasTempsSec(largeurGraphe) {
-        const maxGraduations = Math.max(2, Math.floor(largeurGraphe / 64));
-        for (const pas of ECHELLES_TEMPS_SEC) {
-            if (dureeFenetreSec / pas <= maxGraduations) return pas;
+    function timeStepSec(graphWidth) {
+        const maxGraduations = Math.max(2, Math.floor(graphWidth / 64));
+        for (const stepValue of TIME_SCALES_SEC) {
+            if (windowDurationSec / stepValue <= maxGraduations) return stepValue;
         }
-        return DUREE_MAX_SEC;
+        return MAX_DURATION_SEC;
     }
 
     /** Récupère (en le créant au besoin) le n-ième enfant d'un conteneur. */
-    function elementPool(parent, index, creer) {
+    function elementPool(parent, index, create) {
         let el = parent.children[index];
         if (!el) {
-            el = creer();
+            el = create();
             parent.appendChild(el);
         }
         el.style.display = '';
         return el;
     }
 
-    function masquerSurplus(parent, aPartirDe) {
-        for (let i = aPartirDe; i < parent.children.length; i++) {
+    function clipOverflow(parent, since) {
+        for (let i = since; i < parent.children.length; i++) {
             parent.children[i].style.display = 'none';
         }
     }
 
-    function creerLigneSvg() {
+    function createSvgLine() {
         return document.createElementNS('http://www.w3.org/2000/svg', 'line');
     }
 
@@ -390,12 +390,12 @@
         return d;
     }
 
-    function buildSvgArea(pts, basY) {
+    function buildSvgArea(pts, bottomY) {
         if (pts.length < 2) return '';
         const lineD = buildSvgPath(pts);
-        const dernier = pts[pts.length - 1];
-        const premier = pts[0];
-        return `${lineD} L ${dernier.x.toFixed(1)} ${basY.toFixed(1)} L ${premier.x.toFixed(1)} ${basY.toFixed(1)} Z`;
+        const last = pts[pts.length - 1];
+        const first = pts[0];
+        return `${lineD} L ${last.x.toFixed(1)} ${bottomY.toFixed(1)} L ${first.x.toFixed(1)} ${bottomY.toFixed(1)} Z`;
     }
 
     function renderGraph(dtSec) {
@@ -405,96 +405,96 @@
         const rect = container.getBoundingClientRect();
         const width = rect.width || 340;
         const height = rect.height || 170;
-        const graphW = Math.max(20, width - MARGE.gauche - MARGE.droite);
-        const graphH = Math.max(20, height - MARGE.haut - MARGE.bas);
-        const basY = MARGE.haut + graphH;
+        const graphW = Math.max(20, width - MARGIN.left - MARGIN.right);
+        const graphH = Math.max(20, height - MARGIN.top - MARGIN.bottom);
+        const bottomY = MARGIN.top + graphH;
 
         // La densité de nœuds dépend de la largeur : un tiroir redimensionné
         // change le pas d'agrégation, donc les paquets.
-        if (Math.abs(graphW - derniereLargeurGraphe) > 1) {
-            derniereLargeurGraphe = graphW;
-            reconstruirePaquets(graphW);
+        if (Math.abs(graphW - lastGraphWidth) > 1) {
+            lastGraphWidth = graphW;
+            rebuildBuckets(graphW);
         }
 
-        const maintenant = Date.now();
-        const fenetreMs = dureeFenetreSec * 1000;
-        const tGauche = maintenant - fenetreMs;
-        const xDe = (t) => MARGE.gauche + ((t - tGauche) / fenetreMs) * graphW;
+        const now = Date.now();
+        const windowMs = windowDurationSec * 1000;
+        const tLeft = now - windowMs;
+        const xFrom = (t) => MARGIN.left + ((t - tLeft) / windowMs) * graphW;
 
-        elaguerPaquets();
-        lisserValeurs(dtSec);
+        pruneBuckets();
+        smoothValues(dtSec);
 
         // Paquets visibles, plus le dernier sorti par la gauche pour que la
         // courbe traverse le bord au lieu d'y naître.
-        const visibles = [];
-        for (let i = 0; i < paquets.length; i++) {
-            if (paquets[i].tDernier >= tGauche) {
-                if (visibles.length === 0 && i > 0) visibles.push(paquets[i - 1]);
-                visibles.push(paquets[i]);
+        const visible = [];
+        for (let i = 0; i < buckets.length; i++) {
+            if (buckets[i].tLast >= tLeft) {
+                if (visible.length === 0 && i > 0) visible.push(buckets[i - 1]);
+                visible.push(buckets[i]);
             }
         }
 
         // Échelle verticale : sommet arrondi, rejoint en douceur.
-        let sommetMo = 0;
-        for (const p of visibles) {
-            const rssMo = p.dRss / MO;
-            const heapMo = p.dHeap / MO;
-            if (rssMo > sommetMo) sommetMo = rssMo;
-            if (heapMo > sommetMo) sommetMo = heapMo;
+        let peakMB = 0;
+        for (const p of visible) {
+            const rssMegabytes = p.dRss / BYTES_PER_MB;
+            const heapMegabytes = p.dHeap / BYTES_PER_MB;
+            if (rssMegabytes > peakMB) peakMB = rssMegabytes;
+            if (heapMegabytes > peakMB) peakMB = heapMegabytes;
         }
-        const cibleMo = maxJoli(sommetMo * 1.15);
-        maxAfficheMo += (cibleMo - maxAfficheMo) * facteurLissage(dtSec, 0.12);
-        const maxOctets = Math.max(1, maxAfficheMo) * MO;
-        const yDe = (octets) => basY - Math.min(1.2, (octets || 0) / maxOctets) * graphH;
+        const targetMB = niceMax(peakMB * 1.15);
+        maxDisplayedMB += (targetMB - maxDisplayedMB) * smoothingFactor(dtSec, 0.12);
+        const maxBytes = Math.max(1, maxDisplayedMB) * BYTES_PER_MB;
+        const yFrom = (bytes) => bottomY - Math.min(1.2, (bytes || 0) / maxBytes) * graphH;
 
         // Graduations verticales (valeurs) — libellés alignés au pixel près
         // sur les lignes de la grille.
         const yAxis = document.getElementById('y-axis-labels');
         if (yAxis) {
-            for (let i = 0; i <= NIVEAUX_Y; i++) {
-                const fraction = i / NIVEAUX_Y;
+            for (let i = 0; i <= Y_LEVELS; i++) {
+                const fraction = i / Y_LEVELS;
                 const lbl = elementPool(yAxis, i, () => {
                     const span = document.createElement('span');
                     span.className = 'y-axis-label';
                     return span;
                 });
-                lbl.textContent = formatBytesWithUnit(maxOctets * fraction);
-                lbl.style.top = `${(basY - fraction * graphH).toFixed(1)}px`;
+                lbl.textContent = formatBytesWithUnit(maxBytes * fraction);
+                lbl.style.top = `${(bottomY - fraction * graphH).toFixed(1)}px`;
             }
-            masquerSurplus(yAxis, NIVEAUX_Y + 1);
+            clipOverflow(yAxis, Y_LEVELS + 1);
         }
 
         // Grille : horizontales sur les graduations, verticales sur des
         // instants ronds — c'est ce qui rend la fenêtre du curseur lisible.
-        const grille = document.getElementById('svg-grid-group');
+        const grid = document.getElementById('svg-grid-group');
         const xAxis = document.getElementById('x-axis-labels');
-        let iLigne = 0;
-        if (grille) {
-            for (let i = 0; i <= NIVEAUX_Y; i++) {
-                const y = (basY - (i / NIVEAUX_Y) * graphH).toFixed(1);
-                const ligne = elementPool(grille, iLigne++, creerLigneSvg);
-                ligne.setAttribute('class', 'graph-grid-line');
-                ligne.setAttribute('x1', MARGE.gauche);
-                ligne.setAttribute('y1', y);
-                ligne.setAttribute('x2', (MARGE.gauche + graphW).toFixed(1));
-                ligne.setAttribute('y2', y);
+        let lineIndex = 0;
+        if (grid) {
+            for (let i = 0; i <= Y_LEVELS; i++) {
+                const y = (bottomY - (i / Y_LEVELS) * graphH).toFixed(1);
+                const line = elementPool(grid, lineIndex++, createSvgLine);
+                line.setAttribute('class', 'graph-grid-line');
+                line.setAttribute('x1', MARGIN.left);
+                line.setAttribute('y1', y);
+                line.setAttribute('x2', (MARGIN.left + graphW).toFixed(1));
+                line.setAttribute('y2', y);
             }
         }
 
-        const pasTemps = pasTempsSec(graphW) * 1000;
-        const avecSecondes = pasTemps < 60000;
+        const timeStep = timeStepSec(graphW) * 1000;
+        const withSeconds = timeStep < 60000;
         let iLabelX = 0;
-        for (let t = Math.ceil(tGauche / pasTemps) * pasTemps; t <= maintenant; t += pasTemps) {
-            const x = xDe(t);
-            if (x < MARGE.gauche - 1 || x > MARGE.gauche + graphW + 1) continue;
+        for (let t = Math.ceil(tLeft / timeStep) * timeStep; t <= now; t += timeStep) {
+            const x = xFrom(t);
+            if (x < MARGIN.left - 1 || x > MARGIN.left + graphW + 1) continue;
 
-            if (grille) {
-                const ligne = elementPool(grille, iLigne++, creerLigneSvg);
-                ligne.setAttribute('class', 'graph-grid-line vertical');
-                ligne.setAttribute('x1', x.toFixed(1));
-                ligne.setAttribute('y1', MARGE.haut);
-                ligne.setAttribute('x2', x.toFixed(1));
-                ligne.setAttribute('y2', basY);
+            if (grid) {
+                const line = elementPool(grid, lineIndex++, createSvgLine);
+                line.setAttribute('class', 'graph-grid-line vertical');
+                line.setAttribute('x1', x.toFixed(1));
+                line.setAttribute('y1', MARGIN.top);
+                line.setAttribute('x2', x.toFixed(1));
+                line.setAttribute('y2', bottomY);
             }
             if (xAxis) {
                 const lbl = elementPool(xAxis, iLabelX++, () => {
@@ -502,25 +502,25 @@
                     span.className = 'x-axis-label';
                     return span;
                 });
-                lbl.textContent = heureCourte(t, avecSecondes);
+                lbl.textContent = shortTime(t, withSeconds);
                 lbl.style.left = `${x.toFixed(1)}px`;
-                lbl.style.top = `${(basY + 8).toFixed(1)}px`;
+                lbl.style.top = `${(bottomY + 8).toFixed(1)}px`;
             }
         }
-        if (grille) masquerSurplus(grille, iLigne);
-        if (xAxis) masquerSurplus(xAxis, iLabelX);
+        if (grid) clipOverflow(grid, lineIndex);
+        if (xAxis) clipOverflow(xAxis, iLabelX);
 
         // Zone de tracé : la courbe ne doit pas déborder sous les libellés.
         const clip = document.getElementById('graph-clip-rect');
         if (clip) {
-            clip.setAttribute('x', MARGE.gauche);
-            clip.setAttribute('y', MARGE.haut - 6);
+            clip.setAttribute('x', MARGIN.left);
+            clip.setAttribute('y', MARGIN.top - 6);
             clip.setAttribute('width', graphW.toFixed(1));
             clip.setAttribute('height', (graphH + 6).toFixed(1));
         }
 
-        const ptsRss = visibles.map(p => ({ x: xDe(p.tDernier), y: yDe(p.dRss) }));
-        const ptsHeap = visibles.map(p => ({ x: xDe(p.tDernier), y: yDe(p.dHeap) }));
+        const ptsRss = visible.map(p => ({ x: xFrom(p.tLast), y: yFrom(p.dRss) }));
+        const ptsHeap = visible.map(p => ({ x: xFrom(p.tLast), y: yFrom(p.dHeap) }));
 
         const svgRssLine = document.getElementById('svg-rss-line');
         const svgHeapLine = document.getElementById('svg-heap-line');
@@ -529,18 +529,18 @@
 
         if (svgRssLine) svgRssLine.setAttribute('d', buildSvgPath(ptsRss));
         if (svgHeapLine) svgHeapLine.setAttribute('d', buildSvgPath(ptsHeap));
-        if (svgRssArea) svgRssArea.setAttribute('d', buildSvgArea(ptsRss, basY));
-        if (svgHeapArea) svgHeapArea.setAttribute('d', buildSvgArea(ptsHeap, basY));
+        if (svgRssArea) svgRssArea.setAttribute('d', buildSvgArea(ptsRss, bottomY));
+        if (svgHeapArea) svgHeapArea.setAttribute('d', buildSvgArea(ptsHeap, bottomY));
 
         // Survol : le paquet dont l'abscisse est la plus proche du curseur.
-        let survole = -1;
-        if (isHoveringGraph && hoverX >= MARGE.gauche - 12 && hoverX <= MARGE.gauche + graphW + 12) {
-            let ecartMin = Infinity;
+        let hovered = -1;
+        if (isHoveringGraph && hoverX >= MARGIN.left - 12 && hoverX <= MARGIN.left + graphW + 12) {
+            let minGap = Infinity;
             ptsRss.forEach((pt, i) => {
-                const ecart = Math.abs(pt.x - hoverX);
-                if (ecart < ecartMin) {
-                    ecartMin = ecart;
-                    survole = i;
+                const gap = Math.abs(pt.x - hoverX);
+                if (gap < minGap) {
+                    minGap = gap;
+                    hovered = i;
                 }
             });
         }
@@ -550,31 +550,31 @@
         // le tracé de pastilles. Hors survol, le graphique reste nu.
         const nodesLayer = document.getElementById('graph-nodes-layer');
         if (nodesLayer) {
-            if (survole >= 0) {
-                [[ptsRss[survole], 'rss'], [ptsHeap[survole], 'heap']].forEach(([pt, serie], j) => {
+            if (hovered >= 0) {
+                [[ptsRss[hovered], 'rss'], [ptsHeap[hovered], 'heap']].forEach(([pt, series], j) => {
                     const node = elementPool(nodesLayer, j, () => document.createElement('div'));
-                    node.className = `dom-graph-node ${serie} active`;
+                    node.className = `dom-graph-node ${series} active`;
                     node.style.left = `${pt.x.toFixed(1)}px`;
                     node.style.top = `${pt.y.toFixed(1)}px`;
                     node.style.opacity = '1';
                 });
             }
-            masquerSurplus(nodesLayer, survole >= 0 ? 2 : 0);
+            clipOverflow(nodesLayer, hovered >= 0 ? 2 : 0);
         }
 
         // Réticule et infobulle
         const tooltip = document.getElementById('graph-tooltip');
         const crosshair = document.getElementById('svg-crosshair');
 
-        if (survole >= 0) {
-            const paquet = visibles[survole];
-            const hx = ptsRss[survole].x;
+        if (hovered >= 0) {
+            const bucket = visible[hovered];
+            const hx = ptsRss[hovered].x;
 
             if (crosshair) {
                 crosshair.setAttribute('x1', hx.toFixed(1));
-                crosshair.setAttribute('y1', MARGE.haut);
+                crosshair.setAttribute('y1', MARGIN.top);
                 crosshair.setAttribute('x2', hx.toFixed(1));
-                crosshair.setAttribute('y2', basY);
+                crosshair.setAttribute('y2', bottomY);
                 crosshair.style.opacity = '1';
             }
 
@@ -583,9 +583,9 @@
 
                 // Les valeurs affichées sont les mesures réelles du paquet,
                 // pas leur version lissée pour l'animation.
-                const rssMo = (paquet.sommeRss / paquet.nb) / MO;
-                const heapMo = (paquet.sommeHeap / paquet.nb) / MO;
-                const heapTotalMo = (paquet.sommeHeapTotal / paquet.nb) / MO;
+                const rssMegabytes = (bucket.rssSum / bucket.count) / BYTES_PER_MB;
+                const heapMegabytes = (bucket.heapSum / bucket.count) / BYTES_PER_MB;
+                const heapTotalMegabytes = (bucket.heapTotalSum / bucket.count) / BYTES_PER_MB;
 
                 const elTime = document.getElementById('gt-time');
                 const elRss = document.getElementById('gt-rss');
@@ -594,20 +594,20 @@
                 // Un paquet qui condense plus d'une seconde de mesures affiche
                 // sa plage : la moyenne annoncée reste ainsi interprétable.
                 if (elTime) {
-                    elTime.textContent = (paquet.tDernier - paquet.tPremier) >= 1000
-                        ? `${heureCourte(paquet.tPremier, true)} → ${heureCourte(paquet.tDernier, true)}`
-                        : heureCourte(paquet.tDernier, true);
+                    elTime.textContent = (bucket.tLast - bucket.tFirst) >= 1000
+                        ? `${shortTime(bucket.tFirst, true)} → ${shortTime(bucket.tLast, true)}`
+                        : shortTime(bucket.tLast, true);
                 }
-                const uniteMo = unites().mo;
-                if (elRss) elRss.textContent = `${rssMo.toFixed(1)} ${uniteMo}`;
-                if (elHeap) elHeap.textContent = `${heapMo.toFixed(1)} / ${heapTotalMo.toFixed(1)} ${uniteMo}`;
+                const mbUnit = units().mo;
+                if (elRss) elRss.textContent = `${rssMegabytes.toFixed(1)} ${mbUnit}`;
+                if (elHeap) elHeap.textContent = `${heapMegabytes.toFixed(1)} / ${heapTotalMegabytes.toFixed(1)} ${mbUnit}`;
 
                 const tooltipW = tooltip.offsetWidth || 140;
                 const tooltipH = tooltip.offsetHeight || 75;
 
                 let posX = hx - tooltipW / 2;
-                let posY = Math.min(ptsRss[survole].y, ptsHeap[survole].y) - tooltipH - 12;
-                if (posY < 5) posY = Math.max(ptsRss[survole].y, ptsHeap[survole].y) + 12;
+                let posY = Math.min(ptsRss[hovered].y, ptsHeap[hovered].y) - tooltipH - 12;
+                if (posY < 5) posY = Math.max(ptsRss[hovered].y, ptsHeap[hovered].y) + 12;
                 posX = Math.max(8, Math.min(width - tooltipW - 8, posX));
 
                 tooltip.style.left = `${posX}px`;
@@ -619,25 +619,25 @@
         }
     }
 
-    function boucleAnimation(horodatage) {
-        const maintenant = typeof horodatage === 'number' ? horodatage : performance.now();
-        const dtSec = derniereFrameMs > 0 ? (maintenant - derniereFrameMs) / 1000 : 1 / 60;
-        derniereFrameMs = maintenant;
+    function animationLoop(timestamp) {
+        const now = typeof timestamp === 'number' ? timestamp : performance.now();
+        const dtSec = lastFrameMs > 0 ? (now - lastFrameMs) / 1000 : 1 / 60;
+        lastFrameMs = now;
 
         renderGraph(Math.min(0.5, Math.max(0.001, dtSec)));
 
         if (drawerPanel && drawerPanel.classList.contains('open')) {
-            animFrameId = requestAnimationFrame(boucleAnimation);
+            animFrameId = requestAnimationFrame(animationLoop);
         } else {
             animFrameId = null;
-            derniereFrameMs = 0;
+            lastFrameMs = 0;
         }
     }
 
     function startAnimationLoop() {
         if (!animFrameId) {
-            derniereFrameMs = 0;
-            boucleAnimation();
+            lastFrameMs = 0;
+            animationLoop();
         }
     }
 
@@ -645,12 +645,12 @@
         if (animFrameId) {
             cancelAnimationFrame(animFrameId);
             animFrameId = null;
-            derniereFrameMs = 0;
+            lastFrameMs = 0;
         }
     }
 
     /** Le graphique ne se redessine que s'il est à l'écran. */
-    function estOuvert() {
+    function isOpen() {
         return !!(drawerPanel && drawerPanel.classList.contains('open'));
     }
 
@@ -659,13 +659,13 @@
      * minuteur et quelques kilo-octets par seconde : on ne le demande que
      * pendant que le graphique est visible.
      */
-    function demanderFluxMemoire(actif) {
+    function requestMemoryStream(active) {
         if (typeof window.MusicPlayer.sendWS !== 'function') return;
         window.MusicPlayer.sendWS({
             type: 'memoryStream',
-            data: { enabled: !!actif, hz: CADENCE_FINE_HZ }
+            data: { enabled: !!active, hz: FINE_RATE_HZ }
         });
-        derniereDemandeFluxMs = Date.now();
+        lastStreamRequestMs = Date.now();
     }
 
     /**
@@ -673,12 +673,12 @@
      * Chaque mesure est un petit objet de quatre nombres ; chaque agrégat en
      * porte une douzaine de champs.
      */
-    window.MusicPlayer.empreinteGraphique = function() {
-        const mesures = echantillonsLents.length + echantillonsFins.length;
+    window.MusicPlayer.graphicsFingerprint = function() {
+        const samples = slowSamples.length + fineSamples.length;
         return {
-            mesures,
-            paquets: paquets.length,
-            octets: mesures * (4 * 8 + 40) + paquets.length * (12 * 8 + 40)
+            samples,
+            buckets: buckets.length,
+            bytes: samples * (4 * 8 + 40) + buckets.length * (12 * 8 + 40)
         };
     };
 
@@ -689,9 +689,9 @@
         if (!data || !Array.isArray(data.samples)) return;
         for (const s of data.samples) {
             if (!Array.isArray(s) || s.length < 4) continue;
-            ajouterMesure(echantillonsFins, FENETRE_FINE_SEC * 1000, s[1], s[2], s[3], s[0]);
+            addSample(fineSamples, FINE_WINDOW_SEC * 1000, s[1], s[2], s[3], s[0]);
         }
-        dernierFinRecuMs = Date.now();
+        lastEndReceivedMs = Date.now();
     };
 
     // Drawer Open / Close Controls
@@ -703,10 +703,10 @@
             localStorage.setItem('music_player_drawer_open', 'true');
             const savedBlur = localStorage.getItem('music_player_drawer_blur') ?? '4';
             applyDrawerBlur(savedBlur);
-            demanderFluxMemoire(true);
+            requestMemoryStream(true);
             startAnimationLoop();
-            if (typeof window.MusicPlayer.setRepartitionActive === 'function') {
-                window.MusicPlayer.setRepartitionActive(true);
+            if (typeof window.MusicPlayer.setBreakdownActive === 'function') {
+                window.MusicPlayer.setBreakdownActive(true);
             }
         }
     }
@@ -717,10 +717,10 @@
             drawerBackdrop.classList.remove('active');
             document.body.classList.remove('drawer-is-open');
             localStorage.setItem('music_player_drawer_open', 'false');
-            demanderFluxMemoire(false);
+            requestMemoryStream(false);
             stopAnimationLoop();
-            if (typeof window.MusicPlayer.setRepartitionActive === 'function') {
-                window.MusicPlayer.setRepartitionActive(false);
+            if (typeof window.MusicPlayer.setBreakdownActive === 'function') {
+                window.MusicPlayer.setBreakdownActive(false);
             }
         }
     }
@@ -752,9 +752,9 @@
         if (stats.memory) {
             // L'historique se remplit même tiroir fermé : à l'ouverture, le
             // graphique montre le passé réel plutôt qu'une courbe vide.
-            ajouterMesure(
-                echantillonsLents,
-                DUREE_MAX_SEC * 1000 + MARGE_TAMPON_MS,
+            addSample(
+                slowSamples,
+                MAX_DURATION_SEC * 1000 + BUFFER_MARGIN_MS,
                 stats.memory.rss,
                 stats.memory.heapUsed,
                 stats.memory.heapTotal,
@@ -765,34 +765,34 @@
             // reconnexion (ou un redémarrage du bot) le perd sans prévenir.
             // Ce message-ci arrive chaque seconde et sert de battement : si le
             // flux se tait alors que le tiroir est ouvert, on le redemande.
-            const maintenant = Date.now();
-            if (estOuvert()
-                && maintenant - dernierFinRecuMs > 2000
-                && maintenant - derniereDemandeFluxMs > 2000) {
-                demanderFluxMemoire(true);
+            const now = Date.now();
+            if (isOpen()
+                && now - lastEndReceivedMs > 2000
+                && now - lastStreamRequestMs > 2000) {
+                requestMemoryStream(true);
             }
 
             // Update UI metric text labels
-            const rssMB = (stats.memory.rss / MO).toFixed(1);
-            const heapUsedMB = (stats.memory.heapUsed / MO).toFixed(1);
-            const heapTotalMB = (stats.memory.heapTotal / MO).toFixed(1);
+            const rssMB = (stats.memory.rss / BYTES_PER_MB).toFixed(1);
+            const heapUsedMB = (stats.memory.heapUsed / BYTES_PER_MB).toFixed(1);
+            const heapTotalMB = (stats.memory.heapTotal / BYTES_PER_MB).toFixed(1);
 
             const elRss = document.getElementById('bot-mem-rss');
             const elHeap = document.getElementById('bot-mem-heap');
             const elUptime = document.getElementById('bot-uptime');
 
-            const mo = unites().mo;
+            const mo = units().mo;
             if (elRss) elRss.textContent = `${rssMB} ${mo}`;
             if (elHeap) elHeap.textContent = `${heapUsedMB} / ${heapTotalMB} ${mo}`;
             if (elUptime) elUptime.textContent = formatUptime(stats.uptime);
 
             // Dernières valeurs connues, pour pouvoir réafficher au changement de langue
-            derniersStats = stats;
+            lastStats = stats;
         }
     }
 
     /** Dernier instantané reçu, réutilisé lors d'un changement de langue. */
-    let derniersStats = null;
+    let lastStats = null;
 
     /**
      * Réapplique la langue aux libellés que le tiroir construit lui-même :
@@ -800,19 +800,19 @@
      */
     window.MusicPlayer.refreshDrawerLabels = function() {
         updateBandwidthUI();
-        if (derniersStats && derniersStats.memory) {
-            const stats = derniersStats;
-            const mo = unites().mo;
+        if (lastStats && lastStats.memory) {
+            const stats = lastStats;
+            const mo = units().mo;
             const elRss = document.getElementById('bot-mem-rss');
             const elHeap = document.getElementById('bot-mem-heap');
             const elUptime = document.getElementById('bot-uptime');
-            if (elRss) elRss.textContent = `${(stats.memory.rss / MO).toFixed(1)} ${mo}`;
+            if (elRss) elRss.textContent = `${(stats.memory.rss / BYTES_PER_MB).toFixed(1)} ${mo}`;
             if (elHeap) {
-                elHeap.textContent = `${(stats.memory.heapUsed / MO).toFixed(1)} / ${(stats.memory.heapTotal / MO).toFixed(1)} ${mo}`;
+                elHeap.textContent = `${(stats.memory.heapUsed / BYTES_PER_MB).toFixed(1)} / ${(stats.memory.heapTotal / BYTES_PER_MB).toFixed(1)} ${mo}`;
             }
             if (elUptime) elUptime.textContent = formatUptime(stats.uptime);
         }
-        if (estOuvert()) renderGraph(1 / 60);
+        if (isOpen()) renderGraph(1 / 60);
     };
 
     function applyDrawerBlur(val) {
@@ -843,20 +843,20 @@
      * qu'élargir la fenêtre fait apparaître du passé déjà enregistré.
      */
     function applyGraphDuration(val) {
-        const demande = parseInt(val, 10);
-        dureeFenetreSec = Math.max(DUREE_MIN_SEC, Math.min(DUREE_MAX_SEC, isNaN(demande) ? 30 : demande));
+        const request = parseInt(val, 10);
+        windowDurationSec = Math.max(MIN_DURATION_SEC, Math.min(MAX_DURATION_SEC, isNaN(request) ? 30 : request));
 
         const valSpan = document.getElementById('val-graph-duration');
-        if (valSpan) valSpan.textContent = formatDurationHHMMSS(dureeFenetreSec);
+        if (valSpan) valSpan.textContent = formatDurationHHMMSS(windowDurationSec);
 
         const container = document.getElementById('memory-graph-container');
-        const largeur = container
-            ? Math.max(20, container.getBoundingClientRect().width - MARGE.gauche - MARGE.droite)
-            : derniereLargeurGraphe || 240;
-        derniereLargeurGraphe = largeur;
-        reconstruirePaquets(largeur);
+        const panelWidth = container
+            ? Math.max(20, container.getBoundingClientRect().width - MARGIN.left - MARGIN.right)
+            : lastGraphWidth || 240;
+        lastGraphWidth = panelWidth;
+        rebuildBuckets(panelWidth);
 
-        if (estOuvert()) renderGraph(1 / 60);
+        if (isOpen()) renderGraph(1 / 60);
     }
 
     // Initialize Drawer Elements and Event Listeners
@@ -866,12 +866,12 @@
 
         const graphContainer = document.getElementById('memory-graph-container');
         if (graphContainer) {
-            const pointerSuivi = (clientX) => {
+            const pointerTracked = (clientX) => {
                 const rect = graphContainer.getBoundingClientRect();
                 hoverX = clientX - rect.left;
                 isHoveringGraph = true;
             };
-            const pointerFin = () => {
+            const pointerEnd = () => {
                 isHoveringGraph = false;
                 hoverX = -1;
                 const tooltip = document.getElementById('graph-tooltip');
@@ -884,16 +884,16 @@
                 }
             };
 
-            graphContainer.addEventListener('mousemove', (e) => pointerSuivi(e.clientX));
-            graphContainer.addEventListener('mouseleave', pointerFin);
+            graphContainer.addEventListener('mousemove', (e) => pointerTracked(e.clientX));
+            graphContainer.addEventListener('mouseleave', pointerEnd);
             graphContainer.addEventListener('touchstart', (e) => {
-                if (e.touches.length > 0) pointerSuivi(e.touches[0].clientX);
+                if (e.touches.length > 0) pointerTracked(e.touches[0].clientX);
             }, { passive: true });
             graphContainer.addEventListener('touchmove', (e) => {
-                if (e.touches.length > 0) pointerSuivi(e.touches[0].clientX);
+                if (e.touches.length > 0) pointerTracked(e.touches[0].clientX);
             }, { passive: true });
-            graphContainer.addEventListener('touchend', pointerFin);
-            graphContainer.addEventListener('touchcancel', pointerFin);
+            graphContainer.addEventListener('touchend', pointerEnd);
+            graphContainer.addEventListener('touchcancel', pointerEnd);
         }
 
         const edgeTab = document.getElementById('drawer-edge-tab');
@@ -968,9 +968,9 @@
                 const step = 5;
                 let val = parseInt(durationRange.value, 10) || 30;
                 if (e.deltaY < 0 || e.deltaX > 0) {
-                    val = Math.min(DUREE_MAX_SEC, val + step);
+                    val = Math.min(MAX_DURATION_SEC, val + step);
                 } else {
-                    val = Math.max(DUREE_MIN_SEC, val - step);
+                    val = Math.max(MIN_DURATION_SEC, val - step);
                 }
                 durationRange.value = val;
                 applyGraphDuration(val);
@@ -987,7 +987,7 @@
         });
 
         window.addEventListener('resize', () => {
-            if (estOuvert()) renderGraph(1 / 60);
+            if (isOpen()) renderGraph(1 / 60);
         });
         updateBandwidthUI();
 

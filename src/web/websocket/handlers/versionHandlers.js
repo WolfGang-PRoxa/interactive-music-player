@@ -11,22 +11,22 @@
  */
 
 const versioning = require('../../../versioning');
-const { redemarrerProcessus } = require('./systemHandlers');
+const { restartProcess } = require('./systemHandlers');
 const log = require('../../../utils/logger');
 
 /**
  * Une installation à la fois. Deux téléchargements concurrents viseraient le
  * même dossier temporaire de destination et se disputeraient le redémarrage.
  */
-let installationEnCours = null;
+let installInProgress = null;
 
 /** Diffuse à tous les onglets ouverts : l'opération concerne le bot entier. */
-function diffuser(webServer, type, data) {
-    const charge = JSON.stringify({ type, data });
+function broadcast(webServer, type, data) {
+    const payload = JSON.stringify({ type, data });
     webServer.wss.clients.forEach((client) => {
         if (client.readyState === 1) {
             try {
-                client.send(charge);
+                client.send(payload);
             } catch (e) {}
         }
     });
@@ -35,19 +35,19 @@ function diffuser(webServer, type, data) {
 async function handleListVersions(ctx) {
     const { ws } = ctx;
 
-    let charge;
+    let payload;
     try {
-        charge = await versioning.catalogue();
+        payload = await versioning.catalog();
     } catch (err) {
         log.error('[Versions] Lecture du catalogue impossible :', err.message);
-        charge = { releases: [], erreur: { message: err.message, statut: null } };
+        payload = { releases: [], error: { message: err.message, status: null } };
     }
 
     // Une installation lancée depuis un autre onglet doit apparaître ici aussi.
-    charge.installationEnCours = installationEnCours;
+    payload.installInProgress = installInProgress;
 
     try {
-        ws.send(JSON.stringify({ type: 'versionCatalog', data: charge }));
+        ws.send(JSON.stringify({ type: 'versionCatalog', data: payload }));
     } catch (e) {}
 }
 
@@ -64,55 +64,55 @@ async function handleInstallVersion(ctx) {
 
     const tag = String((data && data.tag) || '').trim();
     if (!tag) {
-        return diffuser(webServer, 'versionProgress', {
+        return broadcast(webServer, 'versionProgress', {
             phase: 'erreur',
             message: 'Aucune version sélectionnée.',
         });
     }
 
-    if (installationEnCours) {
-        return diffuser(webServer, 'versionProgress', {
+    if (installInProgress) {
+        return broadcast(webServer, 'versionProgress', {
             phase: 'erreur',
             tag,
-            message: `Une installation est déjà en cours (${installationEnCours}).`,
+            message: `Une installation est déjà en cours (${installInProgress}).`,
         });
     }
 
-    if (versioning.estCourante(tag)) {
-        return diffuser(webServer, 'versionProgress', {
+    if (versioning.isCurrent(tag)) {
+        return broadcast(webServer, 'versionProgress', {
             phase: 'deja',
             tag,
             message: 'Cette version est déjà celle qui tourne.',
         });
     }
 
-    installationEnCours = tag;
+    installInProgress = tag;
     try {
-        if (tag !== versioning.TAG_DEV) {
-            const resultat = await versioning.installer(tag, (etape) => {
-                diffuser(webServer, 'versionProgress', { tag, ...etape });
+        if (tag !== versioning.DEV_TAG) {
+            const result = await versioning.install(tag, (step) => {
+                broadcast(webServer, 'versionProgress', { tag, ...step });
             });
             log.info(
-                `[Versions] Bascule vers ${tag} (${resultat.dejaInstallee ? 'déjà installée' : 'fraîchement installée'}).`
+                `[Versions] Bascule vers ${tag} (${result.alreadyInstalled ? 'déjà installée' : 'fraîchement installée'}).`
             );
         }
 
-        const cible = versioning.pointEntree(tag);
+        const target = versioning.resolveEntryPoint(tag);
 
-        diffuser(webServer, 'versionProgress', { phase: 'redemarrage', tag });
+        broadcast(webServer, 'versionProgress', { phase: 'redemarrage', tag });
         // Le tableau de bord sait déjà afficher le voile de redémarrage sur ce
         // message : la bascule de version réutilise le même chemin que le
         // redémarrage ordinaire.
-        diffuser(webServer, 'status', { status: 'restarting' });
+        broadcast(webServer, 'status', { status: 'restarting' });
 
-        log.info(`[Versions] Redémarrage sur ${cible.type === 'dev' ? 'la version de développement' : tag}.`);
+        log.info(`[Versions] Redémarrage sur ${target.type === 'dev' ? 'la version de développement' : tag}.`);
         // Laisse aux sockets le temps d'écouler les deux messages ci-dessus
         // avant que le serveur ne se ferme sous eux.
-        setTimeout(() => redemarrerProcessus(webServer, { entree: cible.entree }), 250);
+        setTimeout(() => restartProcess(webServer, { entryPoint: target.entryPoint }), 250);
     } catch (err) {
-        installationEnCours = null;
+        installInProgress = null;
         log.error(`[Versions] Échec de l'installation de ${tag} :`, err.message);
-        diffuser(webServer, 'versionProgress', { phase: 'erreur', tag, message: err.message });
+        broadcast(webServer, 'versionProgress', { phase: 'erreur', tag, message: err.message });
     }
 }
 
@@ -133,43 +133,43 @@ async function handleUninstallVersion(ctx) {
 
     const tag = String((data && data.tag) || '').trim();
     if (!tag) {
-        return diffuser(webServer, 'versionRemoved', { tag, message: 'Aucune version sélectionnée.' });
+        return broadcast(webServer, 'versionRemoved', { tag, message: 'Aucune version sélectionnée.' });
     }
 
-    if (installationEnCours) {
-        return diffuser(webServer, 'versionRemoved', {
+    if (installInProgress) {
+        return broadcast(webServer, 'versionRemoved', {
             tag,
-            message: `Une installation est en cours (${installationEnCours}) : réessayez ensuite.`,
+            message: `Une installation est en cours (${installInProgress}) : réessayez ensuite.`,
         });
     }
 
-    if (tag === versioning.TAG_DEV) {
-        return diffuser(webServer, 'versionRemoved', {
+    if (tag === versioning.DEV_TAG) {
+        return broadcast(webServer, 'versionRemoved', {
             tag,
             message: "La version de développement ne s'installe ni ne se désinstalle.",
         });
     }
 
-    if (versioning.estCourante(tag)) {
-        return diffuser(webServer, 'versionRemoved', {
+    if (versioning.isCurrent(tag)) {
+        return broadcast(webServer, 'versionRemoved', {
             tag,
             message: "Impossible de désinstaller la version en cours d'exécution.",
         });
     }
 
     try {
-        versioning.desinstaller(tag);
+        versioning.uninstall(tag);
     } catch (err) {
         log.error(`[Versions] Échec de la désinstallation de ${tag} :`, err.message);
-        return diffuser(webServer, 'versionRemoved', { tag, message: err.message });
+        return broadcast(webServer, 'versionRemoved', { tag, message: err.message });
     }
 
-    diffuser(webServer, 'versionRemoved', { tag, ok: true });
+    broadcast(webServer, 'versionRemoved', { tag, ok: true });
 
     try {
-        const charge = await versioning.catalogue();
-        charge.installationEnCours = installationEnCours;
-        diffuser(webServer, 'versionCatalog', charge);
+        const payload = await versioning.catalog();
+        payload.installInProgress = installInProgress;
+        broadcast(webServer, 'versionCatalog', payload);
     } catch (err) {
         // Le catalogue n'est qu'un rafraîchissement de confort : la
         // désinstallation, elle, a bien eu lieu et a déjà été annoncée.

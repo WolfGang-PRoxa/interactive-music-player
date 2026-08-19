@@ -94,11 +94,11 @@ const SCHEMA = {
      * connexion vocale. Les deux champs suivants tiennent lieu de lecteur en
      * attendant le retour.
      */
-    absentSalonVide: () => false,
+    absentEmptyChannel: () => false,
     /** @type {number} Position figée dans la piste courante, en ms */
-    positionFigeeMs: () => 0,
+    frozenPositionMs: () => 0,
     /** @type {boolean} La lecture était-elle en cours au moment du départ ? */
-    lectureFigeeEnCours: () => false,
+    frozenIsPlaying: () => false,
 
     // --- Divers ---
     pauseOnNextTrack: () => false,
@@ -185,14 +185,14 @@ class PlaybackSession {
      *
      * @returns {boolean}
      */
-    estGelee() {
-        if (this.isPersonal || !this.absentSalonVide) return false;
+    isFrozen() {
+        if (this.isPersonal || !this.absentEmptyChannel) return false;
         return !this.queue?.connection;
     }
 
     /** @returns {boolean} */
     getIsPlaying() {
-        if (this.estGelee()) return !!this.lectureFigeeEnCours;
+        if (this.isFrozen()) return !!this.frozenIsPlaying;
         if (this.isPersonal) return !!this.virtualIsPlaying;
         if (this.transitioningToEveryone) return !this.restorePaused;
         try {
@@ -205,7 +205,7 @@ class PlaybackSession {
     /** @returns {boolean} */
     getIsPaused() {
         if (this.isPersonal) return !!this.virtualIsPaused;
-        if (this.estGelee()) return !this.lectureFigeeEnCours && !!this.queue?.currentTrack;
+        if (this.isFrozen()) return !this.frozenIsPlaying && !!this.queue?.currentTrack;
         if (this.transitioningToEveryone) return !!this.restorePaused;
         try {
             return !!this.queue?.node?.isPaused();
@@ -230,9 +230,9 @@ class PlaybackSession {
      *
      * @returns {{enLecture: boolean}|null} `null` si rien n'est à expliquer.
      */
-    attenteAuditeur() {
-        if (!this.estGelee() || !this.getCurrentTrack()) return null;
-        return { enLecture: !!this.lectureFigeeEnCours };
+    listenerWait() {
+        if (!this.isFrozen() || !this.getCurrentTrack()) return null;
+        return { playing: !!this.frozenIsPlaying };
     }
 
 }

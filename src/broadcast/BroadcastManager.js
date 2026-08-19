@@ -8,7 +8,7 @@
 const { ChannelType, PermissionFlagsBits } = require('discord.js');
 const config = require('../config');
 const database = require('../database/Database');
-const { retirerMoteur } = require('../audio/mix');
+const { removeEngine } = require('../audio/mix');
 const { convertForMode } = require('../utils/setAsideQueue');
 const log = require('../utils/logger');
 
@@ -102,7 +102,7 @@ class BroadcastManager {
                     // un flux permanent que la fin de lecture de discord-player
                     // ne concerne pas, et il continuerait donc à décoder — et à
                     // se disputer la connexion avec le diffuseur de silence.
-                    retirerMoteur(queue);
+                    removeEngine(queue);
 
                     // Arrêter la lecture en cours sur la connexion Discord sans déconnecter le bot
                     if (queue.dispatcher) {

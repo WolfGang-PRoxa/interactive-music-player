@@ -24,10 +24,10 @@ function handleRemoveTrack(ctx) {
                 if (isPlaylistPlaying) {
                     // Même liste et mêmes index dans les deux modes : la file
                     // mise de côté ne dépend pas du mode de diffusion.
-                    const pistes = readSetAsideQueue(settings);
-                    if (index >= 0 && index < pistes.length) {
-                        pistes.splice(index, 1);
-                        writeSetAsideQueue(currentGuildId, pistes, settings);
+                    const stored = readSetAsideQueue(settings);
+                    if (index >= 0 && index < stored.length) {
+                        stored.splice(index, 1);
+                        writeSetAsideQueue(currentGuildId, stored, settings);
                         webServer.broadcastState(currentGuildId);
                         playbackStateManager.saveState(player);
                     }
@@ -148,11 +148,11 @@ async function handleMoveOrInsertTrack(ctx) {
         if (source === 'queue') {
             if (typeof fromIndex === 'number' && typeof toIndex === 'number') {
                 if (isPlaylistPlaying) {
-                    const pistes = readSetAsideQueue(settings);
-                    if (fromIndex >= 0 && fromIndex < pistes.length) {
-                        const [deplacee] = pistes.splice(fromIndex, 1);
-                        if (deplacee) pistes.splice(toIndex, 0, deplacee);
-                        writeSetAsideQueue(currentGuildId, pistes, settings);
+                    const stored = readSetAsideQueue(settings);
+                    if (fromIndex >= 0 && fromIndex < stored.length) {
+                        const [moved] = stored.splice(fromIndex, 1);
+                        if (moved) stored.splice(toIndex, 0, moved);
+                        writeSetAsideQueue(currentGuildId, stored, settings);
                         webServer.broadcastState(currentGuildId);
                     }
                 } else if (isPersonal) {
@@ -186,10 +186,10 @@ async function handleMoveOrInsertTrack(ctx) {
                     };
 
                     if (isPlaylistPlaying) {
-                        const pistes = readSetAsideQueue(settings);
-                        const cible = typeof toIndex === 'number' ? Math.min(toIndex, pistes.length) : pistes.length;
-                        pistes.splice(cible, 0, trackData);
-                        writeSetAsideQueue(currentGuildId, pistes, settings);
+                        const stored = readSetAsideQueue(settings);
+                        const targetIndex = typeof toIndex === 'number' ? Math.min(toIndex, stored.length) : stored.length;
+                        stored.splice(targetIndex, 0, trackData);
+                        writeSetAsideQueue(currentGuildId, stored, settings);
                         webServer.broadcastState(currentGuildId);
                     } else if (queue) {
                         if (isPersonal) {

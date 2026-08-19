@@ -24,7 +24,7 @@
 
 const { GuildQueue, GuildQueuePlayerNode, GuildQueueEvent, TrackSkipReason } = require('discord-player');
 
-const { assurerMoteur, moteurActif } = require('./index');
+const { ensureEngine, activeEngine } = require('./index');
 const { formatMs } = require('../../utils/duration');
 const log = require('../../utils/logger');
 
@@ -33,11 +33,11 @@ const log = require('../../utils/logger');
  * @param {object} piste
  * @returns {number}
  */
-function dureeAnnonceeMs(piste) {
-    if (!piste) return 0;
-    if (piste.durationMS) return piste.durationMS;
-    if (typeof piste.duration === 'string') {
-        const parts = piste.duration.split(':').map(Number);
+function announcedDurationMs(track) {
+    if (!track) return 0;
+    if (track.durationMS) return track.durationMS;
+    if (typeof track.duration === 'string') {
+        const parts = track.duration.split(':').map(Number);
         if (parts.some(isNaN)) return 0;
         if (parts.length === 2) return (parts[0] * 60 + parts[1]) * 1000;
         if (parts.length === 3) return (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000;
@@ -52,14 +52,14 @@ function dureeAnnonceeMs(piste) {
  * @param {string} nom
  * @param {(original: Function) => Function} fabrique
  */
-function envelopper(prototype, nom, fabrique) {
-    const original = prototype[nom];
+function wrap(prototype, name, factory) {
+    const original = prototype[name];
     if (typeof original !== 'function') {
-        log.warn(`[MixPont] Méthode « ${nom} » absente : le pont ne peut pas s'y greffer.`);
+        log.warn(`[MixBridge] Méthode « ${name} » absente : le pont ne peut pas s'y greffer.`);
         return;
     }
-    Object.defineProperty(prototype, nom, {
-        value: fabrique(original),
+    Object.defineProperty(prototype, name, {
+        value: factory(original),
         writable: true,
         configurable: true,
         enumerable: false,
@@ -69,8 +69,8 @@ function envelopper(prototype, nom, fabrique) {
 /**
  * Installe le pont. Sans effet s'il est déjà en place.
  */
-function installerPont() {
-    if (GuildQueuePlayerNode.prototype.__pontMixInstalle) return;
+function installBridge() {
+    if (GuildQueuePlayerNode.prototype.__mixBridgeInstalled) return;
 
     const proto = GuildQueuePlayerNode.prototype;
 
@@ -82,9 +82,9 @@ function installerPont() {
      * reconnaître le titre qu'il a déjà mis en route pour le fondu enchaîné et
      * de le promouvoir au lieu de le relancer.
      */
-    envelopper(proto, 'play', (original) => async function play(res, options) {
-        const moteur = assurerMoteur(this.queue);
-        if (!moteur) return original.call(this, res, options);
+    wrap(proto, 'play', (original) => async function play(res, options) {
+        const engine = ensureEngine(this.queue);
+        if (!engine) return original.call(this, res, options);
 
         const opts = Object.assign({}, {
             queue: this.queue.currentTrack != null,
@@ -96,32 +96,32 @@ function installerPont() {
         // alors qu'un morceau joue déjà part en file d'attente.
         if (res && opts.queue) return this.queue.addTrack(res);
 
-        const piste = res || this.queue.tracks.dispatch();
-        if (!piste) {
+        const track = res || this.queue.tracks.dispatch();
+        if (!track) {
             this.queue.emit(GuildQueueEvent.Error, this.queue,
                 new Error('Demande de lecture reçue sans piste à jouer.'));
             return;
         }
 
         this.queue.setTransitioning(!!opts.transitionMode);
-        await moteur.jouer(piste, { seek: typeof opts.seek === 'number' ? opts.seek : 0 });
+        await engine.play(track, { seek: typeof opts.seek === 'number' ? opts.seek : 0 });
     });
 
-    envelopper(proto, 'skip', (original) => function skip(options) {
-        const moteur = moteurActif(this.queue);
-        if (!moteur) return original.call(this, options);
+    wrap(proto, 'skip', (original) => function skip(options) {
+        const engine = activeEngine(this.queue);
+        if (!engine) return original.call(this, options);
 
-        const piste = this.queue.currentTrack;
-        if (!piste) return false;
+        const track = this.queue.currentTrack;
+        if (!track) return false;
 
         this.queue.setTransitioning(false);
-        moteur.passer();
+        engine.skip();
 
         const { reason, description } = options || {
             reason: TrackSkipReason.Manual,
             description: 'The track was skipped manually',
         };
-        this.queue.emit(GuildQueueEvent.PlayerSkip, this.queue, piste, reason, description);
+        this.queue.emit(GuildQueueEvent.PlayerSkip, this.queue, track, reason, description);
         return true;
     });
 
@@ -130,35 +130,35 @@ function installerPont() {
      * faire taire le son. Celle du bus est permanente : il faut lui retirer ses
      * sources, sans quoi la musique continuerait après un arrêt demandé.
      */
-    envelopper(proto, 'stop', (original) => function stop(force = false) {
-        const moteur = moteurActif(this.queue);
-        if (!moteur) return original.call(this, force);
+    wrap(proto, 'stop', (original) => function stop(force = false) {
+        const engine = activeEngine(this.queue);
+        if (!engine) return original.call(this, force);
 
         this.queue.tracks.clear();
         this.queue.history.clear();
-        moteur.taire();
+        engine.mute();
 
         if (force) {
             this.queue.dispatcher?.destroy();
             return true;
         }
         if (this.queue.options.leaveOnStop) {
-            const minuteur = setTimeout(() => {
-                if (this.queue.tracks.size) return clearTimeout(minuteur);
+            const timer = setTimeout(() => {
+                if (this.queue.tracks.size) return clearTimeout(timer);
                 this.queue.dispatcher?.destroy();
             }, this.queue.options.leaveOnStopCooldown).unref();
         }
         return true;
     });
 
-    envelopper(proto, 'seek', (original) => async function seek(duration) {
-        const moteur = moteurActif(this.queue);
-        if (!moteur) return original.call(this, duration);
+    wrap(proto, 'seek', (original) => async function seek(duration) {
+        const engine = activeEngine(this.queue);
+        if (!engine) return original.call(this, duration);
 
-        const piste = this.queue.currentTrack;
-        if (!piste) return false;
+        const track = this.queue.currentTrack;
+        if (!track) return false;
 
-        const total = dureeAnnonceeMs(piste);
+        const total = announcedDurationMs(track);
         if (total && duration > total) {
             return this.skip({
                 reason: TrackSkipReason.SEEK_OVER_THRESHOLD,
@@ -166,38 +166,38 @@ function installerPont() {
             });
         }
 
-        const cible = Math.max(0, duration);
-        const avant = moteur.positionMs();
-        const abouti = await moteur.repositionner(cible);
+        const target = Math.max(0, duration);
+        const before = engine.positionMs();
+        const succeeded = await engine.seek(target);
 
-        if (abouti) {
+        if (succeeded) {
             this.queue.emit(GuildQueueEvent.PlayerSeek, this.queue, {
-                currentPosition: avant,
-                seekTarget: cible,
+                currentPosition: before,
+                seekTarget: target,
                 totalDuration: total,
             });
         }
-        return abouti;
+        return succeeded;
     });
 
     // ─── Volume ───────────────────────────────────────────────────────────
 
-    envelopper(proto, 'setVolume', (original) => function setVolume(vol) {
-        const moteur = moteurActif(this.queue);
-        if (!moteur) return original.call(this, vol);
+    wrap(proto, 'setVolume', (original) => function setVolume(vol) {
+        const engine = activeEngine(this.queue);
+        if (!engine) return original.call(this, vol);
 
-        const abouti = moteur.definirVolume(vol);
-        if (abouti) this.queue.filters._lastFiltersCache.volume = vol;
-        return abouti;
+        const succeeded = engine.setVolume(vol);
+        if (succeeded) this.queue.filters._lastFiltersCache.volume = vol;
+        return succeeded;
     });
 
-    const descripteurVolume = Object.getOwnPropertyDescriptor(proto, 'volume');
-    if (descripteurVolume?.get) {
-        const lireOriginal = descripteurVolume.get;
+    const volumeDescriptor = Object.getOwnPropertyDescriptor(proto, 'volume');
+    if (volumeDescriptor?.get) {
+        const readOriginal = volumeDescriptor.get;
         Object.defineProperty(proto, 'volume', {
             get() {
-                const moteur = moteurActif(this.queue);
-                return moteur ? moteur.volume : lireOriginal.call(this);
+                const engine = activeEngine(this.queue);
+                return engine ? engine.volume : readOriginal.call(this);
             },
             configurable: true,
             enumerable: false,
@@ -208,33 +208,33 @@ function installerPont() {
 
     // `pause()` et `resume()` délèguent à `setPaused()` : les envelopper toutes
     // les trois ferait passer deux fois par le pont.
-    envelopper(proto, 'setPaused', (original) => function setPaused(state) {
-        const moteur = moteurActif(this.queue);
-        if (!moteur) return original.call(this, state);
-        return moteur.definirPause(!!state);
+    wrap(proto, 'setPaused', (original) => function setPaused(state) {
+        const engine = activeEngine(this.queue);
+        if (!engine) return original.call(this, state);
+        return engine.setPaused(!!state);
     });
 
-    envelopper(proto, 'isPlaying', (original) => function isPlaying() {
-        const moteur = moteurActif(this.queue);
-        if (!moteur) return original.call(this);
-        return moteur.enLecture();
+    wrap(proto, 'isPlaying', (original) => function isPlaying() {
+        const engine = activeEngine(this.queue);
+        if (!engine) return original.call(this);
+        return engine.playing();
     });
 
-    envelopper(proto, 'isPaused', (original) => function isPaused() {
-        const moteur = moteurActif(this.queue);
-        if (!moteur) return original.call(this);
-        return moteur.enPause();
+    wrap(proto, 'isPaused', (original) => function isPaused() {
+        const engine = activeEngine(this.queue);
+        if (!engine) return original.call(this);
+        return engine.paused();
     });
 
-    envelopper(proto, 'isIdle', (original) => function isIdle() {
-        const moteur = moteurActif(this.queue);
-        if (!moteur) return original.call(this);
+    wrap(proto, 'isIdle', (original) => function isIdle() {
+        const engine = activeEngine(this.queue);
+        if (!engine) return original.call(this);
         return !this.queue.currentTrack;
     });
 
-    envelopper(proto, 'isBuffering', (original) => function isBuffering() {
-        const moteur = moteurActif(this.queue);
-        if (!moteur) return original.call(this);
+    wrap(proto, 'isBuffering', (original) => function isBuffering() {
+        const engine = activeEngine(this.queue);
+        if (!engine) return original.call(this);
         return false;
     });
 
@@ -245,22 +245,22 @@ function installerPont() {
      * non plus estimée. La forme du résultat est inchangée : le tableau de bord
      * et les commandes la lisent telle quelle.
      */
-    envelopper(proto, 'getTimestamp', (original) => function getTimestamp(ignoreFilters = false) {
-        const moteur = moteurActif(this.queue);
-        if (!moteur) return original.call(this, ignoreFilters);
+    wrap(proto, 'getTimestamp', (original) => function getTimestamp(ignoreFilters = false) {
+        const engine = activeEngine(this.queue);
+        if (!engine) return original.call(this, ignoreFilters);
 
-        const piste = this.queue.currentTrack;
-        if (!piste) return null;
+        const track = this.queue.currentTrack;
+        if (!track) return null;
 
-        const multiplicateur = this.getDurationMultiplier?.() || 1;
-        const courant = moteur.positionMs();
-        const brut = dureeAnnonceeMs(piste);
-        const total = ignoreFilters ? brut : Math.round(brut / multiplicateur);
+        const multiplier = this.getDurationMultiplier?.() || 1;
+        const current = engine.positionMs();
+        const raw = announcedDurationMs(track);
+        const total = ignoreFilters ? raw : Math.round(raw / multiplier);
 
         return {
-            current: { label: formatMs(courant), value: courant },
+            current: { label: formatMs(current), value: current },
             total: { label: formatMs(total), value: total },
-            progress: total > 0 ? Math.round((courant / total) * 100) : 0,
+            progress: total > 0 ? Math.round((current / total) * 100) : 0,
         };
     });
 
@@ -269,10 +269,10 @@ function installerPont() {
      * et non plus par un filtre FFmpeg de la chaîne de discord-player, que
      * l'implémentation d'origine inspectait.
      */
-    envelopper(proto, 'getDurationMultiplier', (original) => function getDurationMultiplier() {
-        const moteur = moteurActif(this.queue);
-        if (!moteur) return original.call(this);
-        return moteur.vitesse;
+    wrap(proto, 'getDurationMultiplier', (original) => function getDurationMultiplier() {
+        const engine = activeEngine(this.queue);
+        if (!engine) return original.call(this);
+        return engine.speed;
     });
 
     // ─── File ─────────────────────────────────────────────────────────────
@@ -282,18 +282,18 @@ function installerPont() {
      * comprise — c'est ainsi que les appelants s'en servent pour décider s'il
      * faut démarrer la file.
      */
-    envelopper(GuildQueue.prototype, 'isPlaying', (original) => function isPlaying() {
-        const moteur = moteurActif(this);
-        if (!moteur) return original.call(this);
+    wrap(GuildQueue.prototype, 'isPlaying', (original) => function isPlaying() {
+        const engine = activeEngine(this);
+        if (!engine) return original.call(this);
         return this.currentTrack != null;
     });
 
-    Object.defineProperty(proto, '__pontMixInstalle', {
+    Object.defineProperty(proto, '__mixBridgeInstalled', {
         value: true,
         enumerable: false,
     });
 
-    log.info('[MixPont] Le lecteur est branché sur le bus de mixage.');
+    log.info('[MixBridge] Le lecteur est branché sur le bus de mixage.');
 }
 
-module.exports = { installerPont };
+module.exports = { installBridge };

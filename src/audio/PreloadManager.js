@@ -12,8 +12,8 @@ const log = require('../utils/logger');
 const MIN_CACHE_BYTES = 1024 * 10;
 
 /** Débits MP3 proposés dans l'interface, en kbps. */
-const DEBITS_AUDIO_VALIDES = ['320', '256', '192', '128', '96'];
-const DEBIT_AUDIO_DEFAUT = '320';
+const VALID_AUDIO_BITRATES = ['320', '256', '192', '128', '96'];
+const DEFAULT_AUDIO_BITRATE = '320';
 
 /**
  * Réglages d'import de la guild concernée, ou du premier serveur connu si la
@@ -23,7 +23,7 @@ const DEBIT_AUDIO_DEFAUT = '320';
  * @param {object} track
  * @returns {object|null}
  */
-function reglagesImport(track) {
+function importSettings(track) {
     const database = require('../database/Database');
     const guildId = track?.queue?.guild?.id || track?.requestedBy?.guildId || null;
     return guildId
@@ -43,18 +43,18 @@ function reglagesImport(track) {
  * @param {object} track - Piste préchargée
  * @returns {string} Débit en kbps
  */
-function resoudreDebitAudio(track) {
+function resolveAudioBitrate(track) {
     try {
         const database = require('../database/Database');
 
-        const parPiste = database.getTrackQuality(track?.url)?.audio;
-        if (DEBITS_AUDIO_VALIDES.includes(String(parPiste))) return String(parPiste);
+        const perTrack = database.getTrackQuality(track?.url)?.audio;
+        if (VALID_AUDIO_BITRATES.includes(String(perTrack))) return String(perTrack);
 
-        const settings = reglagesImport(track);
-        const choix = settings && String(settings.importAudioQuality || '');
-        return DEBITS_AUDIO_VALIDES.includes(choix) ? choix : DEBIT_AUDIO_DEFAUT;
+        const settings = importSettings(track);
+        const choice = settings && String(settings.importAudioQuality || '');
+        return VALID_AUDIO_BITRATES.includes(choice) ? choice : DEFAULT_AUDIO_BITRATE;
     } catch (e) {
-        return DEBIT_AUDIO_DEFAUT;
+        return DEFAULT_AUDIO_BITRATE;
     }
 }
 
@@ -72,19 +72,19 @@ const MAX_CACHE_BYTES = (Number(process.env.MAX_CACHE_MB) || 2048) * 1024 * 1024
  * @param {string} fichier - Nom de fichier, extension comprise
  * @returns {{ key: string, bitrate: string|null }|null}
  */
-function analyserNomCache(fichier) {
-    if (!fichier.endsWith('.mp3')) return null;
-    const base = fichier.slice(0, -4);
+function parseCacheName(fileName) {
+    if (!fileName.endsWith('.mp3')) return null;
+    const base = fileName.slice(0, -4);
     const sep = base.lastIndexOf('.');
     if (sep === -1) return { key: base, bitrate: null };
 
-    const debit = base.slice(sep + 1);
-    if (!DEBITS_AUDIO_VALIDES.includes(debit)) return { key: base, bitrate: null };
-    return { key: base.slice(0, sep), bitrate: debit };
+    const bitrate = base.slice(sep + 1);
+    if (!VALID_AUDIO_BITRATES.includes(bitrate)) return { key: base, bitrate: null };
+    return { key: base.slice(0, sep), bitrate: bitrate };
 }
 
 /** Nom de fichier de cache pour une clé et un débit donnés. */
-function nomCache(key, bitrate) {
+function cacheFileName(key, bitrate) {
     return bitrate ? `${key}.${bitrate}.mp3` : `${key}.mp3`;
 }
 
@@ -99,15 +99,15 @@ function nomCache(key, bitrate) {
  * @param {string} fichier
  * @returns {{ key: string, bitrate: string }|null}
  */
-function analyserNomTemporaire(fichier) {
-    if (!fichier.endsWith('.tmp')) return null;
-    const base = fichier.slice(0, -4);
+function parseTempName(fileName) {
+    if (!fileName.endsWith('.tmp')) return null;
+    const base = fileName.slice(0, -4);
     const sep = base.lastIndexOf('.');
     if (sep === -1) return null;
 
-    const debit = base.slice(sep + 1);
-    if (!DEBITS_AUDIO_VALIDES.includes(debit)) return null;
-    return { key: base.slice(0, sep), bitrate: debit };
+    const bitrate = base.slice(sep + 1);
+    if (!VALID_AUDIO_BITRATES.includes(bitrate)) return null;
+    return { key: base.slice(0, sep), bitrate: bitrate };
 }
 
 /**
@@ -115,7 +115,7 @@ function analyserNomTemporaire(fichier) {
  * @param {object} track
  * @returns {number}
  */
-function dureeMs(track) {
+function trackDurationMs(track) {
     if (!track) return 0;
     if (track.durationMS) return track.durationMS;
     if (track.duration && typeof track.duration === 'string') {
@@ -135,7 +135,7 @@ function dureeMs(track) {
  * l'autre — silence de fin, encodage. Un remix, un live ou une version
  * étendue s'en écartent d'un tout autre ordre de grandeur.
  */
-const PONT_TOLERANCE_MS = 5000;
+const BRIDGE_TOLERANCE_MS = 5000;
 
 /**
  * La source de cette piste ne sert-elle que des métadonnées ?
@@ -148,7 +148,7 @@ const PONT_TOLERANCE_MS = 5000;
  * @param {object} track
  * @returns {boolean}
  */
-function estSourceSansAudio(track) {
+function isAudioLessSource(track) {
     if (!track || !track.url) return false;
     return track.url.includes('spotify.com')
         || track.queryType === 'spotifySong'
@@ -170,28 +170,28 @@ function estSourceSansAudio(track) {
  * @param {number} attendueMs - Durée annoncée, 0 si inconnue
  * @returns {{ piste: object, verifie: boolean, ecartMs: number|null }}
  */
-function choisirParDuree(candidats, attendueMs) {
-    if (!attendueMs) return { piste: candidats[0], verifie: false, ecartMs: null };
+function pickByDuration(candidates, expectedMs) {
+    if (!expectedMs) return { match: candidates[0], verified: false, gapMs: null };
 
-    let meilleur = null;
-    let meilleurEcart = Infinity;
-    for (const candidat of candidats) {
-        const duree = dureeMs(candidat);
-        if (!duree) continue;
-        const ecart = Math.abs(duree - attendueMs);
-        if (ecart < meilleurEcart) {
-            meilleur = candidat;
-            meilleurEcart = ecart;
+    let bestCandidate = null;
+    let bestGapMs = Infinity;
+    for (const candidate of candidates) {
+        const duration = trackDurationMs(candidate);
+        if (!duration) continue;
+        const gap = Math.abs(duration - expectedMs);
+        if (gap < bestGapMs) {
+            bestCandidate = candidate;
+            bestGapMs = gap;
         }
     }
 
-    if (meilleur && meilleurEcart <= PONT_TOLERANCE_MS) {
-        return { piste: meilleur, verifie: true, ecartMs: meilleurEcart };
+    if (bestCandidate && bestGapMs <= BRIDGE_TOLERANCE_MS) {
+        return { match: bestCandidate, verified: true, gapMs: bestGapMs };
     }
     return {
-        piste: candidats[0],
-        verifie: false,
-        ecartMs: meilleur ? meilleurEcart : null
+        match: candidates[0],
+        verified: false,
+        gapMs: bestCandidate ? bestGapMs : null
     };
 }
 
@@ -213,17 +213,17 @@ function choisirParDuree(candidats, attendueMs) {
  * @param {boolean} boucle
  * @returns {object[]}
  */
-function pistesSuivantes(pistes, indexCourant, limite, boucle) {
-    if (!boucle) {
-        return pistes.slice(indexCourant + 1, indexCourant + 1 + limite);
+function upcomingTracks(tracks, currentIndex, limit, loop) {
+    if (!loop) {
+        return tracks.slice(currentIndex + 1, currentIndex + 1 + limit);
     }
 
-    const suivantes = [];
-    const maxi = Math.min(limite, Math.max(0, pistes.length - 1));
-    for (let i = 1; i <= maxi; i++) {
-        suivantes.push(pistes[(indexCourant + i) % pistes.length]);
+    const upcoming = [];
+    const maxCount = Math.min(limit, Math.max(0, tracks.length - 1));
+    for (let i = 1; i <= maxCount; i++) {
+        upcoming.push(tracks[(currentIndex + i) % tracks.length]);
     }
-    return suivantes;
+    return upcoming;
 }
 
 /**
@@ -234,9 +234,9 @@ function pistesSuivantes(pistes, indexCourant, limite, boucle) {
  * @param {string} vers
  * @returns {'up'|'down'|null}
  */
-function directionQualite(depuis, vers) {
-    const a = Number(depuis);
-    const b = Number(vers);
+function qualityDirection(from, to) {
+    const a = Number(from);
+    const b = Number(to);
     if (!a || !b || a === b) return null;
     return b > a ? 'up' : 'down';
 }
@@ -281,7 +281,7 @@ class PreloadManager {
          * remaniement de la file. L'espacement croissant évite qu'une URL
          * définitivement morte soit reprise à chaque seconde.
          */
-        this.echecs = new Map();
+        this.failures = new Map();
     }
 
     /**
@@ -289,8 +289,8 @@ class PreloadManager {
      * @param {number} tentatives - Échecs déjà essuyés
      * @returns {number}
      */
-    _delaiAvantRelance(tentatives) {
-        return Math.min(15 * 60 * 1000, 30 * 1000 * 2 ** Math.max(0, tentatives - 1));
+    _retryDelayMs(attempts) {
+        return Math.min(15 * 60 * 1000, 30 * 1000 * 2 ** Math.max(0, attempts - 1));
     }
 
     /**
@@ -299,13 +299,13 @@ class PreloadManager {
      * @param {Map<string, object>} cibles - Clé → piste
      * @returns {boolean}
      */
-    _cibleARelancer(cibles) {
-        const maintenant = Date.now();
-        for (const key of cibles.keys()) {
+    _hasTargetToRetry(targetMap) {
+        const nowMs = Date.now();
+        for (const key of targetMap.keys()) {
             if (this.cacheIndex.has(key)) continue;
-            if (this._telechargementActif(key)) continue;
-            const echec = this.echecs.get(key);
-            if (!echec || maintenant - echec.at >= this._delaiAvantRelance(echec.tentatives)) {
+            if (this._activeDownloadFor(key)) continue;
+            const failure = this.failures.get(key);
+            if (!failure || nowMs - failure.at >= this._retryDelayMs(failure.attempts)) {
                 return true;
             }
         }
@@ -313,12 +313,12 @@ class PreloadManager {
     }
 
     /** Reconstruit l'index du cache à partir du contenu du dossier. */
-    _indexCache() {
+    _buildCacheIndex() {
         this.cacheIndex.clear();
         try {
             for (const file of fs.readdirSync(this.cacheDir)) {
-                const infos = analyserNomCache(file);
-                if (!infos) continue;
+                const parsed = parseCacheName(file);
+                if (!parsed) continue;
                 try {
                     const stat = fs.statSync(path.join(this.cacheDir, file));
                     if (stat.size <= MIN_CACHE_BYTES) continue;
@@ -326,13 +326,13 @@ class PreloadManager {
                     // Une requalification interrompue peut laisser deux fichiers
                     // pour la même piste : on retient le plus récent, qui est le
                     // seul que la bascule aurait conservé.
-                    const connu = this.cacheIndex.get(infos.key);
-                    if (connu && connu.mtime >= stat.mtimeMs) continue;
+                    const known = this.cacheIndex.get(parsed.key);
+                    if (known && known.mtime >= stat.mtimeMs) continue;
 
-                    this.cacheIndex.set(infos.key, {
+                    this.cacheIndex.set(parsed.key, {
                         size: stat.size,
                         mtime: stat.mtimeMs,
-                        bitrate: infos.bitrate,
+                        bitrate: parsed.bitrate,
                         file
                     });
                 } catch (e) {}
@@ -348,11 +348,11 @@ class PreloadManager {
      * @param {string} [fichier] - Nom précis ; sinon celui de l'index
      * @returns {boolean} true si un fichier a bien été retiré
      */
-    _supprimerFichierCache(key, fichier) {
-        const nom = fichier || this.cacheIndex.get(key)?.file;
-        if (!nom) return false;
+    _deleteCacheFile(key, fileName) {
+        const name = fileName || this.cacheIndex.get(key)?.file;
+        if (!name) return false;
         try {
-            fs.unlinkSync(path.join(this.cacheDir, nom));
+            fs.unlinkSync(path.join(this.cacheDir, name));
             return true;
         } catch (e) {
             return false;
@@ -360,12 +360,12 @@ class PreloadManager {
     }
 
     /** Identifiant d'un téléchargement : une piste peut en avoir deux, à des débits différents. */
-    _cleTelechargement(key, bitrate) {
+    _downloadKey(key, bitrate) {
         return `${key}@${bitrate}`;
     }
 
     /** Chemin du fichier partiel d'un préchargement en cours. */
-    _cheminTemporaire(key, bitrate) {
+    _tempPath(key, bitrate) {
         return path.join(this.cacheDir, `${key}.${bitrate}.tmp`);
     }
 
@@ -381,7 +381,7 @@ class PreloadManager {
      * @param {string} tmpPath
      * @param {string} source - URL résolue
      */
-    _ecrireSource(tmpPath, source) {
+    _writeSource(tmpPath, source) {
         try {
             fs.writeFileSync(`${tmpPath}.src`, source, 'utf8');
         } catch (e) {
@@ -390,7 +390,7 @@ class PreloadManager {
     }
 
     /** Source mémorisée pour un fichier partiel, null si elle est inconnue. */
-    _lireSource(tmpPath) {
+    _readSource(tmpPath) {
         try {
             return fs.readFileSync(`${tmpPath}.src`, 'utf8').trim() || null;
         } catch (e) {
@@ -399,9 +399,9 @@ class PreloadManager {
     }
 
     /** Supprime un fichier partiel et la source qui l'accompagne. */
-    _supprimerTemporaire(tmpPath) {
-        for (const chemin of [tmpPath, `${tmpPath}.src`]) {
-            try { fs.unlinkSync(chemin); } catch (e) {}
+    _deleteTemp(tmpPath) {
+        for (const entryPath of [tmpPath, `${tmpPath}.src`]) {
+            try { fs.unlinkSync(entryPath); } catch (e) {}
         }
     }
 
@@ -412,10 +412,10 @@ class PreloadManager {
      * @returns {{ octets: number, secondes: number }|null} null si le partiel
      *   est absent, illisible, ou trop court pour valoir une reprise
      */
-    _evaluerReprise(tmpPath) {
-        const infos = analyzePartial(tmpPath);
-        if (infos.bytes <= MIN_CACHE_BYTES) return null;
-        return infos;
+    _resumableFrom(tmpPath) {
+        const parsed = analyzePartial(tmpPath);
+        if (parsed.bytes <= MIN_CACHE_BYTES) return null;
+        return parsed;
     }
 
     /**
@@ -426,48 +426,48 @@ class PreloadManager {
      * arrêt régulier suffisait à ce que les longues pistes ne se cachent
      * jamais. Ne sont désormais écartés que ceux dont il n'y a rien à tirer.
      */
-    _trierTemporaires() {
-        let repris = 0;
-        let ecartes = 0;
+    _sortTempFiles() {
+        let resumed = 0;
+        let discarded = 0;
 
-        let fichiers;
+        let dirFiles;
         try {
-            fichiers = fs.readdirSync(this.cacheDir);
+            dirFiles = fs.readdirSync(this.cacheDir);
         } catch (e) {
             return;
         }
 
-        for (const fichier of fichiers) {
-            const chemin = path.join(this.cacheDir, fichier);
+        for (const fileName of dirFiles) {
+            const entryPath = path.join(this.cacheDir, fileName);
 
             // Source orpheline : son partiel a disparu, elle ne sert plus à rien
-            if (fichier.endsWith('.tmp.src')) {
-                if (!fs.existsSync(chemin.slice(0, -4))) {
-                    try { fs.unlinkSync(chemin); } catch (e) {}
+            if (fileName.endsWith('.tmp.src')) {
+                if (!fs.existsSync(entryPath.slice(0, -4))) {
+                    try { fs.unlinkSync(entryPath); } catch (e) {}
                 }
                 continue;
             }
 
-            if (!fichier.endsWith('.tmp')) continue;
+            if (!fileName.endsWith('.tmp')) continue;
 
-            const infos = analyserNomTemporaire(fichier);
-            const reprise = infos ? this._evaluerReprise(chemin) : null;
-            if (!reprise) {
-                this._supprimerTemporaire(chemin);
-                ecartes++;
+            const parsed = parseTempName(fileName);
+            const resumeInfo = parsed ? this._resumableFrom(entryPath) : null;
+            if (!resumeInfo) {
+                this._deleteTemp(entryPath);
+                discarded++;
                 continue;
             }
 
-            repris++;
-            log.info(`[PreloadManager] Préchargement partiel retrouvé (${infos.bitrate} kbps) : `
-                + `${reprise.seconds.toFixed(0)} s déjà encodées, la reprise s'y raccordera.`);
+            resumed++;
+            log.info(`[PreloadManager] Préchargement partiel retrouvé (${parsed.bitrate} kbps) : `
+                + `${resumeInfo.seconds.toFixed(0)} s déjà encodées, la reprise s'y raccordera.`);
         }
 
-        if (ecartes > 0) {
-            log.info(`[PreloadManager] ${ecartes} fichier(s) temporaire(s) inexploitable(s) supprimé(s).`);
+        if (discarded > 0) {
+            log.info(`[PreloadManager] ${discarded} fichier(s) temporaire(s) inexploitable(s) supprimé(s).`);
         }
-        if (repris > 0) {
-            log.success(`[PreloadManager] ${repris} préchargement(s) reprendront là où ils s'étaient arrêtés.`);
+        if (resumed > 0) {
+            log.success(`[PreloadManager] ${resumed} préchargement(s) reprendront là où ils s'étaient arrêtés.`);
         }
     }
 
@@ -476,7 +476,7 @@ class PreloadManager {
      * @param {string} key
      * @returns {object|null}
      */
-    _telechargementActif(key) {
+    _activeDownloadFor(key) {
         for (const [dlKey, dl] of this.activeDownloads.entries()) {
             if (dlKey.startsWith(`${key}@`)) return dl;
         }
@@ -507,28 +507,28 @@ class PreloadManager {
         if (total <= MAX_CACHE_BYTES) return 0;
 
         // Les plus anciens d'abord : approximation raisonnable du moins utile
-        const candidats = [...this.cacheIndex.entries()]
+        const candidates = [...this.cacheIndex.entries()]
             .filter(([key]) => !protectedKeys.has(key))
             .sort((a, b) => a[1].mtime - b[1].mtime);
 
-        let supprimes = 0;
-        for (const [key, entry] of candidats) {
+        let removed = 0;
+        for (const [key, entry] of candidates) {
             if (total <= MAX_CACHE_BYTES) break;
-            if (this._supprimerFichierCache(key, entry.file)) {
+            if (this._deleteCacheFile(key, entry.file)) {
                 this.cacheIndex.delete(key);
                 total -= entry.size;
-                supprimes++;
+                removed++;
             }
         }
 
-        if (supprimes > 0) {
-            log.info(`[PreloadManager] Plafond du cache atteint : ${supprimes} fichier(s) évincé(s), `
+        if (removed > 0) {
+            log.info(`[PreloadManager] Plafond du cache atteint : ${removed} fichier(s) évincé(s), `
                 + `${(total / 1024 / 1024).toFixed(0)} Mo restants sur ${MAX_CACHE_BYTES / 1024 / 1024} Mo.`);
         } else {
             log.warn('[PreloadManager] Plafond du cache dépassé mais aucun fichier évinçable '
                 + '(toutes les pistes sont en cours de lecture).');
         }
-        return supprimes;
+        return removed;
     }
 
     /**
@@ -550,15 +550,15 @@ class PreloadManager {
     }
 
     getPreloadStatus(track) {
-        const vide = { isPreloaded: false, isPreloading: false, preloadProgress: 0, cachedAudioQuality: null, requalify: null };
-        if (!track) return vide;
+        const empty = { isPreloaded: false, isPreloading: false, preloadProgress: 0, cachedAudioQuality: null, requalify: null };
+        if (!track) return empty;
         const key = this.getTrackKey(track);
-        if (!key) return vide;
+        if (!key) return empty;
 
         // Index mémoire plutôt que disque : ce chemin est emprunté pour chaque
         // piste à chaque diffusion d'état.
         const entry = this.cacheIndex.get(key);
-        const dl = this._telechargementActif(key);
+        const dl = this._activeDownloadFor(key);
 
         if (entry) {
             return {
@@ -573,7 +573,7 @@ class PreloadManager {
                     progress: dl.progress !== undefined ? dl.progress : 5,
                     from: dl.requalifyFrom || entry.bitrate,
                     to: dl.bitrate,
-                    direction: directionQualite(dl.requalifyFrom || entry.bitrate, dl.bitrate)
+                    direction: qualityDirection(dl.requalifyFrom || entry.bitrate, dl.bitrate)
                 } : null
             };
         }
@@ -588,7 +588,7 @@ class PreloadManager {
             };
         }
 
-        return vide;
+        return empty;
     }
 
     /**
@@ -603,18 +603,18 @@ class PreloadManager {
      * @param {string} nouveauDebit
      * @returns {boolean} true si une requalification a bien été lancée
      */
-    requalify(track, nouveauDebit) {
-        if (!DEBITS_AUDIO_VALIDES.includes(String(nouveauDebit))) return false;
+    requalify(track, newBitrate) {
+        if (!VALID_AUDIO_BITRATES.includes(String(newBitrate))) return false;
         const key = this.getTrackKey(track);
         if (!key) return false;
 
         const entry = this.cacheIndex.get(key);
         if (!entry) return false;                       // Pas en cache : rien à requalifier
-        if (entry.bitrate === String(nouveauDebit)) return false;
-        if (this.activeDownloads.has(this._cleTelechargement(key, nouveauDebit))) return false;
+        if (entry.bitrate === String(newBitrate)) return false;
+        if (this.activeDownloads.has(this._downloadKey(key, newBitrate))) return false;
 
-        log.info(`[PreloadManager] Requalification de ${track.title} : ${entry.bitrate || 'inconnu'} → ${nouveauDebit} kbps.`);
-        this.startDownload(track, key, String(nouveauDebit), entry.bitrate);
+        log.info(`[PreloadManager] Requalification de ${track.title} : ${entry.bitrate || 'inconnu'} → ${newBitrate} kbps.`);
+        this.startDownload(track, key, String(newBitrate), entry.bitrate);
         return true;
     }
 
@@ -633,12 +633,12 @@ class PreloadManager {
         // Conserver les préchargements interrompus par la session précédente,
         // écarter ceux qui ne sont pas exploitables
         try {
-            this._trierTemporaires();
+            this._sortTempFiles();
         } catch (e) {
             log.error('[PreloadManager] Erreur tri des fichiers temporaires au démarrage:', e.message);
         }
 
-        this._indexCache();
+        this._buildCacheIndex();
 
         // Intercepter la méthode stream de tous les extracteurs enregistrés
         player.extractors.store.forEach((extractor) => {
@@ -656,8 +656,8 @@ class PreloadManager {
                     // par là que les deux modes de diffusion divergeaient. Le
                     // pont mémorisé les remet d'accord ; null laisse le
                     // comportement d'origine reprendre la main.
-                    const fluxPonte = await this._fluxDepuisPont(track);
-                    if (fluxPonte) return fluxPonte;
+                    const bridgedStream = await this._streamFromBridge(track);
+                    if (bridgedStream) return bridgedStream;
 
                     return originalStream.apply(extractor, [track, ...args]);
                 };
@@ -696,11 +696,11 @@ class PreloadManager {
         // L'index donne le nom exact, qui porte le débit du fichier. On repasse
         // tout de même par le disque : une suppression externe ne doit pas
         // faire échouer la lecture plus loin.
-        const nom = this.cacheIndex.get(key)?.file;
-        const candidats = nom ? [nom, nomCache(key, null)] : [nomCache(key, null)];
+        const name = this.cacheIndex.get(key)?.file;
+        const candidates = name ? [name, cacheFileName(key, null)] : [cacheFileName(key, null)];
 
-        for (const candidat of candidats) {
-            const filePath = path.join(this.cacheDir, candidat);
+        for (const candidate of candidates) {
+            const filePath = path.join(this.cacheDir, candidate);
             try {
                 const stat = fs.statSync(filePath);
                 if (stat.size > MIN_CACHE_BYTES) return filePath;
@@ -724,7 +724,7 @@ class PreloadManager {
      * @param {object} settings
      * @returns {object[]} Pistes, de la première à la dernière
      */
-    _fileMiseDeCote(settings) {
+    _setAsideQueue(settings) {
         return readSetAsideQueue(settings);
     }
 
@@ -748,7 +748,7 @@ class PreloadManager {
         const queueLimit = Math.min(5, Math.max(0, parseInt(preloading.queueCount ?? 3, 10)));
         const playlistLimit = Math.min(5, Math.max(0, parseInt(preloading.playlistCount ?? 3, 10)));
 
-        const sourceEstUnePlaylist = !!settings.activePlaybackSource
+        const sourceIsPlaylist = !!settings.activePlaybackSource
             && settings.activePlaybackSource.startsWith('playlist_');
 
         const targets = [];
@@ -767,8 +767,8 @@ class PreloadManager {
             // de l'utilisateur est mise de côté dans les réglages. Sans ce
             // détour, elle perdrait son préchargement dès qu'une playlist
             // démarre — et y revenir se ferait sur une coupure.
-            if (sourceEstUnePlaylist) {
-                targets.push(...this._fileMiseDeCote(settings).slice(0, queueLimit));
+            if (sourceIsPlaylist) {
+                targets.push(...this._setAsideQueue(settings).slice(0, queueLimit));
             }
         }
 
@@ -788,11 +788,11 @@ class PreloadManager {
                 // La playlist en cours de lecture d'abord : ce sont ses titres
                 // à venir qu'il faut avoir sous la main en premier, sous peine
                 // d'entendre la coupure au changement de morceau.
-                if (sourceEstUnePlaylist) {
+                if (sourceIsPlaylist) {
                     const activePlaylist = globalPlaylists.find(p => p.id === settings.activePlaybackSource);
                     if (activePlaylist && activePlaylist.tracks && activePlaylist.tracks.length > 0) {
                         const currentIdx = typeof settings.playlistCurrentIndex === 'number' ? settings.playlistCurrentIndex : 0;
-                        targets.push(...pistesSuivantes(
+                        targets.push(...upcomingTracks(
                             activePlaylist.tracks, currentIdx, playlistLimit, !!settings.loopPlaylist
                         ));
                     }
@@ -841,17 +841,17 @@ class PreloadManager {
 
         const urls = Array.from(targetKeys.values()).map(t => t.url);
         const last = this.lastTargets.get(guildId) || [];
-        const inchange = urls.length === last.length && urls.every((url, i) => url === last[i]);
+        const unchanged = urls.length === last.length && urls.every((url, i) => url === last[i]);
 
         // Une liste inchangée ne dispense pas d'un passage : elle peut contenir
         // une cible ni cachée ni en cours, laissée par un échec ou une
         // annulation. Sans cette relance, elle resterait manquante jusqu'au
         // prochain remaniement de la file — soit, sur une file stable, jamais.
-        if (inchange && !this._cibleARelancer(targetKeys)) return;
+        if (unchanged && !this._hasTargetToRetry(targetKeys)) return;
 
         this.lastTargets.set(guildId, urls);
 
-        if (!inchange) {
+        if (!unchanged) {
             log.info(`[PreloadManager] Cibles de préchargement mises à jour pour la guild ${guildId} (${urls.length} pistes).`);
         }
 
@@ -885,28 +885,28 @@ class PreloadManager {
                 // le disque indéfiniment. Un partiel devenu inutile est aussi
                 // celui dont la piste est désormais entièrement cachée, la
                 // requalification en cours mise à part.
-                const tmp = analyserNomTemporaire(file);
+                const tmp = parseTempName(file);
                 if (tmp) {
-                    const cible = allGuildTargetKeys.has(tmp.key);
-                    const actif = this.activeDownloads.has(this._cleTelechargement(tmp.key, tmp.bitrate));
-                    if (!actif && (!cible || this.cacheIndex.has(tmp.key))) {
-                        this._supprimerTemporaire(path.join(this.cacheDir, file));
+                    const isTarget = allGuildTargetKeys.has(tmp.key);
+                    const isActive = this.activeDownloads.has(this._downloadKey(tmp.key, tmp.bitrate));
+                    if (!isActive && (!isTarget || this.cacheIndex.has(tmp.key))) {
+                        this._deleteTemp(path.join(this.cacheDir, file));
                         log.info(`[PreloadManager] Préchargement partiel inutile supprimé : ${file}`);
                     }
                     return;
                 }
                 if (file.endsWith('.tmp.src')) return; // Suit le sort de son partiel
 
-                const infos = analyserNomCache(file);
-                if (!infos || allGuildTargetKeys.has(infos.key)) return;
+                const parsed = parseCacheName(file);
+                if (!parsed || allGuildTargetKeys.has(parsed.key)) return;
 
                 const filePath = path.join(this.cacheDir, file);
                 try {
                     fs.unlinkSync(filePath);
                     // Seulement si l'index désigne bien ce fichier : une
                     // requalification en cours a pu en référencer un autre.
-                    if (this.cacheIndex.get(infos.key)?.file === file) {
-                        this.cacheIndex.delete(infos.key);
+                    if (this.cacheIndex.get(parsed.key)?.file === file) {
+                        this.cacheIndex.delete(parsed.key);
                     }
                     log.info(`[PreloadManager] Fichier cache inutilisé supprimé : ${file}`);
                 } catch (e) {
@@ -920,15 +920,15 @@ class PreloadManager {
         // 3. Ramener le cache sous son plafond de taille. La purge par
         // pertinence ci-dessus ne retire que les pistes hors cible ; l'ensemble
         // des cibles peut à lui seul dépasser toute limite raisonnable.
-        const enCoursDeLecture = new Set();
+        const nowPlayingKeys = new Set();
         try {
             this.player.queues.cache.forEach((q) => {
-                const courante = getSession(q).getCurrentTrack();
-                const cle = courante ? this.getTrackKey(courante) : null;
-                if (cle) enCoursDeLecture.add(cle);
+                const playing = getSession(q).getCurrentTrack();
+                const cacheKey = playing ? this.getTrackKey(playing) : null;
+                if (cacheKey) nowPlayingKeys.add(cacheKey);
             });
         } catch (e) {}
-        this.enforceCacheLimit(enCoursDeLecture);
+        this.enforceCacheLimit(nowPlayingKeys);
 
         // 4. Lancer le préchargement des nouvelles cibles non encore cachées ou en cours de téléchargement.
         // Une piste déjà en cache à un autre débit n'est pas retouchée ici : le
@@ -937,14 +937,14 @@ class PreloadManager {
         for (const [key, track] of targetKeys.entries()) {
             if (this.cacheIndex.has(key)) continue;
 
-            const debit = resoudreDebitAudio(track);
-            if (this.activeDownloads.has(this._cleTelechargement(key, debit))) continue;
-            this.startDownload(track, key, debit);
+            const bitrate = resolveAudioBitrate(track);
+            if (this.activeDownloads.has(this._downloadKey(key, bitrate))) continue;
+            this.startDownload(track, key, bitrate);
         }
     }
 
     /** Piste jouable correspondant à une URL, null si elle est irrésolvable. */
-    async _hydrater(url) {
+    async _hydrate(url) {
         try {
             const res = await this.player.search(url);
             return (res && res.tracks && res.tracks[0]) || null;
@@ -970,54 +970,54 @@ class PreloadManager {
      *   n'est pas nécessaire ou n'a pas abouti — l'appelant garde alors la
      *   piste d'origine et son propre repli.
      */
-    async _resoudrePont(track, libelle) {
-        if (!this.player || !estSourceSansAudio(track)) return null;
+    async _resolveBridge(track, label) {
+        if (!this.player || !isAudioLessSource(track)) return null;
 
         const database = require('../database/Database');
-        const nom = libelle || track.title;
+        const name = label || track.title;
 
-        const memorise = database.getBridge(track.url);
-        if (memorise) {
-            const piste = await this._hydrater(memorise);
-            if (piste) return piste;
+        const remembered = database.getBridge(track.url);
+        if (remembered) {
+            const match = await this._hydrate(remembered);
+            if (match) return match;
 
             // Vidéo supprimée à la source depuis : le pont est refait, sans
             // quoi la piste resterait injouable indéfiniment.
-            log.warn(`[PreloadManager] Pont mémorisé de ${nom} devenu irrésolvable, nouvelle recherche.`);
+            log.warn(`[PreloadManager] Pont mémorisé de ${name} devenu irrésolvable, nouvelle recherche.`);
             database.clearBridge(track.url);
         }
 
-        let candidats = [];
+        let candidates = [];
         try {
-            const requete = `${track.author || ''} ${track.title}`.trim();
-            const res = await this.player.search(requete, { requestedBy: null });
-            candidats = (res && res.tracks) || [];
+            const query = `${track.author || ''} ${track.title}`.trim();
+            const res = await this.player.search(query, { requestedBy: null });
+            candidates = (res && res.tracks) || [];
         } catch (e) {
-            log.error(`[PreloadManager] Échec de la recherche du pont pour ${nom} :`, e.message);
+            log.error(`[PreloadManager] Échec de la recherche du pont pour ${name} :`, e.message);
             return null;
         }
 
-        if (candidats.length === 0) {
-            log.warn(`[PreloadManager] Aucun candidat trouvé pour ponter ${nom}.`);
+        if (candidates.length === 0) {
+            log.warn(`[PreloadManager] Aucun candidat trouvé pour ponter ${name}.`);
             return null;
         }
 
-        const { piste, verifie, ecartMs } = choisirParDuree(candidats, dureeMs(track));
-        if (!piste || !piste.url) return null;
+        const { match, verified, gapMs } = pickByDuration(candidates, trackDurationMs(track));
+        if (!match || !match.url) return null;
 
-        database.setBridge(track.url, piste.url);
+        database.setBridge(track.url, match.url);
 
-        if (verifie) {
-            log.success(`[PreloadManager] Pont établi pour ${nom} : ${piste.url} `
-                + `(écart de durée ${(ecartMs / 1000).toFixed(1)} s).`);
+        if (verified) {
+            log.success(`[PreloadManager] Pont établi pour ${name} : ${match.url} `
+                + `(écart de durée ${(gapMs / 1000).toFixed(1)} s).`);
         } else {
             // Mémorisé quand même : un enregistrement approximatif mais stable
             // vaut mieux qu'un titre qui change à chaque lecture.
-            log.warn(`[PreloadManager] Pont établi pour ${nom} sans correspondance de durée `
-                + `${ecartMs !== null ? `(meilleur écart ${(ecartMs / 1000).toFixed(1)} s) ` : ''}`
-                + `: ${piste.url}`);
+            log.warn(`[PreloadManager] Pont établi pour ${name} sans correspondance de durée `
+                + `${gapMs !== null ? `(meilleur écart ${(gapMs / 1000).toFixed(1)} s) ` : ''}`
+                + `: ${match.url}`);
         }
-        return piste;
+        return match;
     }
 
     /**
@@ -1034,19 +1034,19 @@ class PreloadManager {
      * @returns {Promise<object|null>} Flux, ou null pour laisser l'extracteur
      *   procéder à sa manière
      */
-    async _fluxDepuisPont(track) {
-        if (!estSourceSansAudio(track)) return null;
+    async _streamFromBridge(track) {
+        if (!isAudioLessSource(track)) return null;
 
         try {
-            const ponte = await this._resoudrePont(track);
-            if (!ponte || !ponte.url || ponte.url === track.url) return null;
-            if (!ponte.extractor || typeof ponte.extractor.stream !== 'function') return null;
+            const bridged = await this._resolveBridge(track);
+            if (!bridged || !bridged.url || bridged.url === track.url) return null;
+            if (!bridged.extractor || typeof bridged.extractor.stream !== 'function') return null;
 
-            log.info(`[PreloadManager] ${track.title} lu via le pont mémorisé : ${ponte.url}`);
+            log.info(`[PreloadManager] ${track.title} lu via le pont mémorisé : ${bridged.url}`);
             // L'extracteur cible est lui aussi intercepté : sa piste étant une
             // source normale, il retombera sur son flux d'origine sans repasser
             // par ici.
-            return await ponte.extractor.stream(ponte);
+            return await bridged.extractor.stream(bridged);
         } catch (e) {
             log.error(`[PreloadManager] Pont indisponible pour ${track.title}, `
                 + `repli sur l'extracteur :`, e.message);
@@ -1071,32 +1071,32 @@ class PreloadManager {
      * @param {string} [debitAudio] - Débit cible ; sinon celui résolu pour la piste
      * @param {string|null} [requalifyFrom] - Débit du fichier déjà en cache, s'il s'agit d'une requalification
      */
-    async startDownload(track, key, debitAudio, requalifyFrom = null) {
+    async startDownload(track, key, audioBitrate, requalifyFrom = null) {
         // Débit choisi dans la box « Ajouter un fichier » ou dans le menu de la
         // piste. Ne concerne que les sources distantes : un fichier local
         // n'est jamais transcodé.
-        const debit = debitAudio || resoudreDebitAudio(track);
-        const dlKey = this._cleTelechargement(key, debit);
-        const tmpPath = this._cheminTemporaire(key, debit);
-        const mp3Path = path.join(this.cacheDir, nomCache(key, debit));
+        const bitrate = audioBitrate || resolveAudioBitrate(track);
+        const dlKey = this._downloadKey(key, bitrate);
+        const tmpPath = this._tempPath(key, bitrate);
+        const mp3Path = path.join(this.cacheDir, cacheFileName(key, bitrate));
 
         // Le débit du fichier vaut exactement celui demandé, le transcodage
         // étant à débit constant : la taille finale se déduit de la durée, et
         // la progression n'a pas besoin d'estimation grossière.
-        const octetsParSeconde = Number(debit) * 1000 / 8;
-        let estTotalBytes = Math.max(100 * 1024, ((dureeMs(track) || 180000) / 1000) * octetsParSeconde);
-        const pourcentage = (octets) => Math.min(98, Math.max(5, Math.round((octets / estTotalBytes) * 100)));
+        const bytesPerSecond = Number(bitrate) * 1000 / 8;
+        let estTotalBytes = Math.max(100 * 1024, ((trackDurationMs(track) || 180000) / 1000) * bytesPerSecond);
+        const percentOf = (bytes) => Math.min(98, Math.max(5, Math.round((bytes / estTotalBytes) * 100)));
 
         // Évalué avant toute résolution réseau : la barre de progression doit
         // repartir de son niveau d'avant l'interruption, pas de zéro. La
         // vérification de la source, elle, attend l'URL résolue.
-        let reprise = this._evaluerReprise(tmpPath);
+        let resumeInfo = this._resumableFrom(tmpPath);
 
-        if (reprise) {
-            log.info(`[PreloadManager] Reprise du préchargement de : ${track.title} (${debit} kbps) `
-                + `à ${reprise.seconds.toFixed(0)} s (${pourcentage(reprise.bytes)} %)`);
+        if (resumeInfo) {
+            log.info(`[PreloadManager] Reprise du préchargement de : ${track.title} (${bitrate} kbps) `
+                + `à ${resumeInfo.seconds.toFixed(0)} s (${percentOf(resumeInfo.bytes)} %)`);
         } else {
-            log.info(`[PreloadManager] Début du préchargement de : ${track.title} (${debit} kbps)`);
+            log.info(`[PreloadManager] Début du préchargement de : ${track.title} (${bitrate} kbps)`);
         }
 
         let stream = null;
@@ -1120,15 +1120,15 @@ class PreloadManager {
         const cancel = () => {
             isCancelled = true;
             cleanup();
-            this._supprimerTemporaire(tmpPath);
+            this._deleteTemp(tmpPath);
         };
 
         const downloadObj = {
             cancel,
-            progress: reprise ? pourcentage(reprise.bytes) : 5,
+            progress: resumeInfo ? percentOf(resumeInfo.bytes) : 5,
             startTime: Date.now(),
             key,
-            bitrate: debit,
+            bitrate: bitrate,
             requalifyFrom
         };
         this.activeDownloads.set(dlKey, downloadObj);
@@ -1149,8 +1149,8 @@ class PreloadManager {
         // plus bas, se verrait sinon remettre une URL protégée et échouerait sur
         // le DRM. Le pont est désormais vérifié par la durée et mémorisé, pour
         // que le fichier mis en cache soit celui que la lecture directe emploie.
-        const pisteReelle = await this._resoudrePont(targetTrack, track.title);
-        if (pisteReelle) targetTrack = pisteReelle;
+        const bridgedTrack = await this._resolveBridge(targetTrack, track.title);
+        if (bridgedTrack) targetTrack = bridgedTrack;
 
         let targetUrl = targetTrack && targetTrack.url ? targetTrack.url : (track.url || '');
         if (targetUrl.includes('music.youtube.com')) {
@@ -1178,28 +1178,28 @@ class PreloadManager {
         // La reprise n'est valable que si l'on s'apprête à encoder la même
         // source qu'à l'interruption. Un pont Spotify → YouTube, ou une simple
         // vidéo supprimée depuis, peut faire aboutir la résolution ailleurs.
-        if (reprise) {
+        if (resumeInfo) {
             // À défaut de source mémorisée — partiel écrit par une version
             // antérieure —, l'égalité entre la clé du fichier et le condensat
             // de l'URL résolue suffit : la résolution n'a rien détourné, et
             // seule une résolution détournée peut faire diverger le contenu.
-            const sourcePartielle = this._lireSource(tmpPath)
+            const partialSource = this._readSource(tmpPath)
                 || (crypto.createHash('sha256').update(targetUrl).digest('hex') === key ? targetUrl : null);
 
-            if (sourcePartielle !== targetUrl) {
+            if (partialSource !== targetUrl) {
                 log.info(`[PreloadManager] Partiel de ${track.title} écarté : `
-                    + `source ${sourcePartielle ? 'différente' : 'inconnue'}, réencodage complet.`);
-                this._supprimerTemporaire(tmpPath);
-                reprise = null;
+                    + `source ${partialSource ? 'différente' : 'inconnue'}, réencodage complet.`);
+                this._deleteTemp(tmpPath);
+                resumeInfo = null;
                 downloadObj.progress = 5;
             }
         }
-        this._ecrireSource(tmpPath, targetUrl);
+        this._writeSource(tmpPath, targetUrl);
 
         // La durée de la piste hydratée est plus fiable que celle de l'entrée
         // de file, qui peut venir d'une playlist enregistrée sans métadonnées.
-        const dureeResolue = dureeMs(targetTrack) || dureeMs(track);
-        if (dureeResolue) estTotalBytes = Math.max(100 * 1024, (dureeResolue / 1000) * octetsParSeconde);
+        const resolvedDurationMs = trackDurationMs(targetTrack) || trackDurationMs(track);
+        if (resolvedDurationMs) estTotalBytes = Math.max(100 * 1024, (resolvedDurationMs / 1000) * bytesPerSecond);
 
         const runPipeline = async () => {
             let rawStreamObj = null;
@@ -1294,10 +1294,10 @@ class PreloadManager {
             // Placé avant -i : le décodage démarre à la seconde demandée, sans
             // réencoder ce que le fichier partiel contient déjà. Sur une URL
             // directe, ffmpeg n'en télécharge même pas le début.
-            if (reprise) {
-                ffmpegArgs.push('-ss', reprise.seconds.toFixed(6));
+            if (resumeInfo) {
+                ffmpegArgs.push('-ss', resumeInfo.seconds.toFixed(6));
             }
-            ffmpegArgs.push('-i', ffmpegInput || 'pipe:0', '-acodec', 'libmp3lame', '-ab', `${debit}k`);
+            ffmpegArgs.push('-i', ffmpegInput || 'pipe:0', '-acodec', 'libmp3lame', '-ab', `${bitrate}k`);
             // Sans ces deux options, chaque segment encodé s'ouvre sur une
             // étiquette ID3, qui se retrouverait en plein milieu du fichier au
             // moment du raccord.
@@ -1335,17 +1335,17 @@ class PreloadManager {
             // La trame incomplète que l'interruption a laissée en fin de
             // fichier est retirée : le nouveau segment doit s'ajouter sur une
             // frontière de trame, sinon les deux moitiés ne se recollent pas.
-            if (reprise) {
-                fs.truncateSync(tmpPath, reprise.bytes);
+            if (resumeInfo) {
+                fs.truncateSync(tmpPath, resumeInfo.bytes);
             }
-            outStream = fs.createWriteStream(tmpPath, { flags: reprise ? 'a' : 'w' });
+            outStream = fs.createWriteStream(tmpPath, { flags: resumeInfo ? 'a' : 'w' });
 
-            let bytesWritten = reprise ? reprise.bytes : 0;
+            let bytesWritten = resumeInfo ? resumeInfo.bytes : 0;
             let lastReportedPct = downloadObj.progress;
 
             ffmpegProcess.stdout.on('data', (chunk) => {
                 bytesWritten += chunk.length;
-                const pct = pourcentage(bytesWritten);
+                const pct = percentOf(bytesWritten);
                 if (pct > lastReportedPct + 2) {
                     log.info(`[PreloadManager Debug] Écriture en cours pour ${track.title}: ${bytesWritten} octets (${pct}%)`);
                     lastReportedPct = pct;
@@ -1400,34 +1400,34 @@ class PreloadManager {
                     // tout — un fichier repris fait forcément plus que le
                     // minimum. On compare donc à la durée annoncée.
                     const encode = analyzePartial(tmpPath);
-                    const attendu = dureeResolue / 1000;
-                    if (attendu && encode.seconds < attendu * 0.95) {
+                    const expected = resolvedDurationMs / 1000;
+                    if (expected && encode.seconds < expected * 0.95) {
                         throw new Error(`Encodage incomplet : ${encode.seconds.toFixed(0)} s `
-                            + `sur ${attendu.toFixed(0)} s annoncées.`);
+                            + `sur ${expected.toFixed(0)} s annoncées.`);
                     }
 
                     // Bascule : le fichier précédent n'est retiré qu'ici, une
                     // fois le nouveau complet et validé. Jusqu'à cet instant, la
                     // lecture continuait d'être servie à l'ancienne qualité.
-                    const precedent = this.cacheIndex.get(key);
+                    const previous = this.cacheIndex.get(key);
 
                     fs.renameSync(tmpPath, mp3Path);
-                    this._supprimerTemporaire(tmpPath);
+                    this._deleteTemp(tmpPath);
                     this.cacheIndex.set(key, {
                         size: stat.size,
                         mtime: Date.now(),
-                        bitrate: debit,
-                        file: nomCache(key, debit)
+                        bitrate: bitrate,
+                        file: cacheFileName(key, bitrate)
                     });
 
-                    this.echecs.delete(key);
+                    this.failures.delete(key);
 
-                    if (precedent && precedent.file !== nomCache(key, debit)) {
-                        this._supprimerFichierCache(key, precedent.file);
+                    if (previous && previous.file !== cacheFileName(key, bitrate)) {
+                        this._deleteCacheFile(key, previous.file);
                         log.success(`[PreloadManager] Requalification terminée pour ${track.title} : `
-                            + `${precedent.bitrate || 'inconnu'} → ${debit} kbps, ancien fichier retiré.`);
+                            + `${previous.bitrate || 'inconnu'} → ${bitrate} kbps, ancien fichier retiré.`);
                     } else {
-                        log.success(`[PreloadManager] Préchargement réussi et validé pour : ${track.title} (${debit} kbps)`);
+                        log.success(`[PreloadManager] Préchargement réussi et validé pour : ${track.title} (${bitrate} kbps)`);
                     }
                 } else {
                     throw new Error(`Fichier trop petit (${stat.size} octets), considéré comme corrompu.`);
@@ -1444,25 +1444,25 @@ class PreloadManager {
             // suivante, dans cette session ou après un redémarrage, repartira
             // de là. Une annulation vaut en revanche abandon de la piste, et
             // cancel() a déjà fait le ménage.
-            const restant = isCancelled ? null : this._evaluerReprise(tmpPath);
-            if (restant) {
+            const leftover = isCancelled ? null : this._resumableFrom(tmpPath);
+            if (leftover) {
                 log.info(`[PreloadManager] Partiel conservé pour ${track.title} : `
-                    + `${restant.seconds.toFixed(0)} s encodées, reprise à la prochaine tentative.`);
+                    + `${leftover.seconds.toFixed(0)} s encodées, reprise à la prochaine tentative.`);
             } else {
-                this._supprimerTemporaire(tmpPath);
+                this._deleteTemp(tmpPath);
             }
 
             if (isCancelled) {
                 // La piste n'est plus une cible : rien à retenter, et la
                 // mémoire d'un échec antérieur n'a plus lieu d'être.
-                this.echecs.delete(key);
+                this.failures.delete(key);
                 log.info(`[PreloadManager] Préchargement annulé pour ${track.title}.`);
             } else {
-                const tentatives = (this.echecs.get(key)?.tentatives || 0) + 1;
-                this.echecs.set(key, { at: Date.now(), tentatives });
-                const relance = Math.round(this._delaiAvantRelance(tentatives) / 1000);
+                const attempts = (this.failures.get(key)?.attempts || 0) + 1;
+                this.failures.set(key, { at: Date.now(), attempts });
+                const retryIn = Math.round(this._retryDelayMs(attempts) / 1000);
                 log.error(`[PreloadManager] Échec du préchargement pour ${track.title} `
-                    + `(tentative ${tentatives}, nouvel essai dans ${relance} s) :`, err.message);
+                    + `(tentative ${attempts}, nouvel essai dans ${retryIn} s) :`, err.message);
             }
             this.notifyProgress();
         }

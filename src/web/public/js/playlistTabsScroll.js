@@ -56,34 +56,34 @@
      * long au même seuil : en deçà le doigt cherche encore, au-delà les deux
      * gestes sont départagés sans jamais se disputer le contact.
      */
-    const SEUIL_GLISSEMENT_PX = 10;
+    const DRAG_THRESHOLD_PX = 10;
 
     /** Part de vitesse conservée à chaque image pendant l'élan. */
-    const FROTTEMENT = 0.94;
+    const FRICTION = 0.94;
 
     /** En deçà, l'élan ne se voit plus et n'a plus qu'à s'arrêter. */
-    const VITESSE_MORTE = 0.4;
+    const MIN_SPEED = 0.4;
 
     /**
      * Écrit une position en la ramenant dans les bornes.
      * @param {HTMLElement} bande
      * @param {number} cible
      */
-    function placer(bande, cible) {
-        const debordement = bande.scrollWidth - bande.clientWidth;
-        bande.scrollLeft = Math.max(0, Math.min(debordement, cible));
+    function place(strip, target) {
+        const overflow = strip.scrollWidth - strip.clientWidth;
+        strip.scrollLeft = Math.max(0, Math.min(overflow, target));
     }
 
     /**
      * Allume ou éteint les repères selon ce qui dépasse de part et d'autre.
      * @param {HTMLElement} bande
      */
-    function majReperes(bande) {
-        const debordement = bande.scrollWidth - bande.clientWidth;
-        bande.classList.toggle('can-scroll-left', bande.scrollLeft > TOLERANCE_PX);
-        bande.classList.toggle(
+    function updateMarkers(strip) {
+        const overflow = strip.scrollWidth - strip.clientWidth;
+        strip.classList.toggle('can-scroll-left', strip.scrollLeft > TOLERANCE_PX);
+        strip.classList.toggle(
             'can-scroll-right',
-            bande.scrollLeft < debordement - TOLERANCE_PX
+            strip.scrollLeft < overflow - TOLERANCE_PX
         );
     }
 
@@ -98,22 +98,22 @@
      * @param {HTMLElement} bande
      * @param {WheelEvent} e
      */
-    function surMolette(bande, e) {
-        const debordement = bande.scrollWidth - bande.clientWidth;
-        if (debordement <= TOLERANCE_PX) return;
+    function onWheel(strip, e) {
+        const overflow = strip.scrollWidth - strip.clientWidth;
+        if (overflow <= TOLERANCE_PX) return;
 
         // Les pavés tactiles et les souris à roue inclinable émettent aussi du
         // déplacement horizontal ; on prend le plus franc des deux axes.
-        const pas = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-        if (!pas) return;
+        const step = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+        if (!step) return;
 
-        const enButee = pas < 0
-            ? bande.scrollLeft <= TOLERANCE_PX
-            : bande.scrollLeft >= debordement - TOLERANCE_PX;
-        if (enButee) return;
+        const atEdge = step < 0
+            ? strip.scrollLeft <= TOLERANCE_PX
+            : strip.scrollLeft >= overflow - TOLERANCE_PX;
+        if (atEdge) return;
 
         e.preventDefault();
-        placer(bande, bande.scrollLeft + pas);
+        place(strip, strip.scrollLeft + step);
     }
 
     /**
@@ -130,95 +130,95 @@
      *
      * @param {HTMLElement} bande
      */
-    function brancherGlissement(bande) {
-        let contact = null;
-        let departX = 0;
-        let departScroll = 0;
-        let dernierX = 0;
-        let dernierInstant = 0;
-        let vitesse = 0;
-        let glisse = false;
+    function bindDrag(strip) {
+        let pointer = null;
+        let startX = 0;
+        let startScroll = 0;
+        let lastX = 0;
+        let lastTime = 0;
+        let speed = 0;
+        let dragging = false;
         let animation = null;
         /*
          * Un glissement se termine par un `click` sur l'onglet resté sous le
          * doigt, que rien ne distingue d'une sélection délibérée : sans ce
          * témoin, faire défiler la bande changeait de playlist.
          */
-        let vientDeGlisser = false;
+        let justDragged = false;
 
-        const arreterElan = () => {
+        const stopMomentum = () => {
             if (animation === null) return;
             cancelAnimationFrame(animation);
             animation = null;
         };
 
-        const lancerElan = () => {
-            let v = vitesse;
-            const pas = () => {
-                v *= FROTTEMENT;
-                if (Math.abs(v) < VITESSE_MORTE) { animation = null; return; }
-                const avant = bande.scrollLeft;
-                placer(bande, avant + v);
+        const startMomentum = () => {
+            let v = speed;
+            const step = () => {
+                v *= FRICTION;
+                if (Math.abs(v) < MIN_SPEED) { animation = null; return; }
+                const before = strip.scrollLeft;
+                place(strip, before + v);
                 // Butée atteinte : insister ne ferait qu'occuper une image sur
                 // deux jusqu'à extinction de la vitesse.
-                if (bande.scrollLeft === avant) { animation = null; return; }
-                animation = requestAnimationFrame(pas);
+                if (strip.scrollLeft === before) { animation = null; return; }
+                animation = requestAnimationFrame(step);
             };
-            animation = requestAnimationFrame(pas);
+            animation = requestAnimationFrame(step);
         };
 
-        bande.addEventListener('pointerdown', (e) => {
+        strip.addEventListener('pointerdown', (e) => {
             if (e.pointerType === 'mouse') return;
-            arreterElan();
-            contact = e.pointerId;
-            departX = e.clientX;
-            dernierX = e.clientX;
-            dernierInstant = e.timeStamp;
-            departScroll = bande.scrollLeft;
-            vitesse = 0;
-            glisse = false;
+            stopMomentum();
+            pointer = e.pointerId;
+            startX = e.clientX;
+            lastX = e.clientX;
+            lastTime = e.timeStamp;
+            startScroll = strip.scrollLeft;
+            speed = 0;
+            dragging = false;
         });
 
-        bande.addEventListener('pointermove', (e) => {
-            if (e.pointerId !== contact) return;
-            const ecart = e.clientX - departX;
+        strip.addEventListener('pointermove', (e) => {
+            if (e.pointerId !== pointer) return;
+            const delta = e.clientX - startX;
 
-            if (!glisse) {
-                if (Math.abs(ecart) < SEUIL_GLISSEMENT_PX) return;
-                glisse = true;
+            if (!dragging) {
+                if (Math.abs(delta) < DRAG_THRESHOLD_PX) return;
+                dragging = true;
                 // Le doigt peut sortir de la bande sans que le geste s'arrête.
-                bande.setPointerCapture(contact);
+                strip.setPointerCapture(pointer);
             }
 
-            const duree = e.timeStamp - dernierInstant;
+            const elapsed = e.timeStamp - lastTime;
             // Ramenée à l'image de 16 ms, unité dans laquelle l'élan avance.
-            if (duree > 0) vitesse = ((dernierX - e.clientX) / duree) * 16;
-            dernierX = e.clientX;
-            dernierInstant = e.timeStamp;
+            if (elapsed > 0) speed = ((lastX - e.clientX) / elapsed) * 16;
+            lastX = e.clientX;
+            lastTime = e.timeStamp;
 
-            placer(bande, departScroll - ecart);
+            place(strip, startScroll - delta);
         });
 
-        const relacher = (e) => {
-            if (e.pointerId !== contact) return;
-            if (glisse && bande.hasPointerCapture(contact)) {
-                bande.releasePointerCapture(contact);
+        const release = (e) => {
+            if (e.pointerId !== pointer) return;
+            if (dragging && strip.hasPointerCapture(pointer)) {
+                strip.releasePointerCapture(pointer);
             }
-            contact = null;
-            if (!glisse) return;
-            glisse = false;
-            vientDeGlisser = true;
-            lancerElan();
+            pointer = null;
+            if (!dragging) return;
+            dragging = false;
+            justDragged = true;
+            startMomentum();
         };
 
-        bande.addEventListener('pointerup', relacher);
-        bande.addEventListener('pointercancel', relacher);
+        strip.addEventListener('pointerup', release);
+        strip.addEventListener('pointercancel', release);
 
         // En capture : le clic doit être intercepté avant d'atteindre l'onglet,
         // pas après. Le témoin ne vaut que pour ce clic-ci.
-        bande.addEventListener('click', (e) => {
-            if (!vientDeGlisser) return;
-            vientDeGlisser = false;
+        strip.addEventListener('click', (e) => {
+            if (!justDragged) return;
+            justDragged = false;
             e.preventDefault();
             e.stopPropagation();
         }, true);
@@ -229,18 +229,18 @@
      * @returns {boolean} false si la bande n'est pas encore dans le document
      */
     function init() {
-        const bande = document.getElementById('playlists-tabs-container');
-        if (!bande) return false;
-        if (bande.dataset.scrollInit === 'true') return true;
-        bande.dataset.scrollInit = 'true';
+        const strip = document.getElementById('playlists-tabs-container');
+        if (!strip) return false;
+        if (strip.dataset.scrollInit === 'true') return true;
+        strip.dataset.scrollInit = 'true';
 
-        const rafraichir = () => majReperes(bande);
+        const refresh = () => updateMarkers(strip);
 
-        bande.addEventListener('scroll', rafraichir, { passive: true });
+        strip.addEventListener('scroll', refresh, { passive: true });
         // `passive: false` est indispensable : sans lui, `preventDefault` est
         // ignoré et la page défilerait en même temps que la bande.
-        bande.addEventListener('wheel', (e) => surMolette(bande, e), { passive: false });
-        brancherGlissement(bande);
+        strip.addEventListener('wheel', (e) => onWheel(strip, e), { passive: false });
+        bindDrag(strip);
 
         /*
          * Deux sources de changement, toutes deux hors de notre contrôle : la
@@ -251,15 +251,15 @@
          * connaître ce module.
          */
         if (window.ResizeObserver) {
-            new ResizeObserver(rafraichir).observe(bande);
+            new ResizeObserver(refresh).observe(strip);
         } else {
-            window.addEventListener('resize', rafraichir);
+            window.addEventListener('resize', refresh);
         }
         if (window.MutationObserver) {
-            new MutationObserver(rafraichir).observe(bande, { childList: true, subtree: true });
+            new MutationObserver(refresh).observe(strip, { childList: true, subtree: true });
         }
 
-        rafraichir();
+        refresh();
         return true;
     }
 

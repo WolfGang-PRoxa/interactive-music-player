@@ -84,7 +84,7 @@ async function searchLocalAwareTrack(player, url) {
  * @param {object} settings
  * @returns {boolean}
  */
-function playlistEstLaSource(settings) {
+function playlistIsSource(settings) {
     return !!settings.activePlaybackSource && settings.activePlaybackSource !== 'queue';
 }
 
@@ -102,13 +102,13 @@ function playlistEstLaSource(settings) {
  * @returns {boolean} true si les pistes ont été rangées — il n'y a alors rien
  *   à jouer, ni à ajouter au lecteur
  */
-function ajouterALaFileEnAttente(currentGuildId, settings, tracks) {
-    if (!playlistEstLaSource(settings)) return false;
+function addToSetAsideQueue(currentGuildId, settings, tracks) {
+    if (!playlistIsSource(settings)) return false;
 
-    const aRanger = (Array.isArray(tracks) ? tracks : [tracks]).filter(t => t && t.url);
-    if (aRanger.length === 0) return true;
+    const toStore = (Array.isArray(tracks) ? tracks : [tracks]).filter(t => t && t.url);
+    if (toStore.length === 0) return true;
 
-    const versDonnees = (t) => ({
+    const toData = (t) => ({
         title: t.title,
         author: t.author || 'Inconnu',
         duration: t.duration || '0:00',
@@ -122,11 +122,11 @@ function ajouterALaFileEnAttente(currentGuildId, settings, tracks) {
     // Une seule liste, quel que soit le mode : rien n'y joue tant que la
     // playlist occupe le lecteur, et c'est au retour à la file que son premier
     // titre reprendra la lecture.
-    const pistes = readSetAsideQueue(settings);
-    aRanger.forEach(t => pistes.push(versDonnees(t)));
-    writeSetAsideQueue(currentGuildId, pistes, settings);
+    const stored = readSetAsideQueue(settings);
+    toStore.forEach(t => stored.push(toData(t)));
+    writeSetAsideQueue(currentGuildId, stored, settings);
 
-    log.info(`[Queue] ${aRanger.length} piste(s) ajoutée(s) à la file d'attente ; `
+    log.info(`[Queue] ${toStore.length} piste(s) ajoutée(s) à la file d'attente ; `
         + 'la playlist en cours reste la source de lecture.');
     return true;
 }
@@ -150,23 +150,23 @@ function switchToQueueSourceIfNeeded(currentGuildId, queue, settings) {
 
         // La file mise de côté est une simple liste : c'est ici, au moment de
         // reprendre, que son premier titre redevient la piste courante.
-        const misDeCote = readSetAsideQueue(settings);
+        const setAside = readSetAsideQueue(settings);
 
         if (isPersonal) {
-            if (queue && misDeCote.length > 0) {
-                const [premiere, ...suite] = misDeCote;
-                queue.virtualCurrentTrack = premiere;
-                queue.virtualTracks = suite;
+            if (queue && setAside.length > 0) {
+                const [first, ...rest] = setAside;
+                queue.virtualCurrentTrack = first;
+                queue.virtualTracks = rest;
                 queue.virtualProgressMs = 0;
                 queue.virtualIsPlaying = true;
                 queue.virtualIsPaused = false;
             }
         } else {
-            if (queue && misDeCote.length > 0) {
+            if (queue && setAside.length > 0) {
                 const { Track, useMainPlayer } = require('discord-player');
                 const player = useMainPlayer();
                 queue.tracks.clear();
-                const resolved = misDeCote.map(t => {
+                const resolved = setAside.map(t => {
                     const track = new Track(player, {
                         title: t.title,
                         author: t.author || 'Inconnu',
@@ -189,7 +189,7 @@ function switchToQueueSourceIfNeeded(currentGuildId, queue, settings) {
 
 module.exports = {
     searchLocalAwareTrack,
-    playlistEstLaSource,
-    ajouterALaFileEnAttente,
+    playlistIsSource,
+    addToSetAsideQueue,
     switchToQueueSourceIfNeeded,
 };

@@ -18,10 +18,10 @@ const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB) || 1024;
  * installée, la documentation lue dans le tableau de bord doit être celle de la
  * version qui tourne, pas celle du dépôt qui l'héberge.
  */
-const DOSSIER_DOCS = path.resolve(__dirname, '..', '..', '..', 'docs');
+const DOCS_DIR = path.resolve(__dirname, '..', '..', '..', 'docs');
 
 /** Profondeur d'exploration : `docs/` et ses sous-dossiers immédiats. */
-const PROFONDEUR_DOCS = 2;
+const DOCS_DEPTH = 2;
 
 const MIME_TYPES = {
     mp4: 'video/mp4',
@@ -53,20 +53,20 @@ function parseRange(rangeHeader, size) {
     const m = /^bytes=(\d*)-(\d*)$/.exec(String(rangeHeader || '').trim());
     if (!m) return null;
 
-    const [, debutBrut, finBrut] = m;
-    if (debutBrut === '' && finBrut === '') return null;
+    const [, rawStart, rawEnd] = m;
+    if (rawStart === '' && rawEnd === '') return null;
 
     let start;
     let end;
-    if (debutBrut === '') {
+    if (rawStart === '') {
         // Forme suffixe : les N derniers octets
-        const n = parseInt(finBrut, 10);
+        const n = parseInt(rawEnd, 10);
         if (!Number.isFinite(n) || n <= 0) return null;
         start = Math.max(0, size - n);
         end = size - 1;
     } else {
-        start = parseInt(debutBrut, 10);
-        end = finBrut === '' ? size - 1 : parseInt(finBrut, 10);
+        start = parseInt(rawStart, 10);
+        end = rawEnd === '' ? size - 1 : parseInt(rawEnd, 10);
     }
 
     if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
@@ -167,23 +167,23 @@ function findTrackForRequest(trackUrl, queue) {
  * de fichier. Seul le début est lu — le titre d'un Markdown bien tenu s'y
  * trouve, et il n'y a pas de raison de charger 20 Ko pour l'apprendre.
  */
-function titreDocument(chemin, secours) {
-    let debut;
+function documentTitle(docPath, fallback) {
+    let head;
     try {
-        const tampon = Buffer.alloc(2048);
-        const fd = fs.openSync(chemin, 'r');
+        const buffer = Buffer.alloc(2048);
+        const fd = fs.openSync(docPath, 'r');
         try {
-            const lus = fs.readSync(fd, tampon, 0, tampon.length, 0);
-            debut = tampon.slice(0, lus).toString('utf8');
+            const readBytes = fs.readSync(fd, buffer, 0, buffer.length, 0);
+            head = buffer.slice(0, readBytes).toString('utf8');
         } finally {
             fs.closeSync(fd);
         }
     } catch (e) {
-        return secours;
+        return fallback;
     }
 
-    const titre = /^#\s+(.+)$/m.exec(debut);
-    return titre ? titre[1].trim() : secours;
+    const titleMatch = /^#\s+(.+)$/m.exec(head);
+    return titleMatch ? titleMatch[1].trim() : fallback;
 }
 
 /**
@@ -199,62 +199,62 @@ function titreDocument(chemin, secours) {
  *
  * @returns {Array<{id: string, titre: string, groupe: string, octets: number}>}
  */
-function inventaireDocs() {
-    const trouves = [];
+function listDocuments() {
+    const docs = [];
 
-    const explorer = (dossier, prefixe, profondeur) => {
-        let entrees;
+    const walk = (dir, prefix, depth) => {
+        let dirEntries;
         try {
-            entrees = fs.readdirSync(dossier, { withFileTypes: true });
+            dirEntries = fs.readdirSync(dir, { withFileTypes: true });
         } catch (e) {
             return;
         }
 
-        for (const entree of entrees) {
-            if (entree.name.startsWith('.')) continue;
-            const complet = path.join(dossier, entree.name);
+        for (const dirEntry of dirEntries) {
+            if (dirEntry.name.startsWith('.')) continue;
+            const fullPath = path.join(dir, dirEntry.name);
 
-            if (entree.isDirectory()) {
-                if (profondeur > 1) explorer(complet, `${prefixe}${entree.name}/`, profondeur - 1);
+            if (dirEntry.isDirectory()) {
+                if (depth > 1) walk(fullPath, `${prefix}${dirEntry.name}/`, depth - 1);
                 continue;
             }
-            if (!/\.md$/i.test(entree.name)) continue;
+            if (!/\.md$/i.test(dirEntry.name)) continue;
 
-            let octets = 0;
+            let bytes = 0;
             try {
-                octets = fs.statSync(complet).size;
+                bytes = fs.statSync(fullPath).size;
             } catch (e) {}
 
-            trouves.push({
-                id: `${prefixe}${entree.name}`,
-                titre: titreDocument(complet, entree.name.replace(/\.md$/i, '')),
-                groupe: prefixe ? prefixe.replace(/\/$/, '') : '',
-                octets,
+            docs.push({
+                id: `${prefix}${dirEntry.name}`,
+                title: documentTitle(fullPath, dirEntry.name.replace(/\.md$/i, '')),
+                group: prefix ? prefix.replace(/\/$/, '') : '',
+                bytes,
             });
         }
     };
 
-    explorer(DOSSIER_DOCS, '', PROFONDEUR_DOCS);
+    walk(DOCS_DIR, '', DOCS_DEPTH);
 
     // Racine avant sous-dossiers, et `README` en tête de son groupe : c'est
     // l'ordre dans lequel la documentation se lit, pas l'ordre alphabétique où
     // le sommaire d'un dossier atterrit après les chapitres qu'il annonce.
-    const rang = (doc) => {
-        if (!doc.groupe) return 0;
+    const rank = (doc) => {
+        if (!doc.group) return 0;
         return /(^|\/)README\.md$/i.test(doc.id) ? 1 : 2;
     };
 
-    return trouves.sort((a, b) => {
-        if (a.groupe !== b.groupe) return a.groupe.localeCompare(b.groupe);
-        const ecart = rang(a) - rang(b);
-        if (ecart !== 0) return ecart;
+    return docs.sort((a, b) => {
+        if (a.group !== b.group) return a.group.localeCompare(b.group);
+        const gap = rank(a) - rank(b);
+        if (gap !== 0) return gap;
         return a.id.localeCompare(b.id, 'fr', { numeric: true });
     });
 }
 
 /** Hauteurs vidéo proposées dans l'interface, en pixels. */
-const HAUTEURS_VIDEO_VALIDES = ['2160', '1440', '1080', '720', '480', '360'];
-const HAUTEUR_VIDEO_DEFAUT = 720;
+const VALID_VIDEO_HEIGHTS = ['2160', '1440', '1080', '720', '480', '360'];
+const DEFAULT_VIDEO_HEIGHT = 720;
 
 /**
  * Hauteur vidéo cible.
@@ -270,16 +270,16 @@ const HAUTEUR_VIDEO_DEFAUT = 720;
  */
 function resolveVideoHeight(guildId, track = null) {
     try {
-        const parPiste = String(database.getTrackQuality(track?.url)?.video || '');
-        if (HAUTEURS_VIDEO_VALIDES.includes(parPiste)) return Number(parPiste);
+        const perTrack = String(database.getTrackQuality(track?.url)?.video || '');
+        if (VALID_VIDEO_HEIGHTS.includes(perTrack)) return Number(perTrack);
     } catch (e) {}
 
-    if (!guildId) return HAUTEUR_VIDEO_DEFAUT;
+    if (!guildId) return DEFAULT_VIDEO_HEIGHT;
     try {
-        const choix = String(database.getSettings(guildId).importVideoQuality || '');
-        return HAUTEURS_VIDEO_VALIDES.includes(choix) ? Number(choix) : HAUTEUR_VIDEO_DEFAUT;
+        const choice = String(database.getSettings(guildId).importVideoQuality || '');
+        return VALID_VIDEO_HEIGHTS.includes(choice) ? Number(choice) : DEFAULT_VIDEO_HEIGHT;
     } catch (e) {
-        return HAUTEUR_VIDEO_DEFAUT;
+        return DEFAULT_VIDEO_HEIGHT;
     }
 }
 
@@ -295,7 +295,7 @@ function resolveVideoHeight(guildId, track = null) {
  * @param {object} format
  * @returns {number} 0 = le plus sûr
  */
-function rangCodec(format) {
+function codecRank(format) {
     const codec = String(format?.vcodec || '').toLowerCase();
     if (codec.startsWith('avc') || codec.startsWith('h264')) return 0;
     if (codec.startsWith('vp9') || codec.startsWith('vp09')) return 1;
@@ -305,7 +305,7 @@ function rangCodec(format) {
 }
 
 /** Au-delà de ce rang, le flux est jugé trop incertain pour être servi tel quel. */
-const RANG_CODEC_MAX = 2;
+const MAX_CODEC_RANK = 2;
 
 /**
  * Choisit le format vidéo le plus proche de la hauteur demandée, parmi ceux
@@ -323,30 +323,30 @@ const RANG_CODEC_MAX = 2;
  * @param {number} hauteurCible
  * @returns {object}
  */
-function pickVideoFormat(formats, hauteurCible) {
-    const avecHauteur = formats.filter(f => typeof f.height === 'number' && f.height > 0);
-    if (avecHauteur.length === 0) return formats[0];
+function pickVideoFormat(formats, targetHeight) {
+    const withHeight = formats.filter(f => typeof f.height === 'number' && f.height > 0);
+    if (withHeight.length === 0) return formats[0];
 
     // On ne considère que les codecs sûrs tant qu'il en reste ; sinon il vaut
     // mieux tenter un AV1 que ne rien renvoyer du tout.
-    const surs = avecHauteur.filter(f => rangCodec(f) <= RANG_CODEC_MAX);
-    const candidats = surs.length > 0 ? surs : avecHauteur;
+    const safeCodecs = withHeight.filter(f => codecRank(f) <= MAX_CODEC_RANK);
+    const candidates = safeCodecs.length > 0 ? safeCodecs : withHeight;
 
-    const hauteurs = [...new Set(candidats.map(f => f.height))];
-    let hauteurRetenue;
+    const heights = [...new Set(candidates.map(f => f.height))];
+    let chosenHeight;
 
-    if (hauteurs.includes(hauteurCible)) {
-        hauteurRetenue = hauteurCible;
+    if (heights.includes(targetHeight)) {
+        chosenHeight = targetHeight;
     } else {
-        const enDessous = hauteurs.filter(h => h < hauteurCible).sort((a, b) => b - a);
-        hauteurRetenue = enDessous.length > 0
-            ? enDessous[0]
-            : hauteurs.sort((a, b) => a - b)[0];
+        const below = heights.filter(h => h < targetHeight).sort((a, b) => b - a);
+        chosenHeight = below.length > 0
+            ? below[0]
+            : heights.sort((a, b) => a - b)[0];
     }
 
-    return candidats
-        .filter(f => f.height === hauteurRetenue)
-        .sort((a, b) => (rangCodec(a) - rangCodec(b)) || ((b.tbr || 0) - (a.tbr || 0)))[0];
+    return candidates
+        .filter(f => f.height === chosenHeight)
+        .sort((a, b) => (codecRank(a) - codecRank(b)) || ((b.tbr || 0) - (a.tbr || 0)))[0];
 }
 
 function createApiRouter(webServer) {
@@ -366,18 +366,18 @@ function createApiRouter(webServer) {
      * une installation qui ne connaît encore aucun serveur.
      */
     router.get('/invite', (req, res) => {
-        const url = webServer.lienInvitation();
+        const url = webServer.inviteLink();
         if (!url) return res.status(503).json({ error: 'Bot non connecté à Discord' });
         res.json({ inviteUrl: url });
     });
 
     router.get('/version', (req, res) => {
         const versioning = require('../../versioning');
-        const courante = versioning.versionCourante();
+        const current = versioning.currentVersion();
         res.json({
-            type: courante.type,
-            tag: courante.tag,
-            versionPackage: courante.versionPackage,
+            type: current.type,
+            tag: current.tag,
+            packageVersion: current.packageVersion,
         });
     });
 
@@ -403,7 +403,7 @@ function createApiRouter(webServer) {
      * bord (voir js/docs.js).
      */
     router.get('/docs', (req, res) => {
-        res.json({ documents: inventaireDocs() });
+        res.json({ documents: listDocuments() });
     });
 
     /**
@@ -415,20 +415,20 @@ function createApiRouter(webServer) {
      * rien à contourner — elle ne correspond simplement à aucune entrée.
      */
     router.get('/docs/contenu', (req, res) => {
-        const demande = String(req.query.id || '');
-        const document = inventaireDocs().find((d) => d.id === demande);
+        const requestedId = String(req.query.id || '');
+        const document = listDocuments().find((d) => d.id === requestedId);
         if (!document) return res.status(404).json({ error: 'Document introuvable' });
 
-        const chemin = path.join(DOSSIER_DOCS, ...document.id.split('/'));
+        const docPath = path.join(DOCS_DIR, ...document.id.split('/'));
         let source;
         try {
-            source = fs.readFileSync(chemin, 'utf8');
+            source = fs.readFileSync(docPath, 'utf8');
         } catch (err) {
             log.error(`[WebServer Docs] Lecture impossible pour ${document.id} :`, err.message);
             return res.status(500).json({ error: 'Document illisible' });
         }
 
-        res.json({ id: document.id, titre: document.titre, groupe: document.groupe, source });
+        res.json({ id: document.id, title: document.title, group: document.group, source });
     });
 
     router.get('/state', (req, res) => {
@@ -438,7 +438,7 @@ function createApiRouter(webServer) {
         // n'est plus lu qu'au démarrage du bot, où il devient précisément ce
         // salon courant. Le relire ici le ferait primer sur toute sélection
         // ultérieure — un tableau de bord ne pourrait plus en changer.
-        let salonCourantId = null;
+        let currentChannelId = null;
 
         // Le dernier salon visité, comme à l'ouverture d'un tableau de bord
         // (cf. `WebServer._initClient`).
@@ -447,7 +447,7 @@ function createApiRouter(webServer) {
             const guild = webServer.client.guilds.cache.get(lastChannelInfo.guildId);
             if (guild && guild.channels.cache.has(lastChannelInfo.channelId)) {
                 targetGuildId = lastChannelInfo.guildId;
-                salonCourantId = lastChannelInfo.channelId;
+                currentChannelId = lastChannelInfo.channelId;
             }
         }
 
@@ -456,7 +456,7 @@ function createApiRouter(webServer) {
         }
 
         if (!targetGuildId) return res.status(400).json({ error: 'Bot non connecté aux serveurs Discord' });
-        res.json(webServer.getState(targetGuildId, salonCourantId));
+        res.json(webServer.getState(targetGuildId, currentChannelId));
     });
 
     router.get('/stream', async (req, res) => {
@@ -800,10 +800,10 @@ function createApiRouter(webServer) {
             return res.status(404).json({ error: 'Local audio file, no video extraction needed' });
         }
 
-        const hauteurCible = resolveVideoHeight(guildId || webServer._getFirstGuildId(), { url: trackUrl });
+        const targetHeight = resolveVideoHeight(guildId || webServer._getFirstGuildId(), { url: trackUrl });
         // La hauteur entre dans la clé : changer de qualité doit relancer une
         // résolution, pas resservir l'entrée mise en cache pour l'ancienne.
-        const cacheKey = `${targetQuery.toLowerCase()}|${hauteurCible}`;
+        const cacheKey = `${targetQuery.toLowerCase()}|${targetHeight}`;
         if (videoCache.has(cacheKey)) {
             const cached = videoCache.get(cacheKey);
             if (Date.now() - cached.timestamp < 3600000) {
@@ -838,10 +838,10 @@ function createApiRouter(webServer) {
                 return res.status(404).json({ error: 'Aucun flux vidéo trouvé' });
             }
 
-            const optimal = pickVideoFormat(formats, hauteurCible);
+            const optimal = pickVideoFormat(formats, targetHeight);
 
-            if (optimal.height && optimal.height !== hauteurCible) {
-                log.info(`[WebServer Video-Info] ${hauteurCible}p indisponible dans un codec lisible pour `
+            if (optimal.height && optimal.height !== targetHeight) {
+                log.info(`[WebServer Video-Info] ${targetHeight}p indisponible dans un codec lisible pour `
                     + `« ${entry.title || targetQuery} » : ${optimal.height}p (${optimal.vcodec || '?'}) servi à la place.`);
             }
 
@@ -850,7 +850,7 @@ function createApiRouter(webServer) {
                 height: optimal.height,
                 // Hauteur demandée : le client peut ainsi signaler l'écart sans
                 // relire les réglages.
-                requestedHeight: hauteurCible,
+                requestedHeight: targetHeight,
                 codec: optimal.vcodec || null,
                 format: optimal.ext || 'mp4',
                 title: entry.title || title || '',

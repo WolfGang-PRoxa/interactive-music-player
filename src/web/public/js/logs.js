@@ -36,10 +36,10 @@ function normalizeLevel(level) {
 /** Ligne servant de point de départ aux sélections par plage. */
 let logAnchor = null;
 
-function tr(cle, defaut) {
+function tr(key, fallback) {
     const t = window.MusicPlayer && window.MusicPlayer.t;
-    const valeur = typeof t === 'function' ? t(cle) : null;
-    return (valeur && valeur !== cle) ? valeur : defaut;
+    const value = typeof t === 'function' ? t(key) : null;
+    return (value && value !== key) ? value : fallback;
 }
 
 function notifier(message) {
@@ -55,10 +55,10 @@ function notifier(message) {
  * tableau de bord est consulté par son adresse IP en HTTP (HOST=0.0.0.0). Le
  * repli par zone de texte cachée couvre ce cas.
  */
-async function copierTexte(texte) {
+async function copyText(text) {
     try {
         if (navigator.clipboard && window.isSecureContext) {
-            await navigator.clipboard.writeText(texte);
+            await navigator.clipboard.writeText(text);
             return true;
         }
     } catch (e) {
@@ -66,7 +66,7 @@ async function copierTexte(texte) {
     }
     try {
         const zone = document.createElement('textarea');
-        zone.value = texte;
+        zone.value = text;
         zone.setAttribute('readonly', '');
         zone.style.position = 'fixed';
         zone.style.top = '-1000px';
@@ -81,67 +81,67 @@ async function copierTexte(texte) {
     }
 }
 
-async function copierLignes(lignes) {
-    if (!lignes.length) {
+async function copyLines(lines) {
+    if (!lines.length) {
         notifier(tr('logs_copy_empty', 'Aucune ligne à copier.'));
         return;
     }
-    const ok = await copierTexte(lignes.join('\n'));
+    const ok = await copyText(lines.join('\n'));
     if (ok) {
-        notifier(lignes.length === 1
+        notifier(lines.length === 1
             ? tr('logs_copied_one', 'Ligne copiée.')
-            : `${lignes.length} ${tr('logs_copied_many', 'lignes copiées.')}`);
+            : `${lines.length} ${tr('logs_copied_many', 'lignes copiées.')}`);
     } else {
         notifier(tr('logs_copy_failed', 'Copie impossible dans ce navigateur.'));
     }
 }
 
 /** Lignes actuellement affichées, filtres actifs pris en compte. */
-function entreesVisibles() {
+function visibleEntries() {
     const conteneur = document.getElementById('logs-terminal-container');
     if (!conteneur) return [];
     return [...conteneur.querySelectorAll('.log-entry:not(.filtered-out)')];
 }
 
-function entreesSelectionnees() {
+function selectedEntries() {
     const conteneur = document.getElementById('logs-terminal-container');
     if (!conteneur) return [];
     return [...conteneur.querySelectorAll('.log-entry.log-selected')];
 }
 
-function viderSelection() {
-    entreesSelectionnees().forEach(el => el.classList.remove('log-selected'));
+function clearSelection() {
+    selectedEntries().forEach(el => el.classList.remove('log-selected'));
 }
 
 /** Sélectionne toutes les lignes visibles entre deux bornes, incluses. */
-function selectionnerPlage(depuis, jusqua) {
-    const visibles = entreesVisibles();
-    const i = visibles.indexOf(depuis);
-    const j = visibles.indexOf(jusqua);
+function selectRange(since, jusqua) {
+    const visibleOnes = visibleEntries();
+    const i = visibleOnes.indexOf(since);
+    const j = visibleOnes.indexOf(jusqua);
     if (i === -1 || j === -1) return;
 
-    viderSelection();
-    const [debut, fin] = i <= j ? [i, j] : [j, i];
-    for (let k = debut; k <= fin; k++) {
-        visibles[k].classList.add('log-selected');
+    clearSelection();
+    const [start, endIdx] = i <= j ? [i, j] : [j, i];
+    for (let k = start; k <= endIdx; k++) {
+        visibleOnes[k].classList.add('log-selected');
     }
 }
 
 window.MusicPlayer.updateLogsSelectionBar = function() {
-    const barre = document.getElementById('logs-selection-bar');
-    const compteur = document.getElementById('logs-selection-count');
-    if (!barre) return;
+    const bar = document.getElementById('logs-selection-bar');
+    const counter = document.getElementById('logs-selection-count');
+    if (!bar) return;
 
-    const nb = entreesSelectionnees().length;
-    if (nb === 0) {
-        barre.classList.add('hidden');
+    const count = selectedEntries().length;
+    if (count === 0) {
+        bar.classList.add('hidden');
         return;
     }
-    barre.classList.remove('hidden');
-    if (compteur) {
-        compteur.textContent = nb === 1
+    bar.classList.remove('hidden');
+    if (counter) {
+        counter.textContent = count === 1
             ? `1 ${tr('logs_selected_one', 'ligne sélectionnée')}`
-            : `${nb} ${tr('logs_selected_many', 'lignes sélectionnées')}`;
+            : `${count} ${tr('logs_selected_many', 'lignes sélectionnées')}`;
     }
 };
 
@@ -150,7 +150,7 @@ window.MusicPlayer.setupLogsSelection = function() {
     if (!conteneur || conteneur.dataset.selectionReady) return;
     conteneur.dataset.selectionReady = '1';
 
-    const majBarre = window.MusicPlayer.updateLogsSelectionBar;
+    const updateBar = window.MusicPlayer.updateLogsSelectionBar;
 
     // Maj+clic étendrait la sélection de texte native : on la neutralise ici,
     // au moment du mousedown, avant que le navigateur ne s'en saisisse.
@@ -159,75 +159,75 @@ window.MusicPlayer.setupLogsSelection = function() {
     });
 
     conteneur.addEventListener('click', async (e) => {
-        const boutonCopie = e.target.closest('.log-copy-btn');
-        if (boutonCopie) {
+        const copyButton = e.target.closest('.log-copy-btn');
+        if (copyButton) {
             e.stopPropagation();
-            const entree = boutonCopie.closest('.log-entry');
-            if (entree) await copierLignes([entree.dataset.copy || entree.textContent.trim()]);
+            const entryEl = copyButton.closest('.log-entry');
+            if (entryEl) await copyLines([entryEl.dataset.copy || entryEl.textContent.trim()]);
             return;
         }
 
-        const entree = e.target.closest('.log-entry');
-        if (!entree) return;
+        const entryEl = e.target.closest('.log-entry');
+        if (!entryEl) return;
 
         // Un glissement ayant sélectionné du texte n'est pas un clic de sélection
-        const selectionTexte = window.getSelection();
-        if (selectionTexte && selectionTexte.toString().trim().length > 0) return;
+        const textSelection = window.getSelection();
+        if (textSelection && textSelection.toString().trim().length > 0) return;
 
         if (e.shiftKey && logAnchor && logAnchor.isConnected) {
-            selectionnerPlage(logAnchor, entree);
+            selectRange(logAnchor, entryEl);
         } else if (e.ctrlKey || e.metaKey) {
-            entree.classList.toggle('log-selected');
-            logAnchor = entree;
+            entryEl.classList.toggle('log-selected');
+            logAnchor = entryEl;
         } else {
-            const seuleEtDejaChoisie = entree.classList.contains('log-selected')
-                && entreesSelectionnees().length === 1;
-            viderSelection();
+            const seuleEtDejaChoisie = entryEl.classList.contains('log-selected')
+                && selectedEntries().length === 1;
+            clearSelection();
             if (!seuleEtDejaChoisie) {
-                entree.classList.add('log-selected');
-                logAnchor = entree;
+                entryEl.classList.add('log-selected');
+                logAnchor = entryEl;
             }
         }
-        majBarre();
+        updateBar();
     });
 
     // Raccourcis clavier
     document.addEventListener('keydown', async (e) => {
-        if (e.key === 'Escape' && entreesSelectionnees().length > 0) {
-            viderSelection();
-            majBarre();
+        if (e.key === 'Escape' && selectedEntries().length > 0) {
+            clearSelection();
+            updateBar();
             return;
         }
         if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
-            const selection = entreesSelectionnees();
+            const selection = selectedEntries();
             if (selection.length === 0) return;
             // Une sélection de texte native reste prioritaire
-            const texteNatif = window.getSelection();
-            if (texteNatif && texteNatif.toString().trim().length > 0) return;
+            const nativeText = window.getSelection();
+            if (nativeText && nativeText.toString().trim().length > 0) return;
             e.preventDefault();
-            await copierLignes(selection.map(el => el.dataset.copy || el.textContent.trim()));
+            await copyLines(selection.map(el => el.dataset.copy || el.textContent.trim()));
         }
     });
 
-    const btnCopierSelection = document.getElementById('btn-copy-selection');
-    if (btnCopierSelection) {
-        btnCopierSelection.addEventListener('click', async () => {
-            await copierLignes(entreesSelectionnees().map(el => el.dataset.copy || el.textContent.trim()));
+    const btnCopySelection = document.getElementById('btn-copy-selection');
+    if (btnCopySelection) {
+        btnCopySelection.addEventListener('click', async () => {
+            await copyLines(selectedEntries().map(el => el.dataset.copy || el.textContent.trim()));
         });
     }
 
-    const btnViderSelection = document.getElementById('btn-clear-selection');
-    if (btnViderSelection) {
-        btnViderSelection.addEventListener('click', () => {
-            viderSelection();
-            majBarre();
+    const btnClearSelection = document.getElementById('btn-clear-selection');
+    if (btnClearSelection) {
+        btnClearSelection.addEventListener('click', () => {
+            clearSelection();
+            updateBar();
         });
     }
 
-    const btnCopierTout = document.getElementById('btn-copy-logs');
-    if (btnCopierTout) {
-        btnCopierTout.addEventListener('click', async () => {
-            await copierLignes(entreesVisibles().map(el => el.dataset.copy || el.textContent.trim()));
+    const btnCopyAll = document.getElementById('btn-copy-logs');
+    if (btnCopyAll) {
+        btnCopyAll.addEventListener('click', async () => {
+            await copyLines(visibleEntries().map(el => el.dataset.copy || el.textContent.trim()));
         });
     }
 };

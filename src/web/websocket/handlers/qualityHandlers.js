@@ -10,9 +10,9 @@ const preloadManager = require('../../../audio/PreloadManager');
 const log = require('../../../utils/logger');
 
 /** Débits MP3 proposés dans l'interface, en kbps. */
-const DEBITS_AUDIO_VALIDES = ['320', '256', '192', '128', '96'];
+const VALID_AUDIO_BITRATES = ['320', '256', '192', '128', '96'];
 /** Hauteurs vidéo proposées dans l'interface, en pixels. */
-const HAUTEURS_VIDEO_VALIDES = ['2160', '1440', '1080', '720', '480', '360'];
+const VALID_VIDEO_HEIGHTS = ['2160', '1440', '1080', '720', '480', '360'];
 
 /**
  * Change la qualité audio et/ou vidéo retenue pour une piste.
@@ -33,10 +33,10 @@ function handleSetTrackQuality(ctx) {
     if (!url) return;
 
     const patch = {};
-    if (audio !== undefined && DEBITS_AUDIO_VALIDES.includes(String(audio))) {
+    if (audio !== undefined && VALID_AUDIO_BITRATES.includes(String(audio))) {
         patch.audio = String(audio);
     }
-    if (video !== undefined && HAUTEURS_VIDEO_VALIDES.includes(String(video))) {
+    if (video !== undefined && VALID_VIDEO_HEIGHTS.includes(String(video))) {
         patch.video = String(video);
     }
     if (Object.keys(patch).length === 0) return;

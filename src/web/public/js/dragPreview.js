@@ -71,17 +71,17 @@
         node.classList.add('drag-preview');
         node.removeAttribute('id');
 
-        const fixe = (prop, valeur) => node.style.setProperty(prop, valeur, 'important');
-        fixe('width', `${rect.width}px`);
-        fixe('height', `${rect.height}px`);
-        fixe('margin', '0');
-        fixe('opacity', '1');
+        const fixed = (prop, value) => node.style.setProperty(prop, value, 'important');
+        fixed('width', `${rect.width}px`);
+        fixed('height', `${rect.height}px`);
+        fixed('margin', '0');
+        fixed('opacity', '1');
         // Neutralisé ici, puis repositionné par l'appelant : `.is-dragging`
         // pose un `scale()` en !important qui écraserait tout translate.
-        fixe('transform', 'none');
-        fixe('transition', 'none');
-        fixe('animation', 'none');
-        fixe('pointer-events', 'none');
+        fixed('transform', 'none');
+        fixed('transition', 'none');
+        fixed('animation', 'none');
+        fixed('pointer-events', 'none');
 
         return { node, rect };
     }

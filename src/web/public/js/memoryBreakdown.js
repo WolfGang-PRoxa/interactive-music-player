@@ -35,29 +35,29 @@
     const COUT_ELEMENT = 256;
     const COUT_ATTRIBUT = 48;
     const COUT_CARACTERE = 2;      // chaînes UTF-16
-    const OCTETS_PAR_PIXEL = 4;    // RGBA
+    const BYTES_PER_PIXEL = 4;    // RGBA
     const PERIODE_MS = 2000;
     /** Au-delà, les zones les plus légères sont fondues dans « Autres ». */
-    const LIGNES_MAX = 8;
+    const MAX_ROWS = 8;
 
     const PALETTE = [
         '#5865f2', '#00f3ff', '#eb459e', '#26de81', '#f7b731',
         '#a55eea', '#fd9644', '#45aaf2', '#2bcbba', '#fc5c65'
     ];
-    const COULEUR_ELEMENTS = '#5865f2';
-    const COULEUR_TAS = '#00f3ff';
-    const COULEUR_CODE = '#f7b731';
+    const ELEMENTS_COLOR = '#5865f2';
+    const HEAP_COLOR = '#00f3ff';
+    const CODE_COLOR = '#f7b731';
 
-    let minuteur = null;
+    let timer = null;
 
-    function tr(cle, defaut) {
+    function tr(key, fallback) {
         const t = window.MusicPlayer && window.MusicPlayer.t;
-        const valeur = typeof t === 'function' ? t(cle) : null;
-        return (valeur && valeur !== cle) ? valeur : defaut;
+        const value = typeof t === 'function' ? t(key) : null;
+        return (value && value !== key) ? value : fallback;
     }
 
-    function formatOctets(octets) {
-        const v = Math.max(0, octets || 0);
+    function formatBytes(bytes) {
+        const v = Math.max(0, bytes || 0);
         const ko = tr('unit_kb', 'Ko');
         const mo = tr('unit_mb', 'Mo');
         const go = tr('unit_gb', 'Go');
@@ -67,7 +67,7 @@
         return `${Math.round(v)} o`;
     }
 
-    function nombreCourt(n) {
+    function shortCount(n) {
         return (n || 0).toLocaleString();
     }
 
@@ -77,93 +77,93 @@
      * Place occupée par la bitmap d'un élément — la seule mémoire d'affichage
      * réellement calculable depuis la page.
      */
-    function octetsBitmap(el) {
+    function bitmapBytes(el) {
         switch (el.tagName) {
             case 'IMG':
                 return (el.complete && el.naturalWidth)
-                    ? el.naturalWidth * el.naturalHeight * OCTETS_PAR_PIXEL : 0;
+                    ? el.naturalWidth * el.naturalHeight * BYTES_PER_PIXEL : 0;
             case 'CANVAS':
-                return (el.width || 0) * (el.height || 0) * OCTETS_PAR_PIXEL;
+                return (el.width || 0) * (el.height || 0) * BYTES_PER_PIXEL;
             case 'VIDEO':
                 // Une image décodée. Le nombre de trames gardées en tampon
                 // dépend du décodeur et n'est pas exposé.
-                return (el.videoWidth || 0) * (el.videoHeight || 0) * OCTETS_PAR_PIXEL;
+                return (el.videoWidth || 0) * (el.videoHeight || 0) * BYTES_PER_PIXEL;
             default:
                 return 0;
         }
     }
 
     /** Parcourt une zone une seule fois et en compte le contenu. */
-    function peserZone(racine) {
-        if (!racine) return null;
+    function weighZone(root) {
+        if (!root) return null;
 
         let elements = 0;
-        let attributs = 0;
+        let attrs = 0;
         let caracteres = 0;
         let bitmaps = 0;
         let images = 0;
 
-        const marcheur = document.createTreeWalker(
-            racine,
+        const walker = document.createTreeWalker(
+            root,
             NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT
         );
 
-        let noeud = racine;   // la racine elle-même fait partie de la zone
-        while (noeud) {
-            if (noeud.nodeType === 1) {
+        let node = root;   // la racine elle-même fait partie de la zone
+        while (node) {
+            if (node.nodeType === 1) {
                 elements++;
-                attributs += noeud.attributes ? noeud.attributes.length : 0;
-                const bitmap = octetsBitmap(noeud);
+                attrs += node.attributes ? node.attributes.length : 0;
+                const bitmap = bitmapBytes(node);
                 if (bitmap > 0) {
                     bitmaps += bitmap;
                     images++;
                 }
-            } else if (noeud.nodeType === 3 && noeud.nodeValue) {
-                caracteres += noeud.nodeValue.length;
+            } else if (node.nodeType === 3 && node.nodeValue) {
+                caracteres += node.nodeValue.length;
             }
-            noeud = marcheur.nextNode();
+            node = walker.nextNode();
         }
 
         return {
-            elements, attributs, caracteres, bitmaps, images,
-            octets: elements * COUT_ELEMENT
-                  + attributs * COUT_ATTRIBUT
+            elements, attrs, caracteres, bitmaps, images,
+            bytes: elements * COUT_ELEMENT
+                  + attrs * COUT_ATTRIBUT
                   + caracteres * COUT_CARACTERE
                   + bitmaps
         };
     }
 
-    function additionner(a, b) {
+    function addTotals(a, b) {
         return {
             elements: a.elements + b.elements,
-            attributs: a.attributs + b.attributs,
+            attrs: a.attrs + b.attrs,
             caracteres: a.caracteres + b.caracteres,
             bitmaps: a.bitmaps + b.bitmaps,
             images: a.images + b.images,
-            octets: a.octets + b.octets
+            bytes: a.bytes + b.bytes
         };
     }
 
-    function soustraire(a, b) {
+    function subtractTotals(a, b) {
         return {
             elements: Math.max(0, a.elements - b.elements),
-            attributs: Math.max(0, a.attributs - b.attributs),
+            attrs: Math.max(0, a.attrs - b.attrs),
             caracteres: Math.max(0, a.caracteres - b.caracteres),
             bitmaps: Math.max(0, a.bitmaps - b.bitmaps),
             images: Math.max(0, a.images - b.images),
-            octets: Math.max(0, a.octets - b.octets)
+            bytes: Math.max(0, a.bytes - b.bytes)
         };
     }
 
-    const ZERO = { elements: 0, attributs: 0, caracteres: 0, bitmaps: 0, images: 0, octets: 0 };
+    const ZERO = { elements: 0, attrs: 0, caracteres: 0, bitmaps: 0, images: 0, bytes: 0 };
 
     /** Titre visible d'une carte, débarrassé de sa poignée et de son cadenas. */
-    function titreCarte(carte) {
-        const titre = carte.querySelector('.card-title');
-        if (!titre) return carte.id || '?';
-        const copie = titre.cloneNode(true);
+    function cardTitle(card) {
+        const title = card.querySelector('.card-title');
+        if (!title) return card.id || '?';
+        const copie = title.cloneNode(true);
         copie.querySelectorAll('svg, button').forEach(el => el.remove());
-        return copie.textContent.trim() || carte.id;
+        return copie.textContent.trim() || card.id;
     }
 
     /**
@@ -171,12 +171,12 @@
      * modales, menus contextuels, décor — est déduit par soustraction.
      */
     function zonesMesurables() {
-        const liste = [];
+        const list = [];
 
-        const grille = document.getElementById('dashboard-grid');
-        if (grille) {
-            grille.querySelectorAll(':scope > .card').forEach(carte => {
-                liste.push({ cle: carte.id, libelle: titreCarte(carte), element: carte });
+        const grid = document.getElementById('dashboard-grid');
+        if (grid) {
+            grid.querySelectorAll(':scope > .card').forEach(card => {
+                list.push({ key: card.id, label: cardTitle(card), element: card });
             });
         }
 
@@ -185,58 +185,58 @@
             ['video-floating-window', 'mem_zone_video', 'Fenêtre vidéo'],
             ['logs-floating-window', 'mem_zone_logs', 'Fenêtre des journaux'],
             ['drawer-panel', 'mem_zone_drawer', 'Tiroir']
-        ].forEach(([id, cle, defaut]) => {
+        ].forEach(([id, key, fallback]) => {
             const el = document.getElementById(id);
-            if (el) liste.push({ cle: id, libelle: tr(cle, defaut), element: el });
+            if (el) list.push({ key: id, label: tr(key, fallback), element: el });
         });
 
-        return liste;
+        return list;
     }
 
-    function mesurerElements() {
-        const total = peserZone(document.body) || ZERO;
+    function measureElements() {
+        const total = weighZone(document.body) || ZERO;
         const zones = zonesMesurables();
 
-        let cumul = ZERO;
-        const lignes = zones.map((zone, i) => {
-            const poids = peserZone(zone.element) || ZERO;
-            cumul = additionner(cumul, poids);
-            return { cle: zone.cle, libelle: zone.libelle, poids, couleur: PALETTE[i % PALETTE.length] };
+        let running = ZERO;
+        const rows = zones.map((zone, i) => {
+            const weight = weighZone(zone.element) || ZERO;
+            running = addTotals(running, weight);
+            return { key: zone.key, label: zone.label, weight, color: PALETTE[i % PALETTE.length] };
         });
 
         // Tout ce que le document contient hors des zones nommées.
-        lignes.push({
-            cle: '__reste__',
-            libelle: tr('mem_zone_other', 'Autres éléments'),
-            poids: soustraire(total, cumul),
-            couleur: 'rgba(160, 160, 176, 0.75)'
+        rows.push({
+            key: '__reste__',
+            label: tr('mem_zone_other', 'Autres éléments'),
+            weight: subtractTotals(total, running),
+            color: 'rgba(160, 160, 176, 0.75)'
         });
 
-        lignes.sort((a, b) => b.poids.octets - a.poids.octets);
+        rows.sort((a, b) => b.weight.bytes - a.weight.bytes);
 
         // Les zones les plus légères rejoignent le fourre-tout, qui ferme la
         // liste. On repart d'un cumul unique : le fourre-tout figure déjà
         // parmi les lignes triées, et en créer un second le dédoublerait.
-        if (lignes.length > LIGNES_MAX) {
+        if (rows.length > MAX_ROWS) {
             const gardees = [];
-            let reste = ZERO;
-            for (const l of lignes) {
-                if (gardees.length < LIGNES_MAX - 1 && l.cle !== '__reste__') {
+            let remainder = ZERO;
+            for (const l of rows) {
+                if (gardees.length < MAX_ROWS - 1 && l.key !== '__reste__') {
                     gardees.push(l);
                 } else {
-                    reste = additionner(reste, l.poids);
+                    remainder = addTotals(remainder, l.weight);
                 }
             }
             gardees.push({
-                cle: '__reste__',
-                libelle: tr('mem_zone_other', 'Autres éléments'),
-                poids: reste,
-                couleur: 'rgba(160, 160, 176, 0.75)'
+                key: '__reste__',
+                label: tr('mem_zone_other', 'Autres éléments'),
+                weight: remainder,
+                color: 'rgba(160, 160, 176, 0.75)'
             });
-            return { total, lignes: gardees };
+            return { total, rows: gardees };
         }
 
-        return { total, lignes };
+        return { total, rows };
     }
 
     // ── Mesure hors DOM ─────────────────────────────────────────────
@@ -245,7 +245,7 @@
     function tasJavaScript() {
         const m = window.performance && window.performance.memory;
         if (!m || typeof m.usedJSHeapSize !== 'number') return null;
-        return { utilise: m.usedJSHeapSize, total: m.totalJSHeapSize, limite: m.jsHeapSizeLimit };
+        return { utilise: m.usedJSHeapSize, total: m.totalJSHeapSize, limit: m.jsHeapSizeLimit };
     }
 
     /**
@@ -256,17 +256,17 @@
     function codeCharge() {
         if (!window.performance || typeof window.performance.getEntriesByType !== 'function') return null;
         const types = ['script', 'link', 'css'];
-        let octets = 0;
-        let nombre = 0;
+        let bytes = 0;
+        let count = 0;
         for (const e of window.performance.getEntriesByType('resource')) {
             if (!types.includes(e.initiatorType)) continue;
-            const taille = e.decodedBodySize || 0;
-            if (taille > 0) {
-                octets += taille;
-                nombre++;
+            const size = e.decodedBodySize || 0;
+            if (size > 0) {
+                bytes += size;
+                count++;
             }
         }
-        return { octets, nombre };
+        return { bytes, count };
     }
 
     /**
@@ -274,173 +274,173 @@
      * annoncée est celle de leur forme sérialisée : un ordre de grandeur
      * comparable d'une ligne à l'autre, pas l'empreinte exacte dans le tas.
      */
-    function donneesConservees() {
-        const etat = window.MusicPlayer.state || {};
-        const lignes = [];
+    function retainedData() {
+        const state = window.MusicPlayer.state || {};
+        const rows = [];
 
-        const ajouter = (libelle, valeur, nombre) => {
-            if (!valeur) return;
-            let taille = 0;
+        const add = (label, value, count) => {
+            if (!value) return;
+            let size = 0;
             try {
-                taille = JSON.stringify(valeur).length;
+                size = JSON.stringify(value).length;
             } catch (e) {
                 return;
             }
-            if (taille <= 2) return;
-            lignes.push({ libelle, octets: taille, nombre });
+            if (size <= 2) return;
+            rows.push({ label, bytes: size, count });
         };
 
-        ajouter(tr('card_queue', "File d'attente"), etat.queue, (etat.queue || []).length);
-        ajouter(tr('card_history', 'Historique de lecture'), etat.history, (etat.history || []).length);
-        ajouter(tr('card_playlists', 'Playlists'), etat.playlists, (etat.playlists || []).length);
+        add(tr('card_queue', "File d'attente"), state.queue, (state.queue || []).length);
+        add(tr('card_history', 'Historique de lecture'), state.history, (state.history || []).length);
+        add(tr('card_playlists', 'Playlists'), state.playlists, (state.playlists || []).length);
 
-        const journaux = window.MusicPlayer.logsHistory;
-        if (Array.isArray(journaux)) {
-            ajouter(tr('mem_data_logs', 'Journaux'), journaux, journaux.length);
+        const logs = window.MusicPlayer.logsHistory;
+        if (Array.isArray(logs)) {
+            add(tr('mem_data_logs', 'Journaux'), logs, logs.length);
         }
 
-        if (typeof window.MusicPlayer.empreinteGraphique === 'function') {
-            const g = window.MusicPlayer.empreinteGraphique();
-            if (g && g.octets > 0) {
-                lignes.push({
-                    libelle: tr('mem_data_graph', 'Mesures du graphique'),
-                    octets: g.octets,
-                    nombre: g.mesures
+        if (typeof window.MusicPlayer.graphicsFingerprint === 'function') {
+            const g = window.MusicPlayer.graphicsFingerprint();
+            if (g && g.bytes > 0) {
+                rows.push({
+                    label: tr('mem_data_graph', 'Mesures du graphique'),
+                    bytes: g.bytes,
+                    count: g.samples
                 });
             }
         }
 
-        lignes.sort((a, b) => b.octets - a.octets);
-        return lignes;
+        rows.sort((a, b) => b.bytes - a.bytes);
+        return rows;
     }
 
     // ── Rendu ───────────────────────────────────────────────────────
 
-    function creerLigne(couleur, libelle, detail, valeur, fraction) {
-        const ligne = document.createElement('div');
-        ligne.className = 'breakdown-row';
+    function buildRow(color, label, detail, value, fraction) {
+        const row = document.createElement('div');
+        row.className = 'breakdown-row';
 
-        const jauge = document.createElement('div');
-        jauge.className = 'breakdown-rowbar';
-        jauge.style.width = `${Math.max(0, Math.min(100, fraction * 100)).toFixed(1)}%`;
-        jauge.style.background = couleur;
-        ligne.appendChild(jauge);
+        const gauge = document.createElement('div');
+        gauge.className = 'breakdown-rowbar';
+        gauge.style.width = `${Math.max(0, Math.min(100, fraction * 100)).toFixed(1)}%`;
+        gauge.style.background = color;
+        row.appendChild(gauge);
 
         const pastille = document.createElement('span');
         pastille.className = 'breakdown-dot';
-        pastille.style.background = couleur;
-        ligne.appendChild(pastille);
+        pastille.style.background = color;
+        row.appendChild(pastille);
 
-        const nom = document.createElement('span');
-        nom.className = 'breakdown-label';
-        nom.textContent = libelle;
-        ligne.appendChild(nom);
+        const nameEl = document.createElement('span');
+        nameEl.className = 'breakdown-label';
+        nameEl.textContent = label;
+        row.appendChild(nameEl);
 
         if (detail) {
             const det = document.createElement('span');
             det.className = 'breakdown-detail';
             det.textContent = detail;
-            ligne.appendChild(det);
+            row.appendChild(det);
         }
 
-        const val = document.createElement('span');
-        val.className = 'breakdown-value';
-        val.textContent = valeur;
-        ligne.appendChild(val);
+        const valueEl = document.createElement('span');
+        valueEl.className = 'breakdown-value';
+        valueEl.textContent = value;
+        row.appendChild(valueEl);
 
-        return ligne;
+        return row;
     }
 
-    function creerTitreGroupe(libelle, valeur) {
-        const titre = document.createElement('div');
-        titre.className = 'breakdown-group-title';
+    function buildGroupTitle(label, value) {
+        const title = document.createElement('div');
+        title.className = 'breakdown-group-title';
 
-        const nom = document.createElement('span');
-        nom.textContent = libelle;
-        titre.appendChild(nom);
+        const nameEl = document.createElement('span');
+        nameEl.textContent = label;
+        title.appendChild(nameEl);
 
-        const val = document.createElement('span');
-        val.textContent = valeur;
-        titre.appendChild(val);
+        const valueEl = document.createElement('span');
+        valueEl.textContent = value;
+        title.appendChild(valueEl);
 
-        return titre;
+        return title;
     }
 
-    function rendre() {
-        const liste = document.getElementById('breakdown-list');
-        const barre = document.getElementById('breakdown-bar');
+    function render() {
+        const list = document.getElementById('breakdown-list');
+        const bar = document.getElementById('breakdown-bar');
         const badge = document.getElementById('breakdown-total');
-        if (!liste || !barre) return;
+        if (!list || !bar) return;
 
-        const elements = mesurerElements();
+        const elements = measureElements();
         const tas = tasJavaScript();
         const code = codeCharge();
 
-        const octetsElements = elements.total.octets;
-        const octetsTas = tas ? tas.utilise : 0;
-        const octetsCode = code ? code.octets : 0;
-        const totalGeneral = octetsElements + octetsTas + octetsCode;
+        const elementBytes = elements.total.bytes;
+        const heapBytes = tas ? tas.utilise : 0;
+        const codeBytes = code ? code.bytes : 0;
+        const grandTotal = elementBytes + heapBytes + codeBytes;
 
-        if (badge) badge.textContent = formatOctets(totalGeneral);
+        if (badge) badge.textContent = formatBytes(grandTotal);
 
         // Barre empilée : uniquement les trois familles, qui ne se recouvrent pas.
-        barre.innerHTML = '';
+        bar.innerHTML = '';
         [
-            [octetsElements, COULEUR_ELEMENTS],
-            [octetsTas, COULEUR_TAS],
-            [octetsCode, COULEUR_CODE]
-        ].forEach(([octets, couleur]) => {
-            if (octets <= 0 || totalGeneral <= 0) return;
+            [elementBytes, ELEMENTS_COLOR],
+            [heapBytes, HEAP_COLOR],
+            [codeBytes, CODE_COLOR]
+        ].forEach(([bytes, color]) => {
+            if (bytes <= 0 || grandTotal <= 0) return;
             const seg = document.createElement('div');
             seg.className = 'breakdown-seg';
-            seg.style.width = `${(octets / totalGeneral * 100).toFixed(2)}%`;
-            seg.style.background = couleur;
-            barre.appendChild(seg);
+            seg.style.width = `${(bytes / grandTotal * 100).toFixed(2)}%`;
+            seg.style.background = color;
+            bar.appendChild(seg);
         });
 
-        liste.innerHTML = '';
+        list.innerHTML = '';
 
         // ── Groupe 1 : les éléments de la page ──
-        liste.appendChild(creerTitreGroupe(
+        list.appendChild(buildGroupTitle(
             tr('mem_group_elements', 'Éléments du tableau de bord'),
-            formatOctets(octetsElements)
+            formatBytes(elementBytes)
         ));
 
-        const plusLourd = elements.lignes.length > 0 ? elements.lignes[0].poids.octets : 1;
-        const motNoeuds = tr('mem_unit_nodes', 'nœuds');
-        const motImages = tr('mem_unit_images', 'img.');
+        const plusLourd = elements.rows.length > 0 ? elements.rows[0].weight.bytes : 1;
+        const nodesWord = tr('mem_unit_nodes', 'nœuds');
+        const imagesWord = tr('mem_unit_images', 'img.');
 
-        elements.lignes.forEach(l => {
-            let detail = `${nombreCourt(l.poids.elements)} ${motNoeuds}`;
-            if (l.poids.images > 0) {
-                detail += ` · ${l.poids.images} ${motImages} ${formatOctets(l.poids.bitmaps)}`;
+        elements.rows.forEach(l => {
+            let detail = `${shortCount(l.weight.elements)} ${nodesWord}`;
+            if (l.weight.images > 0) {
+                detail += ` · ${l.weight.images} ${imagesWord} ${formatBytes(l.weight.bitmaps)}`;
             }
-            liste.appendChild(creerLigne(
-                l.couleur, l.libelle, detail, formatOctets(l.poids.octets),
-                plusLourd > 0 ? l.poids.octets / plusLourd : 0
+            list.appendChild(buildRow(
+                l.color, l.label, detail, formatBytes(l.weight.bytes),
+                plusLourd > 0 ? l.weight.bytes / plusLourd : 0
             ));
         });
 
         // ── Groupe 2 : tout le reste ──
-        liste.appendChild(creerTitreGroupe(
+        list.appendChild(buildGroupTitle(
             tr('mem_group_other', 'Hors éléments'),
-            formatOctets(octetsTas + octetsCode)
+            formatBytes(heapBytes + codeBytes)
         ));
 
-        const reference = Math.max(octetsTas, octetsCode, 1);
+        const reference = Math.max(heapBytes, codeBytes, 1);
 
         if (tas) {
-            liste.appendChild(creerLigne(
-                COULEUR_TAS,
+            list.appendChild(buildRow(
+                HEAP_COLOR,
                 tr('mem_row_heap', 'Tas JavaScript'),
-                `${formatOctets(tas.total)} ${tr('mem_reserved', 'réservés')}`,
-                formatOctets(tas.utilise),
-                octetsTas / reference
+                `${formatBytes(tas.total)} ${tr('mem_reserved', 'réservés')}`,
+                formatBytes(tas.utilise),
+                heapBytes / reference
             ));
         } else {
             // Firefox et Safari ne publient pas la taille du tas. Mieux vaut
             // le dire que d'avancer un chiffre inventé.
-            liste.appendChild(creerLigne(
+            list.appendChild(buildRow(
                 'rgba(160, 160, 176, 0.75)',
                 tr('mem_row_heap', 'Tas JavaScript'),
                 '',
@@ -454,38 +454,38 @@
         // Ce détail ne dépend pas de la publication du tas par le navigateur :
         // il reste affiché là où celle-ci manque, et c'est même là qu'il
         // renseigne le plus.
-        const donnees = donneesConservees();
-        if (donnees.length > 0) {
+        const data = retainedData();
+        if (data.length > 0) {
             const intro = document.createElement('div');
             intro.className = 'breakdown-sub-intro';
             intro.textContent = tr('mem_of_which', 'dont données conservées (taille sérialisée)');
-            liste.appendChild(intro);
+            list.appendChild(intro);
 
-            donnees.forEach(d => {
-                const sous = document.createElement('div');
-                sous.className = 'breakdown-sub';
+            data.forEach(d => {
+                const sub = document.createElement('div');
+                sub.className = 'breakdown-sub';
 
-                const nom = document.createElement('span');
-                nom.className = 'breakdown-label';
-                nom.textContent = d.libelle + (d.nombre ? ` (${nombreCourt(d.nombre)})` : '');
-                sous.appendChild(nom);
+                const nameEl = document.createElement('span');
+                nameEl.className = 'breakdown-label';
+                nameEl.textContent = d.label + (d.count ? ` (${shortCount(d.count)})` : '');
+                sub.appendChild(nameEl);
 
-                const val = document.createElement('span');
-                val.className = 'breakdown-value';
-                val.textContent = formatOctets(d.octets);
-                sous.appendChild(val);
+                const valueEl = document.createElement('span');
+                valueEl.className = 'breakdown-value';
+                valueEl.textContent = formatBytes(d.bytes);
+                sub.appendChild(valueEl);
 
-                liste.appendChild(sous);
+                list.appendChild(sub);
             });
         }
 
-        if (code && code.octets > 0) {
-            liste.appendChild(creerLigne(
-                COULEUR_CODE,
+        if (code && code.bytes > 0) {
+            list.appendChild(buildRow(
+                CODE_COLOR,
                 tr('mem_row_code', 'Code & styles chargés'),
-                `${code.nombre} ${tr('mem_unit_files', 'fichiers')}`,
-                formatOctets(code.octets),
-                octetsCode / reference
+                `${code.count} ${tr('mem_unit_files', 'fichiers')}`,
+                formatBytes(code.bytes),
+                codeBytes / reference
             ));
         }
     }
@@ -493,7 +493,7 @@
     /** Rendu public, réutilisé au changement de langue. */
     window.MusicPlayer.refreshMemoryBreakdown = function() {
         try {
-            rendre();
+            render();
         } catch (err) {
             console.error('[Répartition mémoire] Rendu impossible :', err);
         }
@@ -503,13 +503,13 @@
      * Le parcours du DOM n'a de sens que si le widget est visible : hors de
      * là, rien ne tourne.
      */
-    window.MusicPlayer.setRepartitionActive = function(actif) {
-        if (minuteur) {
-            clearInterval(minuteur);
-            minuteur = null;
+    window.MusicPlayer.setBreakdownActive = function(active) {
+        if (timer) {
+            clearInterval(timer);
+            timer = null;
         }
-        if (!actif) return;
+        if (!active) return;
         window.MusicPlayer.refreshMemoryBreakdown();
-        minuteur = setInterval(window.MusicPlayer.refreshMemoryBreakdown, PERIODE_MS);
+        timer = setInterval(window.MusicPlayer.refreshMemoryBreakdown, PERIODE_MS);
     };
 })();

@@ -86,7 +86,7 @@ class DuckingManager {
         }
 
         // Informer le serveur web en temps réel
-        this._notifierTableauDeBord();
+        this._notifyDashboard();
     }
 
     /**
@@ -110,7 +110,7 @@ class DuckingManager {
         }
 
         // Informer le serveur web en temps réel
-        this._notifierTableauDeBord();
+        this._notifyDashboard();
     }
 
     /**
@@ -233,7 +233,7 @@ class DuckingManager {
         // parole » ne viendra jamais par un canal qui n'existe plus. Les
         // locuteurs restés inscrits animeraient indéfiniment le tableau de bord,
         // et tiendraient le volume baissé sans que personne ne parle.
-        this.oublierLocuteurs();
+        this.forgetSpeakers();
         if (this._active) {
             this._setupListeners();
         }
@@ -246,7 +246,7 @@ class DuckingManager {
      * salon ou par une coupure de connexion : sans ce ménage, un locuteur reste
      * inscrit pour toujours.
      */
-    oublierLocuteurs() {
+    forgetSpeakers() {
         if (this.activeSpeakers.size === 0) return;
         this.activeSpeakers.clear();
         this._cancelRestoreTimer();
@@ -255,7 +255,7 @@ class DuckingManager {
         if (settings.duckingEnabled && this.volumeController) {
             this.volumeController.duckUp(settings.duckingFade);
         }
-        this._notifierTableauDeBord();
+        this._notifyDashboard();
     }
 
     /**
@@ -265,7 +265,7 @@ class DuckingManager {
      * @param {string} userId
      * @returns {boolean} true si l'utilisateur y figurait
      */
-    oublierLocuteur(userId) {
+    forgetSpeaker(userId) {
         if (!this.activeSpeakers.delete(userId)) return false;
         log.debug(`[Ducking Debug] Locuteur ${userId} retiré : il a quitté le salon en parlant.`);
 
@@ -273,7 +273,7 @@ class DuckingManager {
         if (settings.duckingEnabled && this._countActiveNonIgnored() === 0) {
             this._scheduleRestore(settings.duckingDelay, settings.duckingFade);
         }
-        this._notifierTableauDeBord();
+        this._notifyDashboard();
         return true;
     }
 
@@ -289,7 +289,7 @@ class DuckingManager {
      * vocale », et de toute atténuation la diffusion personnelle, où c'est le
      * navigateur qui baisse le son sur la foi de cet état.
      */
-    _notifierTableauDeBord() {
+    _notifyDashboard() {
         try {
             const webServer = require('../web/WebServer');
             webServer.broadcastSpeakers(this.guildId);

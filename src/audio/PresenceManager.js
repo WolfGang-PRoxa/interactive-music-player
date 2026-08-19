@@ -44,7 +44,7 @@ const database = require('../database/Database');
 const log = require('../utils/logger');
 
 /** Un salon vocal compte-t-il au moins un humain ? */
-function salonHabite(channel) {
+function isInhabited(channel) {
     if (!channel || !channel.members) return false;
     return channel.members.filter(m => !m.user.bot).size > 0;
 }
@@ -54,13 +54,13 @@ class PresenceManager {
         this.client = null;
         this.player = null;
         /** @type {Map<string, NodeJS.Timeout>} guildId → départ programmé */
-        this.departsProgrammes = new Map();
+        this.scheduledDepartures = new Map();
         /** @type {Set<string>} guildes dont la connexion est en cours de bascule */
-        this.basculesEnCours = new Set();
+        this.switchesInProgress = new Set();
     }
 
     /** La règle de présence est-elle active ? */
-    get actif() {
+    get active() {
         return config.presence.enabled !== false;
     }
 
@@ -78,7 +78,7 @@ class PresenceManager {
         // l'écouteur de client dans index.js.
         player.events.on('voiceStateUpdate', (queue, oldState, newState) => {
             try {
-                this._suivreEtatDuBot(queue, oldState, newState);
+                this._trackBotVoiceState(queue, oldState, newState);
             } catch (err) {
                 log.error('[Presence] Erreur de suivi de l\'état vocal :', err.message);
             }
@@ -88,7 +88,7 @@ class PresenceManager {
         // de fichier, sélection de salon —, met fin au gel : le lecteur existe
         // de nouveau et redevient la source de vérité.
         player.events.on('connection', (queue) => {
-            queue.absentSalonVide = false;
+            queue.absentEmptyChannel = false;
 
             // L'écoute de la parole se monte ici plutôt qu'à chaque appelant.
             // Elle était jusqu'ici accrochée au démarrage d'une piste, si bien
@@ -105,8 +105,8 @@ class PresenceManager {
         });
     }
 
-    salonHabite(channel) {
-        return salonHabite(channel);
+    isInhabited(channel) {
+        return isInhabited(channel);
     }
 
     /**
@@ -119,10 +119,10 @@ class PresenceManager {
      * @param {import('discord.js').VoiceBasedChannel|null|undefined} channel
      * @returns {boolean}
      */
-    connexionAutorisee(channel) {
+    connectionAllowed(channel) {
         if (!channel) return false;
-        if (!this.actif) return true;
-        return salonHabite(channel);
+        if (!this.active) return true;
+        return isInhabited(channel);
     }
 
     /**
@@ -147,20 +147,20 @@ class PresenceManager {
      * @param {string} guildId
      * @returns {import('discord.js').VoiceBasedChannel|null}
      */
-    salonAssigne(guildId) {
+    assignedChannel(guildId) {
         const guild = this.client?.guilds?.cache?.get(guildId);
         if (!guild) return null;
 
         const settings = database.getSettings(guildId);
         const queue = this.player?.queues?.get(guildId);
 
-        const candidats = [
+        const candidates = [
             queue?.activeChannelId,
             queue?.channel?.id,
             settings.lastVoiceChannelId,
         ];
 
-        for (const id of candidats) {
+        for (const id of candidates) {
             if (!id) continue;
             const channel = guild.channels.cache.get(id);
             if (channel?.isVoiceBased?.()) return channel;
@@ -176,28 +176,28 @@ class PresenceManager {
      *
      * @param {string} guildId
      */
-    evaluer(guildId) {
-        if (!this.actif || !guildId) return;
-        if (this.basculesEnCours.has(guildId)) return;
+    evaluate(guildId) {
+        if (!this.active || !guildId) return;
+        if (this.switchesInProgress.has(guildId)) return;
 
         const queue = this.player?.queues?.get(guildId);
-        const salonActuel = queue?.connection ? queue.channel : null;
+        const currentChannel = queue?.connection ? queue.channel : null;
 
-        if (salonActuel) {
-            if (salonHabite(salonActuel)) {
-                this._annulerDepart(guildId);
+        if (currentChannel) {
+            if (isInhabited(currentChannel)) {
+                this._cancelDeparture(guildId);
             } else {
-                this._programmerDepart(guildId);
+                this._scheduleDeparture(guildId);
             }
             return;
         }
 
-        this._annulerDepart(guildId);
+        this._cancelDeparture(guildId);
         if (!queue) return;
 
-        const cible = this.salonAssigne(guildId);
-        if (cible) {
-            if (salonHabite(cible)) this._rejoindreEnFond(guildId, cible);
+        const target = this.assignedChannel(guildId);
+        if (target) {
+            if (isInhabited(target)) this._joinInBackground(guildId, target);
             return;
         }
 
@@ -205,14 +205,14 @@ class PresenceManager {
         // se pose là où quelqu'un vient d'apparaître plutôt que de rester
         // introuvable en attendant une sélection depuis le tableau de bord.
         const guild = this.client?.guilds?.cache?.get(guildId);
-        const spontane = guild?.channels?.cache
-            ?.filter(c => c.type === ChannelType.GuildVoice && salonHabite(c))
+        const spontaneous = guild?.channels?.cache
+            ?.filter(c => c.type === ChannelType.GuildVoice && isInhabited(c))
             ?.first();
-        if (spontane) this._rejoindreEnFond(guildId, spontane);
+        if (spontaneous) this._joinInBackground(guildId, spontaneous);
     }
 
-    _rejoindreEnFond(guildId, channel) {
-        this.rejoindre(guildId, channel).catch(err => {
+    _joinInBackground(guildId, channel) {
+        this.join(guildId, channel).catch(err => {
             log.error('[Presence] Erreur à l\'arrivée dans le salon :', err.message);
         });
     }
@@ -226,22 +226,22 @@ class PresenceManager {
      * @param {import('discord-player').GuildQueue} queue
      * @param {object} [etat] Position et état de lecture à mémoriser.
      */
-    marquerAbsent(queue, etat = {}) {
+    markAbsent(queue, state = {}) {
         if (!queue) return;
-        queue.absentSalonVide = true;
-        if (etat.positionMs !== undefined) queue.positionFigeeMs = etat.positionMs;
-        if (etat.enLecture !== undefined) queue.lectureFigeeEnCours = !!etat.enLecture;
+        queue.absentEmptyChannel = true;
+        if (state.positionMs !== undefined) queue.frozenPositionMs = state.positionMs;
+        if (state.playing !== undefined) queue.frozenIsPlaying = !!state.playing;
     }
 
     /**
      * Lève l'absence : le bot est dans le salon, c'est son lecteur qui fait foi.
      * @param {import('discord-player').GuildQueue} queue
      */
-    _marquerPresent(queue) {
-        if (!queue || !queue.absentSalonVide) return;
-        queue.absentSalonVide = false;
-        queue.positionFigeeMs = 0;
-        queue.lectureFigeeEnCours = false;
+    _markPresent(queue) {
+        if (!queue || !queue.absentEmptyChannel) return;
+        queue.absentEmptyChannel = false;
+        queue.frozenPositionMs = 0;
+        queue.frozenIsPlaying = false;
     }
 
     // ─── Arrivée ──────────────────────────────────────────────────────────
@@ -252,7 +252,7 @@ class PresenceManager {
      * @param {string} guildId
      * @param {import('discord.js').VoiceBasedChannel} channel
      */
-    async rejoindre(guildId, channel) {
+    async join(guildId, channel) {
         const queue = this.player?.queues?.get(guildId);
         if (!queue || !channel) return;
         if (queue.connection && queue.channel?.id === channel.id) {
@@ -261,12 +261,12 @@ class PresenceManager {
             // de mode de diffusion sur un salon alors désert, par exemple. La
             // laisser inscrite figerait la position affichée par le tableau de
             // bord sur celle du départ, pendant que le son avance.
-            this._marquerPresent(queue);
+            this._markPresent(queue);
             return;
         }
-        if (this.basculesEnCours.has(guildId)) return;
+        if (this.switchesInProgress.has(guildId)) return;
 
-        this.basculesEnCours.add(guildId);
+        this.switchesInProgress.add(guildId);
         try {
             log.info(`[Presence] Quelqu'un est arrivé dans « ${channel.name} » : connexion du bot.`);
             await queue.connect(channel);
@@ -283,15 +283,15 @@ class PresenceManager {
                 // pour ne pas se refermer.
                 this.client?.startSilencePlayer?.(queue);
             } else {
-                await this._reprendreLecture(queue);
+                await this._resumePlayback(queue);
             }
 
-            this._marquerPresent(queue);
+            this._markPresent(queue);
         } finally {
-            this.basculesEnCours.delete(guildId);
+            this.switchesInProgress.delete(guildId);
         }
 
-        this._notifier(guildId);
+        this._notify(guildId);
     }
 
     /**
@@ -302,10 +302,10 @@ class PresenceManager {
      *
      * @param {import('discord-player').GuildQueue} queue
      */
-    async _reprendreLecture(queue) {
-        const piste = queue.currentTrack;
+    async _resumePlayback(queue) {
+        const frozenTrack = queue.currentTrack;
 
-        if (!piste) {
+        if (!frozenTrack) {
             if (queue.tracks.size > 0) {
                 try {
                     await queue.node.play();
@@ -320,9 +320,9 @@ class PresenceManager {
         // repositionnement en silence, puis rétablissement du volume — le tout
         // piloté par `playerStart` dans PlayerEvents.
         queue.transitioningToEveryone = true;
-        queue.transitionTargetProgress = queue.positionFigeeMs || 0;
-        queue.transitionTrack = piste;
-        queue.restorePaused = !queue.lectureFigeeEnCours;
+        queue.transitionTargetProgress = queue.frozenPositionMs || 0;
+        queue.transitionTrack = frozenTrack;
+        queue.restorePaused = !queue.frozenIsPlaying;
 
         try {
             queue.node.setVolume(0);
@@ -332,7 +332,7 @@ class PresenceManager {
             // Lecture directe plutôt que `queue.play()` : celle-ci ferait passer
             // la piste par la file d'attente, où elle se rangerait derrière les
             // titres suivants au lieu de démarrer.
-            await queue.node.play(piste, { queue: false });
+            await queue.node.play(frozenTrack, { queue: false });
         } catch (err) {
             log.error('[Presence] Erreur de reprise de la lecture :', err.message);
             queue.transitioningToEveryone = false;
@@ -355,29 +355,29 @@ class PresenceManager {
      * @param {string} guildId
      * @returns {number}
      */
-    _delaiDepart(guildId) {
-        const secondes = Number(database.getSettings(guildId)?.presenceDepartureDelay);
-        if (Number.isFinite(secondes) && secondes >= 0) return Math.round(secondes * 1000);
+    _departureDelayMs(guildId) {
+        const seconds = Number(database.getSettings(guildId)?.presenceDepartureDelay);
+        if (Number.isFinite(seconds) && seconds >= 0) return Math.round(seconds * 1000);
         return config.presence.departureDelay;
     }
 
-    _programmerDepart(guildId) {
-        if (this.departsProgrammes.has(guildId)) return;
+    _scheduleDeparture(guildId) {
+        if (this.scheduledDepartures.has(guildId)) return;
 
-        const delai = this._delaiDepart(guildId);
+        const delay = this._departureDelayMs(guildId);
         const queue = this.player?.queues?.get(guildId);
         log.info(`[Presence] Salon « ${queue?.channel?.name || '?'} » vide : `
-            + `départ du bot dans ${Math.round(delai / 1000)}s.`);
+            + `départ du bot dans ${Math.round(delay / 1000)}s.`);
 
-        const minuteur = setTimeout(() => {
-            this.departsProgrammes.delete(guildId);
-            this.quitter(guildId).catch(err => {
+        const timer = setTimeout(() => {
+            this.scheduledDepartures.delete(guildId);
+            this.leave(guildId).catch(err => {
                 log.error('[Presence] Erreur au départ du salon :', err.message);
             });
-        }, delai);
-        if (minuteur.unref) minuteur.unref();
+        }, delay);
+        if (timer.unref) timer.unref();
 
-        this.departsProgrammes.set(guildId, minuteur);
+        this.scheduledDepartures.set(guildId, timer);
     }
 
     /**
@@ -390,19 +390,19 @@ class PresenceManager {
      *
      * @param {string} guildId
      */
-    reprogrammerDepart(guildId) {
-        const minuteur = this.departsProgrammes.get(guildId);
-        if (!minuteur) return;
-        clearTimeout(minuteur);
-        this.departsProgrammes.delete(guildId);
-        this.evaluer(guildId);
+    rescheduleDeparture(guildId) {
+        const timer = this.scheduledDepartures.get(guildId);
+        if (!timer) return;
+        clearTimeout(timer);
+        this.scheduledDepartures.delete(guildId);
+        this.evaluate(guildId);
     }
 
-    _annulerDepart(guildId) {
-        const minuteur = this.departsProgrammes.get(guildId);
-        if (!minuteur) return;
-        clearTimeout(minuteur);
-        this.departsProgrammes.delete(guildId);
+    _cancelDeparture(guildId) {
+        const timer = this.scheduledDepartures.get(guildId);
+        if (!timer) return;
+        clearTimeout(timer);
+        this.scheduledDepartures.delete(guildId);
         log.info('[Presence] Quelqu\'un est là : départ du bot annulé.');
     }
 
@@ -410,15 +410,15 @@ class PresenceManager {
      * Retire le bot d'un salon devenu vide, en préservant la lecture.
      * @param {string} guildId
      */
-    async quitter(guildId) {
+    async leave(guildId) {
         const queue = this.player?.queues?.get(guildId);
         if (!queue?.dispatcher) return;
 
-        const salon = queue.channel;
-        if (salonHabite(salon)) return; // quelqu'un est revenu entre-temps
+        const leavingChannel = queue.channel;
+        if (isInhabited(leavingChannel)) return; // quelqu'un est revenu entre-temps
 
-        log.info(`[Presence] Salon « ${salon?.name || '?'} » toujours vide : le bot s'en retire.`);
-        this.retirer(guildId);
+        log.info(`[Presence] Salon « ${leavingChannel?.name || '?'} » toujours vide : le bot s'en retire.`);
+        this.withdraw(guildId);
     }
 
     /**
@@ -430,21 +430,21 @@ class PresenceManager {
      *
      * @param {string} guildId
      */
-    retirer(guildId) {
+    withdraw(guildId) {
         const queue = this.player?.queues?.get(guildId);
         if (!queue?.dispatcher) return;
 
         // Relever la position pendant que le lecteur sait encore répondre.
         let positionMs = 0;
-        let enLecture = false;
+        let playing = false;
         try {
             positionMs = queue.node.getTimestamp()?.current?.value || 0;
-            enLecture = queue.node.isPlaying();
+            playing = queue.node.isPlaying();
         } catch (e) {}
-        this.marquerAbsent(queue, { positionMs, enLecture });
+        this.markAbsent(queue, { positionMs, playing });
 
-        this.detacher(guildId);
-        this._notifier(guildId);
+        this.detach(guildId);
+        this._notify(guildId);
     }
 
     /**
@@ -456,7 +456,7 @@ class PresenceManager {
      *
      * @param {string} guildId
      */
-    detacher(guildId) {
+    detach(guildId) {
         const queue = this.player?.queues?.get(guildId);
         if (!queue?.dispatcher) return;
 
@@ -470,12 +470,12 @@ class PresenceManager {
         // ignorer à discord-player la fin de flux que provoque la destruction :
         // sans lui, il enchaînerait sur la piste suivante et pousserait la
         // courante dans l'historique.
-        const etaitEnTransition = queue.isTransitioning();
+        const wasTransitioning = queue.isTransitioning();
         queue.setTransitioning(true);
         try {
             queue.dispatcher.destroy();
         } finally {
-            queue.setTransitioning(etaitEnTransition);
+            queue.setTransitioning(wasTransitioning);
         }
 
         // La lecture reprendra depuis l'état figé : les drapeaux d'une
@@ -499,22 +499,22 @@ class PresenceManager {
      * @param {import('discord.js').VoiceBasedChannel} voiceChannel
      * @returns {Promise<boolean>}
      */
-    async connecterSiHabite(queue, voiceChannel) {
+    async connectIfInhabited(queue, voiceChannel) {
         if (!queue || !voiceChannel) return false;
         const guildId = queue.guild.id;
 
-        if (!this.connexionAutorisee(voiceChannel)) {
+        if (!this.connectionAllowed(voiceChannel)) {
             log.info(`[Presence] Salon « ${voiceChannel.name} » désert : `
                 + 'la lecture attendra un auditeur.');
-            if (queue.connection) this.retirer(guildId);
-            else this.marquerAbsent(queue);
+            if (queue.connection) this.withdraw(guildId);
+            else this.markAbsent(queue);
             return false;
         }
 
         if (!queue.connection || queue.channel?.id !== voiceChannel.id) {
             await queue.connect(voiceChannel);
         }
-        queue.absentSalonVide = false;
+        queue.absentEmptyChannel = false;
         return true;
     }
 
@@ -530,35 +530,35 @@ class PresenceManager {
      * @param {number} [valeur] Position visée, pour `seek`.
      * @returns {boolean} true si la commande a été absorbée par l'état figé
      */
-    commanderFige(queue, action, valeur = 0) {
-        if (!queue?.session?.estGelee()) return false;
+    applyFrozenCommand(queue, action, value = 0) {
+        if (!queue?.session?.isFrozen()) return false;
 
         switch (action) {
             case 'pause':
-                queue.lectureFigeeEnCours = false;
+                queue.frozenIsPlaying = false;
                 break;
             case 'resume':
-                queue.lectureFigeeEnCours = true;
+                queue.frozenIsPlaying = true;
                 break;
             case 'stop':
-                queue.lectureFigeeEnCours = false;
-                queue.positionFigeeMs = 0;
+                queue.frozenIsPlaying = false;
+                queue.frozenPositionMs = 0;
                 break;
             case 'seek':
-                queue.positionFigeeMs = Math.max(0, valeur || 0);
+                queue.frozenPositionMs = Math.max(0, value || 0);
                 break;
             case 'skip': {
                 if (queue.currentTrack) queue.history.push(queue.currentTrack);
                 queue.__current = queue.tracks.dispatch() || null;
-                queue.positionFigeeMs = 0;
+                queue.frozenPositionMs = 0;
                 break;
             }
             case 'previous': {
-                const precedente = queue.history.tracks.dispatch();
-                if (!precedente) return true;
+                const previous = queue.history.tracks.dispatch();
+                if (!previous) return true;
                 if (queue.currentTrack) queue.insertTrack(queue.currentTrack, 0);
-                queue.__current = precedente;
-                queue.positionFigeeMs = 0;
+                queue.__current = previous;
+                queue.frozenPositionMs = 0;
                 break;
             }
             default:
@@ -577,49 +577,49 @@ class PresenceManager {
      * @param {import('discord-player').GuildQueue} queue
      * @param {string} channelId
      */
-    chargerEtatFige(queue, channelId) {
+    loadFrozenState(queue, channelId) {
         const { Track } = require('discord-player');
         const { restoreHistory } = require('../utils/historyOrder');
 
         const player = this.player;
-        const versTrack = (donnees) => {
-            const track = new Track(player, donnees);
-            track.queryType = donnees.queryType || null;
-            track.raw = donnees.raw || {};
-            if (donnees.extractorName) {
-                track.extractor = player.extractors.store.get(donnees.extractorName) || null;
+        const toTrack = (data) => {
+            const track = new Track(player, data);
+            track.queryType = data.queryType || null;
+            track.raw = data.raw || {};
+            if (data.extractorName) {
+                track.extractor = player.extractors.store.get(data.extractorName) || null;
             }
             return track;
         };
-        const utilisable = (t) => !!(t && t.title && t.url);
+        const usable = (t) => !!(t && t.title && t.url);
 
-        const instantane = queue.channelStates?.[channelId];
+        const snapshot = queue.channelStates?.[channelId];
 
         queue.tracks.clear();
         queue.history.clear();
         // `currentTrack` retombe sur `__current` faute de flux : c'est là qu'il
         // faut poser la piste tant qu'aucun lecteur n'existe pour la porter.
-        queue.__current = utilisable(instantane?.currentTrack)
-            ? versTrack(instantane.currentTrack)
+        queue.__current = usable(snapshot?.currentTrack)
+            ? toTrack(snapshot.currentTrack)
             : null;
 
-        const suite = (instantane?.queue || []).filter(utilisable);
-        if (suite.length > 0) queue.addTrack(suite.map(versTrack));
+        const upcoming = (snapshot?.queue || []).filter(usable);
+        if (upcoming.length > 0) queue.addTrack(upcoming.map(toTrack));
 
         restoreHistory(
             queue,
-            (instantane?.history || []).filter(utilisable),
-            versTrack,
+            (snapshot?.history || []).filter(usable),
+            toTrack,
             queue.__current?.url || null
         );
 
         try {
-            queue.setRepeatMode(instantane?.repeatMode || 0);
+            queue.setRepeatMode(snapshot?.repeatMode || 0);
         } catch (e) {}
 
-        this.marquerAbsent(queue, {
-            positionMs: instantane?.currentProgress || 0,
-            enLecture: !!instantane?.isPlaying,
+        this.markAbsent(queue, {
+            positionMs: snapshot?.currentProgress || 0,
+            playing: !!snapshot?.isPlaying,
         });
     }
 
@@ -633,9 +633,9 @@ class PresenceManager {
      * la file doit survivre, et quand c'est un modérateur, `evaluer()` décidera
      * s'il y a lieu de revenir.
      */
-    _suivreEtatDuBot(queue, oldState, newState) {
-        const moi = newState.guild?.members?.me?.id;
-        if (!moi || newState.member?.id !== moi) return;
+    _trackBotVoiceState(queue, oldState, newState) {
+        const botId = newState.guild?.members?.me?.id;
+        if (!botId || newState.member?.id !== botId) return;
 
         // Sourdine serveur : suivre la décision du modérateur.
         if (newState.serverMute != null && oldState.serverMute !== newState.serverMute) {
@@ -667,12 +667,12 @@ class PresenceManager {
             const ducking = this.client?.duckingManagers?.get(queue.guild.id);
             if (ducking) {
                 ducking.setChannelId(newState.channelId);
-                ducking.oublierLocuteurs();
+                ducking.forgetSpeakers();
             }
         }
     }
 
-    _notifier(guildId) {
+    _notify(guildId) {
         try {
             const webServer = require('../web/WebServer');
             webServer.broadcastState(guildId);

@@ -3,12 +3,12 @@ const database = require('../database/Database');
 const playbackStateManager = require('../database/PlaybackStateManager');
 const embeds = require('../utils/embeds');
 const webServer = require('../web/WebServer');
-const { moteurActif } = require('./mix');
-const { appliquerVitesse } = require('./reglagesLecture');
+const { activeEngine } = require('./mix');
+const { applySpeed } = require('./playbackSettings');
 const log = require('../utils/logger');
 
 /** Délai au-delà duquel on cesse d'attendre le rattrapage du seeker PCM. */
-const ATTENTE_MAX_RATTRAPAGE_MS = 8000;
+const MAX_SEEK_CATCH_UP_MS = 8000;
 
 /**
  * Temps laissé à la chaîne DSP pour se mettre en place avant de repositionner.
@@ -20,7 +20,7 @@ const ATTENTE_MAX_RATTRAPAGE_MS = 8000;
  * `durationMS`. Sans cette attente, le seek serait silencieusement ignoré et la
  * lecture resterait au début du morceau.
  */
-const DELAI_MISE_EN_PLACE_DSP_MS = 100;
+const DSP_SETUP_DELAY_MS = 100;
 
 /** Petite pause utilitaire. */
 const pause = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -41,23 +41,23 @@ const pause = (ms) => new Promise(resolve => setTimeout(resolve, ms));
  * @param {import('discord-player').GuildQueue} queue
  * @returns {Promise<void>}
  */
-function attendreRattrapageSeek(queue) {
+function awaitSeekCatchUp(queue) {
     const seeker = queue?.filters?.seeker;
     if (!seeker || seeker.seekTarget === null) return Promise.resolve();
 
     return new Promise(resolve => {
-        const echeance = Date.now() + ATTENTE_MAX_RATTRAPAGE_MS;
-        const minuteur = setInterval(() => {
-            const encoreEnCours = queue?.filters?.seeker === seeker && seeker.seekTarget !== null;
-            if (!encoreEnCours) {
-                clearInterval(minuteur);
+        const deadline = Date.now() + MAX_SEEK_CATCH_UP_MS;
+        const pollTimer = setInterval(() => {
+            const stillSeeking = queue?.filters?.seeker === seeker && seeker.seekTarget !== null;
+            if (!stillSeeking) {
+                clearInterval(pollTimer);
                 resolve();
                 return;
             }
-            if (Date.now() >= echeance) {
-                clearInterval(minuteur);
+            if (Date.now() >= deadline) {
+                clearInterval(pollTimer);
                 log.warn('[Player] Rattrapage de position toujours incomplet après '
-                    + `${ATTENTE_MAX_RATTRAPAGE_MS}ms : rétablissement du son malgré tout.`);
+                    + `${MAX_SEEK_CATCH_UP_MS}ms : rétablissement du son malgré tout.`);
                 resolve();
             }
         }, 20);
@@ -154,10 +154,10 @@ function registerPlayerEvents(player, client) {
                     const settings = database.getSettings(guildId);
 
                     if (progress > 0) {
-                        await pause(DELAI_MISE_EN_PLACE_DSP_MS);
+                        await pause(DSP_SETUP_DELAY_MS);
                         log.info(`[Player] Repositionnement de transition : ${progress}ms`);
                         await queue.node.seek(progress);
-                        await attendreRattrapageSeek(queue);
+                        await awaitSeekCatchUp(queue);
                     }
 
                     // Filet de sécurité : la piste qui reprend sa lecture n'a rien à
@@ -167,8 +167,8 @@ function registerPlayerEvents(player, client) {
                     // n'était jamais reconnue.
                     if (queue.currentTrack) {
                         try {
-                            const urlCourante = queue.currentTrack.url;
-                            queue.history.tracks.remove(t => t.url === urlCourante);
+                            const currentUrl = queue.currentTrack.url;
+                            queue.history.tracks.remove(t => t.url === currentUrl);
                             log.info('[Player] Piste courante nettoyée de l\'historique post-transition.');
                         } catch (e) {}
                     }
@@ -222,7 +222,7 @@ function registerPlayerEvents(player, client) {
         try {
             const settings = database.getSettings(guildId);
             if (settings.playbackSpeed) {
-                appliquerVitesse(queue, settings.playbackSpeed);
+                applySpeed(queue, settings.playbackSpeed);
             }
         } catch (speedErr) {
             log.error('[Player] Erreur application de la vitesse au démarrage :', speedErr.message);
@@ -245,7 +245,7 @@ function registerPlayerEvents(player, client) {
             const fadeinEnabled = !!settings.mixEnabled;
             const fadeinDurationMs = (parseFloat(settings.mixDuration) || 5) * 1000;
 
-            if (fadeinEnabled && !moteurActif(queue) && !queue.restorePaused && !queue.transitioningToEveryone) {
+            if (fadeinEnabled && !activeEngine(queue) && !queue.restorePaused && !queue.transitioningToEveryone) {
                 if (queue.mixAppliedTrackId !== track.id) {
                     queue.mixAppliedTrackId = track.id;
 
@@ -333,12 +333,12 @@ function registerPlayerEvents(player, client) {
         // Playlist en boucle : la file vide signe la fin de la playlist, pas
         // la fin de la lecture. On la recharge depuis son premier titre avant
         // de démonter le ducking et la connexion vocale.
-        if (webServer.relancerPlaylistBouclee(queue.guild.id)) return;
+        if (webServer.restartLoopedPlaylist(queue.guild.id)) return;
 
         // Playlist achevée sans bouclage : ce que la file d'attente gardait de
         // côté pendant sa lecture prend la main, plutôt que de rester en plan
         // sous les yeux de l'utilisateur.
-        if (webServer.enchainerSurLaFile(queue.guild.id)) return;
+        if (webServer.advanceToQueue(queue.guild.id)) return;
 
         // Le ducking n'est pas démonté ici, et ne l'était que dans un seul mode
         // de diffusion. C'est pourtant lui qui porte l'écoute de la parole : le

@@ -59,7 +59,7 @@ const playbackStateManager = require('./database/PlaybackStateManager');
 require('./audio/PlaybackSession');
 // Même raison : branche le lecteur de discord-player sur le bus de mixage, qui
 // porte la diffusion commune et rend possible la superposition de deux pistes.
-require('./audio/mix/pontLecteur').installerPont();
+require('./audio/mix/playerBridge').installBridge();
 const DuckingManager = require('./audio/DuckingManager');
 const VolumeController = require('./audio/VolumeController');
 const preloadManager = require('./audio/PreloadManager');
@@ -336,7 +336,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
     if (guildId && oldState.channelId && oldState.channelId !== newState.channelId) {
         const manager = client.duckingManagers.get(guildId);
         if (manager && manager.channelId === oldState.channelId) {
-            manager.oublierLocuteur(oldState.id);
+            manager.forgetSpeaker(oldState.id);
         }
     }
 
@@ -345,7 +345,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
     // suffirait pas — il ne se déclenche que si le bot est déjà connecté,
     // c'est-à-dire jamais dans le cas de l'arrivée.
     if (guildId) {
-        presenceManager.evaluer(guildId);
+        presenceManager.evaluate(guildId);
     }
 
     // Si un utilisateur quitte un salon vocal, vérifier s'il faut nettoyer un salon personnel
@@ -364,31 +364,31 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 
 // --- Ready ---
 client.once(Events.ClientReady, async (readyClient) => {
-    const version = versioning.versionCourante();
-    const libelleVersion = version.type === 'dev'
-        ? `DEV (${version.versionPackage || '?'})`
+    const version = versioning.currentVersion();
+    const versionLabel = version.type === 'dev'
+        ? `DEV (${version.packageVersion || '?'})`
         : version.tag;
 
     log.success('╔══════════════════════════════════════════════════╗');
     log.success('║   🎵 Bot Musique Interactive — Prêt !            ║');
     log.success(`║   Connecté : ${readyClient.user.tag.padEnd(31)}     ║`);
     log.success(`║   Serveurs : ${String(readyClient.guilds.cache.size).padEnd(31)}     ║`);
-    log.success(`║   Version  : ${libelleVersion.padEnd(31)}     ║`);
+    log.success(`║   Version  : ${versionLabel.padEnd(31)}     ║`);
     log.success('╚══════════════════════════════════════════════════╝');
 
     // Une installation interrompue laisse une extraction partielle. Elle n'a
     // jamais servi — le marqueur d'intégrité manque —, et le disque n'a aucune
     // raison de la garder.
-    versioning.nettoyerTemporaires();
+    versioning.cleanTempDirs();
 
     // Le salon favori vaut ici, et nulle part ailleurs : il devient le salon
     // courant le temps d'un démarrage, puis s'efface derrière les choix de
     // l'utilisateur. C'est ce qui lui permet de désigner le salon d'ouverture
     // sans pour autant retenir le bot — et le tableau de bord — prisonniers de
     // ce salon pour le reste de la session.
-    const favori = database.appliquerSalonFavori();
-    if (favori) {
-        log.info(`[Startup] Salon favori appliqué : ${favori.channelId} (serveur ${favori.guildId}).`);
+    const favorite = database.applyFavoriteChannel();
+    if (favorite) {
+        log.info(`[Startup] Salon favori appliqué : ${favorite.channelId} (serveur ${favorite.guildId}).`);
     }
 
     // Démarrer le serveur Web intégré pour le Dashboard
@@ -408,7 +408,7 @@ client.once(Events.ClientReady, async (readyClient) => {
     // Quelqu'un a pu entrer dans un salon pendant la restauration : aucun
     // événement vocal ne le signalera après coup.
     for (const guildId of readyClient.guilds.cache.keys()) {
-        presenceManager.evaluer(guildId);
+        presenceManager.evaluate(guildId);
     }
 
     // Sauvegarde périodique toutes les 5 secondes (pour la progression/timestamp)
@@ -421,7 +421,7 @@ client.once(Events.ClientReady, async (readyClient) => {
     // laisserait sinon le bot seul dans un salon vide indéfiniment.
     setInterval(() => {
         for (const guildId of readyClient.guilds.cache.keys()) {
-            presenceManager.evaluer(guildId);
+            presenceManager.evaluate(guildId);
         }
     }, 30000);
 });

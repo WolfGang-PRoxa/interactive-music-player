@@ -9,9 +9,9 @@
  * `installateur.js` pour le téléchargement.
  */
 
-const emplacements = require('./emplacements');
+const locations = require('./locations');
 const github = require('./github');
-const installateur = require('./installateur');
+const installer = require('./installer');
 
 /**
  * État complet du système de versions, tel que consommé par le menu déroulant.
@@ -23,68 +23,68 @@ const installateur = require('./installateur');
  *
  * @returns {Promise<object>}
  */
-async function catalogue() {
-    const courante = emplacements.versionCourante();
-    const installees = installateur.listerInstallees();
-    const parTag = new Map(installees.map((i) => [i.tag, i]));
+async function catalog() {
+    const current = locations.currentVersion();
+    const installedList = installer.listInstalled();
+    const byTag = new Map(installedList.map((i) => [i.tag, i]));
 
     let releases = [];
-    let erreur = null;
+    let error = null;
     try {
         // `forcer` : le menu doit refléter les releases publiées à l'instant où
         // l'utilisateur l'ouvre, pas celles de sa précédente ouverture.
-        releases = await github.listerReleases({ forcer: true });
+        releases = await github.listReleases({ force: true });
     } catch (err) {
-        erreur = { message: err.message, statut: err.statut || null };
+        error = { message: err.message, status: err.status || null };
     }
 
-    const entrees = releases.map((r) => {
-        const installee = parTag.get(r.tag);
+    const entries = releases.map((r) => {
+        const installed = byTag.get(r.tag);
         return {
             tag: r.tag,
-            nom: r.nom,
-            publieeLe: r.publieeLe,
+            name: r.name,
+            publishedAt: r.publishedAt,
             prerelease: r.prerelease,
-            installee: !!installee,
-            installeeLe: installee ? installee.installeeLe : null,
-            courante: courante.type === 'release' && courante.tag === r.tag,
-            orpheline: false,
+            installed: !!installed,
+            installedAt: installed ? installed.installedAt : null,
+            current: current.type === 'release' && current.tag === r.tag,
+            orphan: false,
         };
     });
 
     // Une version installée dont la release a disparu du dépôt reste lançable :
     // elle est sur le disque, et l'utilisateur doit pouvoir y revenir.
-    const tagsConnus = new Set(entrees.map((e) => e.tag));
-    for (const installee of installees) {
-        if (tagsConnus.has(installee.tag)) continue;
-        entrees.push({
-            tag: installee.tag,
-            nom: installee.tag,
-            publieeLe: null,
+    const knownTags = new Set(entries.map((e) => e.tag));
+    for (const installed of installedList) {
+        if (knownTags.has(installed.tag)) continue;
+        entries.push({
+            tag: installed.tag,
+            name: installed.tag,
+            publishedAt: null,
             prerelease: false,
-            installee: true,
-            installeeLe: installee.installeeLe,
-            courante: courante.type === 'release' && courante.tag === installee.tag,
-            orpheline: true,
+            installed: true,
+            installedAt: installed.installedAt,
+            current: current.type === 'release' && current.tag === installed.tag,
+            orphan: true,
         });
     }
 
     return {
-        courante: {
-            type: courante.type,
-            tag: courante.tag,
-            versionPackage: courante.versionPackage,
+        current: {
+            type: current.type,
+            tag: current.tag,
+            packageVersion: current.packageVersion,
         },
         dev: {
-            tag: emplacements.TAG_DEV,
-            disponible: emplacements.devDisponible(),
-            courante: courante.type === 'dev',
-            versionPackage: (emplacements.lirePackage(emplacements.racineDev()) || {}).version || null,
+            tag: locations.DEV_TAG,
+            available: locations.devAvailable(),
+            current: current.type === 'dev',
+            packageVersion: (locations.readPackage(locations.devRoot()) || {}).version || null,
         },
-        releases: entrees,
-        depot: github.depot(),
-        dossierVersions: emplacements.DOSSIER_VERSIONS,
-        erreur,
+        releases: entries,
+        repository: github.repository(),
+        versionsDir: locations.VERSIONS_DIR,
+        error,
     };
 }
 
@@ -95,36 +95,36 @@ async function catalogue() {
  * @returns {{ entree: string, type: 'dev'|'release', tag: string }}
  * @throws {Error} si la version n'est pas disponible localement
  */
-function pointEntree(tag) {
-    if (tag === emplacements.TAG_DEV) {
-        const entree = emplacements.entreePour(emplacements.racineDev());
-        if (!emplacements.devDisponible()) {
-            throw new Error(`Version de développement introuvable (${entree}).`);
+function resolveEntryPoint(tag) {
+    if (tag === locations.DEV_TAG) {
+        const entryPoint = locations.entryPointFor(locations.devRoot());
+        if (!locations.devAvailable()) {
+            throw new Error(`Version de développement introuvable (${entryPoint}).`);
         }
-        return { entree, type: 'dev', tag: emplacements.TAG_DEV };
+        return { entryPoint, type: 'dev', tag: locations.DEV_TAG };
     }
 
-    const dossier = installateur.dossierInstalle(tag);
-    if (!dossier) throw new Error(`La version ${tag} n'est pas installée.`);
-    return { entree: emplacements.entreePour(dossier), type: 'release', tag };
+    const dir = installer.installedDir(tag);
+    if (!dir) throw new Error(`La version ${tag} n'est pas installée.`);
+    return { entryPoint: locations.entryPointFor(dir), type: 'release', tag };
 }
 
 /** La version demandée est-elle déjà celle qui tourne ? */
-function estCourante(tag) {
-    const courante = emplacements.versionCourante();
-    return courante.tag === tag;
+function isCurrent(tag) {
+    const current = locations.currentVersion();
+    return current.tag === tag;
 }
 
 module.exports = {
-    TAG_DEV: emplacements.TAG_DEV,
-    catalogue,
-    desinstaller: installateur.desinstaller,
-    emplacements,
-    estCourante,
+    DEV_TAG: locations.DEV_TAG,
+    catalog,
+    uninstall: installer.uninstall,
+    locations,
+    isCurrent,
     github,
-    installateur,
-    installer: installateur.installer,
-    nettoyerTemporaires: installateur.nettoyerTemporaires,
-    pointEntree,
-    versionCourante: emplacements.versionCourante,
+    installer,
+    install: installer.install,
+    cleanTempDirs: installer.cleanTempDirs,
+    resolveEntryPoint,
+    currentVersion: locations.currentVersion,
 };

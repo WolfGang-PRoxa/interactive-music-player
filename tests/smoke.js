@@ -18,11 +18,11 @@ const path = require('path');
 const http = require('http');
 const cp = require('child_process');
 
-const RACINE = path.join(__dirname, '..');
-require(path.join(RACINE, 'node_modules', 'dotenv')).config({ path: path.join(RACINE, '.env') });
+const ROOT = path.join(__dirname, '..');
+require(path.join(ROOT, 'node_modules', 'dotenv')).config({ path: path.join(ROOT, '.env') });
 
 /** Entrées qui démarrent le bot : à ne surtout pas charger en étage 1. */
-const POINTS_ENTREE = ['src/index.js', 'src/deploy-commands.js'];
+const ENTRY_POINTS = ['src/index.js', 'src/deploy-commands.js'];
 
 /**
  * Champs de premier niveau que le serveur place dans le message `state` et que
@@ -32,9 +32,9 @@ const POINTS_ENTREE = ['src/index.js', 'src/deploy-commands.js'];
  * précisément le genre d'oubli que ce test existe pour attraper, un renommage
  * fait d'un seul côté ne produisant aucune erreur, juste un affichage vide.
  */
-const CHAMPS_ETAT = [
+const STATE_FIELDS = [
     'guildId', 'selectedVoiceChannelId', 'guilds', 'currentTrack', 'progress',
-    'isPlaying', 'isPaused', 'attenteAuditeur', 'repeatMode', 'volume',
+    'isPlaying', 'isPaused', 'listenerWait', 'repeatMode', 'volume',
     'settings', 'queue', 'history', 'playlists', 'speakers', 'members', 'botStats',
 ];
 
@@ -45,49 +45,49 @@ const CHAMPS_ETAT = [
  * s'il est celui qui mène la lecture — et n'a donc aucun sens sur une requête
  * HTTP sans état.
  */
-const CHAMPS_ETAT_WS = [...CHAMPS_ETAT, 'pilote'];
+const WS_STATE_FIELDS = [...STATE_FIELDS, 'pilot'];
 
 const PORT = Number(process.env.PORT) || 3000;
-const DELAI_DEMARRAGE_MS = 60000;
+const STARTUP_TIMEOUT_MS = 60000;
 
-let echecs = 0;
-let reussites = 0;
-const verifier = (libelle, ok, detail = '') => {
-    if (ok) { reussites++; console.log(`  ok   ${libelle}${detail ? ` — ${detail}` : ''}`); }
-    else { echecs++; console.log(`  ECHEC ${libelle}${detail ? ` — ${detail}` : ''}`); }
+let failed = 0;
+let passed = 0;
+const check = (label, ok, detail = '') => {
+    if (ok) { passed++; console.log(`  ok   ${label}${detail ? ` — ${detail}` : ''}`); }
+    else { failed++; console.log(`  ECHEC ${label}${detail ? ` — ${detail}` : ''}`); }
     return ok;
 };
 
 /** Tous les .js sous src/, chemins relatifs à la racine du projet, en POSIX. */
-function listerModules() {
-    const trouves = [];
-    (function marcher(dossier) {
-        for (const entree of fs.readdirSync(dossier, { withFileTypes: true })) {
-            const complet = path.join(dossier, entree.name);
-            if (entree.isDirectory()) marcher(complet);
-            else if (entree.name.endsWith('.js')) {
-                trouves.push(path.relative(RACINE, complet).split(path.sep).join('/'));
+function listModules() {
+    const found = [];
+    (function walk(dir) {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isDirectory()) walk(fullPath);
+            else if (entry.name.endsWith('.js')) {
+                found.push(path.relative(ROOT, fullPath).split(path.sep).join('/'));
             }
         }
-    })(path.join(RACINE, 'src'));
-    return trouves.sort();
+    })(path.join(ROOT, 'src'));
+    return found.sort();
 }
 
 /** Jeton du tableau de bord, lu sur place — il ne transite par rien d'autre. */
-function jeton() {
+function token() {
     const env = (process.env.DASHBOARD_TOKEN || '').trim();
     if (env) return env;
-    return fs.readFileSync(path.join(RACINE, 'data', 'dashboard-token'), 'utf8').trim();
+    return fs.readFileSync(path.join(ROOT, 'data', 'dashboard-token'), 'utf8').trim();
 }
 
-function requete(chemin, entetes = {}) {
+function request(filePath, headers = {}) {
     return new Promise((resolve, reject) => {
         const req = http.get(
-            { host: '127.0.0.1', port: PORT, path: chemin, headers: entetes },
+            { host: '127.0.0.1', port: PORT, path: filePath, headers: headers },
             (res) => {
-                let corps = '';
-                res.on('data', (c) => { corps += c; });
-                res.on('end', () => resolve({ code: res.statusCode, corps, entetes: res.headers }));
+                let fakeBody = '';
+                res.on('data', (c) => { fakeBody += c; });
+                res.on('end', () => resolve({ code: res.statusCode, fakeBody, headers: res.headers }));
             }
         );
         req.on('error', reject);
@@ -95,132 +95,132 @@ function requete(chemin, entetes = {}) {
     });
 }
 
-function attendre(ms) {
+function waitFor(ms) {
     return new Promise((r) => setTimeout(r, ms));
 }
 
 // --- Étage 1 : chargement de tous les modules -------------------------------
 
-function etageChargement() {
+function stageLoading() {
     console.log('\n=== 1. Chargement des modules ===\n');
-    const modules = listerModules();
-    let charges = 0;
+    const modules = listModules();
+    let loaded = 0;
 
-    for (const relatif of modules) {
-        if (POINTS_ENTREE.includes(relatif)) continue;
+    for (const relative of modules) {
+        if (ENTRY_POINTS.includes(relative)) continue;
         // Le code du navigateur n'est pas du CommonJS : il n'a rien à faire ici.
-        if (relatif.startsWith('src/web/public/')) continue;
+        if (relative.startsWith('src/web/public/')) continue;
 
         try {
-            const mod = require(path.join(RACINE, relatif));
+            const mod = require(path.join(ROOT, relative));
             if (mod === undefined || mod === null) {
-                verifier(relatif, false, 'export vide');
-            } else charges++;
+                check(relative, false, 'export vide');
+            } else loaded++;
         } catch (err) {
-            verifier(relatif, false, err.message.split('\n')[0]);
+            check(relative, false, err.message.split('\n')[0]);
         }
     }
-    verifier(`${charges} modules chargés sans erreur`, echecs === 0);
-    return charges;
+    check(`${loaded} modules chargés sans erreur`, failed === 0);
+    return loaded;
 }
 
 // --- Étage 2 : le bot démarré pour de vrai ----------------------------------
 
-async function etageIntegration() {
+async function stageIntegration() {
     console.log('\n=== 2. Démarrage du bot et interrogation ===\n');
 
     const bot = cp.spawn(process.execPath, ['src/index.js'], {
-        cwd: RACINE, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
+        cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
     });
 
-    let sortie = '';
-    bot.stdout.on('data', (d) => { sortie += d.toString(); });
-    bot.stderr.on('data', (d) => { sortie += d.toString(); });
+    let output = '';
+    bot.stdout.on('data', (d) => { output += d.toString(); });
+    bot.stderr.on('data', (d) => { output += d.toString(); });
 
-    const arreter = () => { try { bot.kill(); } catch (e) {} };
+    const stop = () => { try { bot.kill(); } catch (e) {} };
 
     try {
         // Prêt = le serveur web répond. Attendre le journal serait plus fragile.
-        const limite = Date.now() + DELAI_DEMARRAGE_MS;
-        let debout = false;
-        while (Date.now() < limite) {
+        const limit = Date.now() + STARTUP_TIMEOUT_MS;
+        let alive = false;
+        while (Date.now() < limit) {
             try {
-                await requete('/');
-                debout = true;
+                await request('/');
+                alive = true;
                 break;
-            } catch (e) { await attendre(500); }
+            } catch (e) { await waitFor(500); }
         }
-        if (!verifier('le serveur web répond', debout, `port ${PORT}`)) return;
+        if (!check('le serveur web répond', alive, `port ${PORT}`)) return;
 
-        verifier('le bot annonce être prêt', /Prêt !/.test(sortie));
-        verifier('les commandes sont chargées', /commandes chargées/.test(sortie));
-        verifier("aucune erreur d'extracteur au démarrage", !/\[ERROR\s*\].*[Ee]xtractor/.test(sortie));
+        check('le bot annonce être prêt', /Prêt !/.test(output));
+        check('les commandes sont chargées', /commandes chargées/.test(output));
+        check("aucune erreur d'extracteur au démarrage", !/\[ERROR\s*\].*[Ee]xtractor/.test(output));
 
-        const sansJeton = await requete('/', { Accept: 'text/html' });
-        verifier('accès refusé sans jeton', sansJeton.code === 401, `HTTP ${sansJeton.code}`);
+        const withoutToken = await request('/', { Accept: 'text/html' });
+        check('accès refusé sans jeton', withoutToken.code === 401, `HTTP ${withoutToken.code}`);
 
-        const t = jeton();
-        const avecJeton = await requete(`/?token=${encodeURIComponent(t)}`, { Accept: 'text/html' });
-        verifier('jeton accepté', avecJeton.code === 302 || avecJeton.code === 200, `HTTP ${avecJeton.code}`);
+        const t = token();
+        const withToken = await request(`/?token=${encodeURIComponent(t)}`, { Accept: 'text/html' });
+        check('jeton accepté', withToken.code === 302 || withToken.code === 200, `HTTP ${withToken.code}`);
 
-        const page = await requete('/', { Cookie: `dashboard_token=${t}` });
-        verifier('le tableau de bord est servi', page.code === 200 && page.corps.includes('<title>'),
-            `${page.corps.length} octets`);
+        const page = await request('/', { Cookie: `dashboard_token=${t}` });
+        check('le tableau de bord est servi', page.code === 200 && page.fakeBody.includes('<title>'),
+            `${page.fakeBody.length} octets`);
 
-        const etat = await requete('/api/state', { Cookie: `dashboard_token=${t}` });
-        verifier('/api/state répond', etat.code === 200, `HTTP ${etat.code}`);
+        const state = await request('/api/state', { Cookie: `dashboard_token=${t}` });
+        check('/api/state répond', state.code === 200, `HTTP ${state.code}`);
 
-        if (etat.code === 200) {
-            let donnees = null;
-            try { donnees = JSON.parse(etat.corps); } catch (e) {}
-            if (verifier('/api/state rend du JSON', !!donnees)) {
-                const manquants = CHAMPS_ETAT.filter((c) => !(c in donnees));
-                verifier('tous les champs du protocole sont présents',
-                    manquants.length === 0,
-                    manquants.length ? `manquants : ${manquants.join(', ')}` : `${CHAMPS_ETAT.length} champs`);
+        if (state.code === 200) {
+            let data = null;
+            try { data = JSON.parse(state.fakeBody); } catch (e) {}
+            if (check('/api/state rend du JSON', !!data)) {
+                const missing = STATE_FIELDS.filter((c) => !(c in data));
+                check('tous les champs du protocole sont présents',
+                    missing.length === 0,
+                    missing.length ? `manquants : ${missing.join(', ')}` : `${STATE_FIELDS.length} champs`);
             }
         }
 
-        await etageWebSocket(t);
+        await stageWebSocket(t);
     } finally {
-        arreter();
-        await attendre(1500);
+        stop();
+        await waitFor(1500);
     }
 }
 
-async function etageWebSocket(t) {
-    const { WebSocket } = require(path.join(RACINE, 'node_modules', 'ws'));
+async function stageWebSocket(t) {
+    const { WebSocket } = require(path.join(ROOT, 'node_modules', 'ws'));
 
     const message = await new Promise((resolve) => {
         const ws = new WebSocket(`ws://127.0.0.1:${PORT}`, {
             headers: { Cookie: `dashboard_token=${t}` },
         });
-        const minuteur = setTimeout(() => { try { ws.close(); } catch (e) {} resolve(null); }, 20000);
+        const timer = setTimeout(() => { try { ws.close(); } catch (e) {} resolve(null); }, 20000);
 
-        ws.on('message', (brut) => {
+        ws.on('message', (raw) => {
             try {
-                const parse = JSON.parse(brut.toString());
+                const parse = JSON.parse(raw.toString());
                 if (parse.type === 'state') {
-                    clearTimeout(minuteur);
+                    clearTimeout(timer);
                     try { ws.close(); } catch (e) {}
                     resolve(parse);
                 }
             } catch (e) {}
         });
-        ws.on('error', () => { clearTimeout(minuteur); resolve(null); });
+        ws.on('error', () => { clearTimeout(timer); resolve(null); });
     });
 
-    if (!verifier('le WebSocket délivre un message state', !!message)) return;
+    if (!check('le WebSocket délivre un message state', !!message)) return;
 
-    const manquants = CHAMPS_ETAT_WS.filter((c) => !(c in message.data));
-    verifier('le state du WebSocket porte tous les champs',
-        manquants.length === 0,
-        manquants.length ? `manquants : ${manquants.join(', ')}` : `${CHAMPS_ETAT_WS.length} champs`);
+    const missing = WS_STATE_FIELDS.filter((c) => !(c in message.data));
+    check('le state du WebSocket porte tous les champs',
+        missing.length === 0,
+        missing.length ? `manquants : ${missing.join(', ')}` : `${WS_STATE_FIELDS.length} champs`);
 
     // Un tableau de bord seul connecté est nécessairement le pilote : c'est la
     // garantie que l'élection a bien lieu, et non que le champ existe.
-    verifier('le seul tableau de bord connecté est désigné pilote',
-        message.data.pilote === true, String(message.data.pilote));
+    check('le seul tableau de bord connecté est désigné pilote',
+        message.data.pilot === true, String(message.data.pilot));
 }
 
 // --- Exécution --------------------------------------------------------------
@@ -228,15 +228,15 @@ async function etageWebSocket(t) {
 (async () => {
     console.log('Test de fumée — interactive_music_player');
 
-    etageChargement();
-    if (echecs > 0) {
+    stageLoading();
+    if (failed > 0) {
         console.log('\nChargement en échec : le démarrage est inutile tant que ce n\'est pas réglé.');
     } else {
-        await etageIntegration();
+        await stageIntegration();
     }
 
-    console.log(`\n=== ${reussites} réussite(s), ${echecs} échec(s) ===`);
-    process.exit(echecs === 0 ? 0 : 1);
+    console.log(`\n=== ${passed} réussite(s), ${failed} échec(s) ===`);
+    process.exit(failed === 0 ? 0 : 1);
 })().catch((err) => {
     console.error('\nLe test de fumée a lui-même échoué :', err);
     process.exit(1);
