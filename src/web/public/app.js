@@ -461,6 +461,23 @@
             if (typeof window.MusicPlayer.onBotStatsUpdate === 'function') {
                 window.MusicPlayer.onBotStatsUpdate(state);
             }
+            // Après updateUI : celle-ci reconstruit des commandes, et le grisage
+            // doit se reposer sur ce qui vient d'être redessiné.
+            if (typeof window.MusicPlayer.applyShareState === 'function') {
+                window.MusicPlayer.applyShareState(state);
+            }
+        } else if (type === 'permissionDenied') {
+            if (typeof window.MusicPlayer.onPermissionDenied === 'function') {
+                window.MusicPlayer.onPermissionDenied(data);
+            }
+        } else if (type === 'controlRevoked') {
+            if (typeof window.MusicPlayer.onControlRevoked === 'function') {
+                window.MusicPlayer.onControlRevoked(data);
+            }
+        } else if (type === 'shareResult') {
+            if (typeof window.MusicPlayer.onShareResult === 'function') {
+                window.MusicPlayer.onShareResult(data);
+            }
         } else if (type === 'progress') {
             // Mise à jour légère émise chaque seconde : seules la position de
             // lecture et les statistiques du bot changent. Le reste de l'état

@@ -153,6 +153,25 @@
                 </a>
             </div>
 
+            <!--
+                 Partage du contrôle. Sa propre section : les deux précédentes
+                 mènent ailleurs — dépôt et don —, celle-ci agit sur le bot.
+                 Le bouton n'apparaît que sur le tableau de bord du maître ;
+                 js/sharedControl.js le retire chez les invités, qui n'ont
+                 personne à qui accorder quoi que ce soit.
+            -->
+            <div class="theme-controls-wrapper" id="share-controls-wrapper" hidden>
+                <button id="btn-open-share" class="theme-toggle-btn btn-share-control" data-tooltip="Partager le contrôle du bot" data-i18n-tooltip="tooltip_share_control">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <span class="share-badge hidden" id="share-badge">0</span>
+                </button>
+            </div>
+
             <div class="status-indicator">
                 <span class="status-dot green"></span>
                 <span class="status-text" data-i18n="status_connected">Client Discord Connecté</span>
@@ -1338,6 +1357,73 @@
     </div>
 
     <!-- Server Removal Confirmation Modal -->
+    <!-- Partage du contrôle -->
+    <div id="share-modal" class="maintenance-overlay hidden">
+        <div class="maintenance-box share-modal-box">
+            <div class="settings-modal-header">
+                <h2 class="settings-modal-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <span data-i18n="share_title">Partager le contrôle</span>
+                </h2>
+                <button id="btn-close-share" class="settings-close-btn" data-tooltip="Fermer" data-i18n-tooltip="tooltip_close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="settings-modal-body">
+                <!--
+                     Avertissement de configuration. Le partage repose sur
+                     l'authentification Discord : sans secret OAuth2 ni adresse
+                     publique, rien ne peut fonctionner, et mieux vaut le dire
+                     ici que laisser le maître cliquer dans le vide.
+                -->
+                <div class="share-warning hidden" id="share-oauth-warning">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                    <div>
+                        <strong data-i18n="share_oauth_missing_title">Authentification Discord non configurée</strong>
+                        <p data-i18n="share_oauth_missing_body">Renseignez <code>DISCORD_CLIENT_SECRET</code> et <code>PUBLIC_URL</code> dans le fichier <code>.env</code>, puis déclarez l'URL de rappel dans le portail développeur Discord.</p>
+                        <p class="share-callback" id="share-callback-url"></p>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3 class="settings-section-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                        <span data-i18n="share_invite_title">Inviter les auditeurs</span>
+                    </h3>
+                    <div class="setting-item-row">
+                        <span data-i18n="share_invite_hint">Poster le lien de connexion dans le tchat du salon vocal</span>
+                        <button id="btn-send-invite" class="maint-btn primary share-invite-btn">
+                            <span data-i18n="share_invite_send">Envoyer le lien</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3 class="settings-section-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
+                        <span data-i18n="share_people_title">Auditeurs</span>
+                    </h3>
+                    <div class="share-people" id="share-people-list">
+                        <div class="share-empty" data-i18n="share_empty">Personne dans le salon vocal.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="server-confirm-delete-modal" class="maintenance-overlay hidden">
         <div class="maintenance-box">
             <h2 data-i18n="server_delete_modal_title">Suppression du serveur</h2>
@@ -1822,6 +1908,7 @@
     <script src="js/customSelect.js"></script>
     <script src="js/layoutPersistence.js"></script>
     <script src="js/speedPad.js"></script>
+    <script src="js/sharedControl.js"></script>
     <script src="js/settingsModal.js"></script>
     <script src="js/qualityMenu.js"></script>
     <script src="js/queue.js"></script>
