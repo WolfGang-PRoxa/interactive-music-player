@@ -35,6 +35,22 @@ window.MusicPlayer.updateGridCellSize = function() {
     }
 };
 
+/**
+ * Montre ou cache la grille tracée sous les cartes.
+ *
+ * Le tracé lui-même est entièrement en CSS (`.dashboard-grid::before`, dans
+ * layout.css) : il se cale sur `--grid-cell-size`, la variable que pose
+ * `updateGridCellSize()` ci-dessus. Il n'y a donc rien à recalculer au
+ * redimensionnement de la fenêtre, ni à redessiner au changement de thème.
+ *
+ * @param {boolean} visible
+ */
+window.MusicPlayer.applyGridOverlay = function(visible) {
+    const dashboardGrid = document.getElementById('dashboard-grid');
+    if (!dashboardGrid) return;
+    dashboardGrid.classList.toggle('grid-visible', !!visible);
+};
+
 window.MusicPlayer.resolveCollisions = function(activeId) {
     const dashboardGrid = document.getElementById('dashboard-grid');
     const cardLayouts = window.MusicPlayer.cardLayouts;

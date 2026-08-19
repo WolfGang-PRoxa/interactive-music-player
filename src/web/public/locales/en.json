@@ -182,6 +182,7 @@
     "channel_users_plural": "users",
     "channel_empty": "Empty",
     "logs_window_enable": "Show logs window (Terminal)",
+    "grid_overlay_enable": "Show the grid the boxes are laid out on",
     "logs_window_title": "Terminal Logs",
     "tooltip_clear_logs": "Clear logs",
     "tooltip_close_logs": "Close logs",

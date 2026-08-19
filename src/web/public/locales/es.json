@@ -182,6 +182,7 @@
     "channel_users_plural": "usuarios",
     "channel_empty": "Vacío",
     "logs_window_enable": "Mostrar ventana de registros (Terminal)",
+    "grid_overlay_enable": "Mostrar la cuadrícula sobre la que se colocan las cajas",
     "logs_window_title": "Registros del Terminal",
     "tooltip_clear_logs": "Borrar registros",
     "tooltip_close_logs": "Cerrar registros",

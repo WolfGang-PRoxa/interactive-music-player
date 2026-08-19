@@ -559,6 +559,10 @@ window.MusicPlayer.initSettingsModal = function() {
         const settingLogsEnable = document.getElementById('setting-logs-enable');
         if (settingLogsEnable) settingLogsEnable.checked = !!dashboardSettings.showLogsWindow;
 
+        const settingGridEnable = document.getElementById('setting-grid-enable');
+        if (settingGridEnable) settingGridEnable.checked = !!dashboardSettings.showGrid;
+        applyGridOverlay(dashboardSettings.showGrid);
+
         const logsWindow = document.getElementById('logs-floating-window');
         if (logsWindow && dashboardSettings.showLogsWindow) {
             logsWindow.classList.remove('hidden');
@@ -582,8 +586,22 @@ window.MusicPlayer.initSettingsModal = function() {
             });
         });
 
+        /**
+         * La grille est dessinée par js/layoutPersistence.js, chargé avant ce
+         * fichier mais pas garanti initialisé : l'appel est donc protégé, comme
+         * les autres passerelles de ce module.
+         */
+        function applyGridOverlay(visible) {
+            if (typeof window.MusicPlayer.applyGridOverlay === 'function') {
+                window.MusicPlayer.applyGridOverlay(visible);
+            }
+        }
+
         function updateSettingsFromUI() {
             dashboardSettings.showLogsWindow = settingLogsEnable ? settingLogsEnable.checked : false;
+
+            dashboardSettings.showGrid = settingGridEnable ? settingGridEnable.checked : false;
+            applyGridOverlay(dashboardSettings.showGrid);
             if (logsWindow) {
                 if (dashboardSettings.showLogsWindow) {
                     logsWindow.classList.remove('hidden');
@@ -713,6 +731,7 @@ window.MusicPlayer.initSettingsModal = function() {
             dashboardSettings.fadeinDuration = 5;
             dashboardSettings.presenceDepartureDelay = 30;
             dashboardSettings.showLogsWindow = false;
+            dashboardSettings.showGrid = false;
             dashboardSettings.tooltipDelay = 0.25;
             dashboardSettings.toast = { ...TOAST_DEFAULTS };
             dashboardSettings.videoDefaultPos = { x: 100, y: 100 };
@@ -726,6 +745,8 @@ window.MusicPlayer.initSettingsModal = function() {
             if (fadeinCheck) fadeinCheck.checked = false;
             if (settingLogsEnable) settingLogsEnable.checked = false;
             if (logsWindow) logsWindow.classList.add('hidden');
+            if (settingGridEnable) settingGridEnable.checked = false;
+            applyGridOverlay(false);
             if (bounceLoad) bounceLoad.checked = true;
             if (bounceStyle) bounceStyle.checked = true;
             if (bounceTheme) bounceTheme.checked = true;

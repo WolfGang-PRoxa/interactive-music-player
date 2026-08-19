@@ -182,6 +182,7 @@
     "channel_users_plural": "Benutzer",
     "channel_empty": "Leer",
     "logs_window_enable": "Logfenster (Terminal) anzeigen",
+    "grid_overlay_enable": "Raster anzeigen, auf dem die Boxen liegen",
     "logs_window_title": "Terminal-Protokolle",
     "tooltip_clear_logs": "Protokolle löschen",
     "tooltip_close_logs": "Logfenster schließen",

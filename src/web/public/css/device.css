@@ -295,6 +295,13 @@ body.touch-dragging * {
     grid-auto-rows: auto;
 }
 
+/* Même raison qu'au repli géométrique de layout.css : les cartes empilées ne
+   suivent plus la grille, il n'y a donc plus rien à tracer. */
+[data-device-mode="tablet"] .dashboard-grid::before,
+[data-device-mode="phone"] .dashboard-grid::before {
+    display: none;
+}
+
 [data-device-mode="tablet"] .card,
 [data-device-mode="phone"] .card {
     grid-column: 1 / -1 !important;

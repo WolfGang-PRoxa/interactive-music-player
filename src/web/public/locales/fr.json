@@ -182,6 +182,7 @@
     "channel_users_plural": "utilisateurs",
     "channel_empty": "Vide",
     "logs_window_enable": "Afficher la fenêtre de logs (Terminal)",
+    "grid_overlay_enable": "Afficher la grille sur laquelle se placent les boxs",
     "logs_window_title": "Terminal Logs",
     "tooltip_clear_logs": "Effacer les logs",
     "tooltip_close_logs": "Fermer les logs",

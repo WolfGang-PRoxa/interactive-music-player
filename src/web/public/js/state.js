@@ -52,6 +52,8 @@ const defaultDashboardSettings = {
     fadeinDuration: 5,
     /** Secondes d'attente avant que le bot ne quitte un salon vidé. */
     presenceDepartureDelay: 30,
+    /** Trace la grille 48 colonnes sous les cartes du tableau de bord. */
+    showGrid: false,
     bounce: {
         load: true,
         style: true,
