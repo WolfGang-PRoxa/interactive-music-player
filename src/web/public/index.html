@@ -817,6 +817,32 @@
                     </div>
                 </div>
                 <div class="docs-header-actions">
+                    <!--
+                         Mode de lecture. Les deux symboles restent affichés — le
+                         livre pour la lecture paginée, les lignes fléchées vers
+                         le bas pour la lecture d'une seule traite — et c'est le
+                         surlignage qui dit lequel est actif. Un bouton à icône
+                         unique aurait laissé la question habituelle : montre-t-il
+                         l'état courant, ou la destination ?
+                    -->
+                    <div class="docs-mode-switch" id="docs-mode-switch" role="group">
+                        <button type="button" class="docs-mode-btn" data-mode="livre" data-tooltip="Lecture paginée, comme un livre" data-i18n-tooltip="docs_tooltip_mode_book">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 6.2v13.6"></path>
+                                <path d="M12 6.2C10.2 4.8 7.6 4.1 4 4.1v13.2c3.6 0 6.2.7 8 2.1"></path>
+                                <path d="M12 6.2c1.8-1.4 4.4-2.1 8-2.1v13.2c-3.6 0-6.2.7-8 2.1"></path>
+                            </svg>
+                        </button>
+                        <button type="button" class="docs-mode-btn" data-mode="flux" data-tooltip="Lecture verticale, d'une seule traite" data-i18n-tooltip="docs_tooltip_mode_flow">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 6h9"></path>
+                                <path d="M4 12h9"></path>
+                                <path d="M4 18h6"></path>
+                                <path d="M18 5v14"></path>
+                                <path d="M14.9 15.9 18 19l3.1-3.1"></path>
+                            </svg>
+                        </button>
+                    </div>
                     <button id="btn-docs-view" class="docs-icon-btn docs-view-btn" data-tooltip="Afficher la source Markdown">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="16 18 22 12 16 6"></polyline>
@@ -877,7 +903,7 @@
 
             <div class="docs-footer">
                 <span class="docs-pager" id="docs-pager"></span>
-                <span class="docs-hint" data-i18n="docs_hint">Flèches, molette ou clic pour tourner les pages</span>
+                <span class="docs-hint" id="docs-hint" data-i18n="docs_hint">Flèches, molette ou clic pour tourner les pages</span>
             </div>
         </div>
     </div>

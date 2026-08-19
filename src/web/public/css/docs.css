@@ -165,6 +165,65 @@
     letter-spacing: 0.06em;
 }
 
+/*
+ * Bascule du mode de lecture — livre paginé ou flux vertical.
+ *
+ * Les deux symboles restent affichés, et c'est le surlignage qui désigne le
+ * mode actif. Le bouton MD/HTML voisin, lui, annonce sa destination : deux
+ * conventions opposées dans le même en-tête, mais chacune est la bonne pour son
+ * cas. MD/HTML n'a qu'un badge à montrer, il ne peut pas montrer les deux
+ * états à la fois ; ici les deux icônes tiennent côte à côte, et le mode
+ * courant se lit alors sans avoir à se demander si l'icône dit l'état ou la
+ * destination.
+ */
+.docs-mode-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    height: 34px;
+    padding: 3px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-card);
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+.docs-mode-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 26px;
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: 7px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.18s ease;
+}
+
+.docs-mode-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+.docs-mode-btn:hover {
+    color: var(--text-main);
+    background: var(--bg-hover);
+}
+
+/*
+ * Le mode actif se signale par un fond et un cerne, pas par la seule couleur du
+ * trait : sur une icône de seize pixels en fil de fer, une teinte ne se
+ * distingue pas assez de celle de l'icône voisine.
+ */
+.docs-mode-btn.active {
+    color: var(--c-primary);
+    background: color-mix(in srgb, var(--c-primary) 20%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-primary) 55%, transparent);
+}
+
 /* ────────────────────────────── Corps ────────────────────────────── */
 
 .docs-body {
@@ -801,6 +860,57 @@ html[data-theme='light'] .docs-leaf-retour .docs-leaf-back .docs-leaf-shade {
 
 html[data-theme='light'] .docs-icon-btn {
     background: rgba(0, 0, 0, 0.03);
+}
+
+/* ═══════════════════ Mode « flux » : lecture verticale ═══════════════════ */
+
+/*
+ * Le même DOM sert aux deux modes : ce qui change ici, c'est que le ruban
+ * cesse d'être un empilement de colonnes hors cadre pour redevenir un bloc de
+ * hauteur libre, dans une fenêtre qui défile. Le JS s'en tient à effacer les
+ * translations qu'il avait posées ; tout le reste de la bascule est dans ces
+ * quelques règles.
+ *
+ * Ce qui relève de la pagination disparaît : la seconde page, le pli de
+ * reliure, les numéros de page, les flèches, et la feuille qui tourne.
+ */
+.docs-mode-flux .docs-sheet-right,
+.docs-mode-flux .docs-spine,
+.docs-mode-flux .docs-folio,
+.docs-mode-flux .docs-nav,
+.docs-mode-flux .docs-leaf {
+    display: none;
+}
+
+.docs-mode-flux .docs-viewport {
+    overflow-y: auto;
+    overflow-x: hidden;
+    /* La colonne du texte s'arrête avant le bord ; la barre de défilement, non.
+       Elle reste ainsi collée au bord de la page, où on la cherche. */
+    padding-right: 0.5rem;
+    margin-right: -0.5rem;
+}
+
+.docs-mode-flux .docs-flow {
+    height: auto;
+    /*
+     * Ligne mesurée. Une page de livre fait ici quatre cents pixels ; en flux,
+     * le texte disposerait de toute la largeur de la fenêtre, soit près du
+     * double de ce qu'un œil suit sans se perdre en fin de ligne. La borne
+     * reste large — les schémas en art ASCII de la documentation technique y
+     * gagnent tout de même en place par rapport au mode livre, où ils
+     * n'avaient qu'une demi-page.
+     */
+    max-width: 92ch;
+    margin-inline: auto;
+    column-count: initial;
+    column-gap: normal;
+}
+
+/* Le numéro de page a disparu : la réserve qu'il occupait en bas n'a plus lieu
+   d'être, et un peu d'air sous la dernière ligne vaut mieux qu'un vide fixe. */
+.docs-mode-flux .docs-sheet {
+    padding-bottom: 1.4rem;
 }
 
 /* ═════════════════════════ Fenêtres étroites ═════════════════════════ */
