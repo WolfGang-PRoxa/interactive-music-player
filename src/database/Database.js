@@ -202,6 +202,18 @@ class GuildDatabase {
             ignoredVoiceUsers: {},
 
             /**
+             * Contrôle partagé : droits accordés aux invités, par compte Discord.
+             *
+             * `{ "<userId>": { playback, queue, playlists, volume } }`, les quatre
+             * groupes de src/web/permissions.js. Un compte absent de la table n'a
+             * aucun droit — c'est aussi ce qui reste après révocation.
+             *
+             * Par serveur, et non par salon : le maître accorde à une personne,
+             * pas à une personne dans un salon donné.
+             */
+            sharedControl: {},
+
+            /**
              * Qualité appliquée aux médias récupérés depuis une source distante.
              * Sans effet sur les fichiers locaux, importés tels quels.
              */
@@ -542,6 +554,70 @@ class GuildDatabase {
 
         this.cache.set(guildId, settings);
         this._save();
+    }
+
+    /**
+     * Droits accordés à un invité sur un serveur.
+     *
+     * Rend toujours les quatre groupes, faux par défaut : les appelants n'ont
+     * ainsi jamais à distinguer « jamais invité » de « invité puis tout retiré ».
+     *
+     * @param {string} guildId
+     * @param {string} userId
+     * @returns {{ playback: boolean, queue: boolean, playlists: boolean, volume: boolean }}
+     */
+    getUserPermissions(guildId, userId) {
+        const { sanitize } = require('../web/permissions');
+        const settings = this.getSettings(guildId);
+        return sanitize(settings.sharedControl?.[String(userId)]);
+    }
+
+    /**
+     * Accorde ou retire des droits à un invité.
+     *
+     * Un invité qui n'a plus aucun droit sort de la table plutôt que d'y rester
+     * avec quatre `false` : le fichier de réglages ne garde ainsi trace que des
+     * partages réellement en vigueur.
+     *
+     * @param {string} guildId
+     * @param {string} userId
+     * @param {object} permissions Droits bruts, assainis avant enregistrement.
+     * @returns {{ playback: boolean, queue: boolean, playlists: boolean, volume: boolean }}
+     */
+    setUserPermissions(guildId, userId, permissions) {
+        const { sanitize, hasAny } = require('../web/permissions');
+        const settings = this.getSettings(guildId);
+        if (!settings.sharedControl) settings.sharedControl = {};
+
+        const clean = sanitize(permissions);
+        if (hasAny(clean)) settings.sharedControl[String(userId)] = clean;
+        else delete settings.sharedControl[String(userId)];
+
+        this.cache.set(guildId, settings);
+        this._save();
+        return clean;
+    }
+
+    /**
+     * Retire tous les droits d'un invité sur un serveur.
+     * @param {string} guildId
+     * @param {string} userId
+     */
+    revokeUserPermissions(guildId, userId) {
+        const settings = this.getSettings(guildId);
+        if (!settings.sharedControl?.[String(userId)]) return;
+        delete settings.sharedControl[String(userId)];
+        this.cache.set(guildId, settings);
+        this._save();
+    }
+
+    /**
+     * Tous les partages en vigueur sur un serveur.
+     * @param {string} guildId
+     * @returns {Object<string, object>} userId → droits.
+     */
+    getSharedControl(guildId) {
+        return this.getSettings(guildId).sharedControl || {};
     }
 
     /**

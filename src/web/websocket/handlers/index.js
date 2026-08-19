@@ -10,6 +10,7 @@ const playbackHandlers = require('./playbackHandlers');
 const queueHandlers = require('./queueHandlers');
 const playlistHandlers = require('./playlistHandlers');
 const qualityHandlers = require('./qualityHandlers');
+const shareHandlers = require('./shareHandlers');
 const systemHandlers = require('./systemHandlers');
 const versionHandlers = require('./versionHandlers');
 
@@ -39,12 +40,15 @@ module.exports = {
     requestState: systemHandlers.handleRequestState,
     restartBot: systemHandlers.handleRestartBot,
     resume: playbackHandlers.handleResume,
+    revokeControl: shareHandlers.handleRevokeControl,
     seek: playbackHandlers.handleSeek,
     selectChannel: guildHandlers.handleSelectChannel,
+    sendInviteLink: shareHandlers.handleSendInviteLink,
     setActivePlaybackSource: playlistHandlers.handleSetActivePlaybackSource,
     setDefaultChannel: guildHandlers.handleSetDefaultChannel,
     setPlayMode: playbackHandlers.handleSetPlayMode,
     setTrackQuality: qualityHandlers.handleSetTrackQuality,
+    shareControl: shareHandlers.handleShareControl,
     shutdownBot: systemHandlers.handleShutdownBot,
     skip: playbackHandlers.handleSkip,
     startupFadeinConsumed: systemHandlers.handleStartupFadeinConsumed,

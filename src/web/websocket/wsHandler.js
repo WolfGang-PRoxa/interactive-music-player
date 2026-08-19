@@ -8,6 +8,8 @@
 
 const routes = require('./handlers');
 const log = require('../../utils/logger');
+const permissions = require('../permissions');
+const database = require('../../database/Database');
 
 /**
  * Messages qui ne visent aucun serveur Discord en particulier.
@@ -20,12 +22,58 @@ const log = require('../../utils/logger');
 const GUILDLESS_TYPES = new Set(['listVersions', 'installVersion']);
 
 /**
+ * Droits du demandeur, relus à chaque message.
+ *
+ * Jamais mis en cache sur la socket : le maître peut révoquer un invité pendant
+ * qu'il est connecté, et l'onglet resté ouvert doit perdre la main au message
+ * suivant, pas à la prochaine reconnexion.
+ *
+ * @param {import('ws').WebSocket} ws
+ * @param {string} guildId
+ * @returns {{ master: boolean, userId: string|null, permissions: object }}
+ */
+function identityOf(ws, guildId) {
+    const identity = ws.identity;
+
+    // Une socket sans identité est un cas qui ne devrait pas se produire : le
+    // handshake en pose toujours une. Le traiter en invité sans droit plutôt
+    // qu'en maître fait pencher l'incident du bon côté.
+    if (!identity) return { master: false, userId: null, permissions: permissions.noPermissions() };
+    if (identity.master) return { master: true, userId: null, permissions: permissions.allPermissions() };
+
+    const userId = identity.session?.userId || null;
+    return {
+        master: false,
+        userId,
+        permissions: userId && guildId
+            ? database.getUserPermissions(guildId, userId)
+            : permissions.noPermissions(),
+    };
+}
+
+/** Prévient l'invité que le maître ne lui a pas accordé ce droit. */
+function refuse(ws, type, identity) {
+    log.warn(`[WebServer] Message « ${type} » refusé à l'invité ${identity.userId || '?'} : droit non accordé.`);
+    try {
+        ws.send(JSON.stringify({
+            type: 'permissionDenied',
+            data: { action: type },
+        }));
+    } catch (e) {
+        // La socket vient de se fermer : rien à signaler.
+    }
+}
+
+/**
  * Traite un message reçu d'un client du dashboard.
  * @param {import('ws').WebSocket} ws - Socket émettrice
  * @param {{ type: string, guildId?: string, data?: object }} payload
  * @param {object} webServer - Instance du WebServer
+ * @param {{ internal?: boolean }} [options] - `internal` saute le contrôle des
+ *   droits : le message vient d'un handler déjà autorisé qui en réutilise un
+ *   autre, et non du réseau.
  */
-async function handleMessage(ws, payload, webServer) {
+async function handleMessage(ws, payload, webServer, options = {}) {
     const { type, guildId, data } = payload;
 
     const currentGuildId = guildId || ws.selectedGuildId || webServer._getFirstGuildId();
@@ -37,6 +85,33 @@ async function handleMessage(ws, payload, webServer) {
         return;
     }
 
+    // Le tableau de bord grise ce qu'un invité n'a pas le droit de faire, mais
+    // ce n'est qu'un confort : la console du navigateur contourne l'affichage.
+    // La barrière qui compte est celle-ci.
+    let effectiveData = data || {};
+    if (!options.internal) {
+        const identity = identityOf(ws, currentGuildId);
+
+        if (!permissions.canSend(identity, type)) {
+            refuse(ws, type, identity);
+            return;
+        }
+
+        // `updateSettings` porte des réglages de plusieurs groupes : il se filtre
+        // champ par champ plutôt que de se refuser en bloc.
+        if (type === 'updateSettings') {
+            const { allowed, refused } = permissions.filterSettings(identity, effectiveData);
+            if (refused.length) {
+                log.warn(`[WebServer] Réglages écartés pour l'invité ${identity.userId || '?'} : ${refused.join(', ')}.`);
+                if (!Object.keys(allowed).length) {
+                    refuse(ws, type, identity);
+                    return;
+                }
+            }
+            effectiveData = allowed;
+        }
+    }
+
     const { useMainPlayer } = require('discord-player');
     const player = useMainPlayer();
 
@@ -45,13 +120,16 @@ async function handleMessage(ws, payload, webServer) {
         // Garde centrale : un payload sans `data` ne doit pas faire planter un
         // handler qui déstructure ses champs. Chaque champ reste `undefined`,
         // ce que les handlers traitent déjà (`x !== undefined ? ... : défaut`).
-        data: data || {},
+        data: effectiveData,
         webServer,
         player,
         queue: player.queues.get(currentGuildId),
         currentGuildId,
-        // Permet à un handler d'en réutiliser un autre (playNow délègue à play)
-        dispatch: (nextPayload) => handleMessage(ws, nextPayload, webServer),
+        // Permet à un handler d'en réutiliser un autre (playNow délègue à play).
+        // Le relais est marqué interne : le droit a été vérifié à l'entrée, et
+        // le revérifier refuserait à un invité une délégation qu'il a pourtant
+        // le droit de déclencher.
+        dispatch: (nextPayload) => handleMessage(ws, nextPayload, webServer, { internal: true }),
     });
 }
 

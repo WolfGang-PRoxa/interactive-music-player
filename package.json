@@ -16,7 +16,8 @@
     "test:drag": "node tests/dragPreview.js",
     "test:queue-handoff": "node tests/queueHandoff.js",
     "test:favorite-channel": "node tests/favoriteChannel.js",
-    "test": "node tests/deviceMode.js && node tests/dragPreview.js && node tests/queueHandoff.js && node tests/favoriteChannel.js && node tests/smoke.js"
+    "test:shared-control": "node tests/sharedControl.js",
+    "test": "node tests/deviceMode.js && node tests/dragPreview.js && node tests/queueHandoff.js && node tests/favoriteChannel.js && node tests/sharedControl.js && node tests/smoke.js"
   },
   "keywords": [
     "discord",

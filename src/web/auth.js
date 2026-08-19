@@ -17,12 +17,22 @@
  * Pour éviter d'avoir à saisir le jeton en usage local, le navigateur est ouvert
  * sur une URL contenant ?token=... : le middleware pose alors le cookie et
  * redirige vers l'URL propre.
+ *
+ * **Deux façons d'entrer.** Le jeton ouvre tout : c'est celle du maître de
+ * session, qui a lancé le bot et lit le jeton dans sa console. Depuis le partage
+ * du contrôle, une seconde porte existe : une session Discord (voir oauth.js et
+ * sessions.js) identifie un invité, qui n'obtient alors que les droits que le
+ * maître lui a accordés — voir permissions.js, où se décide ce qu'il peut faire.
+ *
+ * Ce module ne tranche pas les droits. Il répond seulement à « qui frappe ? »,
+ * et refuse ceux qui ne sont ni l'un ni l'autre.
  */
 
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const log = require('../utils/logger');
+const sessions = require('./sessions');
 
 const COOKIE_NAME = 'dashboard_token';
 const TOKEN_FILE = path.join(process.cwd(), 'data', 'dashboard-token');
@@ -118,8 +128,64 @@ function extractToken(req) {
 }
 
 function isAuthorized(req) {
-    const { value } = extractToken(req);
-    return safeEquals(value, getToken());
+    return identify(req).authorized;
+}
+
+/**
+ * Chemins ouverts sans authentification.
+ *
+ * Le lien d'invitation est posté dans le tchat du salon vocal et cliqué par
+ * quelqu'un qui n'a encore ni jeton ni session : la porte d'entrée du trajet
+ * OAuth2 ne peut pas être fermée, sans quoi personne ne pourrait jamais
+ * s'authentifier. Ces deux chemins ne donnent accès à rien d'autre qu'à
+ * Discord et au retour de Discord.
+ */
+const PUBLIC_PATHS = new Set(['/auth/discord', '/auth/discord/callback']);
+
+function isPublicPath(url) {
+    try {
+        return PUBLIC_PATHS.has(new URL(url, 'http://localhost').pathname);
+    } catch (e) {
+        return false;
+    }
+}
+
+/**
+ * Qui est derrière cette requête ?
+ *
+ * @param {import('http').IncomingMessage} req
+ * @returns {{ authorized: boolean, master: boolean, session: object|null, tokenSource: string|null }}
+ */
+function identify(req) {
+    const { value, source } = extractToken(req);
+    if (safeEquals(value, getToken())) {
+        return { authorized: true, master: true, session: null, tokenSource: source };
+    }
+
+    const cookies = parseCookies(req.headers.cookie);
+    const session = sessions.touch(cookies[sessions.COOKIE_NAME]);
+    if (session) {
+        return { authorized: true, master: false, session, tokenSource: null };
+    }
+
+    return { authorized: false, master: false, session: null, tokenSource: null };
+}
+
+function unauthorizedPage() {
+    // Chargé ici et non en tête de fichier : oauth.js ne sert qu'au moment du
+    // refus, et l'exiger au chargement ferait dépendre l'authentification de
+    // base d'un module qui n'a de sens que pour le partage.
+    let bouton = '';
+    try {
+        const oauth = require('./oauth');
+        if (oauth.isConfigured()) {
+            bouton = `<p><a class="bouton" href="/auth/discord">Se connecter avec Discord</a></p>
+     <p class="note">Si le maître de la session vous a partagé le contrôle, c'est par ici.</p>`;
+        }
+    } catch (e) {
+        // Sans OAuth, la page reste celle du jeton seul.
+    }
+    return UNAUTHORIZED_PAGE.replace('<!--connexion-->', bouton);
 }
 
 const UNAUTHORIZED_PAGE = `<!doctype html>
@@ -130,9 +196,15 @@ const UNAUTHORIZED_PAGE = `<!doctype html>
   main { max-width: 34rem; padding: 2rem; line-height: 1.6; }
   h1 { font-size: 1.4rem; margin-bottom: 0.5rem; }
   code { background: #26262f; padding: 0.15em 0.4em; border-radius: 4px; }
+  .bouton { display: inline-block; background: #5865F2; color: #fff; padding: 0.6em 1.1em;
+            border-radius: 8px; text-decoration: none; font-weight: 600; }
+  .note { opacity: 0.7; font-size: 0.9em; }
+  hr { border: none; border-top: 1px solid #2e2e38; margin: 1.6rem 0; }
 </style></head>
 <body><main>
   <h1>Accès refusé</h1>
+  <!--connexion-->
+  <hr>
   <p>Ce tableau de bord requiert un jeton d'accès.</p>
   <p>Ouvrez-le avec <code>?token=VOTRE_JETON</code>, ou récupérez le jeton dans
      <code>data/dashboard-token</code> (il est également affiché dans la console
@@ -147,18 +219,24 @@ const UNAUTHORIZED_PAGE = `<!doctype html>
  * Referer envoyé aux domaines tiers.
  */
 function middleware(req, res, next) {
-    const { value, source } = extractToken(req);
+    // Le trajet OAuth2 précède toute identité : voir PUBLIC_PATHS.
+    if (isPublicPath(req.originalUrl || req.url)) return next();
 
-    if (!safeEquals(value, getToken())) {
+    const identity = identify(req);
+
+    if (!identity.authorized) {
         res.status(401);
         if ((req.headers.accept || '').includes('text/html')) {
-            return res.type('html').send(UNAUTHORIZED_PAGE);
+            return res.type('html').send(unauthorizedPage());
         }
         return res.json({ error: 'Jeton d\'accès manquant ou invalide' });
     }
 
-    if (source === 'query') {
-        res.cookie(COOKIE_NAME, value, {
+    // Les routes lisent l'identité plutôt que de la redemander.
+    req.identity = identity;
+
+    if (identity.tokenSource === 'query') {
+        res.cookie(COOKIE_NAME, extractToken(req).value, {
             httpOnly: true,
             sameSite: 'lax',
             maxAge: 1000 * 60 * 60 * 24 * 365,
@@ -180,16 +258,22 @@ function middleware(req, res, next) {
  * @returns {boolean}
  */
 function verifyUpgrade(info) {
-    const authorized = isAuthorized(info.req);
-    if (!authorized) {
+    const identity = identify(info.req);
+    if (!identity.authorized) {
         log.warn('[Auth] Handshake WebSocket refusé : jeton manquant ou invalide.');
+        return false;
     }
-    return authorized;
+    // Rangée sur la requête, elle sera relue à l'ouverture de la connexion :
+    // c'est le seul endroit où les en-têtes du handshake sont encore là.
+    info.req.identity = identity;
+    return true;
 }
 
 module.exports = {
     getToken,
     isAuthorized,
+    identify,
+    isPublicPath,
     middleware,
     verifyUpgrade,
     COOKIE_NAME,

@@ -296,7 +296,12 @@ class WebServer {
 
     _initExpress() {
         // L'authentification passe avant tout le reste, fichiers statiques compris.
+        // Elle laisse passer le trajet OAuth2, seul chemin par lequel un invité
+        // peut se présenter : voir PUBLIC_PATHS dans web/auth.js.
         this.app.use(auth.middleware);
+
+        const createAuthRouter = require('./routes/auth');
+        this.app.use('/auth', createAuthRouter(this));
 
         // Servir les fichiers statiques du dashboard
         this.app.use(express.static(path.join(__dirname, 'public')));
@@ -326,7 +331,21 @@ class WebServer {
             clearInterval(heartbeatInterval);
         });
 
-        this.wss.on('connection', (ws) => {
+        this.wss.on('connection', (ws, req) => {
+            // Qui pilote cet onglet : le maître, ou un invité reconnu par
+            // Discord. `verifyUpgrade` l'a déterminé pendant le handshake, seul
+            // moment où les en-têtes — donc les cookies — sont encore là.
+            //
+            // Seule l'identité est retenue, jamais les droits : le maître peut
+            // en retirer pendant que l'invité est connecté, et une copie prise
+            // ici resterait celle d'avant. Ils sont relus à chaque message.
+            ws.identity = req?.identity || { authorized: true, master: true, session: null };
+
+            if (!ws.identity.master && ws.identity.session) {
+                log.info(`[WebServer] Tableau de bord invité connecté : `
+                    + `${ws.identity.session.displayName} (${ws.identity.session.userId}).`);
+            }
+
             // L'initialisation d'un client interroge l'état du lecteur. Sans
             // cette protection, une exception y remonterait comme exception non
             // interceptée et terminerait le processus : une simple connexion au
@@ -427,6 +446,7 @@ class WebServer {
                 data: {
                     ...this.getState(selectedGuildId, ws.selectedVoiceChannelId),
                     pilot: this.isPilot(ws, selectedGuildId),
+                    ...this._shareStateFor(ws, selectedGuildId),
                 }
             }));
         }
@@ -483,6 +503,11 @@ class WebServer {
                 // transmise même si rien d'autre n'a bougé.
                 state.pilot = this.isPilot(client, guildId);
 
+                // Les droits varient d'un tableau de bord à l'autre : ils entrent
+                // dans la signature ci-dessous, de sorte qu'une révocation parte
+                // même quand rien d'autre n'a bougé.
+                Object.assign(state, this._shareStateFor(client, guildId));
+
                 // Mettre à jour le canal vocal sélectionné sur le client pour rester synchronisé avec l'état réel du bot
                 if (state.selectedVoiceChannelId) {
                     client.selectedVoiceChannelId = state.selectedVoiceChannelId;
@@ -538,6 +563,53 @@ class WebServer {
                 }));
             } catch (e) {}
         });
+    }
+
+    /**
+     * Ce que ce tableau de bord a le droit de faire, tel qu'il doit l'afficher.
+     *
+     * Le client s'en sert pour griser ce qui lui est interdit ; le serveur ne
+     * s'y fie pas — il revérifie tout à l'arrivée, dans websocket/wsHandler.js.
+     *
+     * Le maître reçoit en plus la liste des partages en vigueur et l'état de la
+     * configuration OAuth : c'est de quoi remplir sa fenêtre de partage.
+     *
+     * @param {import('ws').WebSocket} ws
+     * @param {string} guildId
+     * @returns {object}
+     */
+    _shareStateFor(ws, guildId) {
+        const permissions = require('./permissions');
+        const sessions = require('./sessions');
+        const oauth = require('./oauth');
+
+        const identity = ws.identity || { master: true };
+
+        if (identity.master) {
+            return {
+                role: 'master',
+                permissions: permissions.allPermissions(),
+                sharing: {
+                    oauthReady: oauth.isConfigured(),
+                    publicUrl: oauth.publicUrl(),
+                    grants: database.getSharedControl(guildId),
+                    knownUsers: sessions.listUsers(),
+                },
+            };
+        }
+
+        const userId = identity.session?.userId || null;
+        return {
+            role: 'guest',
+            identity: {
+                userId,
+                displayName: identity.session?.displayName || '',
+                avatar: identity.session?.avatar || null,
+            },
+            permissions: userId
+                ? database.getUserPermissions(guildId, userId)
+                : permissions.noPermissions(),
+        };
     }
 
     /**
