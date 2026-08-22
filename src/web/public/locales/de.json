@@ -359,6 +359,7 @@
     "docs_hint_flow": "Mausrad oder Bildlaufleiste, um das Dokument zu durchlaufen",
     "docs_tooltip_mode_book": "Seitenweise lesen, wie in einem Buch",
     "docs_tooltip_mode_flow": "Vertikal lesen, an einem Stück",
+    "docs_tooltip_toc": "Inhalt",
     "docs_tooltip_prev": "Vorherige Seite",
     "docs_tooltip_next": "Nächste Seite",
     "docs_tooltip_view_md": "Markdown-Quelltext anzeigen",

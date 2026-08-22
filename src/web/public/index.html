@@ -837,6 +837,22 @@
                 </div>
                 <div class="docs-header-actions">
                     <!--
+                         Accès au sommaire quand la barre latérale a disparu.
+                         Elle s'efface sous 860 px, et le lecteur entré dans un
+                         document n'avait plus aucun moyen d'en changer. Le
+                         bouton n'existe qu'aux largeurs où elle manque.
+                    -->
+                    <button id="btn-docs-toc" class="docs-icon-btn docs-toc-toggle" aria-expanded="false" aria-controls="docs-toc" data-tooltip="Sommaire" data-i18n-tooltip="docs_tooltip_toc">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                            <line x1="8" y1="6" x2="21" y2="6"></line>
+                            <line x1="8" y1="12" x2="21" y2="12"></line>
+                            <line x1="8" y1="18" x2="21" y2="18"></line>
+                        </svg>
+                    </button>
+                    <!--
                          Mode de lecture. Les deux symboles restent affichés — le
                          livre pour la lecture paginée, les lignes fléchées vers
                          le bas pour la lecture d'une seule traite — et c'est le
@@ -878,8 +894,15 @@
                 </div>
             </div>
 
-            <div class="docs-body">
+            <div class="docs-body" id="docs-body">
                 <aside class="docs-toc" id="docs-toc"></aside>
+                <!--
+                     Voile du tiroir. Sous 860 px, le sommaire se pose au-dessus
+                     du livre au lieu de se ranger à côté : il faut alors de quoi
+                     le refermer sans viser un bouton, et de quoi intercepter les
+                     appuis qui tomberaient sur la page cachée derrière.
+                -->
+                <div class="docs-toc-voile" id="docs-toc-voile"></div>
 
                 <div class="docs-reader">
                     <button class="docs-nav docs-nav-prev" id="btn-docs-prev" data-tooltip="Page précédente" data-i18n-tooltip="docs_tooltip_prev">

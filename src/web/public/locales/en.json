@@ -359,6 +359,7 @@
     "docs_hint_flow": "Wheel or scrollbar to move through the document",
     "docs_tooltip_mode_book": "Paged reading, like a book",
     "docs_tooltip_mode_flow": "Vertical reading, in one go",
+    "docs_tooltip_toc": "Contents",
     "docs_tooltip_prev": "Previous page",
     "docs_tooltip_next": "Next page",
     "docs_tooltip_view_md": "Show the Markdown source",

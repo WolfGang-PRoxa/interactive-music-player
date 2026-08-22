@@ -234,6 +234,23 @@
 
 /* Sommaire */
 
+/*
+ * Le sommaire a deux états, selon la place disponible.
+ *
+ * Au large il est une colonne posée à gauche du livre : toujours là, jamais
+ * dans le chemin. Sous 860 px cette colonne mangerait la moitié de l'écran ;
+ * elle y était jusqu'ici purement supprimée, et le lecteur entré dans un
+ * document se retrouvait sans aucun moyen d'en changer. Elle devient alors un
+ * tiroir, ouvert par un bouton d'en-tête et refermé dès qu'on a choisi.
+ *
+ * Le bouton et le voile n'ont pas lieu d'être tant que la colonne tient : ils
+ * ne paraissent qu'au palier étroit, qui les rallume plus bas.
+ */
+.docs-toc-toggle,
+.docs-toc-voile {
+    display: none;
+}
+
 .docs-toc {
     box-sizing: border-box;
     width: 258px;
@@ -929,8 +946,63 @@ html[data-theme='light'] .docs-icon-btn {
 }
 
 @media (max-width: 860px) {
+    /*
+     * Le sommaire passe en tiroir : posé au-dessus du livre plutôt qu'à côté,
+     * il ne prend de la place que le temps qu'on s'en serve. C'est ce qui le
+     * rend utilisable debout comme couché — couché, un téléphone manque de
+     * hauteur autant qu'il manque de largeur debout, et une barre latérale
+     * permanente serait de trop dans les deux cas.
+     */
+    .docs-body {
+        position: relative;
+    }
+
     .docs-toc {
-        display: none;
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 6;
+        width: min(78vw, 300px);
+        /* Le fond de la fenêtre elle-même : opaque dans tous les thèmes, là
+           où --bg-card est translucide dans plusieurs et laisserait lire le
+           livre au travers du tiroir. */
+        background: var(--bg-dropdown);
+        box-shadow: 14px 0 34px rgba(0, 0, 0, 0.5);
+        /* Rangé hors cadre, et non masqué : il doit pouvoir glisser. */
+        transform: translateX(-100%);
+        transition: transform 0.24s ease;
+        padding-left: max(0.7rem, env(safe-area-inset-left));
+    }
+
+    .docs-body.docs-toc-ouvert .docs-toc {
+        transform: none;
+    }
+
+    /*
+     * Le voile assombrit la page et reçoit l'appui qui referme. Il se fond par
+     * l'opacité plutôt que d'apparaître par display, qui ne se transitionne
+     * pas ; pointer-events lui évite d'intercepter quoi que ce soit tant qu'il
+     * est transparent.
+     */
+    .docs-toc-voile {
+        display: block;
+        position: absolute;
+        inset: 0;
+        z-index: 5;
+        background: rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.24s ease;
+    }
+
+    .docs-body.docs-toc-ouvert .docs-toc-voile {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .docs-toc-toggle {
+        display: inline-flex;
     }
 
     .docs-window {

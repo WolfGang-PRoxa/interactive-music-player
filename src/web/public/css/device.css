@@ -153,6 +153,33 @@ body.touch-dragging * {
     transform: translateY(-50%);
 }
 
+/*
+ * Exception de la bascule du mode de lecture de la documentation.
+ *
+ * Ses deux boutons ne sont pas posés côte à côte dans l'en-tête : ils logent
+ * dans `.docs-mode-switch`, un étui à hauteur fixe dont la boîte intérieure ne
+ * fait que 26 px une fois sa bordure et son remplissage déduits. La cible de
+ * 44 px imposée plus haut les y faisait déborder de neuf pixels en haut et
+ * neuf en bas : sur téléphone, le surlignage du mode actif dépassait de l'étui.
+ *
+ * Même partage que pour le `.switch` : c'est l'étui qui prend les 44 px et
+ * devient la cible, les boutons se contentant de ce qu'il leur laisse. Le
+ * doigt vise une zone haute de 44 px comme partout ailleurs, la pastille du
+ * mode actif reste dedans, et la commande garde sur téléphone l'apparence
+ * qu'elle a sur ordinateur.
+ *
+ * `min-height` doit être explicitement rendue au plancher : sans cela, la
+ * règle générale continuerait de l'emporter sur la hauteur donnée juste après.
+ */
+[data-touch-mode="true"] .docs-mode-switch {
+    height: 44px;
+}
+
+[data-touch-mode="true"] .docs-mode-btn {
+    min-height: 0;
+    height: 100%;
+}
+
 /* Les infobulles au survol n'ont pas de sens sans souris : elles restent
    collées après l'appui et masquent ce qu'on vient de toucher. */
 [data-touch-mode="true"] .tooltip-container,

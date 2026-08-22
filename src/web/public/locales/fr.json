@@ -359,6 +359,7 @@
     "docs_hint_flow": "Molette ou barre de défilement pour parcourir le document",
     "docs_tooltip_mode_book": "Lecture paginée, comme un livre",
     "docs_tooltip_mode_flow": "Lecture verticale, d'une seule traite",
+    "docs_tooltip_toc": "Sommaire",
     "docs_tooltip_prev": "Page précédente",
     "docs_tooltip_next": "Page suivante",
     "docs_tooltip_view_md": "Afficher la source Markdown",
