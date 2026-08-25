@@ -580,6 +580,310 @@ body.touch-dragging * {
     border-right: none;
 }
 
+/*
+ * Zones de sécurité de la fenêtre de documentation.
+ *
+ * Elles sont ici, et non dans les paliers de docs.css, pour la raison même qui
+ * a fait monter la mise à plein écran juste au-dessus : ces paliers interrogent
+ * la largeur, et un téléphone couché les dépasse tous. Il se retrouvait alors
+ * bord à bord sans aucune compensation — le sommaire amputé de sa marge gauche,
+ * le pourcentage de défilement mangé par le coin. Le besoin suit l'appareil,
+ * pas la largeur de sa fenêtre : c'est donc au mode de support qu'il faut
+ * l'accrocher.
+ *
+ * Debout, `env()` vaut zéro sur ces côtés et le `max()` rend la valeur d'origine :
+ * rien ne change. C'est couché que les marges apparaissent, du côté où l'écran
+ * est réellement rogné — l'encoche passe à gauche ou à droite selon le sens de
+ * rotation, et les deux insets sont posés pour que les deux sens tiennent.
+ *
+ * Les bordures de l'en-tête et du pied gardent toute la largeur : la marge est
+ * un remplissage, pas un retrait de la boîte. Un trait qui s'arrêterait avant le
+ * bord se verrait davantage que ce qu'il protège.
+ */
+[data-device-mode="phone"] .docs-header {
+    padding-left: max(1.4rem, env(safe-area-inset-left));
+    padding-right: max(1.4rem, env(safe-area-inset-right));
+}
+
+[data-device-mode="phone"] .docs-footer {
+    padding-left: max(1.4rem, env(safe-area-inset-left));
+    padding-right: max(1.4rem, env(safe-area-inset-right));
+    padding-bottom: max(0.7rem, env(safe-area-inset-bottom));
+}
+
+/* Le sommaire longe le bord gauche tant qu'il est une colonne. */
+[data-device-mode="phone"] .docs-toc {
+    padding-left: max(0.7rem, env(safe-area-inset-left));
+}
+
+/*
+ * Le lecteur longe le bord droit dans tous les cas. À gauche, il ne le longe
+ * que lorsque le sommaire s'est retiré en tiroir : la marge est donc posée
+ * là-bas, dans le palier qui décide ce retrait, et non ici où elle volerait de
+ * la place au texte chaque fois que la colonne est présente.
+ */
+[data-device-mode="phone"] .docs-reader {
+    padding-left: max(0.5rem, env(safe-area-inset-left));
+    padding-right: max(0.5rem, env(safe-area-inset-right));
+}
+
+/*
+ * Le sommaire en tiroir sur téléphone, couché comme debout.
+ *
+ * docs.css fait déjà cette bascule sous 860 px, et elle vaut pour toute fenêtre
+ * étroite, téléphone ou non. Mais un téléphone couché passe au-dessus de ce
+ * seuil : il retrouvait une colonne figée de 258 px sur un écran qui n'a déjà
+ * plus de hauteur, sans le bouton pour la replier. Troisième fois que ce piège
+ * se referme — la mise à plein écran et les zones de sécurité l'ont rencontré
+ * avant — et toujours pour la même raison : le besoin suit l'appareil, pas la
+ * largeur de sa fenêtre.
+ *
+ * Les valeurs répètent celles de docs.css plutôt que de s'y ajouter, faute de
+ * pouvoir écrire « cette requête de média **ou** ce sélecteur » en CSS. Elles
+ * sont identiques à dessein : debout, les deux blocs disent la même chose et
+ * celui-ci ne fait que l'emporter par l'ordre de chargement ; couché, il est le
+ * seul à parler. Toute retouche du tiroir doit donc se faire aux deux endroits.
+ */
+[data-device-mode="phone"] .docs-body {
+    position: relative;
+}
+
+[data-device-mode="phone"] .docs-toc {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 6;
+    width: min(78vw, 300px);
+    background: var(--bg-dropdown);
+    box-shadow: 14px 0 34px rgba(0, 0, 0, 0.5);
+    transform: translateX(-100%);
+    transition: transform 0.24s ease;
+}
+
+[data-device-mode="phone"] .docs-body.docs-toc-ouvert .docs-toc {
+    transform: none;
+}
+
+[data-device-mode="phone"] .docs-toc-voile {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.24s ease;
+}
+
+[data-device-mode="phone"] .docs-body.docs-toc-ouvert .docs-toc-voile {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+[data-device-mode="phone"] .docs-toc-toggle {
+    display: inline-flex;
+}
+
+/*
+ * Couché, le sommaire reprend sa colonne au lieu de se poser dessus.
+ *
+ * Le tiroir en surimpression est la bonne réponse debout : la largeur y est si
+ * comptée qu'une colonne permanente ne laisserait plus de ligne lisible, et
+ * mieux vaut masquer un instant que rogner en permanence. Couché, l'arbitrage
+ * s'inverse — la largeur est là, et un sommaire qui recouvre le texte qu'on
+ * vient y chercher est une gêne gratuite.
+ *
+ * Il redevient donc un frère du lecteur dans le flux, et c'est sa largeur qui
+ * s'anime. Le lecteur, en `flex: 1`, encaisse la variation sans qu'on ait à la
+ * lui dire : le cadre de lecture se redimensionne de lui-même, dans le même
+ * mouvement.
+ *
+ * Le voile disparaît, faute d'objet : il ne servait qu'à recevoir l'appui qui
+ * referme un panneau posé par-dessus, et à intercepter ce qui aurait touché la
+ * page cachée dessous. Ici rien n'est caché.
+ */
+@media (orientation: landscape) {
+    [data-device-mode="phone"] .docs-toc {
+        position: static;
+        z-index: auto;
+        width: 0;
+        padding-left: 0;
+        padding-right: 0;
+        border-right-width: 0;
+        overflow: hidden;
+        box-shadow: none;
+        transform: none;
+        transition:
+            width 0.24s ease,
+            padding 0.24s ease,
+            border-right-width 0.24s ease;
+    }
+
+    [data-device-mode="phone"] .docs-body.docs-toc-ouvert .docs-toc {
+        width: min(46vw, 258px);
+        padding-left: max(0.7rem, env(safe-area-inset-left));
+        padding-right: 0.7rem;
+        border-right-width: 1px;
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+
+    [data-device-mode="phone"] .docs-toc-voile {
+        display: none;
+    }
+
+    /*
+     * Le sommaire déployé prend le bord gauche, et avec lui le devoir de s'en
+     * écarter — il porte déjà sa propre marge de sécurité. Le lecteur, repoussé
+     * à plusieurs centaines de pixels de l'encoche, n'a plus rien à en craindre :
+     * lui laisser ce dégagement creuserait un couloir vide entre la colonne et
+     * la première flèche.
+     *
+     * La valeur est réécrite plutôt qu'annulée : `revert` retournerait à la
+     * feuille du navigateur, pas à la règle précédente. Elle reprend celle du
+     * palier des fenêtres basses, seul en vigueur sur un téléphone couché.
+     */
+    [data-device-mode="phone"] .docs-body.docs-toc-ouvert .docs-reader {
+        padding-left: 0.4rem;
+    }
+}
+
+/*
+ * Restitution du couloir que l'encoche n'occupe pas.
+ *
+ * Les marges posées plus haut prennent la réserve du système telle quelle, des
+ * deux côtés. C'est juste mais généreux : couché, un seul des deux bords porte
+ * l'encoche, l'autre n'a qu'un coin arrondi à dégager — et un arrondi demande
+ * une fraction de ce que demande une encoche.
+ *
+ * `deviceMode.js` déduit le côté et le pose en attribut. Ces règles ne s'en
+ * servent que pour **réduire** une marge du côté réputé libre, jamais pour en
+ * poser une : si l'attribut manque — appareil ancien, orientation
+ * indéterminable, tablette née en paysage — rien ne s'applique et les valeurs
+ * du système restent en vigueur. L'hypothèse ne peut donc jamais découvrir
+ * l'encoche, seulement manquer une occasion de rendre de la place.
+ *
+ * Le portrait n'est pas traité : l'encoche y est en haut ou en bas, les bords
+ * latéraux ne portent alors aucune réserve et il n'y a rien à rendre.
+ */
+@media (orientation: landscape) {
+    /* Encoche à gauche : le bord droit n'a qu'un arrondi à dégager. */
+    [data-device-mode="phone"][data-encoche="gauche"] .docs-header,
+    [data-device-mode="phone"][data-encoche="gauche"] .docs-footer {
+        padding-right: 1.4rem;
+    }
+
+    [data-device-mode="phone"][data-encoche="gauche"] .docs-reader {
+        padding-right: 0.9rem;
+    }
+
+    /* Encoche à droite : symétrique, plus le sommaire qui longe ce bord-là. */
+    [data-device-mode="phone"][data-encoche="droite"] .docs-header,
+    [data-device-mode="phone"][data-encoche="droite"] .docs-footer {
+        padding-left: 1.4rem;
+    }
+
+    [data-device-mode="phone"][data-encoche="droite"] .docs-reader {
+        padding-left: 0.9rem;
+    }
+
+    [data-device-mode="phone"][data-encoche="droite"] .docs-toc,
+    [data-device-mode="phone"][data-encoche="droite"] .docs-body.docs-toc-ouvert .docs-toc {
+        padding-left: 0.7rem;
+    }
+}
+
+/*
+ * La croix du tiroir, au doigt.
+ *
+ * Le bouton porte un caractère, `✕`, et non une icône vectorielle : sa taille
+ * ne suit donc pas celle du cadre, elle suit la police. Déclaré à 32 px, le
+ * cadre passe à 44 par la cible tactile imposée plus haut, et le glyphe reste
+ * à la taille héritée — une croix minuscule perdue au milieu de son bouton.
+ *
+ * On la redimensionne donc explicitement. La valeur suit le cadre tactile, non
+ * le cadre déclaré : c'est le premier qu'on voit.
+ */
+[data-touch-mode="true"] .drawer-close-btn {
+    font-size: 1.15rem;
+    line-height: 1;
+}
+
+/*
+ * L'en-tête du tiroir sur téléphone.
+ *
+ * L'écart entre la pastille « en direct » et la croix n'est pas une marge : il
+ * n'existe qu'en conséquence du repli du titre. Faute de place sur une ligne,
+ * « Activité & Performance » passe à deux ; le groupe titre + pastille devient
+ * alors plus étroit que la rangée, et le `space-between` de l'en-tête verse
+ * tout le reliquat entre les deux — là où il se voit le plus.
+ *
+ * On ne déplace donc rien : on rend au titre de quoi tenir sur une ligne. Le
+ * reliquat disparaît de lui-même, la pastille reste accolée au titre comme elle
+ * a été voulue, et l'en-tête y gagne une ligne de hauteur — ce qui n'est pas de
+ * trop sur un écran couché.
+ */
+[data-device-mode="phone"] .drawer-header {
+    padding: 0.85rem 0.9rem;
+}
+
+[data-device-mode="phone"] .drawer-title-group {
+    gap: 7px;
+}
+
+[data-device-mode="phone"] .drawer-title-icon {
+    width: 17px;
+    height: 17px;
+}
+
+[data-device-mode="phone"] .drawer-title {
+    font-size: 0.9rem;
+}
+
+[data-device-mode="phone"] .live-pulse-badge {
+    font-size: 0.7rem;
+    padding: 2px 7px;
+}
+
+/*
+ * Le bloc de téléchargement passe sous le titre.
+ *
+ * « En cours de lecture » aligne trois éléments sur une rangée : la pochette,
+ * le titre, et — pour une piste venue du web — le format d'export avec son
+ * bouton. Les deux extrêmes sont incompressibles : la pochette a sa taille, le
+ * menu déroulant un plancher de 120 px, et le bouton ses 42.
+ *
+ * Le titre, lui, est le seul à céder — il porte `overflow-wrap: anywhere`, posé
+ * pour qu'un nom de fichier interminable ne file pas sous les boutons. Sur un
+ * écran étroit, ce qui restait de la rangée tenait dans une lettre, et la règle
+ * faisait exactement ce qu'on lui demandait : couper n'importe où. Le titre
+ * descendait alors à la verticale, une lettre par ligne.
+ *
+ * Rien à reprocher à `anywhere`, qui reste juste : c'est la rangée qui est de
+ * trop. On la laisse donc se replier, et le bloc de téléchargement prend une
+ * ligne pour lui. Le titre retrouve toute la largeur laissée par la pochette,
+ * et le menu déroulant, à l'étroit depuis le début, s'étale enfin sur la
+ * sienne.
+ */
+[data-device-mode="phone"] .track-details {
+    flex-wrap: wrap;
+}
+
+[data-device-mode="phone"] .download-track-wrapper {
+    /* Une base de 100 % force le passage à la ligne : plus rien ne peut
+       l'accompagner sur la précédente. */
+    flex-basis: 100%;
+    margin-left: 0;
+}
+
+[data-device-mode="phone"] .download-format-select-container {
+    flex: 1;
+    /* Le plancher de 120 px n'a plus de raison d'être une fois la ligne à lui
+       seul, et il l'empêcherait de se réduire si le bouton venait à grandir. */
+    min-width: 0;
+}
+
 /* La fenêtre vidéo flottante n'a nulle part où flotter sur un téléphone. */
 [data-device-mode="phone"] #video-window {
     position: static !important;

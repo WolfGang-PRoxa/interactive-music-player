@@ -48,18 +48,42 @@ function errorPage(titre, message, detail) {
  *
  * Sans cette vérification, n'importe quel compte Discord atteignant l'adresse
  * obtiendrait une session. Le lien ne circule que dans le salon vocal, mais une
- * URL se recopie : le vrai garde-fou est l'appartenance au serveur, que le bot
- * connaît déjà par son cache.
+ * URL se recopie : le vrai garde-fou est l'appartenance au serveur.
+ *
+ * Le cache d'abord, car il répond sans rien demander à Discord. Mais il ne
+ * suffit pas : l'intent `GuildMembers` n'étant pas activé — le bot n'en a pas
+ * l'usage ailleurs, et c'est une intention privilégiée qu'il vaut mieux ne pas
+ * réclamer — ce cache ne retient que les membres croisés en route, ceux qu'un
+ * état vocal ou un message a fait passer. Un membre parfaitement légitime mais
+ * silencieux et hors du vocal en est absent, et se voyait refuser l'entrée.
+ * Pire, la liste repart vide à chaque redémarrage : le même compte était admis
+ * la veille et éconduit le lendemain, sans que rien ait changé de son côté.
+ *
+ * On demande donc à Discord quand le cache se tait. `members.fetch(id)` passe
+ * par l'API REST, qui ne réclame aucune intention privilégiée pour un membre
+ * nommément désigné — l'intent ne conditionne que la réception des événements
+ * et le listage en masse. Un membre inconnu s'y solde par une erreur, qui est
+ * ici une réponse comme une autre : ce serveur-là ne le connaît pas.
  *
  * @param {object} client Client discord.js.
  * @param {string} userId
- * @returns {boolean}
+ * @returns {Promise<boolean>}
  */
-function estMembreConnu(client, userId) {
+async function estMembreConnu(client, userId) {
     if (!client || !client.guilds) return false;
+
     for (const guild of client.guilds.cache.values()) {
         if (guild.members?.cache?.has(userId)) return true;
     }
+
+    for (const guild of client.guilds.cache.values()) {
+        try {
+            if (await guild.members.fetch(userId)) return true;
+        } catch (e) {
+            // Membre inconnu de ce serveur : on poursuit avec le suivant.
+        }
+    }
+
     return false;
 }
 
@@ -127,7 +151,7 @@ function createAuthRouter(webServer) {
             ));
         }
 
-        if (!estMembreConnu(webServer?.client, user.id)) {
+        if (!(await estMembreConnu(webServer?.client, user.id))) {
             log.warn(`[OAuth] Accès refusé à ${user.username} (${user.id}) : membre d'aucun serveur du bot.`);
             return res.status(403).type('html').send(errorPage(
                 'Accès refusé',

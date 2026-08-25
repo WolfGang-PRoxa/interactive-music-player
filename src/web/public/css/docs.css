@@ -368,6 +368,15 @@
     /* La profondeur donne à la feuille son relief pendant la rotation ; sans
        elle, la page se contenterait de s'aplatir. */
     perspective: 2600px;
+    /*
+     * Le glissement horizontal revient au livre, qui s'en sert pour tourner les
+     * pages (voir `brancherGlissement()` dans js/docs.js). Le vertical et le
+     * pincement restent au navigateur : le premier fait défiler le mode flux,
+     * le second agrandit un schéma devenu trop petit. Sans cette déclaration,
+     * le navigateur commencerait à interpréter le geste avant de nous le
+     * céder, et la première page tournerait après un à-coup.
+     */
+    touch-action: pan-y pinch-zoom;
     border-radius: 14px;
     background: var(--docs-paper);
     border: 1px solid var(--docs-rule);
@@ -1005,6 +1014,16 @@ html[data-theme='light'] .docs-icon-btn {
         display: inline-flex;
     }
 
+    /*
+     * Le sommaire retiré, c'est le lecteur qui longe désormais le bord gauche :
+     * la marge de sécurité lui revient. Elle est ici et non au mode de support,
+     * pour ne pas amputer le texte des largeurs où la colonne, elle, est là pour
+     * l'absorber.
+     */
+    .docs-reader {
+        padding-left: max(0.5rem, env(safe-area-inset-left));
+    }
+
     .docs-window {
         width: 98vw;
         height: 96vh;
@@ -1091,6 +1110,68 @@ html[data-theme='light'] .docs-icon-btn {
         padding: 0.6rem 1rem;
         padding-left: max(1rem, env(safe-area-inset-left));
         padding-right: max(1rem, env(safe-area-inset-right));
+        font-size: 0.72rem;
+    }
+}
+
+/* ═════════════════════════ Fenêtres basses ═════════════════════════ */
+
+/*
+ * Téléphone couché — et tout autre cas où la hauteur vient à manquer.
+ *
+ * Les paliers précédents interrogent la largeur, et c'est ce qu'il faut tant
+ * que la contrainte est le nombre de caractères par ligne. Couché, un téléphone
+ * a de la largeur de reste : ce qui lui manque, c'est la hauteur, et aucune
+ * requête en largeur ne peut la voir. Le navigateur aggrave l'affaire en
+ * empilant ses propres barres, si bien que la bande laissée à la lecture se
+ * réduisait à deux ou trois lignes.
+ *
+ * On rend donc à la page tout ce que l'habillage prenait sans le mériter : les
+ * marges généreuses, l'icône du titre — décorative, elle ne dit rien que le mot
+ * « Documentation » ne dise déjà — et surtout les deux lignes du titre, mises
+ * bout à bout. Le sous-titre garde son ellipse, il ne poussera donc jamais les
+ * boutons hors du cadre.
+ *
+ * Les commandes, elles, ne bougent pas : leur cible tactile de 44 px reste
+ * intouchée. C'est le décor qui cède, pas ce qui se vise du doigt.
+ */
+@media (max-height: 520px) {
+    .docs-header {
+        padding: 0.4rem 1rem;
+        gap: 0.6rem;
+    }
+
+    .docs-heading {
+        gap: 0.5rem;
+    }
+
+    .docs-heading-icon {
+        display: none;
+    }
+
+    /* Titre et sous-titre côte à côte : une ligne d'en-tête au lieu de deux. */
+    .docs-heading-texte {
+        display: flex;
+        align-items: baseline;
+        gap: 0.5rem;
+        min-width: 0;
+    }
+
+    .docs-heading-texte h2 {
+        font-size: 0.95rem;
+        flex-shrink: 0;
+    }
+
+    .docs-reader {
+        padding: 0.35rem 0.4rem;
+    }
+
+    .docs-sheet {
+        padding: 0.75rem 1rem 1.1rem;
+    }
+
+    .docs-footer {
+        padding: 0.3rem 1rem;
         font-size: 0.72rem;
     }
 }

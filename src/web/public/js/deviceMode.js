@@ -127,6 +127,74 @@
         }
     }
 
+    /* ═══════════════════════ Côté de l'encoche ═══════════════════════ */
+
+    /*
+     * `env(safe-area-inset-*)` dit **combien** rogner de chaque côté, jamais
+     * **pourquoi**. Couché, un téléphone à encoche rapporte volontiers la même
+     * réserve à gauche et à droite : d'un côté pour l'encoche, de l'autre pour
+     * le coin arrondi. La seconde est bien plus large que nécessaire, et c'est
+     * autant de page perdue.
+     *
+     * On déduit donc le côté de l'encoche pour rendre au côté opposé ce qu'il
+     * n'utilise pas. Cette déduction n'est qu'une hypothèse — la feuille de
+     * style ne s'en sert que pour **réduire** une marge, jamais pour en poser
+     * une. Quand l'attribut manque, ou que l'appareil sort du cas courant, il
+     * ne se passe rien : les valeurs du système s'appliquent telles quelles.
+     *
+     * Deux hypothèses la portent, et toutes deux peuvent tomber :
+     *   - l'appareil est né en portrait — faux pour beaucoup de tablettes ;
+     *   - son encoche est sur le bord haut de cette orientation — faux pour les
+     *     perforations latérales et les pliables.
+     * La première est vérifiable et l'est ci-dessous. La seconde ne l'est pas :
+     * aucune interface web ne dit où le matériel est creusé.
+     */
+
+    /**
+     * Côté de l'écran vers lequel bascule l'encoche à 90° et à 270°.
+     *
+     * La spécification de l'angle d'orientation ne permet pas d'en déduire le
+     * sens avec certitude, et les moteurs ne s'accordent pas tous. Ces deux
+     * constantes sont donc à vérifier sur un appareil réel : si le dégagement
+     * se réduit du mauvais côté — du texte qui passe sous l'encoche —, il
+     * suffit de les échanger.
+     */
+    const ENCOCHE_A_90 = 'gauche';
+    const ENCOCHE_A_270 = 'droite';
+
+    /**
+     * Où se trouve l'encoche, si on peut l'établir.
+     * @returns {'haut'|'bas'|'gauche'|'droite'|null} null si indéterminable.
+     */
+    function encocheProbable() {
+        const o = window.screen && window.screen.orientation;
+        // Absent avant iOS 16.4, entre autres. `window.orientation`, déprécié,
+        // porte une convention de signe différente : mieux vaut ne rien dire
+        // que de dire le contraire.
+        if (!o || typeof o.angle !== 'number' || typeof o.type !== 'string') return null;
+
+        const angle = ((o.angle % 360) + 360) % 360;
+        if (angle % 90 !== 0) return null;
+
+        // L'orientation naturelle est celle qu'on retrouve à 0°. Née en
+        // paysage, l'hypothèse de l'encoche en haut du portrait ne tient plus.
+        const enPortrait = o.type.indexOf('portrait') === 0;
+        const droit = angle === 0 || angle === 180;
+        if (!(droit ? enPortrait : !enPortrait)) return null;
+
+        if (angle === 0) return 'haut';
+        if (angle === 180) return 'bas';
+        return angle === 90 ? ENCOCHE_A_90 : ENCOCHE_A_270;
+    }
+
+    /** Reporte le côté déduit sur `<html>`, ou retire l'attribut. */
+    function poserEncoche() {
+        const root = document.documentElement;
+        const cote = encocheProbable();
+        if (cote) root.setAttribute('data-encoche', cote);
+        else root.removeAttribute('data-encoche');
+    }
+
     /**
      * Pose le mode effectif sur `<html>` et prévient les abonnés s'il a changé.
      * @param {boolean} [notify=true]
@@ -199,17 +267,28 @@
 
     choice = readStoredChoice();
     apply(false);
+    poserEncoche();
 
-    // En `auto` seulement : une rotation ou un redimensionnement peut faire
-    // basculer d'un mode à l'autre. Un choix explicite ne doit jamais bouger.
+    // Une rotation ou un redimensionnement peut faire basculer d'un mode à
+    // l'autre — mais en `auto` seulement, un choix explicite ne devant jamais
+    // bouger. Le côté de l'encoche, lui, suit la rotation dans tous les cas :
+    // il ne décrit pas une préférence mais la position de l'appareil.
     let resizeTimer = null;
     const reevaluate = () => {
-        if (choice !== 'auto') return;
         clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(() => apply(), 150);
+        resizeTimer = setTimeout(() => {
+            poserEncoche();
+            if (choice === 'auto') apply();
+        }, 150);
     };
     window.addEventListener('resize', reevaluate);
     window.addEventListener('orientationchange', reevaluate);
+    // Plus fiable que `orientationchange`, déprécié : il émet après que l'angle
+    // a réellement changé, là où l'autre peut devancer la bascule.
+    if (window.screen && window.screen.orientation
+        && typeof window.screen.orientation.addEventListener === 'function') {
+        window.screen.orientation.addEventListener('change', reevaluate);
+    }
 
     window.MusicPlayer.deviceMode = deviceMode;
 })();

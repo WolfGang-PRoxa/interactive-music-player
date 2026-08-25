@@ -27,8 +27,13 @@ const check = (label, ok, detail = '') => {
  * navigateur annonce un pointeur fin. Les laisser déduits de `coarse` et de
  * `width` rendrait justement ces deux cas intestables.
  *
+ * `orientation` simule `screen.orientation`. Absent, l'objet n'existe pas du
+ * tout — c'est le cas des navigateurs qui ne l'exposent pas, et le module doit
+ * alors se taire plutôt que de deviner.
+ *
  * @param {{coarse: boolean, width: number, height?: number,
- *          touchPoints?: number, stored?: string}} env
+ *          touchPoints?: number, stored?: string,
+ *          orientation?: {angle: number, type: string}}} env
  */
 function load(env) {
     const attrs = {};
@@ -38,16 +43,31 @@ function load(env) {
     const height = env.height === undefined ? 900 : env.height;
     const touchList = env.touchPoints === undefined ? (env.coarse ? 5 : 0) : env.touchPoints;
 
+    const fakeScreen = { width: env.width, height };
+    if (env.orientation) {
+        fakeScreen.orientation = {
+            angle: env.orientation.angle,
+            type: env.orientation.type,
+            addEventListener() {},
+        };
+    }
+
     const fakeWindow = {
         matchMedia: (q) => ({ matches: q.includes('coarse') ? env.coarse : false }),
         innerWidth: env.width,
         innerHeight: height,
         addEventListener() {},
+        screen: fakeScreen,
     };
 
     const context = {
         window: fakeWindow,
-        document: { documentElement: { setAttribute: (k, v) => { attrs[k] = v; } } },
+        document: {
+            documentElement: {
+                setAttribute: (k, v) => { attrs[k] = v; },
+                removeAttribute: (k) => { delete attrs[k]; },
+            },
+        },
         localStorage: {
             getItem: (k) => (storage.has(k) ? storage.get(k) : null),
             setItem: (k, v) => storage.set(k, String(v)),
@@ -145,6 +165,46 @@ r.api.set('phone');
 r.api.set('phone');
 r.api.set('desktop');
 check('un événement par changement réel', received.length === 2, received.join(', '));
+
+/*
+ * Côté de l'encoche.
+ *
+ * La déduction repose sur deux hypothèses — appareil né en portrait, encoche
+ * sur son bord haut — et sert à *réduire* une marge de sécurité. Se tromper
+ * découvrirait donc l'encoche : mieux vaut ne rien dire que dire faux, et c'est
+ * ce silence-là que ces cas vérifient d'abord.
+ */
+console.log('\ndeviceMode — côté de l\'encoche\n');
+
+r = load({ coarse: true, width: 390 });
+check('sans screen.orientation, aucune déduction',
+    r.attrs['data-encoche'] === undefined, String(r.attrs['data-encoche']));
+
+r = load({ coarse: true, width: 390, orientation: { angle: 0, type: 'portrait-primary' } });
+check('portrait droit : encoche en haut',
+    r.attrs['data-encoche'] === 'haut', r.attrs['data-encoche']);
+
+r = load({ coarse: true, width: 390, orientation: { angle: 180, type: 'portrait-secondary' } });
+check('portrait renversé : encoche en bas',
+    r.attrs['data-encoche'] === 'bas', r.attrs['data-encoche']);
+
+r = load({ coarse: true, width: 844, height: 390, orientation: { angle: 90, type: 'landscape-primary' } });
+check('couché à 90° : encoche sur un bord latéral',
+    r.attrs['data-encoche'] === 'gauche', r.attrs['data-encoche']);
+
+r = load({ coarse: true, width: 844, height: 390, orientation: { angle: 270, type: 'landscape-secondary' } });
+check('couché à 270° : encoche sur le bord opposé',
+    r.attrs['data-encoche'] === 'droite', r.attrs['data-encoche']);
+
+// Une tablette née en paysage est droite à 0° tout en étant couchée. L'hypothèse
+// « encoche en haut du portrait » n'y a plus de sens : le module doit se taire.
+r = load({ coarse: true, width: 1180, height: 820, orientation: { angle: 0, type: 'landscape-primary' } });
+check('appareil né en paysage : aucune déduction',
+    r.attrs['data-encoche'] === undefined, String(r.attrs['data-encoche']));
+
+r = load({ coarse: true, width: 390, orientation: { angle: 45, type: 'portrait-primary' } });
+check('angle hors des quatre quarts : aucune déduction',
+    r.attrs['data-encoche'] === undefined, String(r.attrs['data-encoche']));
 
 console.log(`\n=== ${passed} réussite(s), ${failed} échec(s) ===`);
 process.exit(failed === 0 ? 0 : 1);
