@@ -230,6 +230,61 @@ body.touch-dragging * {
 }
 
 /*
+ * Deux barres de plus, hors des listes : la progression de « En cours de
+ * lecture » et la piste du pad de vitesse.
+ *
+ * Elles échappaient à la règle ci-dessus parce qu'elles ne se répètent pas —
+ * une seule de chaque sur la page, deux pour le pad si l'on compte celui de la
+ * fenêtre vidéo. Mais ce n'est pas la répétition qui coûte, c'est le calque :
+ * promu, l'élément est peint à part, et Firefox mobile borne ce calque-là à la
+ * hauteur de fenêtre connue avant la rétractation de sa barre. Passé cette
+ * limite, il cesse simplement de le peindre — la roulette de vitesse
+ * disparaissait dès qu'on la faisait descendre sous cette ligne, l'étui du pad
+ * et la carte autour restant, eux, parfaitement dessinés.
+ *
+ * C'est la même limite que celle des listes plus bas : une position d'écran,
+ * pas une frontière d'élément.
+ *
+ * Comme pour les barres de liste, `will-change` n'est qu'une indication : la
+ * retirer ne change ni le rendu ni les transitions, seulement ce que le
+ * navigateur prépare d'avance.
+ */
+[data-touch-mode="true"] .speed-pad-track,
+[data-touch-mode="true"] .progress-fill {
+    will-change: auto;
+}
+
+/*
+ * Même limite, atteinte par l'autre chemin : l'animation.
+ *
+ * La pochette de « En cours de lecture » tourne comme un disque ou palpite
+ * selon le mode choisi, et ces deux animations ne portent que sur `transform`.
+ * C'est exactement le cas que le navigateur confie au compositeur : il promeut
+ * l'élément en calque pour l'animer sans repasser par la peinture. Le disque
+ * de remplacement — l'icône affichée faute de vignette — fait de même.
+ *
+ * Un calque de plus, donc la même disparition que ci-dessus, et pour de bon :
+ * `animation-play-state: paused` suspend le mouvement mais garde le calque, si
+ * bien que la pochette manquait à l'appel même à l'arrêt.
+ *
+ * Les animations voisines qui font pulser une pastille — `livePulse`,
+ * `speakingPulse` — n'ont pas ce défaut : elles animent aussi `box-shadow`,
+ * que le compositeur ne sait pas traiter, ce qui renvoie l'animation entière
+ * sur le fil principal et laisse l'élément dans le calque commun. Il n'y a
+ * donc rien à leur retirer.
+ *
+ * L'animation de la pochette est donc retirée au doigt. Le bouton de mode
+ * continue de servir : le mode disque garde sa forme ronde et son halo, les
+ * deux autres leur carré arrondi. C'est le mouvement seul qui s'arrête, et
+ * c'est lui qu'on échange contre une pochette visible partout sur la page.
+ */
+[data-touch-mode="true"] .thumbnail-wrapper.anim-mode-spin,
+[data-touch-mode="true"] .thumbnail-wrapper.anim-mode-pulse,
+[data-touch-mode="true"] .icon-disc {
+    animation: none;
+}
+
+/*
  * Même pénurie pour les menus déroulants, par un autre chemin.
  *
  * `.custom-select-trigger` porte son propre `backdrop-filter`, et la page en
