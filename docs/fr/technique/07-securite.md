@@ -31,7 +31,7 @@ Ce qui ne l'est pas :
 
 ## Authentification
 
-[`auth.js`](../../src/web/auth.js) protège **HTTP et WebSocket**.
+[`auth.js`](../../../src/web/auth.js) protège **HTTP et WebSocket**.
 
 ### Origine du jeton
 
@@ -80,7 +80,7 @@ filtré par l'option `verifyClient` de `ws`.
 
 ## Restriction des chemins
 
-[`utils/mediaPaths.js`](../../src/utils/mediaPaths.js) décide quels fichiers
+[`utils/mediaPaths.js`](../../../src/utils/mediaPaths.js) décide quels fichiers
 peuvent être servis.
 
 ### Le problème résolu
@@ -102,7 +102,7 @@ fichier passe désormais par `resolveMediaPath()`.
 Un chemin n'est accepté que s'il remplit **toutes** les conditions :
 
 1. **extension média connue** — issue de `supportedExtensions` et
-   `supportedVideoExtensions` de [`config.js`](../../src/config.js) ;
+   `supportedVideoExtensions` de [`config.js`](../../../src/config.js) ;
 2. **existence réelle**, résolue par `fs.realpathSync` — ce qui neutralise les
    liens symboliques pointant hors du périmètre ;
 3. **localisation sous une racine autorisée**.

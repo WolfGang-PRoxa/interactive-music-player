@@ -1,0 +1,170 @@
+# 07 — Security
+
+[← Contents](README.md)
+
+The bot exposes a web server that drives playback, reads files from disk and can
+stop the process. This page describes the protections in place and the threat
+model adopted.
+
+---
+
+## Threat model
+
+The bot is designed to run on its owner's machine. The dashboard has **no**
+account management: a single token grants access to everything.
+
+What is covered:
+
+- access from another machine on the local network;
+- reading arbitrary files from disk through the media routes;
+- memory or disk exhaustion by a single request;
+- stopping the process by an unauthenticated third party.
+
+What is not:
+
+- privilege separation between several dashboard users;
+- direct exposure on the Internet — put the bot behind a reverse proxy with TLS
+  if necessary;
+- protection against a malicious legitimate user.
+
+---
+
+## Authentication
+
+[`auth.js`](../../../src/web/auth.js) protects **both HTTP and WebSocket**.
+
+### Origin of the token
+
+`DASHBOARD_TOKEN` if it is defined, otherwise a 32-byte token generated on first
+startup and saved in `data/dashboard-token` (permissions `0600`). It is also
+printed in the console at startup.
+
+### Why a cookie
+
+The dashboard loads its media through `<audio src>`, `<video src>` and download
+links. **Those elements cannot carry an `Authorization` header.** The cookie is
+therefore the only vector that works for all the cases.
+
+It has one further advantage: the browser also passes it during the same-origin
+WebSocket handshake, which protects the WebSocket without any change to the
+client code.
+
+### Journey
+
+```
+GET /?token=<token>
+   │
+   ├─ valid token → sets the cookie (httpOnly, sameSite=lax, 1 year)
+   │                then redirects to the URL without the parameter
+   │
+   └─ token absent or invalid → 401 + explanation page
+```
+
+Removing the token from the URL prevents it from lingering in the address bar,
+the history or the `Referer` header.
+
+Three sources are accepted, in order: the `token` parameter, the
+`dashboard_token` cookie, the `Authorization: Bearer` header.
+
+The comparison uses `crypto.timingSafeEqual`, so as not to reveal the token byte
+by byte through measurement of the response time.
+
+### Placement of the middleware
+
+`auth.middleware` is mounted **before** `express.static`. The dashboard's files
+are therefore protected on the same footing as the `/api` routes. The WebSocket
+is filtered by the `verifyClient` option of `ws`.
+
+---
+
+## Path restriction
+
+[`utils/mediaPaths.js`](../../../src/utils/mediaPaths.js) decides which files may
+be served.
+
+### The problem solved
+
+The `/api/stream` and `/api/download` routes accepted a raw path from the client
+and served it if it existed:
+
+```js
+if (fs.existsSync(decodedUrl)) {
+    track = { url: decodedUrl, queryType: 'file', ... };
+}
+```
+
+A request `?trackUrl=…/.env` therefore returned the Discord token. All file
+reading now goes through `resolveMediaPath()`.
+
+### The three conditions
+
+A path is only accepted if it meets **all** the conditions:
+
+1. **known media extension** — taken from `supportedExtensions` and
+   `supportedVideoExtensions` in [`config.js`](../../../src/config.js);
+2. **actual existence**, resolved by `fs.realpathSync` — which neutralises
+   symbolic links pointing outside the perimeter;
+3. **location under an allowed root**.
+
+Also rejected outright are paths containing a null byte (which truncates the path
+at the level of the system calls) and remote URLs.
+
+### Allowed roots
+
+| Root | Origin |
+|---|---|
+| `data/uploads` | Imported files |
+| `data/cache` | Preloading |
+| `MEDIA_ROOTS` | Local libraries, separated by `;` or `,` |
+
+Without `MEDIA_ROOTS`, a file played from `D:\Music` will be **refused for
+streaming**. This is a deliberate hardening: widening the perimeter is an
+explicit decision of the operator.
+
+The comparison is case-insensitive on Windows.
+
+### Defence in depth
+
+The guard rail is applied at two levels: at the resolution of the requested
+track, then before the actual reading of the file — including for a track coming
+from the queue. A track whose path is outside the perimeter produces a `403`,
+never a read.
+
+---
+
+## Ceilings
+
+| Limit | Value | Reason |
+|---|---|---|
+| WebSocket payload | 1 MB | The dashboard only exchanges small JSON messages |
+| HTTP JSON body | 1 MB | Likewise; files go through `/api/upload` |
+| Import size | `MAX_UPLOAD_MB`, default 1024 MB | Prevent a single POST from filling the disk |
+| Import extensions | Media list | Refused with `415` |
+
+The import is capped **during the transfer**: the stream is interrupted as soon
+as the limit is exceeded and the partial file deleted, without waiting for the
+end of the request.
+
+> Historically, the WebSocket limit was **1 GB**, for an `uploadPlay` message
+> carrying base64-encoded files. That message was no longer used by the client;
+> it has been removed, which made it possible to bring the limit back to a
+> reasonable value.
+
+---
+
+## Network exposure
+
+`HOST` is `127.0.0.1` by default: the dashboard is only reachable from the host
+machine. To reach it from a phone or another workstation, set `HOST=0.0.0.0` —
+authentication then takes on its full meaning. A warning is logged at startup in
+that case.
+
+---
+
+## When making changes
+
+- Never pass a path coming from the client to `fs.createReadStream`,
+  `fs.statSync` or FFmpeg without going through `resolveMediaPath()`.
+- Never mount a route before `auth.middleware`.
+- A new WebSocket message able to write to disk must validate its inputs: the
+  router only guarantees the presence of `data`.

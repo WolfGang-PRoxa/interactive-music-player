@@ -180,7 +180,7 @@ l'interface — PowerShell ne distingue pas la casse, et le paramètre l'emporte
 
 ## Séquence de démarrage
 
-`npm start` exécute [`src/index.js`](../../src/index.js), dans cet ordre :
+`npm start` exécute [`src/index.js`](../../../src/index.js), dans cet ordre :
 
 **1. Correctif Windows.** Avant tout `require`, `child_process.spawn` est
 enveloppé pour forcer `windowsHide: true`. Sans cela, chaque appel à FFmpeg ou
@@ -310,7 +310,7 @@ identique aurait cassé le bot silencieusement.
 
 ### L'état appartient désormais au projet
 
-[`PlaybackSession`](../../src/audio/PlaybackSession.js) déclare les 23
+[`PlaybackSession`](../../../src/audio/PlaybackSession.js) déclare les 23
 propriétés dans un `SCHEMA` unique, avec leur type et leur valeur initiale.
 L'état vit dans cet objet ; la queue n'en est plus propriétaire.
 
@@ -360,12 +360,12 @@ initiales garanties, protection contre les collisions) est déjà acquis.
 
 **Ajouter une commande Discord** — créer un fichier dans `src/commands/`
 exportant `{ data, execute }`, puis relancer `npm run deploy`. Le chargeur de
-[`index.js`](../../src/index.js) contient un cas particulier en dur pour
+[`index.js`](../../../src/index.js) contient un cas particulier en dur pour
 `queue.js`, qui exporte cinq commandes.
 
 **Ajouter un message WebSocket** — voir
 [05 — Tableau de bord](05-tableau-de-bord.md#ajouter-un-message).
 
 **Ajouter un réglage persistant** — l'ajouter à `_defaults()` dans
-[`Database.js`](../../src/database/Database.js) ; les serveurs déjà enregistrés
+[`Database.js`](../../../src/database/Database.js) ; les serveurs déjà enregistrés
 héritent automatiquement de la valeur par défaut à la lecture.

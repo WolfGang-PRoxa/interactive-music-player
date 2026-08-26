@@ -174,6 +174,20 @@ window.MusicPlayer.applyLanguage = async function(lang) {
     if (typeof window.MusicPlayer.renderQueue === 'function') window.MusicPlayer.renderQueue();
     if (typeof window.MusicPlayer.renderHistory === 'function') window.MusicPlayer.renderHistory();
     if (typeof window.MusicPlayer.renderPlaylists === 'function') window.MusicPlayer.renderPlaylists();
+
+    /*
+     * La documentation embarquée est livrée dans les mêmes langues que
+     * l'interface, et suit donc ce réglage-ci : rien ne justifierait de lire le
+     * tableau de bord dans une langue et sa documentation dans une autre.
+     *
+     * Elle se recharge à part, sans être attendue : ses pages viennent du
+     * serveur, et l'aller-retour n'a pas à retarder la traduction du reste, qui
+     * est déjà en mémoire. La fenêtre de lecture se repeint quand la réponse
+     * arrive ; fermée, elle n'a rien à faire du tout.
+     */
+    if (typeof window.MusicPlayer.refreshDocsLanguage === 'function') {
+        window.MusicPlayer.refreshDocsLanguage().catch(() => {});
+    }
 };
 
 window.MusicPlayer.t = function(key) {

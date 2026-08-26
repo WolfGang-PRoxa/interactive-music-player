@@ -23,7 +23,7 @@ cache mémoire faisant autorité pendant l'exécution.
 
 ## Écriture atomique
 
-[`utils/atomicJson.js`](../../src/utils/atomicJson.js) est le seul point
+[`utils/atomicJson.js`](../../../src/utils/atomicJson.js) est le seul point
 d'écriture JSON autorisé.
 
 ### Le problème résolu
@@ -72,7 +72,7 @@ sérialisation.
 
 ## Database
 
-[`Database.js`](../../src/database/Database.js) — singleton, réglages par
+[`Database.js`](../../../src/database/Database.js) — singleton, réglages par
 serveur et playlists globales.
 
 ### Structure du fichier
@@ -139,7 +139,7 @@ permanente, qui ramènerait sans fin le bot et le tableau de bord sur lui — vo
 
 ## PlaybackStateManager
 
-[`PlaybackStateManager.js`](../../src/database/PlaybackStateManager.js) —
+[`PlaybackStateManager.js`](../../../src/database/PlaybackStateManager.js) —
 instantané de lecture, pour reprendre là où l'on s'était arrêté.
 
 ### Contenu sauvegardé
@@ -149,7 +149,7 @@ position, file d'attente, historique, mode de répétition, lecture ou pause.
 
 ### Rythme
 
-Toutes les 5 secondes (minuteur d'[`index.js`](../../src/index.js)) et à chaque
+Toutes les 5 secondes (minuteur d'[`index.js`](../../../src/index.js)) et à chaque
 événement notable : démarrage et fin de piste, ajout, file vide, changement
 d'état vocal du bot.
 
@@ -186,7 +186,7 @@ exponentielle avant l'enregistrement final. Appelée sur `SIGINT` et sur
 
 ## Stockage des imports
 
-[`uploadService.js`](../../src/web/uploadService.js) — voir aussi
+[`uploadService.js`](../../../src/web/uploadService.js) — voir aussi
 [07 — Sécurité](07-securite.md).
 
 ### Nommage par empreinte
@@ -207,7 +207,7 @@ démarrage par `cleanIncomingUploads()`.
 
 ### Nom affiché
 
-`getCleanFilename()` de [`utils/paths.js`](../../src/utils/paths.js) retire le
+`getCleanFilename()` de [`utils/paths.js`](../../../src/utils/paths.js) retire le
 préfixe technique. Il gère les deux formes : l'empreinte actuelle et
 l'horodatage des fichiers importés avant la déduplication, toujours référencés
 par les playlists existantes.

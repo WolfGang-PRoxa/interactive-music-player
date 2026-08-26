@@ -38,18 +38,18 @@ latence perceptible.
 
 | Pour | Document |
 |---|---|
-| Utiliser le bot et le tableau de bord | **[Guide utilisateur](docs/GUIDE.md)** |
-| Comprendre ou modifier le code | **[Documentation technique](docs/technique/README.md)** |
+| Utiliser le bot et le tableau de bord | **[Guide utilisateur](docs/fr/GUIDE.md)** |
+| Comprendre ou modifier le code | **[Documentation technique](docs/fr/technique/README.md)** |
 
-La documentation technique couvre l'[architecture](docs/technique/01-architecture.md),
-la [chaîne audio](docs/technique/02-lecture-audio.md), le
-[ducking](docs/technique/03-ducking.md), les
-[modes de diffusion](docs/technique/04-diffusion.md), le
-[tableau de bord](docs/technique/05-tableau-de-bord.md), la
-[persistance](docs/technique/06-persistance.md), la
-[sécurité](docs/technique/07-securite.md), la
-[journalisation](docs/technique/08-journalisation.md) et la
-[configuration](docs/technique/09-configuration.md).
+La documentation technique couvre l'[architecture](docs/fr/technique/01-architecture.md),
+la [chaîne audio](docs/fr/technique/02-lecture-audio.md), le
+[ducking](docs/fr/technique/03-ducking.md), les
+[modes de diffusion](docs/fr/technique/04-diffusion.md), le
+[tableau de bord](docs/fr/technique/05-tableau-de-bord.md), la
+[persistance](docs/fr/technique/06-persistance.md), la
+[sécurité](docs/fr/technique/07-securite.md), la
+[journalisation](docs/fr/technique/08-journalisation.md) et la
+[configuration](docs/fr/technique/09-configuration.md).
 
 ---
 
@@ -103,7 +103,7 @@ DISCORD_TOKEN=votre_jeton
 DISCORD_CLIENT_ID=votre_application_id
 ```
 
-Voir la [référence complète des variables](docs/technique/09-configuration.md#variables-denvironnement)
+Voir la [référence complète des variables](docs/fr/technique/09-configuration.md#variables-denvironnement)
 pour le port, l'exposition réseau, les dossiers de musique locaux et la
 journalisation.
 
@@ -153,7 +153,7 @@ http://localhost:3000/?token=VOTRE_JETON
 
 Par défaut, il n'écoute que sur la machine locale. Pour y accéder depuis un
 téléphone ou un autre poste, voir
-[Accès au tableau de bord](docs/GUIDE.md#accès-au-tableau-de-bord).
+[Accès au tableau de bord](docs/fr/GUIDE.md#accès-au-tableau-de-bord).
 
 ---
 
@@ -170,7 +170,7 @@ téléphone ou un autre poste, voir
 | `/ducking toggle\|level\|delay\|fade\|status` | Réglages du ducking |
 | `/broadcast mode:<everyone\|personal>` | Mode de diffusion *(administrateur)* |
 
-Détail et exemples dans le [guide utilisateur](docs/GUIDE.md#référence-complète-des-commandes-discord).
+Détail et exemples dans le [guide utilisateur](docs/fr/GUIDE.md#référence-complète-des-commandes-discord).
 
 ---
 
@@ -189,14 +189,14 @@ src/
 
 tools/                Raccourci Windows : assistant graphique et lanceur
 data/                 Créé à l'exécution, non versionné
-docs/                 Guide utilisateur et documentation technique
+docs/<langue>/        Guide utilisateur et documentation technique (fr, en, es, de)
 
 Create shortcut.vbs   Ouvre l'assistant (Windows)
 Start bot.vbs         Démarre le bot sans console (Windows)
 ```
 
 Arborescence détaillée et carte des dépendances :
-[01 — Architecture](docs/technique/01-architecture.md#arborescence).
+[01 — Architecture](docs/fr/technique/01-architecture.md#arborescence).
 
 ---
 
@@ -228,11 +228,11 @@ vous-même connecté au moment de la commande.
 Une piste doit être en cours de lecture — le ducking est mis en place au
 démarrage d'une piste, pas à la connexion. Vérifiez ensuite `/ducking status` et
 que le participant n'est pas exclu de la détection depuis le tableau de bord.
-Voir le [guide de diagnostic](docs/technique/03-ducking.md#diagnostic).
+Voir le [guide de diagnostic](docs/fr/technique/03-ducking.md#diagnostic).
 
 **Le lecteur du navigateur refuse mes fichiers locaux**
 Seuls les fichiers des dossiers du bot ou déclarés dans `MEDIA_ROOTS` sont
-diffusés. Voir [Sécurité — restriction des chemins](docs/technique/07-securite.md#restriction-des-chemins).
+diffusés. Voir [Sécurité — restriction des chemins](docs/fr/technique/07-securite.md#restriction-des-chemins).
 
 ---
 

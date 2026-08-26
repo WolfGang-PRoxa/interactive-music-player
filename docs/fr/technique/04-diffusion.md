@@ -62,7 +62,7 @@ position réelle par le message `syncProgress`, ce qui corrige la dérive.
 
 ### Fin de piste
 
-`handleVirtualSkip()` dans [`WebServer.js`](../../src/web/WebServer.js) reproduit
+`handleVirtualSkip()` dans [`WebServer.js`](../../../src/web/WebServer.js) reproduit
 le comportement d'un vrai lecteur : gestion du mode répétition, empilage dans
 `virtualHistory`, dépilage de `virtualTracks`, et synchronisation de
 `playlistCurrentIndex` si une playlist est active.
@@ -72,7 +72,7 @@ le comportement d'un vrai lecteur : gestion du mode répétition, empilage dans
 Problème : sans flux audio, Discord ferme la connexion UDP après quelques
 secondes, et la reprise du mode commun exigerait une reconnexion complète.
 
-Solution — `startSilencePlayer()` dans [`index.js`](../../src/index.js) : un
+Solution — `startSilencePlayer()` dans [`index.js`](../../../src/index.js) : un
 `Readable` en `objectMode` émet une trame de silence Opus toutes les 20 ms.
 
 ```js
@@ -124,7 +124,7 @@ transitionTargetProgress = position en ms
 Le volume est maintenu à 0 pendant toute la manœuvre : sans cela, l'utilisateur
 entendrait le début de la piste avant le saut à la bonne position. Les drapeaux
 `restorePaused` et `transitioningToEveryone` sont consultés par
-[`VolumeController`](../../src/audio/VolumeController.js) à sa construction et à
+[`VolumeController`](../../../src/audio/VolumeController.js) à sa construction et à
 chaque changement de nœud, pour ne pas remonter le volume prématurément.
 
 ---
@@ -139,7 +139,7 @@ temporaire privé :
 - permissions : `@everyone` refusé, membre et bot autorisés ;
 - suivi dans `personalChannels` : `Map<guildId, Map<userId, channelId>>` ;
 - suppression automatique quand le membre quitte le vocal, via l'écouteur
-  `VoiceStateUpdate` de [`index.js`](../../src/index.js).
+  `VoiceStateUpdate` de [`index.js`](../../../src/index.js).
 
 > Ce suivi est **en mémoire seule**. Un redémarrage du bot alors que des salons
 > personnels existent les laisse orphelins : ils devront être supprimés à la
@@ -158,7 +158,7 @@ const tracks       = isPersonal ? queue.virtualTracks       : queue.tracks.toArr
 const isPlaying    = isPersonal ? !!queue.virtualIsPlaying  : queue.node.isPlaying();
 ```
 
-`getChannelPlaybackState()` dans [`WebServer.js`](../../src/web/WebServer.js) en
+`getChannelPlaybackState()` dans [`WebServer.js`](../../../src/web/WebServer.js) en
 est l'expression la plus dense : un seul `return` combine trois axes
 (`isPersonal` × `transitioningToEveryone` × présence d'un horodatage) en
 ternaires imbriqués.
@@ -207,7 +207,7 @@ lecture reste figé, et le tableau de bord l'explique (voir plus bas).
 
 Le bot ne s'installe dans un salon vocal que s'il y a quelqu'un pour l'entendre.
 La règle est tenue par
-[`PresenceManager`](../../src/audio/PresenceManager.js), et vaut pour les deux
+[`PresenceManager`](../../../src/audio/PresenceManager.js), et vaut pour les deux
 modes de diffusion — en mode personnel, la connexion ne sert qu'à capter la
 parole pour le ducking, mais elle n'a pas davantage de raison d'être dans une
 pièce vide.
@@ -240,9 +240,9 @@ Le favori (`defaultVoiceChannelId`) désigne le salon sur lequel le bot et le
 tableau de bord se posent quand le process démarre ou redémarre. Il est lu à
 deux endroits, tous deux au démarrage :
 
-- [`Database.appliquerSalonFavori()`](../../src/database/Database.js), appelé une
+- [`Database.appliquerSalonFavori()`](../../../src/database/Database.js), appelé une
   fois à `ClientReady`, en fait le **salon courant** (`setLastVoiceChannel`) ;
-- [`PlaybackStateManager.restoreAll()`](../../src/database/PlaybackStateManager.js)
+- [`PlaybackStateManager.restoreAll()`](../../../src/database/PlaybackStateManager.js)
   lui donne la priorité pour choisir le salon à restaurer, puis inscrit ce choix
   comme rattachement — y compris quand le salon est désert et que la connexion
   est remise à plus tard, sans quoi la règle de présence irait chercher le bot

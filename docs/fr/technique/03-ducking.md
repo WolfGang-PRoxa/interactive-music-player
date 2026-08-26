@@ -30,8 +30,8 @@ et `end` avec l'identifiant de l'utilisateur.
 
 Deux classes se partagent le travail :
 
-- [`DuckingManager`](../../src/audio/DuckingManager.js) — *quand* atténuer ;
-- [`VolumeController`](../../src/audio/VolumeController.js) — *comment* faire varier le volume.
+- [`DuckingManager`](../../../src/audio/DuckingManager.js) — *quand* atténuer ;
+- [`VolumeController`](../../../src/audio/VolumeController.js) — *comment* faire varier le volume.
 
 Une instance de chaque existe **par serveur**, stockée dans
 `client.duckingManagers` (une `Map` indexée par `guildId`).
@@ -212,7 +212,7 @@ sortie et les enchaînements DJ, via des appels directs à `_fadeTo()`.
 | `baseVolume` | `70` | Volume hors parole |
 
 Modifiables par `/ducking …`, `/volume` ou le tableau de bord. Les constantes de
-défaut vivent dans [`config.js`](../../src/config.js), les valeurs effectives
+défaut vivent dans [`config.js`](../../../src/config.js), les valeurs effectives
 dans `data/settings.json`.
 
 ---

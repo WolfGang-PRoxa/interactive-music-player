@@ -20,8 +20,56 @@ const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB) || 1024;
  */
 const DOCS_DIR = path.resolve(__dirname, '..', '..', '..', 'docs');
 
-/** Profondeur d'exploration : `docs/` et ses sous-dossiers immédiats. */
+/** Profondeur d'exploration : la racine d'une langue et ses sous-dossiers immédiats. */
 const DOCS_DEPTH = 2;
+
+/**
+ * Langue servie quand celle demandée n'est pas livrée.
+ *
+ * C'est le français qui est écrit à la main ; les autres en sont traduites. Il
+ * n'intervient qu'à ce titre : une langue absente de `docs/` retombe sur lui.
+ * Une langue livrée, elle, est servie telle quelle — son dossier est le seul
+ * inventaire, et le sommaire n'est rien d'autre que ce qu'il contient.
+ */
+const DOCS_DEFAULT_LANG = 'fr';
+
+/**
+ * Langues effectivement livrées, lues sur le disque à chaque appel.
+ *
+ * Une liste en dur devrait être tenue à jour à la main à chaque langue ajoutée,
+ * et se tromperait sur une version installée qui n'en embarque pas autant. Le
+ * dossier `docs/` fait foi.
+ *
+ * Le filtre sur deux lettres minuscules n'est pas de la validation d'entrée —
+ * rien de ce qui vient du client n'arrive ici — mais une garde contre les
+ * dossiers annexes qu'on pourrait déposer à côté des langues.
+ */
+function availableDocsLangs() {
+    try {
+        return fs
+            .readdirSync(DOCS_DIR, { withFileTypes: true })
+            .filter((e) => e.isDirectory() && /^[a-z]{2}$/.test(e.name))
+            .map((e) => e.name);
+    } catch (e) {
+        return [];
+    }
+}
+
+/**
+ * Langue à servir pour une demande du tableau de bord.
+ *
+ * La valeur reçue n'est jamais assemblée en chemin : elle est comparée aux noms
+ * que le serveur a lui-même lus dans `docs/`, et c'est l'un de ces noms qui est
+ * retourné. Une valeur inconnue — langue non traduite, ou chaîne arbitraire —
+ * ne correspond simplement à aucune entrée et retombe sur la référence.
+ */
+function resolveDocsLang(requested) {
+    const available = availableDocsLangs();
+    const wanted = String(requested || '');
+    const match = available.find((lang) => lang === wanted);
+    if (match) return match;
+    return available.find((lang) => lang === DOCS_DEFAULT_LANG) || available[0] || DOCS_DEFAULT_LANG;
+}
 
 const MIME_TYPES = {
     mp4: 'video/mp4',
@@ -187,19 +235,24 @@ function documentTitle(docPath, fallback) {
 }
 
 /**
- * Inventaire des documents Markdown livrés avec le bot.
+ * Inventaire des documents Markdown d'une langue donnée.
  *
  * L'inventaire est reconstruit à chaque appel : la documentation d'une version
  * installée ne bouge pas, mais celle du dépôt de développement s'écrit pendant
  * que le bot tourne, et le lecteur doit pouvoir la relire sans redémarrage.
  *
- * Les identifiants renvoyés sont des chemins relatifs à `docs/`. Ils forment la
- * liste blanche du service de contenu : aucune valeur venue du client n'est
- * jamais assemblée en chemin de fichier.
+ * Les identifiants renvoyés sont des chemins relatifs à la racine de la langue —
+ * `GUIDE.md`, `technique/01-architecture.md` — et sont donc les mêmes d'une
+ * langue à l'autre. C'est ce qui permet de changer de langue sans quitter le
+ * document qu'on lisait, et aux liens d'un document vers l'autre de se résoudre
+ * à l'identique partout.
  *
- * @returns {Array<{id: string, titre: string, groupe: string, octets: number}>}
+ * Ils forment la liste blanche du service de contenu : aucune valeur venue du
+ * client n'est jamais assemblée en chemin de fichier.
+ *
+ * @returns {Array<{id: string, title: string, group: string, bytes: number}>}
  */
-function listDocuments() {
+function listDocuments(lang) {
     const docs = [];
 
     const walk = (dir, prefix, depth) => {
@@ -234,7 +287,7 @@ function listDocuments() {
         }
     };
 
-    walk(DOCS_DIR, '', DOCS_DEPTH);
+    walk(path.join(DOCS_DIR, lang), '', DOCS_DEPTH);
 
     // Racine avant sous-dossiers, et `README` en tête de son groupe : c'est
     // l'ordre dans lequel la documentation se lit, pas l'ordre alphabétique où
@@ -403,7 +456,8 @@ function createApiRouter(webServer) {
      * bord (voir js/docs.js).
      */
     router.get('/docs', (req, res) => {
-        res.json({ documents: listDocuments() });
+        const lang = resolveDocsLang(req.query.lang);
+        res.json({ lang, documents: listDocuments(lang) });
     });
 
     /**
@@ -413,22 +467,34 @@ function createApiRouter(webServer) {
      * dans l'inventaire, et c'est le chemin que le serveur a lui-même construit
      * en parcourant `docs/` qui est ouvert. Une remontée de dossier n'a donc
      * rien à contourner — elle ne correspond simplement à aucune entrée.
+     *
+     * La langue subit le même traitement, et l'inventaire consulté est celui de
+     * la langue retenue : un identifiant valable dans une langue non livrée ne
+     * peut donc pas servir à lire ailleurs. La réponse renvoie la langue, pour
+     * que le lecteur sache dans laquelle il lit.
      */
     router.get('/docs/contenu', (req, res) => {
         const requestedId = String(req.query.id || '');
-        const document = listDocuments().find((d) => d.id === requestedId);
+        const lang = resolveDocsLang(req.query.lang);
+        const document = listDocuments(lang).find((d) => d.id === requestedId);
         if (!document) return res.status(404).json({ error: 'Document introuvable' });
 
-        const docPath = path.join(DOCS_DIR, ...document.id.split('/'));
+        const docPath = path.join(DOCS_DIR, lang, ...document.id.split('/'));
         let source;
         try {
             source = fs.readFileSync(docPath, 'utf8');
         } catch (err) {
-            log.error(`[WebServer Docs] Lecture impossible pour ${document.id} :`, err.message);
+            log.error(`[WebServer Docs] Lecture impossible pour ${lang}/${document.id} :`, err.message);
             return res.status(500).json({ error: 'Document illisible' });
         }
 
-        res.json({ id: document.id, title: document.title, group: document.group, source });
+        res.json({
+            id: document.id,
+            title: document.title,
+            group: document.group,
+            lang,
+            source,
+        });
     });
 
     router.get('/state', (req, res) => {

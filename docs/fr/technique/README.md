@@ -60,7 +60,7 @@ tout. Le bot est conçu pour être hébergé sur la machine de son propriétaire
 **L'état de lecture appartient au projet.**
 Les 23 propriétés d'état (`virtualCurrentTrack`, `channelStates`,
 `transitioningToEveryone`…) sont déclarées dans
-[`PlaybackSession`](../../src/audio/PlaybackSession.js), et non plus greffées
+[`PlaybackSession`](../../../src/audio/PlaybackSession.js), et non plus greffées
 sans schéma sur l'objet `GuildQueue` de discord-player. Voir
 [01 — Architecture](01-architecture.md#playbacksession).
 

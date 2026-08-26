@@ -9,7 +9,7 @@ la lecture en temps réel et double la totalité des commandes Discord.
 
 ## Serveur
 
-[`WebServer.js`](../../src/web/WebServer.js) est un singleton qui assemble :
+[`WebServer.js`](../../../src/web/WebServer.js) est un singleton qui assemble :
 
 - un serveur **HTTP** Express : fichiers statiques et routes `/api/*` ;
 - un serveur **WebSocket** (`ws`) partageant le même port ;
@@ -23,12 +23,12 @@ connecté, sur une URL contenant le jeton d'accès.
 
 | Fichier | Rôle |
 |---|---|
-| [`WebServer.js`](../../src/web/WebServer.js) | Cycle de vie, agrégation d'état, diffusion |
-| [`auth.js`](../../src/web/auth.js) | Jeton d'accès HTTP et WebSocket |
-| [`routes/api.js`](../../src/web/routes/api.js) | Routes HTTP |
-| [`uploadService.js`](../../src/web/uploadService.js) | Réception et intégration des imports |
-| [`websocket/wsHandler.js`](../../src/web/websocket/wsHandler.js) | Routeur de messages |
-| [`websocket/handlers/`](../../src/web/websocket/handlers/) | Logique métier, un module par domaine |
+| [`WebServer.js`](../../../src/web/WebServer.js) | Cycle de vie, agrégation d'état, diffusion |
+| [`auth.js`](../../../src/web/auth.js) | Jeton d'accès HTTP et WebSocket |
+| [`routes/api.js`](../../../src/web/routes/api.js) | Routes HTTP |
+| [`uploadService.js`](../../../src/web/uploadService.js) | Réception et intégration des imports |
+| [`websocket/wsHandler.js`](../../../src/web/websocket/wsHandler.js) | Routeur de messages |
+| [`websocket/handlers/`](../../../src/web/websocket/handlers/) | Logique métier, un module par domaine |
 
 ---
 
@@ -44,8 +44,8 @@ Toutes sont protégées par le jeton ([07 — Sécurité](07-securite.md)).
 | `GET /api/download` | Téléchargement transcodé, 32 combinaisons format/qualité (MP3, M4A, FLAC, WAV, OGG, OPUS, WEBM, MP4) |
 | `GET /api/video-info` | Résolution d'une URL vidéo via yt-dlp, cache mémoire d'une heure |
 | `POST /api/upload` | Import de fichier, flux brut avec en-tête `X-File-Name` |
-| `GET /api/docs` | Sommaire de la documentation embarquée, lue dans `docs/` |
-| `GET /api/docs/contenu` | Source Markdown d'un document, désigné par son identifiant |
+| `GET /api/docs` | Sommaire de la documentation embarquée, dans la langue demandée |
+| `GET /api/docs/contenu` | Source Markdown d'un document, désigné par son identifiant et sa langue |
 
 `/api/docs` inventorie `docs/` à chaque appel, depuis la **version en cours
 d'exécution** et non depuis la racine partagée : la documentation affichée est
@@ -53,6 +53,17 @@ donc celle du code qui tourne. Les identifiants renvoyés forment la liste
 blanche du service de contenu — celui-ci ne construit jamais de chemin à partir
 de la requête, il cherche l'identifiant dans l'inventaire qu'il vient d'établir.
 C'est ce qui met une remontée de dossier hors sujet plutôt que hors la loi.
+
+Les deux routes acceptent un paramètre `lang`, celui du tableau de bord : `docs/`
+est rangé par langue — `docs/fr/`, `docs/en/`… —, les identifiants restent les
+mêmes partout, et le lecteur ne demande jamais autre chose que la langue de son
+interface. La valeur reçue subit le même traitement que l'identifiant : elle est
+comparée aux dossiers que le serveur a lui-même lus, jamais assemblée en chemin.
+L'inventaire part du dossier de la langue retenue, et **jamais de `docs/`** :
+parcourue depuis la racine partagée, l'arborescence rendrait les dossiers de
+langue eux-mêmes comme autant de groupes, et le sommaire du lecteur se muerait en
+sélecteur de langue — alors que la langue ne se choisit que dans les réglages.
+Une langue absente de `docs/` retombe sur le français, en bloc.
 
 `/api/invite` assemble l'adresse depuis l'application réellement connectée
 (`client.generateInvite`, portées `bot` et `applications.commands`) : un
@@ -100,7 +111,7 @@ préchargement alimente le cache.
 ### Messages client → serveur
 
 36 types, déclarés dans la table de routage
-[`handlers/index.js`](../../src/web/websocket/handlers/index.js) :
+[`handlers/index.js`](../../../src/web/websocket/handlers/index.js) :
 
 | Domaine | Messages |
 |---|---|
@@ -167,7 +178,7 @@ personnelle déduit toute seule de ses deux éléments `<audio>`.
 
 ## Routage des messages
 
-[`wsHandler.js`](../../src/web/websocket/wsHandler.js) ne contient **aucune
+[`wsHandler.js`](../../../src/web/websocket/wsHandler.js) ne contient **aucune
 logique métier**. Il assemble un contexte et délègue :
 
 ```js
@@ -186,11 +197,11 @@ dispense chaque handler de s'en prémunir.
 ### Ajouter un message
 
 1. Écrire la fonction dans le module de
-   [`handlers/`](../../src/web/websocket/handlers/) correspondant au domaine,
+   [`handlers/`](../../../src/web/websocket/handlers/) correspondant au domaine,
    avec la signature `(ctx)`.
 2. L'exporter.
 3. Ajouter la ligne `monMessage: monModule.handleMonMessage,` dans
-   [`handlers/index.js`](../../src/web/websocket/handlers/index.js).
+   [`handlers/index.js`](../../../src/web/websocket/handlers/index.js).
 
 Le routeur n'est jamais modifié.
 
@@ -238,9 +249,6 @@ La charge utile périodique ne dépend plus du nombre de pistes.
    de l'état, `botStats` exclu (son horodatage change à chaque appel et rendrait
    toute comparaison inutile), et n'envoie rien si elle est inchangée.
 
-Cet intervalle n'est toujours jamais arrêté : il n'existe pas de méthode
-`stop()`.
-
 Cet intervalle n'est jamais arrêté : il n'existe pas de méthode `stop()`.
 
 ---
@@ -269,7 +277,7 @@ Un *heartbeat* de 30 secondes (`ping`/`pong`) ferme les connexions mortes.
 
 Environ 9 800 lignes de JavaScript, servies sans transformation. Pas de modules
 ES, pas de bundler : 18 balises `<script>` chargées séquentiellement dans
-[`index.html`](../../src/web/public/index.html) — 16 modules de `js/`, les
+[`index.html`](../../../src/web/public/index.html) — 16 modules de `js/`, les
 traductions et `app.js` — communiquant par l'espace de noms global
 `window.MusicPlayer`.
 
@@ -289,7 +297,7 @@ traductions et `app.js` — communiquant par l'espace de noms global
 | `tooltipSystem.js`, `faviconAnimator.js`, `headerButtonAnimations.js`, `particlePath.js` | Habillage |
 
 Les feuilles de style sont assemblées par `@import` dans
-[`style.css`](../../src/web/public/style.css), plus `css/drawer.css` chargée à
+[`style.css`](../../../src/web/public/style.css), plus `css/drawer.css` chargée à
 part.
 
 L'ordre de chargement est une dépendance implicite : `state.js` doit précéder
@@ -297,14 +305,14 @@ tous les autres, `app.js` doit venir en dernier.
 
 ### Découpage inachevé
 
-[`app.js`](../../src/web/public/app.js) fait 1 823 lignes et concentre des
+[`app.js`](../../../src/web/public/app.js) fait 1 823 lignes et concentre des
 responsabilités que le dossier `js/` a déjà commencé à extraire. C'est le
 pendant frontend du découpage effectué côté serveur, qui reste à terminer.
 
 ### Duplication à surveiller
 
 `window.MusicPlayer.formatMs` dans
-[`player.js`](../../src/web/public/js/player.js) doit rester aligné sur
-`formatMs` de [`src/utils/duration.js`](../../src/utils/duration.js) : c'est le
+[`player.js`](../../../src/web/public/js/player.js) doit rester aligné sur
+`formatMs` de [`src/utils/duration.js`](../../../src/utils/duration.js) : c'est le
 client qui rend la timeline, à partir des millisecondes et non de la chaîne
 envoyée par le serveur.

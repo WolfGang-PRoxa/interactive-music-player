@@ -9,7 +9,7 @@
 | Niveau | Fichier | Modifiable à chaud |
 |---|---|---|
 | Environnement | `.env` | Non — redémarrage requis |
-| Constantes applicatives | [`src/config.js`](../../src/config.js) | Non — valeurs par défaut au code |
+| Constantes applicatives | [`src/config.js`](../../../src/config.js) | Non — valeurs par défaut au code |
 | Réglages par serveur | `data/settings.json` | Oui — commandes ou tableau de bord |
 
 `config.js` ne contient que des **valeurs par défaut** : dès qu'un serveur est
@@ -85,7 +85,7 @@ colors: { … },   // couleurs des encadrés Discord
 
 `fadeStepInterval` est la seule constante non exposée à l'utilisateur : elle
 détermine la granularité des fondus de
-[`VolumeController`](../../src/audio/VolumeController.js).
+[`VolumeController`](../../../src/audio/VolumeController.js).
 
 `presence.enabled` à `false` rend au bot son ancien comportement : il reste
 connecté en permanence, salon vide ou non. Voir
@@ -109,7 +109,7 @@ client (voir [07 — Sécurité](07-securite.md)).
 ## Réglages par serveur
 
 Valeurs par défaut définies dans `_defaults()` de
-[`Database.js`](../../src/database/Database.js). Ajouter une clé ici suffit :
+[`Database.js`](../../../src/database/Database.js). Ajouter une clé ici suffit :
 tous les serveurs existants en héritent, `getSettings()` fusionnant les défauts à
 chaque lecture.
 
@@ -140,7 +140,7 @@ chaque lecture.
 Les deux dernières clés portent **la même** file d'attente — celle qu'une
 playlist a mise de côté —, rangée sous celle du mode de diffusion courant ;
 l'autre est effacée. Tout passe par
-[`setAsideQueue`](../../src/utils/setAsideQueue.js) : une simple liste de
+[`setAsideQueue`](../../../src/utils/setAsideQueue.js) : une simple liste de
 pistes, `{ pistes: [...] }`, dans laquelle rien n'est « courant » puisque rien
 n'en joue tant que la playlist occupe le lecteur. Ces clés portaient auparavant
 deux formes distinctes, et changer de mode faisait lire l'interface dans une
@@ -160,7 +160,7 @@ côté vide laisse la lecture s'arrêter, comme auparavant.
 Le sous-objet `preloading` (`enabled`, `queueCount`, `historyCount`,
 `playlistCount`) n'est pas déclaré dans `_defaults()` : il est écrit par le
 tableau de bord et lu avec des valeurs de repli dans
-[`PreloadManager.js`](../../src/audio/PreloadManager.js).
+[`PreloadManager.js`](../../../src/audio/PreloadManager.js).
 
 ---
 
@@ -171,10 +171,11 @@ tableau de bord et lu avec des valeurs de repli dans
 | `npm start` | Démarre le bot |
 | `npm run dev` | Démarre avec `--watch` (redémarrage au changement de fichier) |
 | `npm run deploy` | Enregistre les commandes slash auprès de Discord |
+| `npm run update-ytdlp` | Met à jour yt-dlp — à faire quand le préchargement échoue en 403 |
 
 ### Déploiement des commandes
 
-[`deploy-commands.js`](../../src/deploy-commands.js) collecte les commandes de
+[`deploy-commands.js`](../../../src/deploy-commands.js) collecte les commandes de
 `src/commands/` et les enregistre **globalement**. La propagation peut prendre
 jusqu'à une heure. Pour un test immédiat, définir `GUILD_ID` dans `.env` : les
 commandes sont alors enregistrées sur ce seul serveur, sans délai.
@@ -199,7 +200,7 @@ nécessite pas.
 | `/broadcast` | `mode` — `everyone` ou `personal` | **Administrateur** |
 
 Les vérifications de droits utilisent
-[`utils/permissions.js`](../../src/utils/permissions.js).
+[`utils/permissions.js`](../../../src/utils/permissions.js).
 
 ---
 

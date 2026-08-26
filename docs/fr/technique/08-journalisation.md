@@ -41,7 +41,7 @@ Les sorties de sévérité `warn` et supérieure vont sur `stderr`, les autres s
 
 ## Ce que ce module a remplacé
 
-Auparavant, [`WebServer.js`](../../src/web/WebServer.js) **remplaçait
+Auparavant, [`WebServer.js`](../../../src/web/WebServer.js) **remplaçait
 `console.log`, `console.warn`, `console.error` et `console.info`** au chargement
 du module, pour capter les messages et les envoyer au tableau de bord. Deux
 défauts en découlaient.
@@ -139,7 +139,7 @@ fichiers, celui de l'instance en cours compris. `latest.log` n'est jamais purgé
 ## Configuration
 
 `log.configure()` est appelée une fois, au chargement de
-[`WebServer.js`](../../src/web/WebServer.js) :
+[`WebServer.js`](../../../src/web/WebServer.js) :
 
 ```js
 log.configure({
@@ -150,7 +150,7 @@ log.configure({
 ```
 
 Sans appel à `configure()`, le logger fonctionne mais n'écrit que sur la sortie
-standard. C'est le cas pour [`deploy-commands.js`](../../src/deploy-commands.js),
+standard. C'est le cas pour [`deploy-commands.js`](../../../src/deploy-commands.js),
 qui ne charge pas le serveur web.
 
 ---

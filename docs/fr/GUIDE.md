@@ -3,7 +3,7 @@
 Ce guide détaille l'utilisation du bot au sein de Discord ainsi que la
 manipulation de son tableau de bord web.
 
-Pour la documentation d'ingénierie, voir [docs/technique/](technique/README.md).
+Pour la documentation d'ingénierie, voir [docs/fr/technique/](technique/README.md).
 
 ---
 

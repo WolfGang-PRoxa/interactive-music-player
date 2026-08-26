@@ -25,7 +25,7 @@ Le projet ne manipule pas l'audio lui-même : il configure
 
 ## Extracteurs
 
-Enregistrés au démarrage dans [`index.js`](../../src/index.js) :
+Enregistrés au démarrage dans [`index.js`](../../../src/index.js) :
 
 | Extracteur | Source | Remarque |
 |---|---|---|
@@ -42,7 +42,7 @@ Enregistrés au démarrage dans [`index.js`](../../src/index.js) :
 ### Résolution d'une requête
 
 `searchLocalAwareTrack()` dans
-[`handlerUtils.js`](../../src/web/websocket/handlerUtils.js) encapsule la
+[`handlerUtils.js`](../../../src/web/websocket/handlerUtils.js) encapsule la
 recherche :
 
 1. Si la requête pointe vers un fichier existant → recherche forcée en
@@ -60,7 +60,7 @@ recherche :
 ## Vitesse de lecture
 
 FFmpeg limite le filtre `atempo` à l'intervalle `[0.5, 2.0]`. Pour couvrir
-0,20× à 3,05×, [`index.js`](../../src/index.js) enregistre 286 filtres nommés
+0,20× à 3,05×, [`index.js`](../../../src/index.js) enregistre 286 filtres nommés
 `speed_<valeur>` en chaînant deux `atempo` hors de cet intervalle :
 
 ```js
@@ -82,7 +82,7 @@ type DJ.
 ## Fondus et enchaînements
 
 Trois mécanismes distincts agissent sur le volume, tous via
-[`VolumeController`](../../src/audio/VolumeController.js) lorsqu'il est
+[`VolumeController`](../../../src/audio/VolumeController.js) lorsqu'il est
 disponible.
 
 ### Fondu d'entrée
@@ -96,7 +96,7 @@ piste.
 
 Appliqué à l'arrêt (`shutdownBot`) et à l'extinction du processus, par
 `fadeOutAndSaveState()` dans
-[`PlaybackStateManager.js`](../../src/database/PlaybackStateManager.js) : 35
+[`PlaybackStateManager.js`](../../../src/database/PlaybackStateManager.js) : 35
 paliers, courbe exponentielle (`facteur^2.5`) pour une décroissance perçue comme
 linéaire.
 
@@ -123,7 +123,7 @@ s'y superposer si le second ne peut exister qu'en remplaçant la ressource audio
 du premier. C'est pourquoi l'enchaînement mix était longtemps refusé en
 diffusion commune.
 
-[`src/audio/mix/`](../../src/audio/mix/) lève cette limite en interposant un
+[`src/audio/mix/`](../../../src/audio/mix/) lève cette limite en interposant un
 flux unique et permanent entre les morceaux et Discord :
 
 ```
@@ -135,12 +135,12 @@ piste B ──► FFmpeg ──► PCM ──┘   (somme,     (permanente)
 
 | Module | Rôle |
 |---|---|
-| [`format.js`](../../src/audio/mix/format.js) | Format d'échange : PCM s16le, 48 kHz, stéréo, trames de 20 ms |
-| [`input.js`](../../src/audio/mix/input.js) | Ramène une piste à une entrée FFmpeg (cache, fichier local, extracteur) |
-| [`MixSource.js`](../../src/audio/mix/MixSource.js) | Un morceau décodé : tampon, enveloppe de gain, balayage de filtre |
-| [`MixBus.js`](../../src/audio/mix/MixBus.js) | Le flux permanent : somme les sources trame par trame |
-| [`MixEngine.js`](../../src/audio/mix/MixEngine.js) | Orchestration par serveur, pilotage de la file discord-player |
-| [`playerBridge.js`](../../src/audio/mix/playerBridge.js) | Enveloppe les méthodes de `GuildQueuePlayerNode` pour les router vers le bus |
+| [`format.js`](../../../src/audio/mix/format.js) | Format d'échange : PCM s16le, 48 kHz, stéréo, trames de 20 ms |
+| [`input.js`](../../../src/audio/mix/input.js) | Ramène une piste à une entrée FFmpeg (cache, fichier local, extracteur) |
+| [`MixSource.js`](../../../src/audio/mix/MixSource.js) | Un morceau décodé : tampon, enveloppe de gain, balayage de filtre |
+| [`MixBus.js`](../../../src/audio/mix/MixBus.js) | Le flux permanent : somme les sources trame par trame |
+| [`MixEngine.js`](../../../src/audio/mix/MixEngine.js) | Orchestration par serveur, pilotage de la file discord-player |
+| [`playerBridge.js`](../../../src/audio/mix/playerBridge.js) | Enveloppe les méthodes de `GuildQueuePlayerNode` pour les router vers le bus |
 
 **Horloge.** Le bus ne produit une trame que lorsque le lecteur vocal en réclame
 une, soit toutes les 20 ms. Toutes les sources avancent donc du même nombre exact
@@ -178,7 +178,7 @@ personnelle, où le son sort du navigateur, ne monte jamais de bus.
 
 ## Préchargement
 
-[`PreloadManager`](../../src/audio/PreloadManager.js) télécharge et transcode à
+[`PreloadManager`](../../../src/audio/PreloadManager.js) télécharge et transcode à
 l'avance les pistes distantes en MP3 dans `data/cache/`, pour trois raisons :
 démarrage instantané, résistance aux coupures réseau, et alimentation du
 lecteur audio du navigateur en mode personnel.
@@ -227,7 +227,7 @@ renommé en `.mp3` qu'une fois complet et validé.
 Le lecteur n'a qu'une liste de pistes physique : quand une playlist l'occupe,
 c'est elle que `session.getTracks()` rend, et la file d'attente de l'utilisateur
 est mise de côté dans les réglages (voir
-[setAsideQueue](../../src/utils/setAsideQueue.js)). Le préchargement va donc
+[setAsideQueue](../../../src/utils/setAsideQueue.js)). Le préchargement va donc
 l'y chercher, sans quoi elle perdrait son cache dès qu'une playlist démarre.
 C'est une simple liste, la même dans les deux modes de diffusion et la même que
 celle affichée par le panneau : la fenêtre `queueCount` porte donc exactement sur
@@ -268,6 +268,15 @@ par clé de piste avant d'agir.
 La progression est remontée au tableau de bord par le rappel
 `preloadManager.onProgress`, limité à un envoi toutes les 150 ms.
 
+**Quand rien n'arrive du réseau.** La source peut refuser la connexion : ffmpeg
+n'écrit alors aucun octet, et le fichier obtenu ne franchit pas le seuil des
+10 Ko. L'échec est annoncé pour ce qu'il est — le refus et son code HTTP — et non
+comme un fichier corrompu : le disque n'y est pour rien, et le dire évite de
+chercher du côté du cache. Sur une piste YouTube, un 403 signale presque toujours
+un yt-dlp périmé, que `npm run update-ytdlp` remet à niveau : les URL que YouTube
+délivre sont liées au client qui les a demandées, et ses règles changent plus vite
+que le binaire livré avec le paquet.
+
 ### Reprise après redémarrage
 
 Les fichiers partiels étaient supprimés au démarrage : un préchargement
@@ -277,7 +286,7 @@ désormais conservés et complétés.
 
 Un MP3 n'est qu'une suite de trames indépendantes, chacune précédée d'un
 en-tête de 4 octets qui porte sa propre longueur.
-[`analyzePartial()`](../../src/utils/mp3.js) les parcourt pour déterminer
+[`analyzePartial()`](../../../src/utils/mp3.js) les parcourt pour déterminer
 jusqu'à quel octet le fichier est intègre — la dernière trame est presque
 toujours amputée, le processus ayant été tué en pleine écriture — et à quelle
 position temporelle cet octet correspond.
@@ -329,11 +338,11 @@ temporairement que couper une lecture en cours.
 
 ## Fichiers locaux
 
-[`LocalFilePlayer`](../../src/audio/LocalFilePlayer.js) fournit le scan de
+[`LocalFilePlayer`](../../../src/audio/LocalFilePlayer.js) fournit le scan de
 dossiers utilisé par la commande `/playlist` : parcours récursif, filtrage sur
 `config.supportedExtensions`, tri par nom, mélange Fisher-Yates optionnel.
 
 Les extensions reconnues sont déclarées dans
-[`config.js`](../../src/config.js) : `supportedExtensions` pour l'audio,
+[`config.js`](../../../src/config.js) : `supportedExtensions` pour l'audio,
 `supportedVideoExtensions` pour la vidéo. Ces listes servent aussi au garde-fou
 de sécurité des chemins ([07 — Sécurité](07-securite.md)).
