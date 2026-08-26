@@ -1105,6 +1105,20 @@ class PreloadManager {
         let finished = false;
         let isCancelled = false;
 
+        /**
+         * Refus réseau relevé dans la sortie de ffmpeg, s'il y en a eu un.
+         *
+         * Quand la source refuse la connexion, ffmpeg n'écrit rien et le
+         * fichier obtenu fait zéro octet. L'échec était alors annoncé comme
+         * « fichier trop petit, considéré comme corrompu » — un diagnostic qui
+         * désigne le disque alors que rien n'est jamais arrivé du réseau. La
+         * vraie cause partait dans une entrée de journal séparée, noyée sous
+         * quarante lignes de bannière ffmpeg.
+         *
+         * Le motif est retenu ici pour être rendu au moment de l'échec.
+         */
+        let refusReseau = null;
+
         const cleanup = () => {
             if (finished) return;
             finished = true;
@@ -1321,7 +1335,14 @@ class PreloadManager {
             if (ffmpegProcess.stderr) {
                 ffmpegProcess.stderr.on('data', (d) => {
                     const msg = d.toString().trim();
-                    if (msg) ffmpegLogs.push(msg);
+                    if (!msg) return;
+                    ffmpegLogs.push(msg);
+
+                    // `HTTP error 403 Forbidden` chez ffmpeg, `Server returned
+                    // 403 Forbidden` selon le protocole : les deux formes
+                    // désignent le même refus.
+                    const refus = /(?:HTTP error|Server returned)\s+(\d{3}[^\n]*)/i.exec(msg);
+                    if (refus && !refusReseau) refusReseau = refus[1].trim();
                 });
             }
             ffmpegProcess.on('close', (code) => {
@@ -1429,9 +1450,19 @@ class PreloadManager {
                     } else {
                         log.success(`[PreloadManager] Préchargement réussi et validé pour : ${track.title} (${bitrate} kbps)`);
                     }
+                } else if (refusReseau) {
+                    // Zéro octet parce que rien n'est arrivé : le disque n'y est
+                    // pour rien, et le dire évite de chercher du côté du cache.
+                    throw new Error(`La source a refusé la connexion (${refusReseau}) — `
+                        + `${stat.size} octet(s) reçu(s). Sur une piste YouTube, c'est le `
+                        + `symptôme habituel d'un yt-dlp périmé : « npm run update-ytdlp ».`);
                 } else {
                     throw new Error(`Fichier trop petit (${stat.size} octets), considéré comme corrompu.`);
                 }
+            } else if (refusReseau) {
+                throw new Error(`La source a refusé la connexion (${refusReseau}) — rien n'a été écrit. `
+                    + `Sur une piste YouTube, c'est le symptôme habituel d'un yt-dlp périmé : `
+                    + `« npm run update-ytdlp ».`);
             } else {
                 throw new Error("Le fichier temporaire n'existe pas.");
             }
