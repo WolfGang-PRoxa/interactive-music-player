@@ -810,6 +810,13 @@
         isTrackPlaying = !!(state.isPlaying && !state.isPaused && state.currentTrack
             && !state.listenerWait);
 
+        // Écran de verrouillage et centre de contrôle du système : même piste
+        // que la carte du lecteur, et posée après la progression pour que la
+        // fiche parte avec sa position.
+        if (typeof window.MusicPlayer.updateMediaSession === 'function') {
+            window.MusicPlayer.updateMediaSession(displayedTrack);
+        }
+
         renderSmoothProgress();
         if (isTrackPlaying || (personalAudio && !personalAudio.paused)) {
             startProgressLoop();
