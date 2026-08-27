@@ -80,7 +80,7 @@ class PresenceManager {
             try {
                 this._trackBotVoiceState(queue, oldState, newState);
             } catch (err) {
-                log.error('[Presence] Erreur de suivi de l\'état vocal :', err.message);
+                log.error('[Presence] Voice state tracking error:', err.message);
             }
         });
 
@@ -100,7 +100,7 @@ class PresenceManager {
             try {
                 this.client?.setupDucking?.(queue.guild.id);
             } catch (err) {
-                log.error('[Presence] Erreur de mise en écoute de la parole :', err.message);
+                log.error('[Presence] Error starting speech detection:', err.message);
             }
         });
     }
@@ -213,7 +213,7 @@ class PresenceManager {
 
     _joinInBackground(guildId, channel) {
         this.join(guildId, channel).catch(err => {
-            log.error('[Presence] Erreur à l\'arrivée dans le salon :', err.message);
+            log.error('[Presence] Error on arrival in the channel:', err.message);
         });
     }
 
@@ -224,7 +224,7 @@ class PresenceManager {
      * ce drapeau qui fera reprendre la lecture au retour du bot.
      *
      * @param {import('discord-player').GuildQueue} queue
-     * @param {object} [etat] Position et état de lecture à mémoriser.
+     * @param {object} [state] Position et état de lecture à mémoriser.
      */
     markAbsent(queue, state = {}) {
         if (!queue) return;
@@ -268,7 +268,7 @@ class PresenceManager {
 
         this.switchesInProgress.add(guildId);
         try {
-            log.info(`[Presence] Quelqu'un est arrivé dans « ${channel.name} » : connexion du bot.`);
+            log.info(`[Presence] Someone arrived in « ${channel.name} »: the bot is connecting.`);
             await queue.connect(channel);
             queue.activeChannelId = channel.id;
 
@@ -310,7 +310,7 @@ class PresenceManager {
                 try {
                     await queue.node.play();
                 } catch (err) {
-                    log.error('[Presence] Erreur de démarrage de la file :', err.message);
+                    log.error('[Presence] Error starting the queue:', err.message);
                 }
             }
             return;
@@ -334,7 +334,7 @@ class PresenceManager {
             // titres suivants au lieu de démarrer.
             await queue.node.play(frozenTrack, { queue: false });
         } catch (err) {
-            log.error('[Presence] Erreur de reprise de la lecture :', err.message);
+            log.error('[Presence] Error resuming playback:', err.message);
             queue.transitioningToEveryone = false;
             queue.transitionTrack = null;
             queue.transitionTargetProgress = 0;
@@ -366,13 +366,13 @@ class PresenceManager {
 
         const delay = this._departureDelayMs(guildId);
         const queue = this.player?.queues?.get(guildId);
-        log.info(`[Presence] Salon « ${queue?.channel?.name || '?'} » vide : `
-            + `départ du bot dans ${Math.round(delay / 1000)}s.`);
+        log.info(`[Presence] Channel « ${queue?.channel?.name || '?'} » empty: `
+            + `the bot leaves in ${Math.round(delay / 1000)}s.`);
 
         const timer = setTimeout(() => {
             this.scheduledDepartures.delete(guildId);
             this.leave(guildId).catch(err => {
-                log.error('[Presence] Erreur au départ du salon :', err.message);
+                log.error('[Presence] Error on leaving the channel:', err.message);
             });
         }, delay);
         if (timer.unref) timer.unref();
@@ -403,7 +403,7 @@ class PresenceManager {
         if (!timer) return;
         clearTimeout(timer);
         this.scheduledDepartures.delete(guildId);
-        log.info('[Presence] Quelqu\'un est là : départ du bot annulé.');
+        log.info('[Presence] Someone is here: the bot no longer leaves.');
     }
 
     /**
@@ -417,7 +417,7 @@ class PresenceManager {
         const leavingChannel = queue.channel;
         if (isInhabited(leavingChannel)) return; // quelqu'un est revenu entre-temps
 
-        log.info(`[Presence] Salon « ${leavingChannel?.name || '?'} » toujours vide : le bot s'en retire.`);
+        log.info(`[Presence] Channel « ${leavingChannel?.name || '?'} » still empty: the bot withdraws.`);
         this.withdraw(guildId);
     }
 
@@ -504,8 +504,8 @@ class PresenceManager {
         const guildId = queue.guild.id;
 
         if (!this.connectionAllowed(voiceChannel)) {
-            log.info(`[Presence] Salon « ${voiceChannel.name} » désert : `
-                + 'la lecture attendra un auditeur.');
+            log.info(`[Presence] Channel « ${voiceChannel.name} » deserted: `
+                + 'playback will wait for a listener.');
             if (queue.connection) this.withdraw(guildId);
             else this.markAbsent(queue);
             return false;
@@ -679,7 +679,7 @@ class PresenceManager {
             const playbackStateManager = require('../database/PlaybackStateManager');
             playbackStateManager.saveState(this.player);
         } catch (err) {
-            log.error('[Presence] Erreur de notification du tableau de bord :', err.message);
+            log.error('[Presence] Error notifying the dashboard:', err.message);
         }
     }
 }

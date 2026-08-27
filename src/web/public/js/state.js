@@ -201,7 +201,7 @@ window.MusicPlayer.t = function(key) {
  * En deçà de cette position, une piste est considérée comme commençant.
  * Sert à distinguer un morceau qui s'ouvre d'un morceau simplement repris.
  */
-const DEBUT_DE_PISTE_SEC = 1.5;
+const TRACK_START_SEC = 1.5;
 
 /**
  * Durée du fondu d'ouverture d'un morceau, en secondes — 0 s'il n'a pas lieu
@@ -221,7 +221,7 @@ const DEBUT_DE_PISTE_SEC = 1.5;
 window.MusicPlayer.openingFadeMs = function(state, positionSecs) {
     const settings = (state && state.settings) || {};
     if (!settings.mixEnabled) return 0;
-    if (!(Number(positionSecs) < DEBUT_DE_PISTE_SEC)) return 0;
+    if (!(Number(positionSecs) < TRACK_START_SEC)) return 0;
 
     const duration = parseFloat(settings.mixDuration);
     return duration > 0 ? duration : 5;
@@ -325,9 +325,9 @@ window.MusicPlayer.copyToClipboard = async function(text) {
         helper.style.opacity = '0';
         document.body.appendChild(helper);
         helper.select();
-        const copie = document.execCommand('copy');
+        const copy = document.execCommand('copy');
         document.body.removeChild(helper);
-        return copie;
+        return copy;
     } catch (err) {}
 
     return false;

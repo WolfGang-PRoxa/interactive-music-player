@@ -109,7 +109,7 @@ class BroadcastManager {
                         try {
                             queue.dispatcher.end();
                         } catch (err) {
-                            log.error('[BroadcastManager] Erreur arrêt dispatcher:', err.message);
+                            log.error('[BroadcastManager] Error stopping the dispatcher:', err.message);
                         }
                     }
 

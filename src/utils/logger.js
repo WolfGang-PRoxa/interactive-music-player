@@ -97,19 +97,19 @@ class Logger {
         this.instanceFile = path.join(dir, `${stamp}.log`);
         this.latestFile = path.join(dir, 'latest.log');
 
-        const header = `[${stamp}] [INFO   ] === Démarrage instance bot: ${stamp}.log ===\n`;
+        const header = `[${stamp}] [INFO   ] === Bot instance startup: ${stamp}.log ===\n`;
         try {
             fs.writeFileSync(this.latestFile, header, 'utf8');
             fs.writeFileSync(this.instanceFile, header, 'utf8');
         } catch (err) {
-            process.stderr.write(`[Logger] Écriture du journal impossible : ${err.message}\n`);
+            process.stderr.write(`[Logger] Cannot write the log: ${err.message}\n`);
         }
 
         // Purge après création du journal courant : le dossier contient alors
         // au plus `retention` fichiers, celui de cette instance compris.
         const removed = this.pruneOldLogs(dir, retention);
         if (removed > 0) {
-            this.info(`[Logger] ${removed} ancien(s) journal(aux) supprimé(s) (rétention : ${retention}).`);
+            this.info(`[Logger] ${removed} old log file(s) deleted (retention: ${retention}).`);
         }
     }
 
@@ -181,7 +181,7 @@ class Logger {
             try {
                 listener(entry);
             } catch (e) {
-                process.stderr.write(`[Logger] Abonné en erreur : ${e.message}\n`);
+                process.stderr.write(`[Logger] Subscriber threw: ${e.message}\n`);
             }
         }
 

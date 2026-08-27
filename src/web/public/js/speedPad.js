@@ -16,13 +16,13 @@ const preciseSpeeds = [];
 for (let s = 0.25; s <= 3.001; s += 0.05) {
     preciseSpeeds.push((Math.round(s * 100) / 100).toFixed(2));
 }
-const centiemeSpeeds = [];
+const hundredthSpeeds = [];
 for (let s = 0.25; s <= 3.001; s += 0.01) {
-    centiemeSpeeds.push((Math.round(s * 100) / 100).toFixed(2));
+    hundredthSpeeds.push((Math.round(s * 100) / 100).toFixed(2));
 }
 
 function getSpeeds() {
-    if (preciseState === 2) return centiemeSpeeds;
+    if (preciseState === 2) return hundredthSpeeds;
     if (preciseState === 1) return preciseSpeeds;
     return classicSpeeds;
 }
@@ -52,11 +52,11 @@ window.MusicPlayer.sendSpeedUpdate = function(speedVal) {
     }
 
     const logMsg = `Changement de vitesse de lecture : ${speedVal}x`;
-    console.log(`[Vitesse Diagnostic] ${logMsg}`);
+    console.log(`[Speed Diagnostic] ${logMsg}`);
     if (typeof window.MusicPlayer.sendWS === 'function') {
         window.MusicPlayer.sendWS({
             type: 'clientLog',
-            data: { source: 'Vitesse Vidéo/IHM', message: logMsg }
+            data: { source: 'Video/UI Speed', message: logMsg }
         });
         window.MusicPlayer.sendWS({
             type: 'updateSettings',
@@ -95,14 +95,14 @@ window.MusicPlayer.rebuildSpeedPadTrack = function(triggerBounce = false) {
 
         if (container) {
             if (preciseState === 2) {
-                container.classList.add('state-centieme');
+                container.classList.add('state-hundredth');
                 container.classList.remove('state-classic', 'state-precise');
             } else if (preciseState === 1) {
                 container.classList.add('state-precise');
-                container.classList.remove('state-classic', 'state-centieme');
+                container.classList.remove('state-classic', 'state-hundredth');
             } else {
                 container.classList.add('state-classic');
-                container.classList.remove('state-precise', 'state-centieme');
+                container.classList.remove('state-precise', 'state-hundredth');
             }
         }
 
@@ -180,7 +180,7 @@ window.MusicPlayer.updateSpeedPad = function(speed, skipTransition = false) {
             preciseState = 1;
             window.MusicPlayer.rebuildSpeedPadTrack(false);
             return;
-        } else if (centiemeSpeeds.includes(formattedSpeed)) {
+        } else if (hundredthSpeeds.includes(formattedSpeed)) {
             preciseState = 2;
             window.MusicPlayer.rebuildSpeedPadTrack(false);
             return;
@@ -229,14 +229,14 @@ function togglePrecisionMode(indicatorSource) {
 
     preciseState = (preciseState + 1) % 3;
 
-    const modeNames = ['CLASSIQUE', 'PRÉCIS (0.05)', 'CENTIÈME (0.01)'];
+    const modeNames = ['CLASSIC', 'FINE (0.05)', 'HUNDREDTH (0.01)'];
     const modeLabel = modeNames[preciseState];
-    const logMsg = `Bascule du mode de précision de la vitesse : ${modeLabel} (Source: ${indicatorSource || 'Indicateur'})`;
-    console.log(`[Vitesse Diagnostic] ${logMsg}`);
+    const logMsg = `Speed precision mode toggled: ${modeLabel} (Source: ${indicatorSource || 'Indicator'})`;
+    console.log(`[Speed Diagnostic] ${logMsg}`);
     if (typeof window.MusicPlayer.sendWS === 'function') {
         window.MusicPlayer.sendWS({
             type: 'clientLog',
-            data: { source: 'Vitesse Précision', message: logMsg }
+            data: { source: 'Speed Precision', message: logMsg }
         });
     }
 
@@ -297,7 +297,27 @@ window.MusicPlayer.initSpeedPad = function() {
         const track = container.querySelector('.speed-pad-track');
         if (!track) return;
 
+        /*
+         * Le pad se manœuvre au pointeur, et non à la souris.
+         *
+         * `mousedown`/`mousemove`/`mouseup` ne sont jamais émis par un écran
+         * tactile autrement qu'en compatibilité, après la fin du geste : la
+         * roulette ne suivait donc pas le doigt, et le seul moyen de changer de
+         * vitesse au téléphone était de taper une valeur déjà visible dans les
+         * 140 px du cadre.
+         *
+         * Les événements pointeur couvrent souris, doigt et stylet par un seul
+         * chemin de code. Tout ce que les gestionnaires lisent — `clientX`,
+         * `clientY`, `target` — existe à l'identique sur un `PointerEvent`, si
+         * bien que la mécanique de glissement n'a pas eu à changer.
+         *
+         * Le déplacement et le relâchement restent écoutés sur `window` : le
+         * doigt sort couramment du cadre pendant le geste, et une capture de
+         * pointeur redirigerait `target` vers le conteneur, ce dont dépend la
+         * reconnaissance du tap sur une valeur précise.
+         */
         let isDragging = false;
+        let activePointer = null;
         let startX = 0;
         let startTranslateX = 0;
         let activeDragSpeed = window.MusicPlayer.currentSpeed;
@@ -305,12 +325,29 @@ window.MusicPlayer.initSpeedPad = function() {
         let clickStartTime = 0;
         let clickStartX = 0;
         let clickStartY = 0;
+        let clickPointerType = 'mouse';
 
-        container.addEventListener('mousedown', (e) => {
+        /*
+         * Tolérance de tap, plus large au doigt.
+         *
+         * La pulpe roule sur l'écran : un appui que l'utilisateur croit
+         * immobile dérive couramment d'une dizaine de pixels. Au seuil de la
+         * souris, ces taps-là étaient lus comme des glissements minuscules et
+         * ne sélectionnaient rien.
+         */
+        const toleranceTap = () => (clickPointerType === 'mouse' ? 8 : 14);
+
+        container.addEventListener('pointerdown', (e) => {
+            // Un second doigt posé pendant le geste ne doit pas en prendre la
+            // main : le premier garde le pad jusqu'à ce qu'il le relâche.
+            if (isDragging) return;
+            if (e.isPrimary === false) return;
+
             e.preventDefault();
             e.stopPropagation();
             isDragging = true;
             isSpeedPadDragging = true;
+            activePointer = e.pointerId;
             startX = e.clientX;
             startTranslateX = parseFloat(track.dataset.translateX || 0);
             activeDragSpeed = window.MusicPlayer.currentSpeed;
@@ -322,10 +359,11 @@ window.MusicPlayer.initSpeedPad = function() {
             clickStartTime = Date.now();
             clickStartX = e.clientX;
             clickStartY = e.clientY;
+            clickPointerType = e.pointerType || 'mouse';
         });
 
-        const onMouseMove = (e) => {
-            if (!isDragging) return;
+        const onPointerMove = (e) => {
+            if (!isDragging || e.pointerId !== activePointer) return;
             if (track.classList.contains('switching')) return;
 
             const dx = e.clientX - startX;
@@ -351,16 +389,18 @@ window.MusicPlayer.initSpeedPad = function() {
             }
         };
 
-        const onMouseUp = (e) => {
-            if (!isDragging) return;
+        const onPointerUp = (e) => {
+            if (!isDragging || e.pointerId !== activePointer) return;
             isDragging = false;
             isSpeedPadDragging = false;
+            activePointer = null;
 
             const clickDuration = Date.now() - clickStartTime;
             const clickDistX = Math.abs(e.clientX - clickStartX);
             const clickDistY = Math.abs(e.clientY - clickStartY);
+            const tolerance = toleranceTap();
 
-            if (clickDuration < 350 && clickDistX < 8 && clickDistY < 8) {
+            if (clickDuration < 350 && clickDistX < tolerance && clickDistY < tolerance) {
                 let speedValueEl = e.target.closest ? e.target.closest('.speed-value') : null;
                 if (!speedValueEl) {
                     let minDiff = Infinity;
@@ -397,8 +437,27 @@ window.MusicPlayer.initSpeedPad = function() {
             }
         };
 
-        window.addEventListener('mousemove', onMouseMove);
-        window.addEventListener('mouseup', onMouseUp);
+        /*
+         * Le navigateur peut reprendre le geste à son compte — défilement de la
+         * page décidé en cours de route, appel entrant, fenêtre qui perd le
+         * focus. Il émet alors `pointercancel` et plus jamais `pointerup` :
+         * sans ce gestionnaire, le pad restait en glissement pour de bon, la
+         * transition neutralisée et le prochain appui ignoré.
+         *
+         * L'abandon rend la vitesse d'avant le geste, comme un relâchement qui
+         * n'aurait rien déplacé.
+         */
+        const onPointerCancel = (e) => {
+            if (!isDragging || e.pointerId !== activePointer) return;
+            isDragging = false;
+            isSpeedPadDragging = false;
+            activePointer = null;
+            window.MusicPlayer.updateSpeedPad(window.MusicPlayer.currentSpeed);
+        };
+
+        window.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointerup', onPointerUp);
+        window.addEventListener('pointercancel', onPointerCancel);
 
         // Wheel scroll for speed adjustment
         container.addEventListener('wheel', (e) => {

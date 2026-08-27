@@ -66,10 +66,10 @@ function getToken() {
     try {
         fs.mkdirSync(path.dirname(TOKEN_FILE), { recursive: true });
         fs.writeFileSync(TOKEN_FILE, token, { encoding: 'utf8', mode: 0o600 });
-        log.info(`[Auth] Jeton du dashboard généré et enregistré dans ${TOKEN_FILE}`);
+        log.info(`[Auth] Dashboard token generated and saved in ${TOKEN_FILE}`);
     } catch (err) {
-        log.error(`[Auth] Impossible d'enregistrer le jeton : ${err.message}`);
-        log.error('[Auth] Un nouveau jeton sera généré au prochain démarrage.');
+        log.error(`[Auth] Cannot save the token: ${err.message}`);
+        log.error('[Auth] A new token will be generated on the next startup.');
     }
     return token;
 }
@@ -175,17 +175,17 @@ function unauthorizedPage() {
     // Chargé ici et non en tête de fichier : oauth.js ne sert qu'au moment du
     // refus, et l'exiger au chargement ferait dépendre l'authentification de
     // base d'un module qui n'a de sens que pour le partage.
-    let bouton = '';
+    let button = '';
     try {
         const oauth = require('./oauth');
         if (oauth.isConfigured()) {
-            bouton = `<p><a class="bouton" href="/auth/discord">Se connecter avec Discord</a></p>
+            button = `<p><a class="bouton" href="/auth/discord">Se connecter avec Discord</a></p>
      <p class="note">Si le maître de la session vous a partagé le contrôle, c'est par ici.</p>`;
         }
     } catch (e) {
         // Sans OAuth, la page reste celle du jeton seul.
     }
-    return UNAUTHORIZED_PAGE.replace('<!--connexion-->', bouton);
+    return UNAUTHORIZED_PAGE.replace('<!--connexion-->', button);
 }
 
 const UNAUTHORIZED_PAGE = `<!doctype html>
@@ -260,7 +260,7 @@ function middleware(req, res, next) {
 function verifyUpgrade(info) {
     const identity = identify(info.req);
     if (!identity.authorized) {
-        log.warn('[Auth] Handshake WebSocket refusé : jeton manquant ou invalide.');
+        log.warn('[Auth] WebSocket handshake refused: token missing or invalid.');
         return false;
     }
     // Rangée sur la requête, elle sera relue à l'ouverture de la connexion :

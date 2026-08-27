@@ -13,7 +13,7 @@ async function loadLocale(lang) {
             return data;
         }
     } catch (e) {
-        console.error(`[i18n] Erreur chargement de la langue ${lang}:`, e);
+        console.error(`[i18n] Error loading language ${lang}:`, e);
     }
     return null;
 }

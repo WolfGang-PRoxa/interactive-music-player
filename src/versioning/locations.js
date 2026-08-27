@@ -150,11 +150,11 @@ function devAvailable() {
  */
 function safeFolderName(tag) {
     const raw = String(tag || '').trim();
-    if (!raw) throw new Error('Tag de version vide.');
+    if (!raw) throw new Error('Empty version tag.');
 
     const name = raw.replace(/[^A-Za-z0-9._-]/g, '-').replace(/^-+|-+$/g, '');
     if (!name || name === '.' || name === '..' || /^\.+$/.test(name)) {
-        throw new Error(`Tag de version inexploitable : ${raw}`);
+        throw new Error(`Unusable version tag: ${raw}`);
     }
     return name;
 }
@@ -196,7 +196,7 @@ function isInstallComplete(dir) {
  * ouvre le message d'erreur change, d'où `refus`.
  *
  * @param {string} cible - Dossier visé
- * @param {string} refus - Début du message d'erreur, p. ex. `Installation refusée`
+ * @param {string} refusal - Début du message d'erreur, p. ex. `Installation refusée`
  * @throws {Error} si l'opération doit être refusée
  */
 function assertTargetWritable(target, refusal) {
@@ -204,20 +204,20 @@ function assertTargetWritable(target, refusal) {
 
     if (isSameDir(VERSIONS_DIR, dev) || isSubdirectory(VERSIONS_DIR, dev)) {
         throw new Error(
-            `${refusal} : le dossier des versions (${VERSIONS_DIR}) contient le dépôt de développement.`
+            `${refusal}: the versions folder (${VERSIONS_DIR}) holds the development checkout.`
         );
     }
 
     if (!isSubdirectory(VERSIONS_DIR, target)) {
-        throw new Error(`${refusal} : ${target} est hors du dossier des versions.`);
+        throw new Error(`${refusal}: ${target} is outside the versions folder.`);
     }
 
     if (isSameDir(target, INSTALL_ROOT)) {
-        throw new Error(`${refusal} : cette version est celle en cours d'exécution.`);
+        throw new Error(`${refusal}: this version is the one currently running.`);
     }
 
     if (isSameDir(target, dev) || isSubdirectory(target, dev)) {
-        throw new Error(`${refusal} : cette cible recouvre le dépôt de développement.`);
+        throw new Error(`${refusal}: this target overlaps the development checkout.`);
     }
 }
 

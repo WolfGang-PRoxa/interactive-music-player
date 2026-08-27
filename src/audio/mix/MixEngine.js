@@ -171,8 +171,8 @@ class MixEngine {
         this.bus = new MixBus();
         this.bus.onFrame(() => this._clock());
         this.bus.on('sourceEpuisee', (source) => this._onSourceExhausted(source));
-        this.bus.on('erreurMoteur', (err) => {
-            log.error('[MixEngine] Erreur dans l\'horloge du bus :', err.message);
+        this.bus.on('engineError', (err) => {
+            log.error('[MixEngine] Error in the bus clock:', err.message);
         });
 
         this.resource = createAudioResource(this.bus, {
@@ -196,7 +196,7 @@ class MixEngine {
         });
 
         this.player.on('error', (err) => {
-            log.error('[MixEngine] Erreur du lecteur audio :', err.message);
+            log.error('[MixEngine] Audio player error:', err.message);
         });
 
         // Le volume nominal est posé avant la première trame : le bus démarrerait
@@ -219,7 +219,7 @@ class MixEngine {
 
         dispatcher.once('destroyed', () => this.stop());
 
-        log.info(`[MixEngine] Bus de mixage ouvert pour la guild ${this.guildId}.`);
+        log.info(`[MixEngine] Mix bus opened for guild ${this.guildId}.`);
         return true;
     }
 
@@ -260,7 +260,7 @@ class MixEngine {
         const connection = this.queue.dispatcher?.voiceConnection;
         if (!connection || this._stopped) return;
         if (connection.state?.subscription === this.subscription) return;
-        log.info('[MixEngine] Abonnement vocal repris par le bus de mixage.');
+        log.info('[MixEngine] Voice subscription taken over by the mix bus.');
         this._takeSubscription(connection);
     }
 
@@ -306,7 +306,7 @@ class MixEngine {
         this.player = null;
         this.subscription = null;
 
-        log.info(`[MixEngine] Bus de mixage refermé pour la guild ${this.guildId}.`);
+        log.info(`[MixEngine] Mix bus closed again for guild ${this.guildId}.`);
     }
 
     /** @returns {boolean} */
@@ -363,7 +363,7 @@ class MixEngine {
         try {
             await source.start();
         } catch (err) {
-            log.error(`[MixEngine] Impossible de décoder « ${track?.title} » :`, err.message);
+            log.error(`[MixEngine] Cannot decode « ${track?.title} »:`, err.message);
             source.stop();
             if (generation === this._generation) this._failTrack(track, err);
             return;
@@ -381,7 +381,7 @@ class MixEngine {
         // lecture muette dont rien ne signalerait jamais la fin.
         if (!source.hasSound) {
             source.stop();
-            this._failTrack(track, new Error('Le décodage n\'a produit aucun son.'));
+            this._failTrack(track, new Error('Decoding produced no sound at all.'));
             return;
         }
 
@@ -500,7 +500,7 @@ class MixEngine {
         try {
             await this._source.seek(position, speed);
         } catch (err) {
-            log.error('[MixEngine] Changement de vitesse impossible :', err.message);
+            log.error('[MixEngine] Speed change impossible:', err.message);
         }
     }
 
@@ -628,10 +628,10 @@ class MixEngine {
                 }
                 this._incoming = source;
                 this._incomingTrack = next;
-                log.debug(`[MixEngine] Morceau suivant prêt à être superposé : ${next.title}`);
+                log.debug(`[MixEngine] Next track ready to be layered in: ${next.title}`);
             })
             .catch((err) => {
-                log.error(`[MixEngine] Préparation impossible pour « ${next?.title} » :`, err.message);
+                log.error(`[MixEngine] Preparation impossible for « ${next?.title} »:`, err.message);
                 source.stop();
             })
             .finally(() => {
@@ -662,7 +662,7 @@ class MixEngine {
         }
 
         this.bus.add(incoming);
-        log.info(`[MixEngine] Fondu enchaîné de ${Math.round(fadeDuration / 1000)}s : `
+        log.info(`[MixEngine] Crossfade of ${Math.round(fadeDuration / 1000)}s: `
             + `« ${outgoing.track?.title} » → « ${incoming.track?.title} ».`);
     }
 
@@ -714,7 +714,7 @@ class MixEngine {
         try {
             dispatcher.emit('finish', this.resource);
         } catch (err) {
-            log.error('[MixEngine] Erreur pendant l\'enchaînement :', err.message);
+            log.error('[MixEngine] Error during the crossfade:', err.message);
         }
 
         // Personne n'a réclamé de nouveau morceau : la file est allée au bout.
@@ -819,7 +819,7 @@ class MixEngine {
         try {
             this.queue.dispatcher?.emit('start', this.resource);
         } catch (err) {
-            log.error('[MixEngine] Erreur à l\'annonce du démarrage :', err.message);
+            log.error('[MixEngine] Error announcing the start:', err.message);
         }
     }
 

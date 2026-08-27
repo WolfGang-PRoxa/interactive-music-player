@@ -333,9 +333,9 @@ window.MusicPlayer = window.MusicPlayer || {};
     function projectOnEdge(rect, px, py) {
         const p = projectOnRect(rect, px, py);
         const radius = rect.radius || 0;
-        const surX = p.x === rect.left || p.x === rect.right;
-        const surY = p.y === rect.top || p.y === rect.bottom;
-        if (radius <= 0 || !surX || !surY) return p;
+        const onEdgeX = p.x === rect.left || p.x === rect.right;
+        const onEdgeY = p.y === rect.top || p.y === rect.bottom;
+        if (radius <= 0 || !onEdgeX || !onEdgeY) return p;
 
         const center = {
             x: p.x === rect.left ? rect.left + radius : rect.right - radius,
@@ -619,10 +619,10 @@ window.MusicPlayer = window.MusicPlayer || {};
         if (!canvas || !ctx || !grid) return;
         if (cssWidth < 2 || cssHeight < 2) return;
 
-        const idCible = TARGET_CARDS[currentTarget] || TARGET_CARDS.queue;
+        const targetId = TARGET_CARDS[currentTarget] || TARGET_CARDS.queue;
         const rects = cardRects();
         const source = rects.find(r => r.id === SOURCE_CARD_ID);
-        const target = rects.find(r => r.id === idCible);
+        const target = rects.find(r => r.id === targetId);
 
         if (!source || !target || source === target) {
             trail = null;
@@ -637,7 +637,7 @@ window.MusicPlayer = window.MusicPlayer || {};
 
         const obstacles = rects.map(r => expand(r, margin));
         const sourceD = obstacles.find(o => o.id === SOURCE_CARD_ID);
-        const targetD = obstacles.find(o => o.id === idCible);
+        const targetD = obstacles.find(o => o.id === targetId);
 
         const from = anchors(sourceD, source);
         const goal = anchors(targetD, target);

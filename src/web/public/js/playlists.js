@@ -166,8 +166,8 @@ window.MusicPlayer.updatePlaylistsUI = function() {
         // La langue entre dans la clé : l'option « File d'attente » est
         // construite ici, elle doit donc être reconstruite quand la langue
         // change — sinon elle reste figée jusqu'au rechargement de la page.
-        const langue = (window.MusicPlayer.dashboardSettings && window.MusicPlayer.dashboardSettings.language) || 'fr';
-        const selectStateKey = `${playlistsStateKey}|${activeSource}|${langue}`;
+        const lang = (window.MusicPlayer.dashboardSettings && window.MusicPlayer.dashboardSettings.language) || 'fr';
+        const selectStateKey = `${playlistsStateKey}|${activeSource}|${lang}`;
         
         if (playbackSourceSelect._lastSelectStateKey !== selectStateKey) {
             playbackSourceSelect._lastSelectStateKey = selectStateKey;
@@ -221,7 +221,7 @@ window.MusicPlayer.updatePlaylistsUI = function() {
                     e.dataTransfer.setData('text/plain', pl.name || pl.id);
                     e.dataTransfer.effectAllowed = 'move';
 
-                    const logMsg = `[DragStart PlaylistTab] Début de réorganisation d'onglet : "${pl.name}" (index: ${index})`;
+                    const logMsg = `[DragStart PlaylistTab] Tab reorder started: "${pl.name}" (index: ${index})`;
                     console.log(logMsg);
                     if (typeof window.MusicPlayer.sendWS === 'function') {
                         window.MusicPlayer.sendWS({ type: 'clientLog', data: { source: 'DragDrop-PlaylistTabReorder', message: logMsg } });
@@ -297,7 +297,7 @@ window.MusicPlayer.updatePlaylistsUI = function() {
                                 playlistsTabsContainer._lastPlaylistsStateKey = null;
                                 window.MusicPlayer.updatePlaylistsUI();
 
-                                const logMsg = `[DragDrop PlaylistTabReorder] Réorganisation des playlists de ${fromIndex} vers ${toIndex}`;
+                                const logMsg = `[DragDrop PlaylistTabReorder] Reordering playlists from ${fromIndex} to ${toIndex}`;
                                 console.log(logMsg);
                                 if (typeof window.MusicPlayer.sendWS === 'function') {
                                     window.MusicPlayer.sendWS({ type: 'clientLog', data: { source: 'DragDrop-PlaylistTabReorder', message: logMsg } });
@@ -316,7 +316,7 @@ window.MusicPlayer.updatePlaylistsUI = function() {
                         return;
                     }
 
-                    const logMsg = `[DragDrop PlaylistTab] Dépôt reçu sur onglet playlist "${pl.name}". Morceau: "${dragData ? dragData.title : 'inconnu'}"`;
+                    const logMsg = `[DragDrop PlaylistTab] Drop received on playlist tab "${pl.name}". Track: "${dragData ? dragData.title : 'unknown'}"`;
                     console.log(logMsg);
                     if (typeof window.MusicPlayer.sendWS === 'function') {
                         window.MusicPlayer.sendWS({ type: 'clientLog', data: { source: 'DragDrop-PlaylistTab', message: logMsg } });
@@ -582,7 +582,7 @@ window.MusicPlayer.updatePlaylistsUI = function() {
                     window.MusicPlayer.handleTrackDropOnPlaylist(playlist.id, dragData, finalTargetIdx);
                 }
             } catch (err) {
-                console.error('[PlaylistTracksListDrop] Erreur:', err);
+                console.error('[PlaylistTracksListDrop] Error:', err);
             }
         });
 
@@ -659,7 +659,7 @@ window.MusicPlayer.updatePlaylistsUI = function() {
                     }
                     e.dataTransfer.effectAllowed = 'copyMove';
 
-                    const logMsg = `[DragStart PlaylistTrack] Début de glissement depuis playlist "${playlist.name}" : "${track.title}" (${track.url})`;
+                    const logMsg = `[DragStart PlaylistTrack] Drag started from playlist "${playlist.name}": "${track.title}" (${track.url})`;
                     console.log(logMsg);
                     if (typeof window.MusicPlayer.sendWS === 'function') {
                         window.MusicPlayer.sendWS({ type: 'clientLog', data: { source: 'DragDrop-PlaylistTrack', message: logMsg } });
@@ -778,7 +778,7 @@ window.MusicPlayer.updatePlaylistsUI = function() {
         // playlist désigne alors le titre qui prendra la suite, pas celui qu'on
         // entend — et la progression affichée serait celle d'un autre fichier.
         // Seule l'URL réellement en lecture peut donc allumer une ligne.
-        const urlEnLecture = state.currentTrack ? state.currentTrack.url : null;
+        const playingUrl = state.currentTrack ? state.currentTrack.url : null;
 
         // Pendant un enchaînement mix, deux titres sonnent ensemble : l'index
         // du serveur, qui n'avance qu'au terme du fondu, ne désigne que le
@@ -825,7 +825,7 @@ window.MusicPlayer.updatePlaylistsUI = function() {
                     }
                 }
                 if (ratio === null && !transition && i === currentIdx
-                    && areUrlsEqual(track.url, urlEnLecture)) {
+                    && areUrlsEqual(track.url, playingUrl)) {
                     ratio = progressPct / 100;
                 }
 
@@ -857,7 +857,7 @@ window.MusicPlayer.updatePlaylistsUI = function() {
 /** Dernier enchaînement mix observé, pour en détecter le début et la fin. */
 let lastMixTransition = null;
 
-function appliquerBarreLecture(item, ratio) {
+function applyPlaybackBar(item, ratio) {
     const clamp = Math.min(1, Math.max(0, ratio));
     let playbackBar = item.querySelector('.playback-fill-bar');
     if (!playbackBar) {
@@ -885,10 +885,10 @@ window.MusicPlayer.updateActivePlaylistTrackProgress = function(ratio) {
 
     const state = window.MusicPlayer.state || {};
     const content = document.getElementById('active-playlist-content');
-    const playlistAffichee = content ? content.getAttribute('data-playlist-id') : null;
-    const afficheLaSource = !!playlistAffichee && playlistAffichee === state.activePlaybackSource;
+    const displayedPlaylist = content ? content.getAttribute('data-playlist-id') : null;
+    const showsSource = !!displayedPlaylist && displayedPlaylist === state.activePlaybackSource;
 
-    const transition = afficheLaSource && typeof window.MusicPlayer.mixTransitionState === 'function'
+    const transition = showsSource && typeof window.MusicPlayer.mixTransitionState === 'function'
         ? window.MusicPlayer.mixTransitionState()
         : null;
 
@@ -896,18 +896,18 @@ window.MusicPlayer.updateActivePlaylistTrackProgress = function(ratio) {
         // Fin du fondu : la ligne sortante s'éteint sur-le-champ, sans
         // attendre que le serveur ait fait avancer son index de lecture.
         if (lastMixTransition) {
-            const urlEntrante = lastMixTransition.incoming.url;
+            const incomingUrl = lastMixTransition.incoming.url;
             listEl.querySelectorAll('.playlist-track-item.is-playing-now').forEach(item => {
-                if (!areUrlsEqual(item.getAttribute('data-url'), urlEntrante)) {
+                if (!areUrlsEqual(item.getAttribute('data-url'), incomingUrl)) {
                     item.classList.remove('is-playing-now', 'playing-active');
-                    appliquerBarreLecture(item, 0);
+                    applyPlaybackBar(item, 0);
                 }
             });
             lastMixTransition = null;
         }
 
         const active = listEl.querySelector('.playlist-track-item.is-playing-now');
-        if (active) appliquerBarreLecture(active, ratio);
+        if (active) applyPlaybackBar(active, ratio);
         return;
     }
 
@@ -917,9 +917,9 @@ window.MusicPlayer.updateActivePlaylistTrackProgress = function(ratio) {
     if (startIdx) {
         listEl.querySelectorAll('.playlist-track-item').forEach(item => {
             const url = item.getAttribute('data-url');
-            const concernee = areUrlsEqual(url, transition.incoming.url)
+            const affected = areUrlsEqual(url, transition.incoming.url)
                 || (transition.outgoing && areUrlsEqual(url, transition.outgoing.url));
-            if (concernee) {
+            if (affected) {
                 item.classList.add('playing-active', 'is-playing-now');
                 item.classList.remove('is-played');
             }
@@ -930,15 +930,15 @@ window.MusicPlayer.updateActivePlaylistTrackProgress = function(ratio) {
     listEl.querySelectorAll('.playlist-track-item.is-playing-now').forEach(item => {
         const url = item.getAttribute('data-url');
         if (areUrlsEqual(url, transition.incoming.url)) {
-            appliquerBarreLecture(item, transition.incoming.ratio);
+            applyPlaybackBar(item, transition.incoming.ratio);
         } else if (transition.outgoing && areUrlsEqual(url, transition.outgoing.url)) {
-            appliquerBarreLecture(item, transition.outgoing.ratio);
+            applyPlaybackBar(item, transition.outgoing.ratio);
         } else {
             // Une transition en cours ne laisse jouer que ses deux morceaux :
             // toute autre ligne s'éteint. C'est par là que passe la sortante
             // une fois son fondu achevé, sans attendre le rendu complet.
             item.classList.remove('is-playing-now', 'playing-active');
-            appliquerBarreLecture(item, 0);
+            applyPlaybackBar(item, 0);
         }
     });
 };
@@ -1062,7 +1062,7 @@ window.MusicPlayer.initPlaylists = function() {
                 if (!dragData) dragData = window.MusicPlayer.activeDragData;
 
                 const targetPlId = activePlaylistTabId || (window.MusicPlayer.state.playlists?.[0]?.id);
-                const logMsg = `[DragDrop PlaylistsCard] Dépôt reçu sur la carte des playlists (ID: ${targetPlId}). Morceau: "${dragData ? dragData.title : 'inconnu'}"`;
+                const logMsg = `[DragDrop PlaylistsCard] Drop received on the playlists card (ID: ${targetPlId}). Track: "${dragData ? dragData.title : 'unknown'}"`;
                 console.log(logMsg);
                 if (typeof window.MusicPlayer.sendWS === 'function') {
                     window.MusicPlayer.sendWS({ type: 'clientLog', data: { source: 'DragDrop-PlaylistsCard', message: logMsg } });
@@ -1072,7 +1072,7 @@ window.MusicPlayer.initPlaylists = function() {
                     window.MusicPlayer.handleTrackDropOnPlaylist(targetPlId || null, dragData);
                 }
             } catch (err) {
-                console.error('[PlaylistsCardDrop] Erreur:', err);
+                console.error('[PlaylistsCardDrop] Error:', err);
             }
         });
     }

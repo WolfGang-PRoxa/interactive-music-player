@@ -64,7 +64,7 @@ class DuckingManager {
      * @param {string} userId
      */
     _handleSpeakingStart(userId) {
-        log.debug(`[Ducking Debug] Détection parole - Début pour l'utilisateur : ${userId}`);
+        log.debug(`[Ducking Debug] Speech detected — start for user: ${userId}`);
         this.activeSpeakers.add(userId);
 
         // Vérifier si cet utilisateur est ignoré pour le ducking
@@ -80,7 +80,7 @@ class DuckingManager {
 
             // Si c'est le premier speaker non-ignoré, déclencher le duck down
             if (activeNonIgnored === 1) {
-                log.debug(`[Ducking Debug] Baisse du volume (duckDown) vers ${settings.duckingLevel}%`);
+                log.debug(`[Ducking Debug] Lowering volume (duckDown) to ${settings.duckingLevel}%`);
                 this.volumeController.duckDown(settings.duckingLevel, settings.duckingFade);
             }
         }
@@ -94,7 +94,7 @@ class DuckingManager {
      * @param {string} userId
      */
     _handleSpeakingEnd(userId) {
-        log.debug(`[Ducking Debug] Détection parole - Fin pour l'utilisateur : ${userId}`);
+        log.debug(`[Ducking Debug] Speech detected — end for user: ${userId}`);
         this.activeSpeakers.delete(userId);
 
         const settings = database.getSettings(this.guildId);
@@ -104,7 +104,7 @@ class DuckingManager {
 
             // Si plus aucun speaker non-ignoré ne parle, restaurer le volume
             if (activeNonIgnored === 0) {
-                log.debug(`[Ducking Debug] Restauration du volume planifiée dans ${settings.duckingDelay}ms`);
+                log.debug(`[Ducking Debug] Volume restore scheduled in ${settings.duckingDelay}ms`);
                 this._scheduleRestore(settings.duckingDelay, settings.duckingFade);
             }
         }
@@ -226,7 +226,7 @@ class DuckingManager {
      */
     updateConnection(connection) {
         if (this.connection === connection) return;
-        log.info(`[Ducking] Mise à jour de la connexion vocale pour guild ${this.guildId}`);
+        log.info(`[Ducking] Updating the voice connection for guild ${this.guildId}`);
         this._removeListeners();
         this.connection = connection;
         // Ce que l'ancienne connexion avait vu ne vaut plus rien : un « fin de
@@ -267,7 +267,7 @@ class DuckingManager {
      */
     forgetSpeaker(userId) {
         if (!this.activeSpeakers.delete(userId)) return false;
-        log.debug(`[Ducking Debug] Locuteur ${userId} retiré : il a quitté le salon en parlant.`);
+        log.debug(`[Ducking Debug] Speaker ${userId} dropped: they left the channel while speaking.`);
 
         const settings = database.getSettings(this.guildId);
         if (settings.duckingEnabled && this._countActiveNonIgnored() === 0) {

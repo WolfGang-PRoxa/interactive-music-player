@@ -144,14 +144,14 @@ class WebServer {
         try {
             require('./uploadService').cleanIncomingUploads();
         } catch (err) {
-            log.error(`[WebServer] Nettoyage des transferts interrompus impossible : ${err.message}`);
+            log.error(`[WebServer] Cannot clean up the interrupted transfers: ${err.message}`);
         }
 
         this.server.listen(port, host, () => {
             const displayHost = (host === '0.0.0.0' || host === '::') ? 'localhost' : host;
-            log.success(`[WebServer] Tableau de bord accessible sur : http://${displayHost}:${port}/?token=${token}`);
+            log.success(`[WebServer] Dashboard reachable at: http://${displayHost}:${port}/?token=${token}`);
             if (host === '0.0.0.0' || host === '::') {
-                log.warn(`[WebServer] Le dashboard est exposé sur toutes les interfaces réseau (HOST=${host}).`);
+                log.warn(`[WebServer] The dashboard is exposed on every network interface (HOST=${host}).`);
             }
 
             // Ouvrir automatiquement le navigateur après 5 secondes si aucun client n'est connecté
@@ -162,12 +162,12 @@ class WebServer {
             // distance, il double la lecture sans que personne ne l'entende.
             setTimeout(() => {
                 if (String(process.env.AUTO_OPEN_DASHBOARD || '').toLowerCase() === 'false') {
-                    log.info('[WebServer] Ouverture automatique du tableau de bord désactivée '
+                    log.info('[WebServer] Automatic opening of the dashboard disabled '
                         + '(AUTO_OPEN_DASHBOARD=false).');
                     return;
                 }
                 if (this.wss.clients.size === 0) {
-                    log.success(`[WebServer] Aucun client connecté détecté. Ouverture automatique du tableau de bord.`);
+                    log.success(`[WebServer] No connected client detected. Opening the dashboard automatically.`);
                     const { exec } = require('child_process');
                     // Le jeton est passé en query : le middleware pose le cookie puis nettoie l'URL.
                     const url = `http://${displayHost}:${port}/?token=${token}`;
@@ -181,11 +181,11 @@ class WebServer {
                     }
                     exec(cmd, { windowsHide: true }, (err) => {
                         if (err) {
-                            log.error(`[WebServer] Impossible d'ouvrir le navigateur : ${err.message}`);
+                            log.error(`[WebServer] Cannot open the browser: ${err.message}`);
                         }
                     });
                 } else {
-                    log.success(`[WebServer] Client existant détecté (${this.wss.clients.size} client(s) connecté(s)).`);
+                    log.success(`[WebServer] Existing client detected (${this.wss.clients.size} client(s) connected).`);
                 }
             }, 5000);
         });
@@ -203,7 +203,7 @@ class WebServer {
                     });
                 }
             } catch (e) {
-                log.error('[WebServer] Erreur onProgress préchargement :', e.message);
+                log.error('[WebServer] Preload onProgress error:', e.message);
             }
         };
 
@@ -251,8 +251,8 @@ class WebServer {
                                     // cas où le tableau de bord se tairait. Elle peut donc
                                     // attendre ; lui, non.
                                     if (durationMs > 0 && queue.virtualProgressMs >= durationMs + AUTO_END_DELAY_MS) {
-                                        log.warn('[WebServer] Fin de piste non annoncée par le tableau de bord : '
-                                            + 'avance automatique de la file virtuelle.');
+                                        log.warn('[WebServer] End of track not announced by the dashboard: '
+                                            + 'advancing the virtual queue automatically.');
                                         this.handleVirtualSkip(queue, guildId);
                                     }
                                 }
@@ -283,7 +283,7 @@ class WebServer {
                         try {
                             preloadManager.update(guildId);
                         } catch (err) {
-                            log.error('[WebServer] Erreur de mise à jour du préchargement :', err.message);
+                            log.error('[WebServer] Preload update error:', err.message);
                         }
                         this.broadcastProgress(guildId);
                     });
@@ -319,7 +319,7 @@ class WebServer {
         const heartbeatInterval = setInterval(() => {
             this.wss.clients.forEach((ws) => {
                 if (ws.isAlive === false) {
-                    log.info('[WebServer] Client WebSocket inactif, fermeture...');
+                    log.info('[WebServer] Idle WebSocket client, closing...');
                     return ws.terminate();
                 }
                 ws.isAlive = false;
@@ -342,7 +342,7 @@ class WebServer {
             ws.identity = req?.identity || { authorized: true, master: true, session: null };
 
             if (!ws.identity.master && ws.identity.session) {
-                log.info(`[WebServer] Tableau de bord invité connecté : `
+                log.info(`[WebServer] Guest dashboard connected: `
                     + `${ws.identity.session.displayName} (${ws.identity.session.userId}).`);
             }
 
@@ -353,7 +353,7 @@ class WebServer {
             try {
                 this._initClient(ws);
             } catch (err) {
-                log.error('[WebServer] Initialisation du client WebSocket échouée :', err);
+                log.error('[WebServer] WebSocket client initialisation failed:', err);
                 try {
                     ws.send(JSON.stringify({
                         type: 'error',
@@ -384,7 +384,7 @@ class WebServer {
             ws.send(JSON.stringify({ type: 'logsHistory', data: log.getHistory() }));
         } catch (err) {}
 
-        log.success('[WebServer] Client connecté en WebSocket.');
+        log.success('[WebServer] Client connected over WebSocket.');
 
         let selectedGuildId = null;
         let selectedChannelId = null;
@@ -458,7 +458,7 @@ class WebServer {
                 const parsed = JSON.parse(message);
                 await wsHandler.handleMessage(ws, parsed, this);
             } catch (err) {
-                log.error('[WebServer] Erreur message WebSocket :', err.message);
+                log.error('[WebServer] WebSocket message error:', err.message);
                 // Un handler interrompu n'a pas atteint son broadcastState : sans
                 // ce renvoi, l'IHM resterait sur son état optimiste (interrupteur
                 // coché, curseur déplacé…) jusqu'au prochain événement, en
@@ -490,7 +490,7 @@ class WebServer {
         try {
             preloadManager.update(guildId);
         } catch (err) {
-            log.error('[WebServer] Erreur de mise à jour du préchargement :', err.message);
+            log.error('[WebServer] Preload update error:', err.message);
         }
 
         this.wss.clients.forEach((client) => {
@@ -642,8 +642,8 @@ class WebServer {
         for (const client of this.wss.clients) {
             if (client.readyState === 1 && client.selectedGuildId === guildId) {
                 this.pilots.set(guildId, client);
-                log.info(`[WebServer] Tableau de bord pilote désigné pour la guild ${guildId} `
-                    + `(${this._countClients(guildId)} connecté(s)).`);
+                log.info(`[WebServer] Pilot dashboard designated for guild ${guildId} `
+                    + `(${this._countClients(guildId)} connected).`);
                 this.broadcastState(guildId);
                 return client;
             }
@@ -670,7 +670,7 @@ class WebServer {
         for (const [guildId, pilot] of this.pilots.entries()) {
             if (pilot !== ws) continue;
             this.pilots.delete(guildId);
-            log.info(`[WebServer] Le tableau de bord pilote de la guild ${guildId} s'est déconnecté.`);
+            log.info(`[WebServer] The pilot dashboard of guild ${guildId} disconnected.`);
             // Différé : à cet instant la connexion figure encore parmi les
             // clients, et se réélirait elle-même.
             setImmediate(() => this._ensurePilot(guildId));
@@ -752,7 +752,7 @@ class WebServer {
             this._stopMemoryStreamIfIdle();
         }, MEM_SEND_PERIOD_MS);
 
-        log.debug(`[WebServer] Flux mémoire haute cadence démarré (${MEM_RATE_HZ} Hz).`);
+        log.debug(`[WebServer] High-rate memory feed started (${MEM_RATE_HZ} Hz).`);
     }
 
     _stopMemoryStreamIfIdle() {
@@ -1254,7 +1254,7 @@ class WebServer {
                             }
                         });
                     } catch (e) {
-                        log.error('[WebServer] Erreur play track playlist everyone:', e);
+                        log.error('[WebServer] play track playlist everyone error:', e);
                     }
 
                     setTimeout(() => {
@@ -1305,7 +1305,7 @@ class WebServer {
                 permissions: [PermissionsBitField.Flags.Administrator]
             });
         } catch (err) {
-            log.warn(`[WebServer] Lien d'invitation indisponible : ${err.message}`);
+            log.warn(`[WebServer] Invitation link unavailable: ${err.message}`);
             return null;
         }
 
@@ -1450,8 +1450,8 @@ class WebServer {
         if (data && data.auto && data.finishedUrl) {
             const currentUrl = queue.virtualCurrentTrack?.url || null;
             if (!currentUrl || !arePathsOrUrlsEqual(currentUrl, data.finishedUrl)) {
-                log.debug('[WebServer] Fin de piste déjà traitée, annonce ignorée : '
-                    + `« ${data.finishedUrl} » n'est plus la piste courante.`);
+                log.debug('[WebServer] End of track already handled, announcement ignored: '
+                    + `« ${data.finishedUrl} » is no longer the current track.`);
                 return;
             }
         }
@@ -1467,9 +1467,9 @@ class WebServer {
         // l'annonce du navigateur et la roue de secours du serveur —, et seul un
         // relevé horodaté dit lequel a joué, combien de fois, et sur quelle file.
         // Le déduire du seul état final s'est révélé impossible.
-        log.debug(`[WebServer] Saut virtuel : « ${queue.virtualCurrentTrack?.title || '—'} » → `
-            + `« ${queue.virtualTracks?.[0]?.title || '—'} » | file de ${queue.virtualTracks?.length ?? 0} `
-            + `| départ ${startProgressMs} ms | source ${database.getSettings(guildId).activePlaybackSource || 'queue'}`);
+        log.debug(`[WebServer] Virtual skip: « ${queue.virtualCurrentTrack?.title || '—'} » → `
+            + `« ${queue.virtualTracks?.[0]?.title || '—'} » | queue of ${queue.virtualTracks?.length ?? 0} `
+            + `| start ${startProgressMs} ms | source ${database.getSettings(guildId).activePlaybackSource || 'queue'}`);
 
         // Repeat mode TRACK check
         const repeatMode = queue.repeatMode;
@@ -1552,7 +1552,7 @@ class WebServer {
         const playlist = (database.getGlobalPlaylists() || []).find(p => p.id === source);
         if (!playlist || !playlist.tracks || playlist.tracks.length === 0) return false;
 
-        log.info(`[WebServer] Fin de la playlist « ${playlist.name} » : relance depuis le début (lecture en boucle).`);
+        log.info(`[WebServer] End of playlist « ${playlist.name} »: restarting from the top (loop playback).`);
         database.updateSettings(guildId, { playlistCurrentIndex: 0 });
 
         // forceRestart : sans lui, une playlist d'un seul titre serait vue
@@ -1563,7 +1563,7 @@ class WebServer {
                 const { useMainPlayer } = require('discord-player');
                 playbackStateManager.saveState(useMainPlayer());
             })
-            .catch(err => log.error('[WebServer] Erreur de relance de playlist :', err.message));
+            .catch(err => log.error('[WebServer] Playlist restart error:', err.message));
 
         return true;
     }
@@ -1617,13 +1617,13 @@ class WebServer {
         // laisser la lecture s'arrêter sur la playlist : il retrouvera sa file,
         // et pourra y revenir lui-même.
         if (settings.broadcastMode !== 'personal' && !queue.channel) {
-            log.info('[WebServer] Fin de playlist : la file d\'attente garde sa place, '
-                + 'le lecteur n\'a plus de salon où la jouer.');
+            log.info('[WebServer] End of playlist: the pending queue keeps its place, '
+                + 'the player no longer has a channel to play it in.');
             return false;
         }
 
-        log.info(`[WebServer] Fin de playlist : la file d'attente prend la main `
-            + `(${pending.length} titre(s)).`);
+        log.info(`[WebServer] End of playlist: the pending queue takes over `
+            + `(${pending.length} track(s)).`);
 
         // `playlistCurrentIndex` est ramené à zéro comme le fait la bascule
         // manuelle : laissé sur la dernière piste, il ferait repartir la
@@ -1681,7 +1681,7 @@ class WebServer {
                 this.broadcastState(guildId);
                 playbackStateManager.saveState(player);
             })
-            .catch(err => log.error('[WebServer] Erreur de passage à la file :', err.message));
+            .catch(err => log.error('[WebServer] Error handing over to the queue:', err.message));
 
         return true;
     }

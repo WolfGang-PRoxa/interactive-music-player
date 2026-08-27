@@ -22,7 +22,7 @@ let failed = 0;
 let passed = 0;
 const check = (label, ok, detail = '') => {
     if (ok) { passed++; console.log(`  ok    ${label}${detail ? ` — ${detail}` : ''}`); }
-    else { failed++; console.log(`  ECHEC ${label}${detail ? ` — ${detail}` : ''}`); }
+    else { failed++; console.log(`  FAIL ${label}${detail ? ` — ${detail}` : ''}`); }
 };
 
 /** Remplace un module par un double avant que quiconque ne le charge. */
@@ -48,8 +48,8 @@ stub('../src/utils/logger', {
 // ─────────────────── Database : l'application du favori ───────────────────
 
 const GUILD = 'g1';
-const FAVORITE = 'salon_favori';
-const OTHER = 'salon_autre';
+const FAVORITE = 'favorite_channel';
+const OTHER = 'other_channel';
 
 // La vraie base, mais coupée du disque : sans ce double elle lirait — et
 // réécrirait — le settings.json de l'utilisateur. `readJsonSafe` rendant null,
@@ -63,33 +63,33 @@ stub('../src/utils/atomicJson', {
 const base = require('../src/database/Database');
 base.cache.set(GUILD, { guildId: GUILD, defaultVoiceChannelId: FAVORITE, lastVoiceChannelId: null });
 
-console.log('\nappliquerSalonFavori — le démarrage\n');
+console.log('\napplyFavoriteChannel — startup\n');
 
 const applied = base.applyFavoriteChannel();
 
-check('le favori est retourné à l\'appelant',
+check('the favorite is returned to the caller',
     applied && applied.guildId === GUILD && applied.channelId === FAVORITE,
     applied ? `${applied.guildId}:${applied.channelId}` : 'aucun');
-check('il devient le salon courant global',
+check('it becomes the global current channel',
     base.getLastVoiceChannel().channelId === FAVORITE, base.getLastVoiceChannel().channelId);
-check('  … et le dernier salon du serveur',
+check('  … and the last channel of the guild',
     base.getSettings(GUILD).lastVoiceChannelId === FAVORITE);
 
 // Le geste de l'utilisateur, en pleine session : `handleSelectChannel` inscrit
 // le salon choisi. Le favori, lui, ne bouge pas — il vaudra au prochain
 // démarrage.
 base.setLastVoiceChannel(GUILD, OTHER);
-check('une sélection en session prend la main',
+check('a selection made during the session takes over',
     base.getLastVoiceChannel().channelId === OTHER, base.getLastVoiceChannel().channelId);
-check('  … sans effacer le favori, qui resservira au démarrage',
+check('  … without erasing the favorite, which will serve again at startup',
     base.getSettings(GUILD).defaultVoiceChannelId === FAVORITE);
-check('  … et rien ne le rappelle avant : seul un nouveau démarrage l\'applique',
+check('  … and nothing recalls it before: only a new startup applies it',
     base.applyFavoriteChannel().channelId === FAVORITE
     && base.getLastVoiceChannel().channelId === FAVORITE);
 
 // ──────────────── PresenceManager : le favori n'y a plus cours ────────────────
 
-console.log('\nsalonAssigne — le rattachement, jamais le favori\n');
+console.log('\nassignedChannel — the attachment, never the favorite\n');
 
 const presenceManager = require('../src/audio/PresenceManager');
 
@@ -104,7 +104,7 @@ const channel = (id, humans = 0) => ({
 
 /**
  * Installe un serveur, ses salons et sa file, puis rend le salon retenu.
- * @param {{ actif?: string, connecte?: string, dernier?: string, favori?: string }} etat
+ * @param {{ active?: string, connected?: string, last?: string, favorite?: string }} state
  */
 function assigned(state) {
     const channels = new Map([
@@ -134,25 +134,25 @@ function assigned(state) {
     return retained ? retained.id : null;
 }
 
-check('le rattachement en cours prime',
+check('the attachment in progress wins',
     assigned({ active: OTHER, favorite: FAVORITE }) === OTHER,
     assigned({ active: OTHER, favorite: FAVORITE }));
 
-check('sans rattachement, le salon où le bot se trouve — pas le favori',
+check('without an attachment, the channel the bot is in — not the favorite',
     assigned({ connected: OTHER, favorite: FAVORITE }) === OTHER,
     assigned({ connected: OTHER, favorite: FAVORITE }));
 
-check('puis le dernier salon visité — pas le favori',
+check('then the last channel visited — not the favorite',
     assigned({ last: OTHER, favorite: FAVORITE }) === OTHER,
     assigned({ last: OTHER, favorite: FAVORITE }));
 
-check('un favori seul ne rattache plus rien',
+check('a favorite on its own no longer attaches anything',
     assigned({ favorite: FAVORITE }) === null,
     String(assigned({ favorite: FAVORITE })));
 
-check('au démarrage, le favori est retrouvé — comme salon courant',
+check('at startup the favorite is found again — as the current channel',
     assigned({ last: FAVORITE, favorite: FAVORITE }) === FAVORITE,
     assigned({ last: FAVORITE, favorite: FAVORITE }));
 
-console.log(`\n=== ${passed} réussite(s), ${failed} échec(s) ===`);
+console.log(`\n=== ${passed} passed, ${failed} failed ===`);
 process.exit(failed === 0 ? 0 : 1);

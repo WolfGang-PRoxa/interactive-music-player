@@ -91,7 +91,7 @@ function readJsonSafe(filepath, logPrefix = '[atomicJson]') {
     try {
         raw = fs.readFileSync(filepath, 'utf8');
     } catch (err) {
-        log.error(`${logPrefix} Lecture impossible de ${path.basename(filepath)} : ${err.message}`);
+        log.error(`${logPrefix} Cannot read ${path.basename(filepath)}: ${err.message}`);
         return null;
     }
 
@@ -102,10 +102,10 @@ function readJsonSafe(filepath, logPrefix = '[atomicJson]') {
         const quarantine = `${filepath}.corrompu-${stamp}`;
         try {
             fs.renameSync(filepath, quarantine);
-            log.error(`${logPrefix} ${path.basename(filepath)} est corrompu : ${err.message}`);
-            log.error(`${logPrefix} Fichier conservé sous ${path.basename(quarantine)} ; redémarrage sur des valeurs par défaut.`);
+            log.error(`${logPrefix} ${path.basename(filepath)} is corrupted: ${err.message}`);
+            log.error(`${logPrefix} File kept as ${path.basename(quarantine)}; restarting from default values.`);
         } catch (renameErr) {
-            log.error(`${logPrefix} ${path.basename(filepath)} est corrompu et n'a pas pu être mis de côté : ${renameErr.message}`);
+            log.error(`${logPrefix} ${path.basename(filepath)} is corrupted and could not be set aside: ${renameErr.message}`);
         }
         return null;
     }

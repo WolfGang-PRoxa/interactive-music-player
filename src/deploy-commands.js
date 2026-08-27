@@ -17,7 +17,7 @@ const log = require('./utils/logger');
 
 // --- Validate env ---
 if (!process.env.DISCORD_TOKEN || !process.env.DISCORD_CLIENT_ID) {
-    log.error('[FATAL] DISCORD_TOKEN et DISCORD_CLIENT_ID sont requis dans .env');
+    log.error('[FATAL] DISCORD_TOKEN and DISCORD_CLIENT_ID are required in .env');
     process.exit(1);
 }
 
@@ -42,7 +42,7 @@ for (const file of commandFiles) {
     }
 }
 
-log.info(`[Deploy] ${commands.length} commandes trouvées :`);
+log.info(`[Deploy] ${commands.length} commands found:`);
 commands.forEach(cmd => log.info(`  • /${cmd.name} — ${cmd.description}`));
 
 // --- Deploy ---
@@ -54,24 +54,24 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
         if (guildId) {
             // Guild-specific deployment (instantané, pour les tests)
-            log.info(`\n[Deploy] Enregistrement pour le serveur ${guildId}...`);
+            log.info(`\n[Deploy] Registering for guild ${guildId}...`);
             const data = await rest.put(
                 Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID, guildId),
                 { body: commands },
             );
-            log.info(`[Deploy] ✅ ${data.length} commandes enregistrées (serveur).`);
+            log.info(`[Deploy] ✅ ${data.length} commands registered (guild).`);
         } else {
             // Global deployment (peut prendre jusqu'à 1h)
             log.info('\n[Deploy] Enregistrement global...');
-            log.info('[Deploy] ⚠ Les commandes globales peuvent prendre jusqu\'à 1h pour se propager.');
-            log.info('[Deploy] 💡 Astuce : ajoutez GUILD_ID=xxx dans .env pour un enregistrement instantané.\n');
+            log.info('[Deploy] ⚠ Global commands can take up to an hour to propagate.');
+            log.info('[Deploy] 💡 Tip: add GUILD_ID=xxx to .env for instant registration.\n');
             const data = await rest.put(
                 Routes.applicationCommands(process.env.DISCORD_CLIENT_ID),
                 { body: commands },
             );
-            log.info(`[Deploy] ✅ ${data.length} commandes enregistrées (global).`);
+            log.info(`[Deploy] ✅ ${data.length} commands registered (global).`);
         }
     } catch (error) {
-        log.error('[Deploy] ❌ Erreur :', error);
+        log.error('[Deploy] ❌ Error:', error);
     }
 })();

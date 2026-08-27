@@ -29,12 +29,12 @@ class PlaybackStateManager {
         });
 
         if (activeQueues.length === 0) {
-            log.info('[PlaybackState] Aucune lecture active nécessitant un fade-out. Sauvegarde directe.');
+            log.info('[PlaybackState] No active playback needs a fade-out. Saving directly.');
             this.saveState(player);
             return;
         }
 
-        log.info(`[PlaybackState] Démarrage du fade-out de ${fadeDurationMs / 1000}s avant sauvegarde...`);
+        log.info(`[PlaybackState] Starting the ${fadeDurationMs / 1000}s fade-out before saving...`);
 
         const steps = 35;
         const stepIntervalMs = Math.round(fadeDurationMs / steps);
@@ -54,7 +54,7 @@ class PlaybackStateManager {
                 // Le contrôleur de volume porte le ducking : il faut passer par lui,
                 // sinon ses propres rampes réécrivent le volume par-dessus la
                 // descente et le silence final n'est jamais atteint.
-                volumeController: this._volumeControllerDe(queue)
+                volumeController: this._volumeControllerFor(queue)
             };
         });
 
@@ -96,7 +96,7 @@ class PlaybackStateManager {
         // Sauvegarder l'état final avec le volume maintenu à 0 jusqu'à l'arrêt complet
         this.saveState(player);
 
-        log.info(`[PlaybackState] Fade-out exponentiel de ${elapsedMs}ms complété jusqu'à 0dB et état sauvegardé.`);
+        log.info(`[PlaybackState] Exponential fade-out of ${elapsedMs}ms completed down to 0dB, state saved.`);
     }
 
     /**
@@ -104,7 +104,7 @@ class PlaybackStateManager {
      * @param {object} queue
      * @returns {import('../audio/VolumeController')|null}
      */
-    _volumeControllerDe(queue) {
+    _volumeControllerFor(queue) {
         const guildId = queue?.guild?.id;
         const managers = queue?.player?.client?.duckingManagers;
         if (!guildId || !managers) return null;
@@ -124,7 +124,7 @@ class PlaybackStateManager {
             queue.node.setVolume(0);
         } catch (e) {}
 
-        const volumeController = this._volumeControllerDe(queue);
+        const volumeController = this._volumeControllerFor(queue);
         if (volumeController) {
             // Départ imposé à 0 et courbe perceptive : le contrôleur ne se fie pas
             // à `queue.node.volume`, qui vaut 100 par défaut tant qu'aucun flux
@@ -252,7 +252,7 @@ class PlaybackStateManager {
 
             writeJsonAtomic(this.filepath, data);
         } catch (err) {
-            log.error('[PlaybackState] Erreur lors de la sauvegarde :', err.message);
+            log.error('[PlaybackState] Error while saving:', err.message);
         }
     }
 
@@ -273,9 +273,9 @@ class PlaybackStateManager {
         const data = readJsonSafe(this.filepath, '[PlaybackState]');
         if (!data) return;
         try {
-            log.info('[PlaybackState] Restauration des files de lecture...');
+            log.info('[PlaybackState] Restoring the playback queues...');
             if (isRestart) {
-                log.info('[PlaybackState] Reprise après redémarrage : fade-in de démarrage ignoré.');
+                log.info('[PlaybackState] Resuming after a restart: startup fade-in skipped.');
             }
 
             // Écouteur pour la restauration silencieuse et la reprise en temps réel (sans coupure ni saut en arrière)
@@ -292,11 +292,11 @@ class PlaybackStateManager {
 
                     if (progress > 0) {
                         queue.restoreProgress = 0; // Éviter les boucles lors des événements suivants
-                        log.info(`[PlaybackState] Restauration : repositionnement immédiat à ${progress}ms...`);
+                        log.info(`[PlaybackState] Restoring: immediate reseek to ${progress}ms...`);
                         try {
                             queue.node.seek(progress);
                         } catch (seekErr) {
-                            log.error('[PlaybackState] Erreur seek :', seekErr.message);
+                            log.error('[PlaybackState] Seek error:', seekErr.message);
                         }
                         
                         setTimeout(() => {
@@ -309,16 +309,16 @@ class PlaybackStateManager {
                                 if (!shouldBePaused) {
                                     queue.node.setPaused(false);
                                     if (fadeinEnabled && fadeinDurationMs > 0) {
-                                        log.info(`[PlaybackState] Restauration terminée : démarrage du fade-in de ${fadeinDurationMs / 1000}s vers ${targetVol}%...`);
+                                        log.info(`[PlaybackState] Restore finished: starting the ${fadeinDurationMs / 1000}s fade-in towards ${targetVol}%...`);
                                         this.fadeInVolume(queue, targetVol, fadeinDurationMs);
                                     } else {
                                         queue.node.setVolume(targetVol);
-                                        log.info(`[PlaybackState] Restauration terminée : reprise immédiate de la lecture à ${progress}ms (volume: ${targetVol}%).`);
+                                        log.info(`[PlaybackState] Restore finished: playback resumed immediately at ${progress}ms (volume: ${targetVol}%).`);
                                     }
                                 } else {
                                     queue.node.setPaused(true);
                                     queue.node.setVolume(targetVol);
-                                    log.info(`[PlaybackState] Restauration terminée : en pause à ${progress}ms (volume: ${targetVol}%).`);
+                                    log.info(`[PlaybackState] Restore finished: paused at ${progress}ms (volume: ${targetVol}%).`);
                                 }
                                 
                                 queue.restorePaused = false;
@@ -327,7 +327,7 @@ class PlaybackStateManager {
                                     player.events.off('playerStart', onRestorePlayerStart);
                                 }
                             } catch (volErr) {
-                                log.error('[PlaybackState] Erreur finalisation seek :', volErr.message);
+                                log.error('[PlaybackState] Seek finalisation error:', volErr.message);
                             }
                         }, 1000);
                     } else {
@@ -341,7 +341,7 @@ class PlaybackStateManager {
                                 if (!shouldBePaused) {
                                     queue.node.setPaused(false);
                                     if (fadeinEnabled && fadeinDurationMs > 0) {
-                                        log.info(`[PlaybackState] Restauration terminée : démarrage du fade-in de ${fadeinDurationMs / 1000}s vers ${targetVol}%...`);
+                                        log.info(`[PlaybackState] Restore finished: starting the ${fadeinDurationMs / 1000}s fade-in towards ${targetVol}%...`);
                                         this.fadeInVolume(queue, targetVol, fadeinDurationMs);
                                     } else {
                                         queue.node.setVolume(targetVol);
@@ -356,7 +356,7 @@ class PlaybackStateManager {
                                     player.events.off('playerStart', onRestorePlayerStart);
                                 }
                             } catch (volErr) {
-                                log.error('[PlaybackState] Erreur finalisation sans seek :', volErr.message);
+                                log.error('[PlaybackState] Error finalising without a seek:', volErr.message);
                             }
                         }, 500);
                     }
@@ -367,7 +367,7 @@ class PlaybackStateManager {
             for (const [guildId, state] of Object.entries(data)) {
                 const guild = client.guilds.cache.get(guildId);
                 if (!guild) {
-                    log.info(`[PlaybackState] Guilde ${guildId} non trouvée dans le cache.`);
+                    log.info(`[PlaybackState] Guild ${guildId} not found in the cache.`);
                     continue;
                 }
 
@@ -412,15 +412,15 @@ class PlaybackStateManager {
 
                 if (channelReachable) {
                     if (defaultChannelId && defaultChannelId === voiceChannel.id) {
-                        log.info(`[PlaybackState] Restauration de la connexion vocale pour la guilde ${guildId} sur le salon par défaut: ${voiceChannel.name}...`);
+                        log.info(`[PlaybackState] Restoring the voice connection for guild ${guildId} on the default channel: ${voiceChannel.name}...`);
                     } else {
-                        log.info(`[PlaybackState] Restauration de la connexion vocale pour la guilde ${guildId} sur le salon ${voiceChannel.name}...`);
+                        log.info(`[PlaybackState] Restoring the voice connection for guild ${guildId} on channel ${voiceChannel.name}...`);
                     }
                 } else if (voiceChannel) {
-                    log.info(`[PlaybackState] Salon « ${voiceChannel.name} » désert : `
-                        + `la lecture de la guilde ${guildId} est restaurée en attente d'un auditeur.`);
+                    log.info(`[PlaybackState] Channel « ${voiceChannel.name} » deserted: `
+                        + `playback for guild ${guildId} is restored and waiting for a listener.`);
                 } else {
-                    log.info(`[PlaybackState] Restauration de la file virtuelle pour la guilde ${guildId} (sans salon vocal)...`);
+                    log.info(`[PlaybackState] Restoring the virtual queue for guild ${guildId} (no voice channel)...`);
                 }
 
                 try {
@@ -479,7 +479,7 @@ class PlaybackStateManager {
                     // Le contrôleur de volume doit connaître ce point de départ :
                     // c'est lui qui pilotera le fade-in, et `queue.node.volume` ne
                     // lui répondrait pas 0 tant qu'aucun flux n'est branché.
-                    const volumeControllerInitial = this._volumeControllerDe(queue);
+                    const volumeControllerInitial = this._volumeControllerFor(queue);
                     if (volumeControllerInitial) {
                         volumeControllerInitial._setVolumeImmediate(initialQueueVol);
                     }
@@ -494,8 +494,8 @@ class PlaybackStateManager {
                             : 5;
                         if (durationSeconds > 0) {
                             queue.pendingStartupFadein = { durationMs: durationSeconds * 1000 };
-                            log.info(`[PlaybackState] Fade-in de ${durationSeconds}s mis en attente : `
-                                + 'il débutera à l\'ouverture du tableau de bord (diffusion personnelle).');
+                            log.info(`[PlaybackState] ${durationSeconds}s fade-in put on hold: `
+                                + 'it will start when the dashboard opens (personal broadcast).');
                         }
                     }
 
@@ -505,7 +505,7 @@ class PlaybackStateManager {
                             try {
                                 queue.setRepeatMode(activeChannelState.repeatMode);
                             } catch (err) {
-                                log.error(`[PlaybackState] Erreur restauration repeatMode pour guild ${guildId} :`, err.message);
+                                log.error(`[PlaybackState] Error restoring repeatMode for guild ${guildId}:`, err.message);
                             }
                         }
 
@@ -567,7 +567,7 @@ class PlaybackStateManager {
                                 const elapsedSinceSave = Date.now() - savedAt;
                                 if (elapsedSinceSave > 0 && elapsedSinceSave < 300000) {
                                     calculatedProgress += elapsedSinceSave;
-                                    log.info(`[PlaybackState] Restauration temps réel : +${elapsedSinceSave}ms ajustées pour compenser le redémarrage (nouveau minutage: ${calculatedProgress}ms).`);
+                                    log.info(`[PlaybackState] Real-time restore: +${elapsedSinceSave}ms adjusted to make up for the restart (new timing: ${calculatedProgress}ms).`);
                                 }
                             }
 
@@ -577,7 +577,7 @@ class PlaybackStateManager {
                                 queue.virtualIsPaused = activeChannelState.isPaused !== undefined ? activeChannelState.isPaused : true;
                                 queue.virtualIsPlaying = activeChannelState.isPlaying !== undefined ? activeChannelState.isPlaying : false;
                                 queue.virtualLastUpdated = Date.now();
-                                log.info(`[PlaybackState] Restauration virtuelle terminée : ${track.title} à ${queue.virtualProgressMs}ms (pause: ${queue.virtualIsPaused})`);
+                                log.info(`[PlaybackState] Virtual restore finished: ${track.title} at ${queue.virtualProgressMs}ms (paused: ${queue.virtualIsPaused})`);
                             } else if (!channelReachable) {
                                 // Pas de connexion vocale, donc pas de lecteur où
                                 // remonter la piste. Elle est posée directement
@@ -589,8 +589,8 @@ class PlaybackStateManager {
                                     positionMs: calculatedProgress,
                                     playing: !!activeChannelState.isPlaying && !activeChannelState.isPaused
                                 });
-                                log.info(`[PlaybackState] Lecture figée à ${calculatedProgress}ms : `
-                                    + `${track.title} reprendra à l'arrivée d'un auditeur.`);
+                                log.info(`[PlaybackState] Playback frozen at ${calculatedProgress}ms: `
+                                    + `${track.title} will resume when a listener arrives.`);
                             } else {
                                 queue.restorePaused = true;
                                 queue.restoreProgress = calculatedProgress;
@@ -636,7 +636,7 @@ class PlaybackStateManager {
                         }
                     }
                 } catch (restErr) {
-                    log.error(`[PlaybackState] Erreur de restauration pour la guilde ${guildId} :`, restErr.message);
+                    log.error(`[PlaybackState] Restore error for guild ${guildId}:`, restErr.message);
                     // S'assurer de restaurer le volume et désactiver le flag en cas d'erreur de restauration
                     try {
                         const settings = require('./Database').getSettings(guildId);
@@ -649,7 +649,7 @@ class PlaybackStateManager {
                 }
             }
         } catch (err) {
-            log.error('[PlaybackState] Erreur globale lors de la restauration :', err.message);
+            log.error('[PlaybackState] Global error during the restore:', err.message);
         }
     }
 }

@@ -271,7 +271,7 @@ window.MusicPlayer.initCardsDragAndDrop = function() {
                     window.MusicPlayer.sendWS({ type: 'playNow', data: { url: dragData.url } });
                 }
             } catch (err) {
-                console.error('[PlayerCardDrop] Erreur:', err);
+                console.error('[PlayerCardDrop] Error:', err);
             }
         });
     }
@@ -340,7 +340,7 @@ window.MusicPlayer.initCardsDragAndDrop = function() {
                 }
                 if (!dragData) dragData = window.MusicPlayer.activeDragData;
 
-                const logMsg = `[DragDrop QueueCard] Dépôt reçu sur la carte file d'attente. Morceau: "${dragData ? dragData.title : 'inconnu'}"`;
+                const logMsg = `[DragDrop QueueCard] Drop received on the pending queue card. Track: "${dragData ? dragData.title : 'unknown'}"`;
                 console.log(logMsg);
                 if (typeof window.MusicPlayer.sendWS === 'function') {
                     window.MusicPlayer.sendWS({ type: 'clientLog', data: { source: 'DragDrop-QueueCard', message: logMsg } });
@@ -364,7 +364,7 @@ window.MusicPlayer.initCardsDragAndDrop = function() {
                     }
                 }
             } catch (err) {
-                console.error('[QueueCardDrop] Erreur:', err);
+                console.error('[QueueCardDrop] Error:', err);
             }
         });
     }
@@ -428,7 +428,7 @@ window.MusicPlayer.updateQueueUI = function() {
                 }
                 if (!dragData) dragData = window.MusicPlayer.activeDragData;
 
-                const logMsg = `[DragDrop Queue] Dépôt reçu sur la file d'attente. Morceau: "${dragData ? dragData.title : 'inconnu'}" (source: ${dragData ? dragData.source : 'aucune'})`;
+                const logMsg = `[DragDrop Queue] Drop received on the pending queue. Track: "${dragData ? dragData.title : 'unknown'}" (source: ${dragData ? dragData.source : 'none'})`;
                 console.log(logMsg);
                 if (typeof window.MusicPlayer.sendWS === 'function') {
                     window.MusicPlayer.sendWS({ type: 'clientLog', data: { source: 'DragDrop-Queue', message: logMsg } });
@@ -467,7 +467,7 @@ window.MusicPlayer.updateQueueUI = function() {
                     }
                 }
             } catch (err) {
-                console.error('[QueueDrop] Erreur:', err);
+                console.error('[QueueDrop] Error:', err);
             }
         });
     }
@@ -678,7 +678,7 @@ window.MusicPlayer.updateHistoryUI = function() {
                     }
                     e.dataTransfer.effectAllowed = 'copy';
 
-                    const logMsg = `[DragStart History] Début de glissement : "${track.title}" (${track.url})`;
+                    const logMsg = `[DragStart History] Drag started: "${track.title}" (${track.url})`;
                     console.log(logMsg);
                     if (typeof window.MusicPlayer.sendWS === 'function') {
                         window.MusicPlayer.sendWS({ type: 'clientLog', data: { source: 'DragDrop-History', message: logMsg } });

@@ -159,14 +159,14 @@
      * se réduit du mauvais côté — du texte qui passe sous l'encoche —, il
      * suffit de les échanger.
      */
-    const ENCOCHE_A_90 = 'gauche';
-    const ENCOCHE_A_270 = 'droite';
+    const NOTCH_AT_90 = 'left';
+    const NOTCH_AT_270 = 'right';
 
     /**
      * Où se trouve l'encoche, si on peut l'établir.
-     * @returns {'haut'|'bas'|'gauche'|'droite'|null} null si indéterminable.
+     * @returns {'top'|'bottom'|'left'|'right'|null} null si indéterminable.
      */
-    function encocheProbable() {
+    function probableNotch() {
         const o = window.screen && window.screen.orientation;
         // Absent avant iOS 16.4, entre autres. `window.orientation`, déprécié,
         // porte une convention de signe différente : mieux vaut ne rien dire
@@ -178,21 +178,21 @@
 
         // L'orientation naturelle est celle qu'on retrouve à 0°. Née en
         // paysage, l'hypothèse de l'encoche en haut du portrait ne tient plus.
-        const enPortrait = o.type.indexOf('portrait') === 0;
-        const droit = angle === 0 || angle === 180;
-        if (!(droit ? enPortrait : !enPortrait)) return null;
+        const isPortrait = o.type.indexOf('portrait') === 0;
+        const upright = angle === 0 || angle === 180;
+        if (!(upright ? isPortrait : !isPortrait)) return null;
 
-        if (angle === 0) return 'haut';
-        if (angle === 180) return 'bas';
-        return angle === 90 ? ENCOCHE_A_90 : ENCOCHE_A_270;
+        if (angle === 0) return 'top';
+        if (angle === 180) return 'bottom';
+        return angle === 90 ? NOTCH_AT_90 : NOTCH_AT_270;
     }
 
     /** Reporte le côté déduit sur `<html>`, ou retire l'attribut. */
-    function poserEncoche() {
+    function setNotch() {
         const root = document.documentElement;
-        const cote = encocheProbable();
-        if (cote) root.setAttribute('data-encoche', cote);
-        else root.removeAttribute('data-encoche');
+        const side = probableNotch();
+        if (side) root.setAttribute('data-notch', side);
+        else root.removeAttribute('data-notch');
     }
 
     /**
@@ -214,7 +214,7 @@
         if (notify && previous !== effective) {
             listeners.forEach((fn) => {
                 try { fn(effective, previous); } catch (e) {
-                    console.error('[deviceMode] Abonné en erreur :', e);
+                    console.error('[deviceMode] Subscriber threw:', e);
                 }
             });
         }
@@ -267,7 +267,7 @@
 
     choice = readStoredChoice();
     apply(false);
-    poserEncoche();
+    setNotch();
 
     // Une rotation ou un redimensionnement peut faire basculer d'un mode à
     // l'autre — mais en `auto` seulement, un choix explicite ne devant jamais
@@ -277,7 +277,7 @@
     const reevaluate = () => {
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(() => {
-            poserEncoche();
+            setNotch();
             if (choice === 'auto') apply();
         }, 150);
     };

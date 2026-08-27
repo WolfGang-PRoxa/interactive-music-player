@@ -39,7 +39,7 @@ async function handleListVersions(ctx) {
     try {
         payload = await versioning.catalog();
     } catch (err) {
-        log.error('[Versions] Lecture du catalogue impossible :', err.message);
+        log.error('[Versions] Cannot read the catalog:', err.message);
         payload = { releases: [], error: { message: err.message, status: null } };
     }
 
@@ -65,14 +65,14 @@ async function handleInstallVersion(ctx) {
     const tag = String((data && data.tag) || '').trim();
     if (!tag) {
         return broadcast(webServer, 'versionProgress', {
-            phase: 'erreur',
+            phase: 'error',
             message: 'Aucune version sélectionnée.',
         });
     }
 
     if (installInProgress) {
         return broadcast(webServer, 'versionProgress', {
-            phase: 'erreur',
+            phase: 'error',
             tag,
             message: `Une installation est déjà en cours (${installInProgress}).`,
         });
@@ -80,7 +80,7 @@ async function handleInstallVersion(ctx) {
 
     if (versioning.isCurrent(tag)) {
         return broadcast(webServer, 'versionProgress', {
-            phase: 'deja',
+            phase: 'already',
             tag,
             message: 'Cette version est déjà celle qui tourne.',
         });
@@ -93,26 +93,26 @@ async function handleInstallVersion(ctx) {
                 broadcast(webServer, 'versionProgress', { tag, ...step });
             });
             log.info(
-                `[Versions] Bascule vers ${tag} (${result.alreadyInstalled ? 'déjà installée' : 'fraîchement installée'}).`
+                `[Versions] Switching to ${tag} (${result.alreadyInstalled ? 'already installed' : 'freshly installed'}).`
             );
         }
 
         const target = versioning.resolveEntryPoint(tag);
 
-        broadcast(webServer, 'versionProgress', { phase: 'redemarrage', tag });
+        broadcast(webServer, 'versionProgress', { phase: 'restart', tag });
         // Le tableau de bord sait déjà afficher le voile de redémarrage sur ce
         // message : la bascule de version réutilise le même chemin que le
         // redémarrage ordinaire.
         broadcast(webServer, 'status', { status: 'restarting' });
 
-        log.info(`[Versions] Redémarrage sur ${target.type === 'dev' ? 'la version de développement' : tag}.`);
+        log.info(`[Versions] Restarting on ${target.type === 'dev' ? 'the development version' : tag}.`);
         // Laisse aux sockets le temps d'écouler les deux messages ci-dessus
         // avant que le serveur ne se ferme sous eux.
         setTimeout(() => restartProcess(webServer, { entryPoint: target.entryPoint }), 250);
     } catch (err) {
         installInProgress = null;
-        log.error(`[Versions] Échec de l'installation de ${tag} :`, err.message);
-        broadcast(webServer, 'versionProgress', { phase: 'erreur', tag, message: err.message });
+        log.error(`[Versions] Failed to install ${tag}:`, err.message);
+        broadcast(webServer, 'versionProgress', { phase: 'error', tag, message: err.message });
     }
 }
 
@@ -160,7 +160,7 @@ async function handleUninstallVersion(ctx) {
     try {
         versioning.uninstall(tag);
     } catch (err) {
-        log.error(`[Versions] Échec de la désinstallation de ${tag} :`, err.message);
+        log.error(`[Versions] Failed to uninstall ${tag}:`, err.message);
         return broadcast(webServer, 'versionRemoved', { tag, message: err.message });
     }
 
@@ -173,7 +173,7 @@ async function handleUninstallVersion(ctx) {
     } catch (err) {
         // Le catalogue n'est qu'un rafraîchissement de confort : la
         // désinstallation, elle, a bien eu lieu et a déjà été annoncée.
-        log.warn(`[Versions] Catalogue illisible après désinstallation : ${err.message}`);
+        log.warn(`[Versions] Catalog unreadable after the uninstall: ${err.message}`);
     }
 }
 

@@ -60,7 +60,7 @@ async function handlePlay(ctx) {
             // ne décide pas de ce qu'on écoute. Si une playlist occupe le
             // lecteur, elle le reste, et les pistes rejoignent la file mise de
             // côté. Seul « Jouer maintenant » change la source de lecture.
-            const versFileEnAttente = playlistIsSource(settings);
+            const toPendingQueue = playlistIsSource(settings);
 
             const fs = require('fs');
             const path = require('path');
@@ -104,7 +104,7 @@ async function handlePlay(ctx) {
                             const track = searchResult.tracks[0];
                             if (track) {
                                 track.title = getCleanFilename(filePath);
-                                if (versFileEnAttente) {
+                                if (toPendingQueue) {
                                     toStore.push(track);
                                     continue;
                                 }
@@ -300,7 +300,7 @@ function handleSkip(ctx) {
         // de n'importe lequel.
         const isAutomaticAnnounce = !!(data && (data.auto || data.startProgressMs > 0));
         if (isAutomaticAnnounce && ws && !webServer.isPilot(ws, currentGuildId)) {
-            log.debug('[WebServer] Fin de piste annoncée par un tableau de bord non pilote : ignorée.');
+            log.debug('[WebServer] End of track announced by a non-pilot dashboard: ignored.');
             return;
         }
 
@@ -316,7 +316,7 @@ function handleSkip(ctx) {
             }
             if (queue && (queue.isPlaying() || queue.currentTrack)) {
                 if (queue.isPendingTransition) {
-                    log.info(`[WebServer] Skip ignoré car une transition est déjà en cours.`);
+                    log.info(`[WebServer] Skip ignored because a transition is already under way.`);
                     return;
                 }
 
@@ -324,7 +324,7 @@ function handleSkip(ctx) {
                 if (queue.transitionTimeout) clearTimeout(queue.transitionTimeout);
                 queue.transitionTimeout = setTimeout(() => {
                     queue.isPendingTransition = false;
-                    log.info('[WebServer] Timeout de transition (skip) : réinitialisation de isPendingTransition à false.');
+                    log.info('[WebServer] Transition timeout (skip): resetting isPendingTransition to false.');
                     webServer.broadcastState(currentGuildId);
                 }, 8000);
 
@@ -337,7 +337,7 @@ function handleSkip(ctx) {
                         clearTimeout(queue.transitionTimeout);
                         queue.transitionTimeout = null;
                     }
-                    log.error('[WebServer] Erreur skip :', err.message);
+                    log.error('[WebServer] skip error:', err.message);
                     webServer.broadcastState(currentGuildId);
                 }
             }
@@ -407,7 +407,7 @@ async function handlePrevious(ctx) {
             }
             if (queue && queue.history) {
                 if (queue.isPendingTransition) {
-                    log.info(`[WebServer] Previous ignoré car une transition est déjà en cours.`);
+                    log.info(`[WebServer] Previous ignored because a transition is already under way.`);
                     return;
                 }
 
@@ -415,7 +415,7 @@ async function handlePrevious(ctx) {
                 if (queue.transitionTimeout) clearTimeout(queue.transitionTimeout);
                 queue.transitionTimeout = setTimeout(() => {
                     queue.isPendingTransition = false;
-                    log.info('[WebServer] Timeout de transition (previous) : réinitialisation de isPendingTransition à false.');
+                    log.info('[WebServer] Transition timeout (previous): resetting isPendingTransition to false.');
                     webServer.broadcastState(currentGuildId);
                 }, 8000);
 
@@ -429,7 +429,7 @@ async function handlePrevious(ctx) {
                         clearTimeout(queue.transitionTimeout);
                         queue.transitionTimeout = null;
                     }
-                    log.error('[WebServer] Erreur previous :', err.message);
+                    log.error('[WebServer] previous error:', err.message);
                     webServer.broadcastState(currentGuildId);
                 }
             }
@@ -462,7 +462,7 @@ function handleSetPlayMode(ctx) {
                 webServer.broadcastState(currentGuildId);
                 playbackStateManager.saveState(player);
             } catch (err) {
-                log.error('[WebServer] Erreur setPlayMode :', err.message);
+                log.error('[WebServer] setPlayMode error:', err.message);
             }
         }
 }
@@ -493,7 +493,7 @@ async function handleStop(ctx) {
                     webServer.broadcastState(currentGuildId);
                     playbackStateManager.saveState(player);
                 } catch (err) {
-                    log.error('[WebServer] Erreur stop :', err.message);
+                    log.error('[WebServer] stop error:', err.message);
                 }
             }
         }
@@ -532,7 +532,7 @@ async function handleSeek(ctx) {
                     webServer.broadcastState(currentGuildId);
                     playbackStateManager.saveState(player);
                 } catch (seekErr) {
-                    log.error('[WebServer] Erreur seek :', seekErr.message);
+                    log.error('[WebServer] seek error:', seekErr.message);
                 }
             }
         }

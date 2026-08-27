@@ -542,6 +542,21 @@ input:checked + .slider .switch-text-off {
     -webkit-user-select: none;
     box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.4);
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    /*
+     * Le geste horizontal appartient au pad, le vertical à la page.
+     *
+     * Sans cette ligne, le navigateur tactile garde les deux axes pour son
+     * défilement : il laisse passer le `pointerdown`, puis reprend la main au
+     * premier mouvement et émet `pointercancel`. La roulette suivait le doigt
+     * le temps d'une image avant de le lâcher — le pire des deux mondes, un
+     * glissement qui commence et n'aboutit jamais.
+     *
+     * `pan-y` cède l'axe vertical et garde l'horizontal, ce qui est exactement
+     * le partage voulu : la vitesse se règle en travers, et un doigt qui monte
+     * ou descend sur le pad fait défiler la page comme ailleurs. `none`
+     * l'aurait piégé, sur 140 px de large au milieu d'une carte.
+     */
+    touch-action: pan-y;
 }
 
 .speed-pad-container:hover {
@@ -668,11 +683,11 @@ input:checked + .slider .switch-text-off {
     box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.4), 0 0 10px rgba(88, 101, 242, 0.4);
 }
 
-.speed-pad-container.state-centieme {
+.speed-pad-container.state-hundredth {
     border-color: var(--c-violet);
     box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.4), 0 0 6px rgba(142, 68, 173, 0.2);
 }
-.speed-pad-container.state-centieme:hover {
+.speed-pad-container.state-hundredth:hover {
     border-color: var(--c-violet);
     box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.4), 0 0 10px rgba(142, 68, 173, 0.4);
 }

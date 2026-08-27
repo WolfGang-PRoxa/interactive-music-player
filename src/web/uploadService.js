@@ -43,7 +43,7 @@ function cleanIncomingUploads() {
         // Dossier absent : rien à nettoyer
     }
     if (removed > 0) {
-        log.info(`[Upload] ${removed} transfert(s) interrompu(s) supprimé(s).`);
+        log.info(`[Upload] ${removed} interrupted transfer(s) deleted.`);
     }
     return removed;
 }
@@ -106,7 +106,7 @@ function receiveUpload(req, { name, maxBytes }) {
 
             if (received === 0) {
                 fs.promises.unlink(tmpPath).catch(() => {});
-                const err = new Error('Fichier vide');
+                const err = new Error('Empty file');
                 err.statusCode = 400;
                 return reject(err);
             }
@@ -118,7 +118,7 @@ function receiveUpload(req, { name, maxBytes }) {
                 if (fs.existsSync(filePath)) {
                     // Contenu déjà présent : on garde l'exemplaire existant
                     fs.unlinkSync(tmpPath);
-                    log.info(`[Upload] "${name}" est déjà présent, copie évitée.`);
+                    log.info(`[Upload] "${name}" is already there, copy avoided.`);
                     return resolve({ filePath, deduplicated: true, bytes: received });
                 }
 

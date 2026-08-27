@@ -473,7 +473,7 @@ function createApiRouter(webServer) {
      * peut donc pas servir à lire ailleurs. La réponse renvoie la langue, pour
      * que le lecteur sache dans laquelle il lit.
      */
-    router.get('/docs/contenu', (req, res) => {
+    router.get('/docs/content', (req, res) => {
         const requestedId = String(req.query.id || '');
         const lang = resolveDocsLang(req.query.lang);
         const document = listDocuments(lang).find((d) => d.id === requestedId);
@@ -484,7 +484,7 @@ function createApiRouter(webServer) {
         try {
             source = fs.readFileSync(docPath, 'utf8');
         } catch (err) {
-            log.error(`[WebServer Docs] Lecture impossible pour ${lang}/${document.id} :`, err.message);
+            log.error(`[WebServer Docs] Cannot read ${lang}/${document.id}:`, err.message);
             return res.status(500).json({ error: 'Document illisible' });
         }
 
@@ -541,7 +541,7 @@ function createApiRouter(webServer) {
         }
 
         if (!req.headers.range || req.headers.range.startsWith('bytes=0-')) {
-            log.info(`[WebServer Stream] Démarrage du stream pour: ${track.title}`);
+            log.info(`[WebServer Stream] Starting the stream for: ${track.title}`);
         }
 
         // Si la piste est déjà dans le cache de préchargement
@@ -550,7 +550,7 @@ function createApiRouter(webServer) {
             try {
                 serveFileWithRange(req, res, cachedPath, 'audio/mpeg');
             } catch (err) {
-                log.error('[WebServer Stream] Erreur lecture fichier cache de préchargement:', err.message);
+                log.error('[WebServer Stream] Error reading the preload cache file:', err.message);
                 res.status(500).send(err.message);
             }
             return;
@@ -561,7 +561,7 @@ function createApiRouter(webServer) {
             try {
                 serveFileWithRange(req, res, localPath, mimeFor(localPath));
             } catch (err) {
-                log.error('[WebServer Stream] Erreur lecture fichier local:', err.message);
+                log.error('[WebServer Stream] Error reading the local file:', err.message);
                 res.status(500).send(err.message);
             }
             return;
@@ -569,7 +569,7 @@ function createApiRouter(webServer) {
 
         // La piste désigne un fichier disque, mais hors des racines autorisées.
         if (track.queryType === 'file' || !/^https?:\/\//i.test(track.url || '')) {
-            log.warn(`[WebServer Stream] Accès refusé, chemin hors racines autorisées : ${track.url}`);
+            log.warn(`[WebServer Stream] Access denied, path outside the allowed roots: ${track.url}`);
             return res.status(403).send('Chemin de fichier non autorisé');
         }
 
@@ -579,7 +579,7 @@ function createApiRouter(webServer) {
                 try {
                     if (await ext.validate(track.url, track.queryType)) {
                         track.extractor = ext;
-                        log.info(`[WebServer Stream] Extractor résolu dynamiquement pour ${track.title} : ${ext.constructor.name}`);
+                        log.info(`[WebServer Stream] Extractor resolved on the fly for ${track.title}: ${ext.constructor.name}`);
                         break;
                     }
                 } catch (e) {}
@@ -632,7 +632,7 @@ function createApiRouter(webServer) {
                     return;
                 }
             } catch (err) {
-                log.error('[WebServer Stream] Erreur extraction/transcodage flux distant:', err.message);
+                log.error('[WebServer Stream] Remote stream extraction/transcoding error:', err.message);
                 res.status(500).send(err.message);
                 return;
             }
@@ -724,7 +724,7 @@ function createApiRouter(webServer) {
             if (localPath) {
                 ffmpegInput = localPath;
             } else if (track.queryType === 'file' || !/^https?:\/\//i.test(track.url || '')) {
-                log.warn(`[WebServer Download] Accès refusé, chemin hors racines autorisées : ${track.url}`);
+                log.warn(`[WebServer Download] Access denied, path outside the allowed roots: ${track.url}`);
                 return res.status(403).send('Chemin de fichier non autorisé');
             }
         }
@@ -842,7 +842,7 @@ function createApiRouter(webServer) {
             }
 
             ffmpegProcess.stdout.pipe(res);
-            log.info(`[WebServer Download] Démarrage du téléchargement transcodé (${fileExt.toUpperCase()}) pour: ${track.title}`);
+            log.info(`[WebServer Download] Starting the transcoded download (${fileExt.toUpperCase()}) for: ${track.title}`);
 
             req.on('close', () => {
                 try { ffmpegProcess.kill(); } catch (e) {}
@@ -907,8 +907,8 @@ function createApiRouter(webServer) {
             const optimal = pickVideoFormat(formats, targetHeight);
 
             if (optimal.height && optimal.height !== targetHeight) {
-                log.info(`[WebServer Video-Info] ${targetHeight}p indisponible dans un codec lisible pour `
-                    + `« ${entry.title || targetQuery} » : ${optimal.height}p (${optimal.vcodec || '?'}) servi à la place.`);
+                log.info(`[WebServer Video-Info] ${targetHeight}p unavailable in a readable codec for `
+                    + `« ${entry.title || targetQuery} »: ${optimal.height}p (${optimal.vcodec || '?'}) served instead.`);
             }
 
             const data = {
@@ -926,7 +926,7 @@ function createApiRouter(webServer) {
             videoCache.set(cacheKey, { timestamp: Date.now(), data });
             res.json(data);
         } catch (err) {
-            log.error('[WebServer Video-Info] Erreur extraction vidéo:', err.message);
+            log.error('[WebServer Video-Info] Video extraction error:', err.message);
             res.status(500).json({ error: err.message });
         }
     });
@@ -944,7 +944,7 @@ function createApiRouter(webServer) {
         if (!currentGuildId) return res.status(400).json({ error: 'Guild non spécifiée' });
 
         if (!isAllowedMediaFilename(name)) {
-            log.warn(`[WebServer Upload] Extension refusée : ${name}`);
+            log.warn(`[WebServer Upload] Extension refused: ${name}`);
             return res.status(415).json({ error: 'Type de fichier non supporté' });
         }
 
@@ -955,7 +955,7 @@ function createApiRouter(webServer) {
                 maxBytes: MAX_UPLOAD_MB * 1024 * 1024,
             });
         } catch (err) {
-            log.warn(`[WebServer Upload] Transfert de "${name}" échoué : ${err.message}`);
+            log.warn(`[WebServer Upload] Transfer of "${name}" failed: ${err.message}`);
             if (!res.headersSent) {
                 res.status(err.statusCode || 500).json({ error: err.message });
             }
@@ -969,7 +969,7 @@ function createApiRouter(webServer) {
             await uploadService.processUploadedFile(stored.filePath, name, playlistId, currentGuildId, voiceChannelId, webServer, player, queue, target, defaultPlaylistName);
             res.json({ success: true, filePath: stored.filePath, name, deduplicated: stored.deduplicated });
         } catch (err) {
-            log.error('[WebServer Upload] Erreur traitement :', err);
+            log.error('[WebServer Upload] Processing error:', err);
             if (!res.headersSent) {
                 res.status(500).json({ error: err.message });
             }

@@ -716,11 +716,11 @@ body.touch-dragging * {
     transition: transform 0.24s ease;
 }
 
-[data-device-mode="phone"] .docs-body.docs-toc-ouvert .docs-toc {
+[data-device-mode="phone"] .docs-body.docs-toc-open .docs-toc {
     transform: none;
 }
 
-[data-device-mode="phone"] .docs-toc-voile {
+[data-device-mode="phone"] .docs-toc-scrim {
     display: block;
     position: absolute;
     inset: 0;
@@ -731,7 +731,7 @@ body.touch-dragging * {
     transition: opacity 0.24s ease;
 }
 
-[data-device-mode="phone"] .docs-body.docs-toc-ouvert .docs-toc-voile {
+[data-device-mode="phone"] .docs-body.docs-toc-open .docs-toc-scrim {
     opacity: 1;
     pointer-events: auto;
 }
@@ -775,7 +775,7 @@ body.touch-dragging * {
             border-right-width 0.24s ease;
     }
 
-    [data-device-mode="phone"] .docs-body.docs-toc-ouvert .docs-toc {
+    [data-device-mode="phone"] .docs-body.docs-toc-open .docs-toc {
         width: min(46vw, 258px);
         padding-left: max(0.7rem, env(safe-area-inset-left));
         padding-right: 0.7rem;
@@ -784,7 +784,7 @@ body.touch-dragging * {
         overflow-y: auto;
     }
 
-    [data-device-mode="phone"] .docs-toc-voile {
+    [data-device-mode="phone"] .docs-toc-scrim {
         display: none;
     }
 
@@ -799,7 +799,7 @@ body.touch-dragging * {
      * feuille du navigateur, pas à la règle précédente. Elle reprend celle du
      * palier des fenêtres basses, seul en vigueur sur un téléphone couché.
      */
-    [data-device-mode="phone"] .docs-body.docs-toc-ouvert .docs-reader {
+    [data-device-mode="phone"] .docs-body.docs-toc-open .docs-reader {
         padding-left: 0.4rem;
     }
 }
@@ -824,27 +824,27 @@ body.touch-dragging * {
  */
 @media (orientation: landscape) {
     /* Encoche à gauche : le bord droit n'a qu'un arrondi à dégager. */
-    [data-device-mode="phone"][data-encoche="gauche"] .docs-header,
-    [data-device-mode="phone"][data-encoche="gauche"] .docs-footer {
+    [data-device-mode="phone"][data-notch="left"] .docs-header,
+    [data-device-mode="phone"][data-notch="left"] .docs-footer {
         padding-right: 1.4rem;
     }
 
-    [data-device-mode="phone"][data-encoche="gauche"] .docs-reader {
+    [data-device-mode="phone"][data-notch="left"] .docs-reader {
         padding-right: 0.9rem;
     }
 
     /* Encoche à droite : symétrique, plus le sommaire qui longe ce bord-là. */
-    [data-device-mode="phone"][data-encoche="droite"] .docs-header,
-    [data-device-mode="phone"][data-encoche="droite"] .docs-footer {
+    [data-device-mode="phone"][data-notch="right"] .docs-header,
+    [data-device-mode="phone"][data-notch="right"] .docs-footer {
         padding-left: 1.4rem;
     }
 
-    [data-device-mode="phone"][data-encoche="droite"] .docs-reader {
+    [data-device-mode="phone"][data-notch="right"] .docs-reader {
         padding-left: 0.9rem;
     }
 
-    [data-device-mode="phone"][data-encoche="droite"] .docs-toc,
-    [data-device-mode="phone"][data-encoche="droite"] .docs-body.docs-toc-ouvert .docs-toc {
+    [data-device-mode="phone"][data-notch="right"] .docs-toc,
+    [data-device-mode="phone"][data-notch="right"] .docs-body.docs-toc-open .docs-toc {
         padding-left: 0.7rem;
     }
 }

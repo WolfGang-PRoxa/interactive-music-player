@@ -54,7 +54,7 @@ let failed = 0;
 let passed = 0;
 const check = (label, ok, detail = '') => {
     if (ok) { passed++; console.log(`  ok   ${label}${detail ? ` — ${detail}` : ''}`); }
-    else { failed++; console.log(`  ECHEC ${label}${detail ? ` — ${detail}` : ''}`); }
+    else { failed++; console.log(`  FAIL ${label}${detail ? ` — ${detail}` : ''}`); }
     return ok;
 };
 
@@ -91,7 +91,7 @@ function request(filePath, headers = {}) {
             }
         );
         req.on('error', reject);
-        req.setTimeout(15000, () => req.destroy(new Error('délai dépassé')));
+        req.setTimeout(15000, () => req.destroy(new Error('timed out')));
     });
 }
 
@@ -102,7 +102,7 @@ function waitFor(ms) {
 // --- Étage 1 : chargement de tous les modules -------------------------------
 
 function stageLoading() {
-    console.log('\n=== 1. Chargement des modules ===\n');
+    console.log('\n=== 1. Loading the modules ===\n');
     const modules = listModules();
     let loaded = 0;
 
@@ -114,20 +114,20 @@ function stageLoading() {
         try {
             const mod = require(path.join(ROOT, relative));
             if (mod === undefined || mod === null) {
-                check(relative, false, 'export vide');
+                check(relative, false, 'empty export');
             } else loaded++;
         } catch (err) {
             check(relative, false, err.message.split('\n')[0]);
         }
     }
-    check(`${loaded} modules chargés sans erreur`, failed === 0);
+    check(`${loaded} modules loaded without error`, failed === 0);
     return loaded;
 }
 
 // --- Étage 2 : le bot démarré pour de vrai ----------------------------------
 
 async function stageIntegration() {
-    console.log('\n=== 2. Démarrage du bot et interrogation ===\n');
+    console.log('\n=== 2. Starting the bot and querying it ===\n');
 
     const bot = cp.spawn(process.execPath, ['src/index.js'], {
         cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
@@ -150,34 +150,34 @@ async function stageIntegration() {
                 break;
             } catch (e) { await waitFor(500); }
         }
-        if (!check('le serveur web répond', alive, `port ${PORT}`)) return;
+        if (!check('the web server answers', alive, `port ${PORT}`)) return;
 
-        check('le bot annonce être prêt', /Prêt !/.test(output));
-        check('les commandes sont chargées', /commandes chargées/.test(output));
-        check("aucune erreur d'extracteur au démarrage", !/\[ERROR\s*\].*[Ee]xtractor/.test(output));
+        check('the bot announces it is ready', /Ready!/.test(output));
+        check('the commands are loaded', /commands loaded/.test(output));
+        check('no extractor error at startup', !/\[ERROR\s*\].*[Ee]xtractor/.test(output));
 
         const withoutToken = await request('/', { Accept: 'text/html' });
-        check('accès refusé sans jeton', withoutToken.code === 401, `HTTP ${withoutToken.code}`);
+        check('access denied without a token', withoutToken.code === 401, `HTTP ${withoutToken.code}`);
 
         const t = token();
         const withToken = await request(`/?token=${encodeURIComponent(t)}`, { Accept: 'text/html' });
-        check('jeton accepté', withToken.code === 302 || withToken.code === 200, `HTTP ${withToken.code}`);
+        check('token accepted', withToken.code === 302 || withToken.code === 200, `HTTP ${withToken.code}`);
 
         const page = await request('/', { Cookie: `dashboard_token=${t}` });
-        check('le tableau de bord est servi', page.code === 200 && page.fakeBody.includes('<title>'),
+        check('the dashboard is served', page.code === 200 && page.fakeBody.includes('<title>'),
             `${page.fakeBody.length} octets`);
 
         const state = await request('/api/state', { Cookie: `dashboard_token=${t}` });
-        check('/api/state répond', state.code === 200, `HTTP ${state.code}`);
+        check('/api/state answers', state.code === 200, `HTTP ${state.code}`);
 
         if (state.code === 200) {
             let data = null;
             try { data = JSON.parse(state.fakeBody); } catch (e) {}
-            if (check('/api/state rend du JSON', !!data)) {
+            if (check('/api/state returns JSON', !!data)) {
                 const missing = STATE_FIELDS.filter((c) => !(c in data));
-                check('tous les champs du protocole sont présents',
+                check('every protocol field is present',
                     missing.length === 0,
-                    missing.length ? `manquants : ${missing.join(', ')}` : `${STATE_FIELDS.length} champs`);
+                    missing.length ? `missing: ${missing.join(', ')}` : `${STATE_FIELDS.length} fields`);
             }
         }
 
@@ -210,34 +210,34 @@ async function stageWebSocket(t) {
         ws.on('error', () => { clearTimeout(timer); resolve(null); });
     });
 
-    if (!check('le WebSocket délivre un message state', !!message)) return;
+    if (!check('the WebSocket delivers a state message', !!message)) return;
 
     const missing = WS_STATE_FIELDS.filter((c) => !(c in message.data));
-    check('le state du WebSocket porte tous les champs',
+    check('the WebSocket state carries every field',
         missing.length === 0,
-        missing.length ? `manquants : ${missing.join(', ')}` : `${WS_STATE_FIELDS.length} champs`);
+        missing.length ? `missing: ${missing.join(', ')}` : `${WS_STATE_FIELDS.length} fields`);
 
     // Un tableau de bord seul connecté est nécessairement le pilote : c'est la
     // garantie que l'élection a bien lieu, et non que le champ existe.
-    check('le seul tableau de bord connecté est désigné pilote',
+    check('the only connected dashboard is designated pilot',
         message.data.pilot === true, String(message.data.pilot));
 }
 
 // --- Exécution --------------------------------------------------------------
 
 (async () => {
-    console.log('Test de fumée — interactive_music_player');
+    console.log('Smoke test — interactive_music_player');
 
     stageLoading();
     if (failed > 0) {
-        console.log('\nChargement en échec : le démarrage est inutile tant que ce n\'est pas réglé.');
+        console.log('\nLoading failed: starting up is pointless until this is fixed.');
     } else {
         await stageIntegration();
     }
 
-    console.log(`\n=== ${passed} réussite(s), ${failed} échec(s) ===`);
+    console.log(`\n=== ${passed} passed, ${failed} failed ===`);
     process.exit(failed === 0 ? 0 : 1);
 })().catch((err) => {
-    console.error('\nLe test de fumée a lui-même échoué :', err);
+    console.error('\nThe smoke test itself failed:', err);
     process.exit(1);
 });

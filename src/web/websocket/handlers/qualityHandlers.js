@@ -53,11 +53,11 @@ function handleSetTrackQuality(ctx) {
             // quand elle n'expose pas d'extracteur, comme pour les playlists.
             preloadManager.requalify({ url, title: data.title || url }, patch.audio);
         } catch (err) {
-            log.error('[WebServer] Erreur de requalification du préchargement :', err.message);
+            log.error('[WebServer] Preload requalification error:', err.message);
         }
     }
 
-    log.info(`[WebServer] Qualité de piste mise à jour (${Object.entries(patch).map(([k, v]) => `${k}=${v}`).join(', ')}) pour ${url}`);
+    log.info(`[WebServer] Track quality updated (${Object.entries(patch).map(([k, v]) => `${k}=${v}`).join(', ')}) for ${url}`);
     webServer.broadcastState(currentGuildId);
 }
 

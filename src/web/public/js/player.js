@@ -97,7 +97,7 @@ function isLocalFile(track) {
  * l'état renvoyé reste « en cours de lecture ».
  *
  * @param {{enLecture: boolean, salon: string|null}|null} attente
- * @param {(cle: string) => string} t
+ * @param {(key: string) => string} t
  */
 function showListenerWait(wait, t) {
     const notice = document.getElementById('playback-wait-notice');

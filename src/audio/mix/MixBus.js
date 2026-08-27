@@ -151,7 +151,7 @@ class MixBus extends Readable {
 
     /**
      * Enregistre l'horloge du moteur : appelée après chaque trame produite.
-     * @param {Function|null} rappel
+     * @param {Function|null} callback
      */
     onFrame(callback) {
         this._onFrame = callback;
@@ -200,7 +200,7 @@ class MixBus extends Readable {
                         try {
                             this._onFrame();
                         } catch (err) {
-                            this.emit('erreurMoteur', err);
+                            this.emit('engineError', err);
                         }
                     }
                 }

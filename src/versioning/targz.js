@@ -163,7 +163,7 @@ function extractTarGz(archive, destination, options = {}) {
             insideTarget === '..' ||
             insideTarget.startsWith(`..${path.sep}`);
         if (escapes) {
-            throw new Error(`Entrée d'archive hors du dossier de destination : ${rawName}`);
+            throw new Error(`Archive entry outside the destination folder: ${rawName}`);
         }
 
         if (typeFlag === '5') {
@@ -180,7 +180,7 @@ function extractTarGz(archive, destination, options = {}) {
     }
 
     if (files === 0) {
-        throw new Error('Archive vide ou illisible : aucun fichier extrait.');
+        throw new Error('Empty or unreadable archive: no file extracted.');
     }
 
     return { files, bytes };

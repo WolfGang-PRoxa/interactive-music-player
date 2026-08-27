@@ -22,7 +22,7 @@ let failed = 0;
 let passed = 0;
 const check = (label, ok, detail = '') => {
     if (ok) { passed++; console.log(`  ok    ${label}${detail ? ` — ${detail}` : ''}`); }
-    else { failed++; console.log(`  ECHEC ${label}${detail ? ` — ${detail}` : ''}`); }
+    else { failed++; console.log(`  FAIL ${label}${detail ? ` — ${detail}` : ''}`); }
 };
 
 /** Élément suffisant pour ce que dragPreview manipule. */
@@ -72,7 +72,7 @@ function load() {
     return { api: fakeWindow.MusicPlayer.dragPreview, dragstartHandler, fakeBody, fakeWindow };
 }
 
-console.log('dragPreview — construction de l\'aperçu\n');
+console.log('dragPreview — building the preview\n');
 
 const { api, dragstartHandler, fakeBody, fakeWindow } = load();
 
@@ -80,45 +80,45 @@ const child = fakeElement(['queue-index', 'is-dragging']);
 const source = fakeElement(['queue-item', 'is-dragging', 'drag-over'], [child]);
 const { node, rect } = api.build(source);
 
-check('un clone est rendu', !!node && node !== source);
-check('classe .drag-preview ajoutée', node.classList.contains('drag-preview'));
-check('.is-dragging retirée du clone', !node.classList.contains('is-dragging'));
-check('.drag-over retirée du clone', !node.classList.contains('drag-over'));
-check('la classe utile est conservée', node.classList.contains('queue-item'));
-check("l'élément source n'est pas modifié", source.classList.contains('is-dragging'));
-check('les descendants du clone sont nettoyés',
+check('a clone is produced', !!node && node !== source);
+check('.drag-preview class added', node.classList.contains('drag-preview'));
+check('.is-dragging removed from the clone', !node.classList.contains('is-dragging'));
+check('.drag-over removed from the clone', !node.classList.contains('drag-over'));
+check('the useful class is kept', node.classList.contains('queue-item'));
+check('the source element is left untouched', source.classList.contains('is-dragging'));
+check('the descendants of the clone are cleaned up',
     !node.children[0].classList.contains('is-dragging'));
-check("les descendants d'origine sont laissés intacts",
+check('the original descendants are left intact',
     child.classList.contains('is-dragging'),
-    'le clone ne doit jamais toucher au document');
-check('le rectangle est remonté', rect.width === 320 && rect.height === 64);
+    'the clone must never touch the document');
+check('the rectangle is reported back', rect.width === 320 && rect.height === 64);
 
-console.log('\ndragPreview — priorité des styles\n');
+console.log('\ndragPreview — style priority\n');
 
 const styles = node._styles;
-check('largeur figée en !important',
+check('width pinned with !important',
     styles.get('width')?.value === '320px' && styles.get('width')?.priority === 'important');
-check('transform neutralisé en !important',
+check('transform neutralised with !important',
     styles.get('transform')?.value === 'none' && styles.get('transform')?.priority === 'important',
-    'sinon le scale() de .is-dragging reprend la main');
-check('opacité forcée à 1 en !important',
+    'otherwise the scale() of .is-dragging takes over again');
+check('opacity forced to 1 with !important',
     styles.get('opacity')?.value === '1' && styles.get('opacity')?.priority === 'important');
-check('pointeurs neutralisés',
+check('pointer events neutralised',
     styles.get('pointer-events')?.value === 'none',
-    'sinon elementFromPoint ne verrait que l\'aperçu');
-check('transitions coupées', styles.get('transition')?.value === 'none');
+    'otherwise elementFromPoint would only ever see the preview');
+check('transitions switched off', styles.get('transition')?.value === 'none');
 
-console.log('\ndragPreview — déplacement\n');
+console.log('\ndragPreview — movement\n');
 
 api.moveTo(node, 500, 400, 20, 10);
 const t = node._styles.get('transform');
-check('translate appliqué', t?.value === 'translate(480px, 390px)', t?.value);
-check('  et en !important', t?.priority === 'important',
-    'la garantie qui manquait et figeait l\'aperçu dans un coin');
+check('translate applied', t?.value === 'translate(480px, 390px)', t?.value);
+check('  and with !important', t?.priority === 'important',
+    'the guarantee that was missing and pinned the preview in a corner');
 
-console.log('\ndragPreview — vignette du glisser à la souris\n');
+console.log('\ndragPreview — mouse drag thumbnail\n');
 
-check('un gestionnaire dragstart est posé en capture', typeof dragstartHandler === 'function');
+check('a dragstart handler is installed in capture phase', typeof dragstartHandler === 'function');
 
 let imageRequested = null;
 const event = {
@@ -132,20 +132,20 @@ const event = {
 fakeWindow.MusicPlayer.deviceMode = { isTouch: () => false };
 dragstartHandler(event);
 
-check('setDragImage est appelé à la souris', !!imageRequested);
-check('  décalage calculé depuis le coin de l\'élément',
+check('setDragImage is called for the mouse', !!imageRequested);
+check('  offset computed from the corner of the element',
     imageRequested && imageRequested.x === 50 && imageRequested.y === 30,
     imageRequested ? `${imageRequested.x}, ${imageRequested.y}` : '');
-check('  le clone est inséré pour être photographié', fakeBody._added.length === 1);
-check('  et rendu hors champ',
+check('  the clone is inserted so it can be photographed', fakeBody._added.length === 1);
+check('  and rendered off-screen',
     fakeBody._added[0]?._styles.get('top')?.value === '-10000px');
 
 imageRequested = null;
 fakeBody._added.length = 0;
 fakeWindow.MusicPlayer.deviceMode = { isTouch: () => true };
 dragstartHandler(event);
-check('au doigt, la vignette native est laissée de côté', imageRequested === null,
-    'touchDragDrop gère son propre aperçu');
+check('with a finger, the native thumbnail is left aside', imageRequested === null,
+    'touchDragDrop handles its own preview');
 
-console.log(`\n=== ${passed} réussite(s), ${failed} échec(s) ===`);
+console.log(`\n=== ${passed} passed, ${failed} failed ===`);
 process.exit(failed === 0 ? 0 : 1);

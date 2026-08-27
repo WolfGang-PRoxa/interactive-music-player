@@ -25,7 +25,7 @@ let failed = 0;
 let passed = 0;
 const check = (label, ok, detail = '') => {
     if (ok) { passed++; console.log(`  ok    ${label}${detail ? ` — ${detail}` : ''}`); }
-    else { failed++; console.log(`  ECHEC ${label}${detail ? ` — ${detail}` : ''}`); }
+    else { failed++; console.log(`  FAIL ${label}${detail ? ` — ${detail}` : ''}`); }
 };
 
 // ─────────────────────────── Côté serveur ───────────────────────────
@@ -118,34 +118,34 @@ function prepare(overrides) {
 const A = { title: 'A', author: 'X', duration: '3:00', url: 'http://a' };
 const B = { title: 'B', author: 'Y', duration: '4:00', url: 'http://b' };
 
-console.log('\nenchainerSurLaFile — refus\n');
+console.log('\nadvanceToQueue — refusal\n');
 
 prepare({ activePlaybackSource: 'queue', queueBackupEveryone: { tracks: [A] } });
-check('la file qui s\'épuise ne s\'enchaîne pas sur elle-même',
+check('a queue that runs dry does not hand off to itself',
     webServer.advanceToQueue('g1') === false);
 
 prepare({ queueBackupEveryone: null });
-check('une file mise de côté vide laisse la lecture s\'arrêter',
+check('an empty set-aside queue lets playback stop',
     webServer.advanceToQueue('g1') === false);
-check('  … et la source reste la playlist',
+check('  … and the source stays the playlist',
     settings.activePlaybackSource === 'playlist_1');
 
 // Sans salon, basculer la source rendrait la sauvegarde inatteignable : la file
 // paraîtrait effacée alors qu'elle est intacte.
 const withoutChannel = prepare({ queueBackupEveryone: { tracks: [A, B] } });
 withoutChannel.channel = null;
-check('un lecteur sans salon laisse la file où elle est',
+check('a player without a channel leaves the queue where it is',
     webServer.advanceToQueue('g1') === false);
-check('  … et la source reste la playlist',
+check('  … and the source stays the playlist',
     settings.activePlaybackSource === 'playlist_1');
 
 // La priorité de la boucle ne tient pas à un test dans `enchainerSurLaFile`,
 // mais à l'ordre des deux appels sur les points d'épuisement : la relance est
 // consultée d'abord, et rend la main dès qu'elle a repris la playlist.
 prepare({ loopPlaylist: true, queueBackupEveryone: { tracks: [A, B] } });
-check('une playlist en boucle se relance elle-même, la file attend son tour',
+check('a looping playlist restarts itself, the queue waits its turn',
     webServer.restartLoopedPlaylist('g1') === true);
-check('  … et la source reste la playlist',
+check('  … and the source stays the playlist',
     settings.activePlaybackSource === 'playlist_1');
 
 console.log('\nenchainerSurLaFile — diffusion commune\n');
@@ -153,40 +153,40 @@ console.log('\nenchainerSurLaFile — diffusion commune\n');
 let queue = prepare({ queueBackupEveryone: { tracks: [A, B] } });
 const switched = webServer.advanceToQueue('g1');
 
-check('la bascule est annoncée à l\'appelant', switched === true);
-check('la source devient la file d\'attente', settings.activePlaybackSource === 'queue');
-check('l\'index de playlist est ramené à zéro', settings.playlistCurrentIndex === 0,
+check('the handoff is announced to the caller', switched === true);
+check('the source becomes the pending queue', settings.activePlaybackSource === 'queue');
+check('the playlist index is reset to zero', settings.playlistCurrentIndex === 0,
     `index ${settings.playlistCurrentIndex}`);
-check('la liste physique est vidée avant la reprise', queue.emptied === true);
-check('le premier titre de la file est mis en lecture', queue.played && queue.played.url === A.url,
+check('the physical list is emptied before resuming', queue.emptied === true);
+check('the first track of the queue starts playing', queue.played && queue.played.url === A.url,
     queue.played ? queue.played.url : 'aucun');
 
 // `play()` est asynchrone : la suite de la file n'est ajoutée qu'une fois le
 // premier titre lancé, pour ne pas se retrouver devant lui.
 setTimeout(() => {
-    check('la suite est ajoutée derrière lui',
+    check('the rest is appended behind it',
         queue.added.length === 1 && queue.added[0].url === B.url,
-        queue.added.map(t => t.url).join(', ') || 'aucune');
+        queue.added.map(t => t.url).join(', ') || 'none');
 
     console.log('\nenchainerSurLaFile — diffusion personnelle\n');
 
     queue = prepare({ broadcastMode: 'personal', queueBackupPersonal: { tracks: [A, B] } });
-    const basculePerso = webServer.advanceToQueue('g1', 1500);
+    const togglePersonal = webServer.advanceToQueue('g1', 1500);
 
-    check('la bascule est annoncée à l\'appelant', basculePerso === true);
-    check('la source devient la file d\'attente', settings.activePlaybackSource === 'queue');
-    check('le premier titre devient la piste courante',
+    check('the handoff is announced to the caller', togglePersonal === true);
+    check('the source becomes the pending queue', settings.activePlaybackSource === 'queue');
+    check('the first track becomes the current track',
         queue.virtualCurrentTrack && queue.virtualCurrentTrack.url === A.url);
-    check('la suite devient la file virtuelle',
+    check('the rest becomes the virtual queue',
         queue.virtualTracks.length === 1 && queue.virtualTracks[0].url === B.url);
-    check('la lecture est déclarée en cours', queue.virtualIsPlaying === true && queue.virtualIsPaused === false);
-    check('la position déjà jouée par le fondu est reprise', queue.virtualProgressMs === 1500,
+    check('playback is declared to be running', queue.virtualIsPlaying === true && queue.virtualIsPaused === false);
+    check('the position already played by the crossfade is carried over', queue.virtualProgressMs === 1500,
         `${queue.virtualProgressMs} ms`);
-    check('rien n\'est envoyé au lecteur physique', queue.played === null);
+    check('nothing is sent to the physical player', queue.played === null);
 
     testNextTrackOf();
 
-    console.log(`\n=== ${passed} réussite(s), ${failed} échec(s) ===`);
+    console.log(`\n=== ${passed} passed, ${failed} failed ===`);
     process.exit(failed === 0 ? 0 : 1);
 }, 0);
 
@@ -225,7 +225,7 @@ function loadState() {
 }
 
 function testNextTrackOf() {
-    console.log('\npisteSuivante — fin de playlist\n');
+    console.log('\nnextTrackOf — end of playlist\n');
 
     const api = loadState();
     const playlist = { id: 'playlist_1', tracks: [{ url: 'p/1' }, { url: 'p/2' }] };
@@ -238,22 +238,22 @@ function testNextTrackOf() {
     }, overrides);
 
     let next = api.nextTrackOf(makeState({ playlistCurrentIndex: 0 }));
-    check('en cours de playlist, le titre suivant de la playlist',
+    check('mid-playlist, the next track of the playlist',
         next && next.url === 'p/2', next ? next.url : 'aucun');
 
     next = api.nextTrackOf(makeState({ loopPlaylist: true }));
-    check('dernier titre en boucle, le premier de la playlist',
+    check('last track on loop, the first of the playlist',
         next && next.url === 'p/1', next ? next.url : 'aucun');
 
     next = api.nextTrackOf(makeState({}));
-    check('dernier titre sans boucle, le premier de la file d\'attente',
+    check('last track without loop, the first of the pending queue',
         next && next.url === 'f/1', next ? next.url : 'aucun');
 
     next = api.nextTrackOf(makeState({ queue: [] }));
-    check('dernier titre sans boucle et file vide, plus rien à enchaîner',
+    check('last track without loop and empty queue, nothing left to chain',
         next === null, String(next));
 
     next = api.nextTrackOf({ activePlaybackSource: 'queue', queue: [{ url: 'f/1' }] });
-    check('sur la file, son premier titre — inchangé',
+    check('on the queue, its first track — unchanged',
         next && next.url === 'f/1', next ? next.url : 'aucun');
 }

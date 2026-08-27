@@ -87,7 +87,7 @@ function token() {
             windowsHide: true,
         }).trim();
         resolvedToken = output || null;
-        if (resolvedToken) log.info('[Versions] Jeton GitHub repris du CLI gh.');
+        if (resolvedToken) log.info('[Versions] GitHub token picked up from the gh CLI.');
     } catch (e) {
         // `gh` absent ou déconnecté : lecture anonyme, suffisante sur un dépôt public.
         resolvedToken = null;
@@ -113,7 +113,7 @@ function headers(withToken = true) {
 class GitHubError extends Error {
     constructor(message, status) {
         super(message);
-        this.name = 'ErreurGitHub';
+        this.name = 'GitHubError';
         this.status = status;
     }
 }
@@ -125,8 +125,8 @@ class GitHubError extends Error {
  * l'API renvoie vers un stockage d'objets signé qui rejette une seconde
  * authentification, et le jeton n'a de toute façon rien à faire chez un tiers.
  *
- * @param {(recus: number, total: number|null) => void} [onProgression]
- * @returns {Promise<{ statut: number, corps: Buffer, enTetes: object }>}
+ * @param {(received: number, total: number|null) => void} [onProgress]
+ * @returns {Promise<{ status: number, body: Buffer, headers: object }>}
  */
 function request(url, options = {}, onProgress = null, redirectsLeft = 5) {
     return new Promise((resolve, reject) => {
@@ -213,7 +213,7 @@ function apiErrorMessage(status, body) {
  * drapeau pour que l'interface les distingue.
  *
  * @param {{ forcer?: boolean }} [options] - `forcer` court-circuite le cache
- * @returns {Promise<Array<{ tag, nom, publieeLe, prerelease, tarballUrl, htmlUrl }>>}
+ * @returns {Promise<Array<{ tag, name, publishedAt, prerelease, tarballUrl, htmlUrl }>>}
  */
 async function listReleases(options = {}) {
     if (!options.force && releasesCache && Date.now() - releasesCache.date < CACHE_TTL_MS) {
@@ -254,7 +254,7 @@ async function listReleases(options = {}) {
  * Télécharge l'archive `.tar.gz` du code source d'une release.
  *
  * @param {string} tarballUrl
- * @param {(recus: number, total: number|null) => void} [onProgression]
+ * @param {(received: number, total: number|null) => void} [onProgress]
  * @returns {Promise<Buffer>}
  */
 async function downloadArchive(tarballUrl, onProgress) {
@@ -263,7 +263,7 @@ async function downloadArchive(tarballUrl, onProgress) {
         throw new GitHubError(apiErrorMessage(status, body), status);
     }
     if (!body.length) throw new GitHubError('Archive vide reçue de GitHub.', status);
-    log.info(`[Versions] Archive téléchargée : ${(body.length / 1024 / 1024).toFixed(1)} Mo.`);
+    log.info(`[Versions] Archive downloaded: ${(body.length / 1024 / 1024).toFixed(1)} MB.`);
     return body;
 }
 

@@ -90,7 +90,7 @@
      * de réception accompagne les positions, pour pouvoir les prolonger entre
      * deux messages.
      *
-     * @type {{sortante: object|null, entrante: object, recuLe: number}|null}
+     * @type {{outgoing: object|null, incoming: object, receivedAt: number}|null}
      */
     let guildTransition = null;
 
@@ -145,11 +145,11 @@
         if (!guildTransition) return null;
 
         const speed = parseFloat((state.settings && state.settings.playbackSpeed) || '1.0');
-        const ecouleMs = (performance.now() - guildTransition.recuLe) * speed;
+        const elapsedMs = (performance.now() - guildTransition.receivedAt) * speed;
 
         const progressOf = (part) => {
             if (!part) return null;
-            const position = part.positionMs + ecouleMs;
+            const position = part.positionMs + elapsedMs;
             const ratio = part.durationMs > 0 ? Math.min(1, Math.max(0, position / part.durationMs)) : 0;
             return { url: part.url, ratio };
         };
@@ -166,7 +166,7 @@
      * évite de le rejouer sur les diffusions d'état qui suivent, avant que le
      * serveur n'ait pris acte de sa consommation.
      */
-    let startupFadeinJoue = false;
+    let startupFadeinPlayed = false;
     /**
      * Le navigateur fait-il autorité sur la position de lecture ?
      *
@@ -343,10 +343,10 @@
     function updateThemeColor() {
         const meta = document.getElementById('app-theme-color');
         if (!meta) return;
-        const fond = getComputedStyle(document.documentElement)
+        const background = getComputedStyle(document.documentElement)
             .getPropertyValue('--bg-main')
             .trim();
-        if (fond) meta.setAttribute('content', fond);
+        if (background) meta.setAttribute('content', background);
     }
 
     function updateFavicon(style) {
@@ -780,7 +780,7 @@
         // l'instant où elles ont été relevées, de quoi les prolonger jusqu'au
         // message suivant.
         guildTransition = state.mixTransition
-            ? { ...state.mixTransition, recuLe: performance.now() }
+            ? { ...state.mixTransition, receivedAt: performance.now() }
             : null;
 
         // --- Now Playing, disque, boutons médias, préc/suivant, mode, volume, broadcast select ---
@@ -866,10 +866,10 @@
         if (state.settings.presenceDepartureDelay !== undefined) {
             const seconds = state.settings.presenceDepartureDelay;
             const cursor = document.getElementById('setting-departure-delay');
-            const affichage = document.getElementById('val-setting-departure-delay');
+            const display = document.getElementById('val-setting-departure-delay');
             if (cursor && document.activeElement !== cursor) {
                 cursor.value = seconds;
-                if (affichage) affichage.textContent = `${seconds}s`;
+                if (display) display.textContent = `${seconds}s`;
             }
             const settings = window.MusicPlayer.dashboardSettings;
             if (settings) settings.presenceDepartureDelay = seconds;
@@ -1002,12 +1002,12 @@
     function togglePlayPause() {
         const now = Date.now();
         if (now - lastPlayPauseClickTime < 350) {
-            console.log('[PlayPause Debug] togglePlayPause ignoré (clic trop rapide < 350ms)');
+            console.log('[PlayPause Debug] togglePlayPause ignored (click too fast < 350ms)');
             return;
         }
         lastPlayPauseClickTime = now;
 
-        console.log('[PlayPause Debug] togglePlayPause declenché', {
+        console.log('[PlayPause Debug] togglePlayPause fired', {
             hasCurrentTrack: !!state.currentTrack,
             trackTitle: state.currentTrack ? state.currentTrack.title : null,
             currentIsPlaying: state.isPlaying,
@@ -1246,7 +1246,7 @@
      * ou protocole file://. Tout le reste — URL http(s) ou simple recherche —
      * sera récupéré à distance, donc transcodé.
      */
-    function estSourceLocale(value) {
+    function isLocalSource(value) {
         const v = (value || '').trim().replace(/^["']|["']$/g, '');
         if (!v) return false;
         if (/^https?:\/\//i.test(v)) return false;
@@ -1256,7 +1256,7 @@
     /** Grise les sélecteurs quand la saisie désigne un fichier local. */
     function updateQualityApplicability() {
         if (!importQualityRow) return;
-        const local = estSourceLocale(searchInput ? searchInput.value : '');
+        const local = isLocalSource(searchInput ? searchInput.value : '');
         importQualityRow.classList.toggle('not-applicable', local);
         if (importQualityHint) {
             importQualityHint.classList.toggle('highlighted', local);
@@ -1687,7 +1687,7 @@
                 const finishedUrl = audio.currentTrackUrl
                     || (state.currentTrack && state.currentTrack.url) || null;
 
-                console.log(`[Audio Mix] Démarrage fade-out client de ${mixDuration}s...`);
+                console.log(`[Audio Mix] Starting the ${mixDuration}s client-side fade-out...`);
                 sendWS({
                     type: 'clientLog',
                     data: {
@@ -1717,7 +1717,7 @@
                             data: { source: 'Mix', message: `LECTURE fondu #${fadeId} | l'entrant joue` }
                         });
                     }).catch(err => {
-                        console.warn('[Audio Mix] Impossible de lire le morceau suivant :', err);
+                        console.warn('[Audio Mix] Cannot play the next track:', err);
                         // Remonté au serveur : un échec de `play()` ne laissait
                         // qu'un avertissement dans la console du navigateur,
                         // invisible depuis un téléphone. Le fondu se déroulait
@@ -1781,7 +1781,7 @@
                             mixAwaitingConfirmation = { url: nextTrack.url, element: nextAudio };
                             mixWaitingSinceMs = Date.now();
 
-                            console.log('[Audio Mix] Transition complétée, envoi skip.');
+                            console.log('[Audio Mix] Transition completed, sending skip.');
                             sendWS({
                                 type: 'clientLog',
                                 data: {
@@ -1835,7 +1835,7 @@
                             fadeAudio.isMixFadingOut = false;
                             fadeAudio = null;
 
-                            console.log('[Audio Mix] Aucun morceau suivant. skip.');
+                            console.log('[Audio Mix] No next track. skip.');
                             sendWS({ type: 'skip' });
                             return;
                         }
@@ -1897,18 +1897,18 @@
      * source n'est pas touché : il joue, donc il est déjà autorisé.
      */
     const SILENCE_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=';
-    let audioDeverrouille = false;
+    let audioUnlocked = false;
 
     function unlockAudio() {
-        if (audioDeverrouille) return;
-        audioDeverrouille = true;
+        if (audioUnlocked) return;
+        audioUnlocked = true;
 
         [primaryAudio, secondaryAudio].forEach((el) => {
             if (!el || el.src) return;
             el.unlockInProgress = true;
             el.muted = true;
             el.src = SILENCE_WAV;
-            const promesse = el.play();
+            const promise = el.play();
             const cleanup = () => {
                 try { el.pause(); } catch (e) {}
                 el.removeAttribute('src');
@@ -1916,8 +1916,8 @@
                 el.muted = false;
                 el.unlockInProgress = false;
             };
-            if (promesse && typeof promesse.then === 'function') {
-                promesse.then(cleanup).catch(() => {
+            if (promise && typeof promise.then === 'function') {
+                promise.then(cleanup).catch(() => {
                     cleanup();
                     sendWS({
                         type: 'clientLog',
@@ -1945,33 +1945,33 @@
      *
      * @param {HTMLAudioElement} audio
      * @param {number} secondes Position visée
-     * @param {() => void} [quandPret] Appelé une fois la position posée — ou
+     * @param {() => void} [whenReady] Appelé une fois la position posée — ou
      *   tout de suite s'il n'y a rien à rattraper, ou en cas d'échec du
      *   chargement, afin qu'aucun traitement en attente ne reste bloqué.
      */
-    function applyInitialPosition(audio, seconds, quandPret) {
-        const signaler = () => {
-            if (typeof quandPret === 'function') quandPret();
+    function applyInitialPosition(audio, seconds, whenReady) {
+        const report = () => {
+            if (typeof whenReady === 'function') whenReady();
         };
 
         // En deçà d'une seconde, rien à rattraper : la piste commence à son début.
         if (!(seconds > 1)) {
             audio.pendingInitialPosition = false;
-            signaler();
+            report();
             return;
         }
 
         audio.pendingInitialPosition = true;
 
-        const abandonner = () => {
+        const giveUp = () => {
             audio.removeEventListener('loadedmetadata', apply);
-            audio.removeEventListener('error', abandonner);
+            audio.removeEventListener('error', giveUp);
             audio.pendingInitialPosition = false;
-            signaler();
+            report();
         };
 
         const apply = () => {
-            audio.removeEventListener('error', abandonner);
+            audio.removeEventListener('error', giveUp);
             audio.removeEventListener('loadedmetadata', apply);
             try {
                 audio.currentTime = seconds;
@@ -1979,7 +1979,7 @@
                 console.warn('[Audio] Repositionnement impossible :', e);
             }
             audio.pendingInitialPosition = false;
-            signaler();
+            report();
         };
 
         // `loadedmetadata` garantit une durée connue ; avant cela, l'affectation
@@ -1990,7 +1990,7 @@
             apply();
         } else {
             audio.addEventListener('loadedmetadata', apply);
-            audio.addEventListener('error', abandonner);
+            audio.addEventListener('error', giveUp);
         }
     }
 
@@ -2003,7 +2003,7 @@
      *
      * @param {HTMLAudioElement} audio
      */
-    function preparerFonduEntree(audio) {
+    function prepareFadeIn(audio) {
         audio.volume = 0;
         audio.isMixFadingIn = true;
     }
@@ -2014,7 +2014,7 @@
      * @param {HTMLAudioElement} audio
      * @param {number} durationSecs
      */
-    function armerFonduEntree(audio, durationSecs) {
+    function armFadeIn(audio, durationSecs) {
         let started = false;
 
         const startFade = () => {
@@ -2085,11 +2085,11 @@
         // L'attente est bornée : une confirmation qui ne viendrait jamais
         // figerait la synchronisation pour le reste de la session.
         if (mixAwaitingConfirmation) {
-            const confirmee = state.currentTrack.url === mixAwaitingConfirmation.url;
-            const expiree = Date.now() - mixWaitingSinceMs > MAX_CONFIRMATION_WAIT_MS;
-            if (confirmee || expiree) {
-                if (!confirmee) {
-                    console.warn('[Audio Mix] Confirmation du serveur non reçue, resynchronisation.');
+            const confirmed = state.currentTrack.url === mixAwaitingConfirmation.url;
+            const expired = Date.now() - mixWaitingSinceMs > MAX_CONFIRMATION_WAIT_MS;
+            if (confirmed || expired) {
+                if (!confirmed) {
+                    console.warn('[Audio Mix] Server confirmation not received, resynchronising.');
                 }
                 mixAwaitingConfirmation = null;
                 mixTransitionNextTrack = null;
@@ -2108,7 +2108,7 @@
         // Fade-in de démarrage du bot mis en attente par le serveur : en diffusion
         // personnelle le son sort d'ici, il ne pouvait donc pas être joué avant que
         // cette page soit ouverte. On le consomme dès la première piste chargée.
-        const fadeinDemarrage = (state.startupFadein && !startupFadeinJoue)
+        const startupFadein = (state.startupFadein && !startupFadeinPlayed)
             ? (parseFloat(state.startupFadein.durationMs) || 0) / 1000
             : 0;
 
@@ -2128,16 +2128,16 @@
 
             // Le fondu de démarrage du bot prime : il se rapporte au bot et non
             // à la piste, et s'applique donc où qu'elle reprenne.
-            const fadeDuration = fadeinDemarrage > 0 ? fadeinDemarrage : mixFade;
+            const fadeDuration = startupFadein > 0 ? startupFadein : mixFade;
 
             // Le volume tombe à zéro dès maintenant, mais la rampe n'est armée
             // qu'une fois la position restaurée appliquée : le repositionnement
             // met le flux en tampon, et une rampe lancée avant s'écoulerait
             // pendant ce silence — la piste entrerait alors à plein volume.
-            if (fadeDuration > 0) preparerFonduEntree(personalAudio);
+            if (fadeDuration > 0) prepareFadeIn(personalAudio);
 
-            if (fadeinDemarrage > 0) {
-                startupFadeinJoue = true;
+            if (startupFadein > 0) {
+                startupFadeinPlayed = true;
                 sendWS({ type: 'startupFadeinConsumed' });
             }
 
@@ -2145,23 +2145,23 @@
             // simple réouverture du tableau de bord). Le recalage périodique plus
             // bas ne suffit pas : il est neutralisé pendant un fondu d'entrée,
             // exactement le cas d'un démarrage avec fade-in activé.
-            const elementCharge = personalAudio;
+            const elementLoaded = personalAudio;
             applyInitialPosition(
-                elementCharge,
+                elementLoaded,
                 resumePositionSecs,
                 () => {
-                    if (fadeDuration > 0) armerFonduEntree(elementCharge, fadeDuration);
+                    if (fadeDuration > 0) armFadeIn(elementLoaded, fadeDuration);
                 }
             );
-        } else if (fadeinDemarrage > 0 && !isMixTransitioning) {
+        } else if (startupFadein > 0 && !isMixTransitioning) {
             // La piste est déjà chargée : le tableau de bord était ouvert pendant
             // l'arrêt du bot. Sans ce cas, le fade-in resterait en attente et se
             // déclencherait au prochain changement de piste, longtemps après le
             // démarrage auquel il se rapporte.
-            startupFadeinJoue = true;
+            startupFadeinPlayed = true;
             sendWS({ type: 'startupFadeinConsumed' });
-            preparerFonduEntree(personalAudio);
-            armerFonduEntree(personalAudio, fadeinDemarrage);
+            prepareFadeIn(personalAudio);
+            armFadeIn(personalAudio, startupFadein);
         }
 
         // Volume (Ducking automatique inclus)
@@ -2183,7 +2183,7 @@
                     audio.pause();
                 } else if (shouldPlay && audio.paused && audio === activeAudio) {
                     audio.play().catch(err => {
-                        console.warn('[Audio] Lecture bloquée ou impossible à démarrer :', err);
+                        console.warn('[Audio] Playback blocked or impossible to start:', err);
                     });
                 }
             }
@@ -2598,7 +2598,7 @@
     // Reconnexion/Synchronisation immédiate lors du retour sur l'onglet
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
-            console.log('[WebSocket] Onglet devenu visible. Vérification de la connexion...');
+            console.log('[WebSocket] Tab became visible. Checking the connection...');
 
             // Le navigateur gèle la boucle d'animation et la décode vidéo d'un
             // onglet masqué, alors que la lecture se poursuit côté serveur : la
@@ -2611,10 +2611,10 @@
 
             const ws = window.MusicPlayer.socket;
             if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
-                console.log('[WebSocket] Déconnecté. Reconnexion immédiate...');
+                console.log('[WebSocket] Disconnected. Reconnecting right away...');
                 connectWebSocket();
             } else if (ws.readyState === WebSocket.OPEN) {
-                console.log('[WebSocket] Connecté. Demande de synchronisation d\'état...');
+                console.log('[WebSocket] Connected. Requesting a state sync...');
                 sendWS({ type: 'requestState' });
             }
         }

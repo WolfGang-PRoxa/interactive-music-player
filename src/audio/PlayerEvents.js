@@ -56,8 +56,8 @@ function awaitSeekCatchUp(queue) {
             }
             if (Date.now() >= deadline) {
                 clearInterval(pollTimer);
-                log.warn('[Player] Rattrapage de position toujours incomplet après '
-                    + `${MAX_SEEK_CATCH_UP_MS}ms : rétablissement du son malgré tout.`);
+                log.warn('[Player] Position catch-up still incomplete after '
+                    + `${MAX_SEEK_CATCH_UP_MS}ms: restoring sound anyway.`);
                 resolve();
             }
         }, 20);
@@ -117,7 +117,7 @@ function registerPlayerEvents(player, client) {
             }
         }
 
-        log.info(`[Player] ▶ En lecture : ${track.title} (${guildId})`);
+        log.info(`[Player] ▶ Now playing: ${track.title} (${guildId})`);
 
         // Check if we should pause immediately (e.g. from Stop command or server restoration)
         if (queue.pauseOnNextTrack || queue.restorePaused) {
@@ -125,7 +125,7 @@ function registerPlayerEvents(player, client) {
             try {
                 queue.node.setPaused(true);
             } catch (err) {
-                log.error('[Player] Erreur mise en pause automatique :', err.message);
+                log.error('[Player] Automatic pause error:', err.message);
             }
         }
 
@@ -155,7 +155,7 @@ function registerPlayerEvents(player, client) {
 
                     if (progress > 0) {
                         await pause(DSP_SETUP_DELAY_MS);
-                        log.info(`[Player] Repositionnement de transition : ${progress}ms`);
+                        log.info(`[Player] Transition reseek: ${progress}ms`);
                         await queue.node.seek(progress);
                         await awaitSeekCatchUp(queue);
                     }
@@ -169,7 +169,7 @@ function registerPlayerEvents(player, client) {
                         try {
                             const currentUrl = queue.currentTrack.url;
                             queue.history.tracks.remove(t => t.url === currentUrl);
-                            log.info('[Player] Piste courante nettoyée de l\'historique post-transition.');
+                            log.info('[Player] Current track cleaned out of the history after the transition.');
                         } catch (e) {}
                     }
                     
@@ -179,7 +179,7 @@ function registerPlayerEvents(player, client) {
                             const duplicate = queue.tracks.toArray().find(t => t.url === queue.currentTrack.url);
                             if (duplicate) {
                                 queue.node.remove(duplicate);
-                                log.info('[Player] Piste courante nettoyée de la file d\'attente post-seek.');
+                                log.info('[Player] Current track cleaned out of the pending queue after the seek.');
                             }
                         } catch (e) {}
                     }
@@ -200,12 +200,12 @@ function registerPlayerEvents(player, client) {
                     if (queue.restorePaused) {
                         queue.node.setPaused(true);
                         queue.restorePaused = false;
-                        log.info('[Player] Pause et volume restaurés après transition.');
+                        log.info('[Player] Pause and volume restored after the transition.');
                     } else {
-                        log.info(`[Player] Volume rétabli à ${settings.baseVolume}% après transition.`);
+                        log.info(`[Player] Volume restored to ${settings.baseVolume}% after the transition.`);
                     }
                 } catch (seekErr) {
-                    log.error('[Player] Erreur restauration transition dans playerStart :', seekErr.message);
+                    log.error('[Player] Transition restore error in playerStart:', seekErr.message);
                     queue.transitioningToEveryone = false;
                     queue.transitionTargetProgress = 0;
                     queue.restorePaused = false;
@@ -225,7 +225,7 @@ function registerPlayerEvents(player, client) {
                 applySpeed(queue, settings.playbackSpeed);
             }
         } catch (speedErr) {
-            log.error('[Player] Erreur application de la vitesse au démarrage :', speedErr.message);
+            log.error('[Player] Error applying the speed at startup:', speedErr.message);
         }
 
         // Fondu d'entrée de l'effet Mix DJ, à chaque piste.
@@ -285,7 +285,7 @@ function registerPlayerEvents(player, client) {
                 }
             }
         } catch (mixErr) {
-            log.error('[Player] Erreur fade-in dans playerStart :', mixErr.message);
+            log.error('[Player] Fade-in error in playerStart:', mixErr.message);
         }
 
         // Notify Web UI
@@ -312,7 +312,7 @@ function registerPlayerEvents(player, client) {
     });
 
     player.events.on('audioTrackAdd', (queue, track) => {
-        log.info(`[Player] + Ajouté : ${track.title}`);
+        log.info(`[Player] + Added: ${track.title}`);
         webServer.broadcastState(queue.guild.id);
         playbackStateManager.saveState(queue.player);
     });
@@ -320,7 +320,7 @@ function registerPlayerEvents(player, client) {
     player.events.on('playerFinish', (queue) => {
         clearTransition(queue);
         queue.mixAppliedTrackId = null;
-        log.info(`[Player] ⏹ Lecture terminée.`);
+        log.info(`[Player] ⏹ Playback finished.`);
         webServer.broadcastState(queue.guild.id);
         playbackStateManager.saveState(queue.player);
     });
@@ -328,7 +328,7 @@ function registerPlayerEvents(player, client) {
     player.events.on('emptyQueue', (queue) => {
         clearTransition(queue);
         queue.mixAppliedTrackId = null;
-        log.info(`[Player] 📋 File d'attente vide.`);
+        log.info(`[Player] 📋 Pending queue empty.`);
 
         // Playlist en boucle : la file vide signe la fin de la playlist, pas
         // la fin de la lecture. On la recharge depuis son premier titre avant
@@ -361,7 +361,7 @@ function registerPlayerEvents(player, client) {
     player.events.on('playerError', (queue, error, track) => {
         clearTransition(queue);
         queue.mixAppliedTrackId = null;
-        log.error(`[Player] ❌ Erreur playerError:`, error.message);
+        log.error(`[Player] ❌ playerError:`, error.message);
         log.error(`[Player] Track:`, track?.title);
         log.error(`[Player] Stack:`, error.stack);
     });
@@ -369,7 +369,7 @@ function registerPlayerEvents(player, client) {
     player.events.on('error', (queue, error) => {
         clearTransition(queue);
         queue.mixAppliedTrackId = null;
-        log.error(`[Player] ❌ Erreur générale :`, error.message);
+        log.error(`[Player] ❌ General error:`, error.message);
         log.error(`[Player] Stack:`, error.stack);
     });
 

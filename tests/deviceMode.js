@@ -16,7 +16,7 @@ let failed = 0;
 let passed = 0;
 const check = (label, ok, detail = '') => {
     if (ok) { passed++; console.log(`  ok    ${label}${detail ? ` — ${detail}` : ''}`); }
-    else { failed++; console.log(`  ECHEC ${label}${detail ? ` — ${detail}` : ''}`); }
+    else { failed++; console.log(`  FAIL ${label}${detail ? ` — ${detail}` : ''}`); }
 };
 
 /**
@@ -84,77 +84,77 @@ function load(env) {
     return { api: fakeWindow.MusicPlayer.deviceMode, attrs, storage };
 }
 
-console.log('deviceMode — détection automatique\n');
+console.log('deviceMode — automatic detection\n');
 
 let r = load({ coarse: true, width: 390 });
-check('téléphone : pointeur grossier + 390 px', r.api.get() === 'phone', r.api.get());
-check('  attribut data-device-mode posé', r.attrs['data-device-mode'] === 'phone');
-check('  attribut data-touch-mode à true', r.attrs['data-touch-mode'] === 'true');
+check('phone: coarse pointer + 390 px', r.api.get() === 'phone', r.api.get());
+check('  data-device-mode attribute set', r.attrs['data-device-mode'] === 'phone');
+check('  data-touch-mode attribute at true', r.attrs['data-touch-mode'] === 'true');
 check('  isTouch() vrai', r.api.isTouch() === true);
 
 r = load({ coarse: true, width: 1024 });
-check('tablette : pointeur grossier + 1024 px', r.api.get() === 'tablet', r.api.get());
+check('tablet: coarse pointer + 1024 px', r.api.get() === 'tablet', r.api.get());
 check('  isTouch() vrai', r.api.isTouch() === true);
 
 r = load({ coarse: false, width: 1920 });
-check('ordinateur : pointeur fin', r.api.get() === 'desktop', r.api.get());
-check('  data-touch-mode à false', r.attrs['data-touch-mode'] === 'false');
+check('desktop: fine pointer', r.api.get() === 'desktop', r.api.get());
+check('  data-touch-mode at false', r.attrs['data-touch-mode'] === 'false');
 check('  isTouch() faux', r.api.isTouch() === false);
 
 r = load({ coarse: false, width: 500 });
-check('fenêtre étroite mais souris : reste ordinateur', r.api.get() === 'desktop', r.api.get());
+check('narrow window but a mouse: stays desktop', r.api.get() === 'desktop', r.api.get());
 
-console.log('\ndeviceMode — orientation et appareils qui se déclarent mal\n');
+console.log('\ndeviceMode — orientation and devices that misreport themselves\n');
 
 // Un téléphone couché est plus large qu'une petite tablette debout : au seul
 // critère de largeur il passait en mode tablette, qui n'adapte pas l'en-tête.
 r = load({ coarse: true, width: 1200, height: 460 });
-check('téléphone couché : 1200 × 460', r.api.get() === 'phone', r.api.get());
+check('phone lying down: 1200 × 460', r.api.get() === 'phone', r.api.get());
 
 r = load({ coarse: true, width: 390, height: 840 });
-check('téléphone debout : 390 × 840', r.api.get() === 'phone', r.api.get());
+check('phone upright: 390 × 840', r.api.get() === 'phone', r.api.get());
 
 r = load({ coarse: true, width: 820, height: 1180 });
 check('tablette debout : 820 × 1180', r.api.get() === 'tablet', r.api.get());
 
 r = load({ coarse: true, width: 1180, height: 820 });
-check('tablette couchée : 1180 × 820', r.api.get() === 'tablet', r.api.get());
+check('tablet lying down: 1180 × 820', r.api.get() === 'tablet', r.api.get());
 
 // Navigateur mobile qui annonce un pointeur fin — mode « site pour ordinateur »
 // ou absence de réponse à `pointer`. La fenêtre trahit l'appareil.
 r = load({ coarse: false, touchPoints: 5, width: 1200, height: 460 });
-check('pointeur fin annoncé mais écran couché et tactile', r.api.get() === 'phone', r.api.get());
+check('fine pointer announced but screen lying down and touch-capable', r.api.get() === 'phone', r.api.get());
 
 // Le garde-fou : un portable à écran tactile a lui aussi des points de contact.
 r = load({ coarse: false, touchPoints: 10, width: 1440, height: 780 });
-check('portable à écran tactile : reste ordinateur', r.api.get() === 'desktop', r.api.get());
+check('laptop with a touch screen: stays desktop', r.api.get() === 'desktop', r.api.get());
 
 r = load({ coarse: false, touchPoints: 10, width: 1920, height: 620 });
-check('  fenêtre basse mais large sur portable tactile', r.api.get() === 'desktop', r.api.get());
+check('  short but wide window on a touch laptop', r.api.get() === 'desktop', r.api.get());
 
 console.log('\ndeviceMode — choix explicite\n');
 
 r = load({ coarse: false, width: 1920, stored: 'phone' });
-check('choix mémorisé « phone » prime sur la détection', r.api.get() === 'phone', r.api.get());
-check('  getChoice() rend le choix, pas le mode', r.api.getChoice() === 'phone');
-check('  detected() rend toujours la détection brute', r.api.detected() === 'desktop', r.api.detected());
+check('remembered choice « phone » wins over detection', r.api.get() === 'phone', r.api.get());
+check('  getChoice() returns the choice, not the mode', r.api.getChoice() === 'phone');
+check('  detected() always returns the raw detection', r.api.detected() === 'desktop', r.api.detected());
 
 r = load({ coarse: true, width: 390, stored: 'desktop' });
-check('« desktop » forcé sur un téléphone', r.api.get() === 'desktop', r.api.get());
-check('  tactile désactivé en conséquence', r.api.isTouch() === false);
+check('« desktop » forced on a phone', r.api.get() === 'desktop', r.api.get());
+check('  touch disabled accordingly', r.api.isTouch() === false);
 
 r = load({ coarse: true, width: 390, stored: 'valeur-invalide' });
-check('valeur illisible ignorée, retour à auto', r.api.getChoice() === 'auto' && r.api.get() === 'phone');
+check('unreadable value ignored, back to auto', r.api.getChoice() === 'auto' && r.api.get() === 'phone');
 
-console.log('\ndeviceMode — set() et persistance\n');
+console.log('\ndeviceMode — set() and persistence\n');
 
 r = load({ coarse: false, width: 1920 });
-check('set("tablet") accepté', r.api.set('tablet') === true);
-check('  mode appliqué', r.api.get() === 'tablet', r.api.get());
-check('  écrit dans localStorage', r.storage.get('music_player_device_mode') === 'tablet');
-check('set("n_importe_quoi") refusé', r.api.set('n_importe_quoi') === false);
-check('  mode inchangé après refus', r.api.get() === 'tablet');
-check('retour à auto', r.api.set('auto') === true && r.api.get() === 'desktop', r.api.get());
+check('set("tablet") accepted', r.api.set('tablet') === true);
+check('  mode applied', r.api.get() === 'tablet', r.api.get());
+check('  written to localStorage', r.storage.get('music_player_device_mode') === 'tablet');
+check('set("anything_at_all") refused', r.api.set('n_importe_quoi') === false);
+check('  mode unchanged after refusal', r.api.get() === 'tablet');
+check('back to auto', r.api.set('auto') === true && r.api.get() === 'desktop', r.api.get());
 
 console.log('\ndeviceMode — abonnement\n');
 
@@ -164,7 +164,7 @@ r.api.onChange((mode, previous) => received.push(`${previous}->${mode}`));
 r.api.set('phone');
 r.api.set('phone');
 r.api.set('desktop');
-check('un événement par changement réel', received.length === 2, received.join(', '));
+check('one event per real change', received.length === 2, received.join(', '));
 
 /*
  * Côté de l'encoche.
@@ -174,37 +174,37 @@ check('un événement par changement réel', received.length === 2, received.joi
  * découvrirait donc l'encoche : mieux vaut ne rien dire que dire faux, et c'est
  * ce silence-là que ces cas vérifient d'abord.
  */
-console.log('\ndeviceMode — côté de l\'encoche\n');
+console.log('\ndeviceMode — notch side\n');
 
 r = load({ coarse: true, width: 390 });
-check('sans screen.orientation, aucune déduction',
-    r.attrs['data-encoche'] === undefined, String(r.attrs['data-encoche']));
+check('without screen.orientation, no deduction',
+    r.attrs['data-notch'] === undefined, String(r.attrs['data-notch']));
 
 r = load({ coarse: true, width: 390, orientation: { angle: 0, type: 'portrait-primary' } });
-check('portrait droit : encoche en haut',
-    r.attrs['data-encoche'] === 'haut', r.attrs['data-encoche']);
+check('upright portrait: notch at the top',
+    r.attrs['data-notch'] === 'top', r.attrs['data-notch']);
 
 r = load({ coarse: true, width: 390, orientation: { angle: 180, type: 'portrait-secondary' } });
-check('portrait renversé : encoche en bas',
-    r.attrs['data-encoche'] === 'bas', r.attrs['data-encoche']);
+check('upside-down portrait: notch at the bottom',
+    r.attrs['data-notch'] === 'bottom', r.attrs['data-notch']);
 
 r = load({ coarse: true, width: 844, height: 390, orientation: { angle: 90, type: 'landscape-primary' } });
-check('couché à 90° : encoche sur un bord latéral',
-    r.attrs['data-encoche'] === 'gauche', r.attrs['data-encoche']);
+check('lying at 90°: notch on one side edge',
+    r.attrs['data-notch'] === 'left', r.attrs['data-notch']);
 
 r = load({ coarse: true, width: 844, height: 390, orientation: { angle: 270, type: 'landscape-secondary' } });
-check('couché à 270° : encoche sur le bord opposé',
-    r.attrs['data-encoche'] === 'droite', r.attrs['data-encoche']);
+check('lying at 270°: notch on the opposite edge',
+    r.attrs['data-notch'] === 'right', r.attrs['data-notch']);
 
 // Une tablette née en paysage est droite à 0° tout en étant couchée. L'hypothèse
 // « encoche en haut du portrait » n'y a plus de sens : le module doit se taire.
 r = load({ coarse: true, width: 1180, height: 820, orientation: { angle: 0, type: 'landscape-primary' } });
-check('appareil né en paysage : aucune déduction',
-    r.attrs['data-encoche'] === undefined, String(r.attrs['data-encoche']));
+check('device born in landscape: no deduction',
+    r.attrs['data-notch'] === undefined, String(r.attrs['data-notch']));
 
 r = load({ coarse: true, width: 390, orientation: { angle: 45, type: 'portrait-primary' } });
-check('angle hors des quatre quarts : aucune déduction',
-    r.attrs['data-encoche'] === undefined, String(r.attrs['data-encoche']));
+check('angle outside the four quarters: no deduction',
+    r.attrs['data-notch'] === undefined, String(r.attrs['data-notch']));
 
-console.log(`\n=== ${passed} réussite(s), ${failed} échec(s) ===`);
+console.log(`\n=== ${passed} passed, ${failed} failed ===`);
 process.exit(failed === 0 ? 0 : 1);

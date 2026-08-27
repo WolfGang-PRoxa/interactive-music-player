@@ -51,7 +51,7 @@ function handleRemoveTrack(ctx) {
                     }
                 }
             } catch (removeErr) {
-                log.error('[WebServer] Erreur suppression track :', removeErr.message);
+                log.error('[WebServer] Track removal error:', removeErr.message);
             }
         }
 }
@@ -111,7 +111,7 @@ async function handlePlayNow(ctx) {
                     webServer._sendError(`Impossible de trouver le morceau : ${queryOrUrl}`);
                 }
             } catch (err) {
-                log.error('[WebServer] Erreur playNow virtuel :', err.message);
+                log.error('[WebServer] Virtual playNow error:', err.message);
                 webServer._sendError(`Impossible de jouer maintenant : ${err.message}`);
             }
         } else {
@@ -127,7 +127,7 @@ async function handlePlayNow(ctx) {
                         webServer._sendError(`Impossible de trouver le morceau : ${queryOrUrl}`);
                     }
                 } catch (err) {
-                    log.error('[WebServer] Erreur playNow :', err.message);
+                    log.error('[WebServer] playNow error:', err.message);
                     webServer._sendError(`Impossible de jouer maintenant : ${err.message}`);
                 }
             } else {
@@ -204,7 +204,7 @@ async function handleMoveOrInsertTrack(ctx) {
                     }
                 }
             } catch (err) {
-                log.error('[WebServer] Erreur moveOrInsertTrack :', err.message);
+                log.error('[WebServer] moveOrInsertTrack error:', err.message);
             }
         }
 }
@@ -242,7 +242,7 @@ function handleRemoveFromHistory(ctx) {
                     }
                 }
             } catch (err) {
-                log.error('[WebServer] Erreur removeFromHistory :', err.message);
+                log.error('[WebServer] removeFromHistory error:', err.message);
             }
         }
 }
@@ -262,7 +262,7 @@ function handleClearHistory(ctx) {
                 webServer.broadcastState(currentGuildId);
                 playbackStateManager.saveState(player);
             } catch (err) {
-                log.error('[WebServer] Erreur clearHistory :', err.message);
+                log.error('[WebServer] clearHistory error:', err.message);
             }
         }
 }
@@ -282,7 +282,7 @@ function handleClearQueue(ctx) {
                 webServer.broadcastState(currentGuildId);
                 playbackStateManager.saveState(player);
             } catch (err) {
-                log.error('[WebServer] Erreur clearQueue :', err.message);
+                log.error('[WebServer] clearQueue error:', err.message);
             }
         }
 }

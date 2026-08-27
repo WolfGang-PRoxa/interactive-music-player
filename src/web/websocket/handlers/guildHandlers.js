@@ -128,8 +128,8 @@ async function handleSelectChannel(ctx) {
                         // attend en l'état — l'arrivée du premier auditeur
                         // amènera le bot et relancera la lecture.
                         if (!presenceManager.connectionAllowed(voiceChannel)) {
-                            log.info(`[WebServer] Salon « ${voiceChannel.name} » désert : `
-                                + 'le bot y viendra à l\'arrivée d\'un auditeur.');
+                            log.info(`[WebServer] Channel « ${voiceChannel.name} » deserted: `
+                                + 'the bot will come when a listener arrives.');
                             presenceManager.detach(targetGuildId);
 
                             const isPersonal = settings.broadcastMode === 'personal';
@@ -206,7 +206,7 @@ async function handleSelectChannel(ctx) {
                                             }
                                         });
                                     } catch (playErr) {
-                                        log.error('[WebServer] Erreur play lors du changement de salon :', playErr.message);
+                                        log.error('[WebServer] play error while changing channel:', playErr.message);
                                     } finally {
                                         if (savedState.queue && savedState.queue.length > 0) {
                                             const tracksToRestore = savedState.queue
@@ -289,7 +289,7 @@ async function handleSelectChannel(ctx) {
                             webServer.client.setupDucking(targetGuildId);
                         }
                     } catch (err) {
-                        log.error('[WebServer] Erreur connexion salon vocal:', err.message);
+                        log.error('[WebServer] Voice channel connection error:', err.message);
                         webServer._sendError(`Impossible de rejoindre le salon vocal : ${err.message}`);
                     }
                 }
@@ -344,7 +344,7 @@ async function handleLeaveGuild(ctx) {
     const guildId = data && data.guildId;
     const guild = guildId ? webServer.client?.guilds.cache.get(guildId) : null;
     if (!guild) {
-        log.warn(`[WebServer] Départ refusé : serveur ${guildId} introuvable.`);
+        log.warn(`[WebServer] Leave refused: guild ${guildId} not found.`);
         return fail('Serveur introuvable — le bot n\'en fait plus partie.');
     }
 
@@ -361,14 +361,14 @@ async function handleLeaveGuild(ctx) {
         const queue = useMainPlayer().queues.get(guildId);
         if (queue) queue.delete();
     } catch (err) {
-        log.warn(`[WebServer] File de ${name} non détruite avant le départ : ${err.message}`);
+        log.warn(`[WebServer] Queue of ${name} not destroyed before leaving: ${err.message}`);
     }
 
     try {
         await guild.leave();
-        log.info(`[WebServer] Le bot a quitté le serveur « ${name} » (${guildId}).`);
+        log.info(`[WebServer] The bot left guild « ${name} » (${guildId}).`);
     } catch (err) {
-        log.error(`[WebServer] Échec du départ de « ${name} » : ${err.message}`);
+        log.error(`[WebServer] Failed to leave « ${name} »: ${err.message}`);
         return fail(`Impossible de quitter « ${name} » : ${err.message}`);
     }
 
@@ -434,9 +434,9 @@ async function handleUpdateSettings(ctx) {
                             // plus rien en diffusion commune.
                             try {
                                 const engine = ensureEngine(queue);
-                                if (engine) log.info('[WebServer] Bus de mixage raccroché à la connexion vocale.');
+                                if (engine) log.info('[WebServer] Mix bus hooked back onto the voice connection.');
                             } catch (subErr) {
-                                log.error('[WebServer] Erreur de raccrochage du bus de mixage :', subErr.message);
+                                log.error('[WebServer] Error hooking the mix bus back:', subErr.message);
                             }
                         }
                         if (webServer.client.setupDucking) {
@@ -485,7 +485,7 @@ async function handleUpdateSettings(ctx) {
                                     });
                                 }
                             } catch (playErr) {
-                                log.error('[WebServer] Erreur play lors du retour en mode everyone :', playErr.message);
+                                log.error('[WebServer] play error when returning to everyone mode:', playErr.message);
                             } finally {
                                 // Restaurer la file et l'historique réels (qu'il y ait eu erreur ou non)
                                 if (queue.virtualTracks && queue.virtualTracks.length > 0) {
@@ -541,7 +541,7 @@ async function handleUpdateSettings(ctx) {
                             }
                         }
                     } catch (err) {
-                        log.error('[WebServer] Erreur reconnexion bot en mode everyone:', err.message);
+                        log.error('[WebServer] Error reconnecting the bot in everyone mode:', err.message);
                     }
                 }
             }
@@ -550,11 +550,11 @@ async function handleUpdateSettings(ctx) {
 
         if (Object.keys(data).length > 0) {
             if (data.baseVolume !== undefined) {
-                const muteStatus = data.baseVolume === 0 ? '[SOURDINE ACTIVÉE]' : `[VOLUME ${data.baseVolume}%]`;
-                log.info(`[Player Mute] ${muteStatus} Réglage du volume à ${data.baseVolume}% pour le serveur (Source: IHM / Fenêtre Vidéo)`);
+                const muteStatus = data.baseVolume === 0 ? '[MUTED]' : `[VOLUME ${data.baseVolume}%]`;
+                log.info(`[Player Mute] ${muteStatus} Setting the guild volume to ${data.baseVolume}% (Source: UI / Video window)`);
             }
             if (data.playbackSpeed !== undefined) {
-                log.info(`[Player Speed] Vitesse de lecture ajustée à ${data.playbackSpeed}x (Source: IHM / Fenêtre Vidéo)`);
+                log.info(`[Player Speed] Playback speed adjusted to ${data.playbackSpeed}x (Source: UI / Video window)`);
             }
 
             // Délai de grâce avant que le bot ne quitte un salon vidé. Il arme
@@ -565,7 +565,7 @@ async function handleUpdateSettings(ctx) {
                 const seconds = Number(data.presenceDepartureDelay);
                 if (Number.isFinite(seconds)) {
                     data.presenceDepartureDelay = Math.min(300, Math.max(0, Math.round(seconds)));
-                    log.info(`[Presence] Départ d'un salon vide fixé à ${data.presenceDepartureDelay}s.`);
+                    log.info(`[Presence] Leaving an empty channel set to ${data.presenceDepartureDelay}s.`);
                 } else {
                     delete data.presenceDepartureDelay;
                 }
@@ -633,7 +633,7 @@ function handleToggleVoiceDetection(ctx) {
             )?.id;
 
         if (!activeChannelId) {
-            log.warn('[WebServer] toggleVoiceDetection : aucun salon vocal actif');
+            log.warn('[WebServer] toggleVoiceDetection: no active voice channel');
             return;
         }
 
@@ -645,7 +645,7 @@ function handleToggleVoiceDetection(ctx) {
             duckMgr.refresh();
         }
 
-        log.info(`[WebServer] Détection vocale ${enabled ? 'activée' : 'désactivée'} pour ${userId} dans ${activeChannelId}`);
+        log.info(`[WebServer] Voice detection ${enabled ? 'enabled' : 'disabled'} for ${userId} in ${activeChannelId}`);
         webServer.broadcastState(currentGuildId);
 }
 

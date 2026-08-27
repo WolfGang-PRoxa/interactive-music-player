@@ -23,8 +23,8 @@
     function units() {
         return {
             byte: tr('unit_bytes', 'octets'),
-            ko: tr('unit_kb', 'Ko'),
-            mo: tr('unit_mb', 'Mo'),
+            kb: tr('unit_kb', 'Ko'),
+            mb: tr('unit_mb', 'Mo'),
             go: tr('unit_gb', 'Go'),
         };
     }
@@ -32,17 +32,17 @@
     // Dynamic auto-scaling unit formatter (octets, Ko, Mo, Go)
     function formatBytes(bytes) {
         const u = units();
-        if (!bytes || bytes <= 0) return { val: '0.00', unit: u.ko, raw: `0 ${u.byte}` };
+        if (!bytes || bytes <= 0) return { val: '0.00', unit: u.kb, raw: `0 ${u.byte}` };
         if (bytes < 1024) {
             return { val: bytes.toString(), unit: u.byte, raw: `${bytes} ${u.byte}` };
         }
         if (bytes < 1024 * 1024) {
-            return { val: (bytes / 1024).toFixed(2), unit: u.ko, raw: `${bytes.toLocaleString()} ${u.byte}` };
+            return { val: (bytes / 1024).toFixed(2), unit: u.kb, raw: `${bytes.toLocaleString()} ${u.byte}` };
         }
         if (bytes < 1024 * 1024 * 1024) {
-            return { val: (bytes / (1024 * 1024)).toFixed(2), unit: u.mo, raw: `${(bytes / 1024).toFixed(1)} ${u.ko}` };
+            return { val: (bytes / (1024 * 1024)).toFixed(2), unit: u.mb, raw: `${(bytes / 1024).toFixed(1)} ${u.kb}` };
         }
-        return { val: (bytes / (1024 * 1024 * 1024)).toFixed(2), unit: u.go, raw: `${(bytes / (1024 * 1024)).toFixed(1)} ${u.mo}` };
+        return { val: (bytes / (1024 * 1024 * 1024)).toFixed(2), unit: u.go, raw: `${(bytes / (1024 * 1024)).toFixed(1)} ${u.mb}` };
     }
 
     function updateBandwidthUI() {
@@ -321,10 +321,10 @@
             return `${(val / (1024 * 1024 * 1024)).toFixed(1)} ${u.go}`;
         }
         if (val >= 1024 * 1024) {
-            return `${Math.round(val / (1024 * 1024))} ${u.mo}`;
+            return `${Math.round(val / (1024 * 1024))} ${u.mb}`;
         }
         if (val >= 1024) {
-            return `${Math.round(val / 1024)} ${u.ko}`;
+            return `${Math.round(val / 1024)} ${u.kb}`;
         }
         return `${Math.round(val)} o`;
     }
@@ -598,7 +598,7 @@
                         ? `${shortTime(bucket.tFirst, true)} → ${shortTime(bucket.tLast, true)}`
                         : shortTime(bucket.tLast, true);
                 }
-                const mbUnit = units().mo;
+                const mbUnit = units().mb;
                 if (elRss) elRss.textContent = `${rssMegabytes.toFixed(1)} ${mbUnit}`;
                 if (elHeap) elHeap.textContent = `${heapMegabytes.toFixed(1)} / ${heapTotalMegabytes.toFixed(1)} ${mbUnit}`;
 
@@ -781,9 +781,9 @@
             const elHeap = document.getElementById('bot-mem-heap');
             const elUptime = document.getElementById('bot-uptime');
 
-            const mo = units().mo;
-            if (elRss) elRss.textContent = `${rssMB} ${mo}`;
-            if (elHeap) elHeap.textContent = `${heapUsedMB} / ${heapTotalMB} ${mo}`;
+            const mb = units().mb;
+            if (elRss) elRss.textContent = `${rssMB} ${mb}`;
+            if (elHeap) elHeap.textContent = `${heapUsedMB} / ${heapTotalMB} ${mb}`;
             if (elUptime) elUptime.textContent = formatUptime(stats.uptime);
 
             // Dernières valeurs connues, pour pouvoir réafficher au changement de langue
@@ -802,13 +802,13 @@
         updateBandwidthUI();
         if (lastStats && lastStats.memory) {
             const stats = lastStats;
-            const mo = units().mo;
+            const mb = units().mb;
             const elRss = document.getElementById('bot-mem-rss');
             const elHeap = document.getElementById('bot-mem-heap');
             const elUptime = document.getElementById('bot-uptime');
-            if (elRss) elRss.textContent = `${(stats.memory.rss / BYTES_PER_MB).toFixed(1)} ${mo}`;
+            if (elRss) elRss.textContent = `${(stats.memory.rss / BYTES_PER_MB).toFixed(1)} ${mb}`;
             if (elHeap) {
-                elHeap.textContent = `${(stats.memory.heapUsed / BYTES_PER_MB).toFixed(1)} / ${(stats.memory.heapTotal / BYTES_PER_MB).toFixed(1)} ${mo}`;
+                elHeap.textContent = `${(stats.memory.heapUsed / BYTES_PER_MB).toFixed(1)} / ${(stats.memory.heapTotal / BYTES_PER_MB).toFixed(1)} ${mb}`;
             }
             if (elUptime) elUptime.textContent = formatUptime(stats.uptime);
         }

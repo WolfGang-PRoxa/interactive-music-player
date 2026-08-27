@@ -31,7 +31,7 @@ let failed = 0;
 let passed = 0;
 const check = (label, ok, detail = '') => {
     if (ok) { passed++; }
-    else { failed++; console.log(`  ECHEC ${label}${detail ? ` — ${detail}` : ''}`); }
+    else { failed++; console.log(`  FAIL ${label}${detail ? ` — ${detail}` : ''}`); }
 };
 
 /**
@@ -98,11 +98,11 @@ const langs = fs.readdirSync(DOCS, { withFileTypes: true })
     .filter((e) => e.isDirectory() && /^[a-z]{2}$/.test(e.name))
     .map((e) => e.name);
 
-console.log(`\n=== Corpus de documentation — langues : ${langs.join(', ')} ===\n`);
+console.log(`\n=== Documentation corpus — languages: ${langs.join(', ')} ===\n`);
 
-check(`la langue de référence « ${REFERENCE} » est présente`, langs.includes(REFERENCE));
+check(`reference language « ${REFERENCE} » is present`, langs.includes(REFERENCE));
 if (!langs.includes(REFERENCE)) {
-    console.log(`\n=== ${passed} réussite(s), ${failed} échec(s) ===`);
+    console.log(`\n=== ${passed} passed, ${failed} failed ===`);
     process.exit(1);
 }
 
@@ -120,10 +120,10 @@ for (const lang of langs) {
 
     const missing = referenceFiles.filter((f) => !files.includes(f));
     const extra = files.filter((f) => !referenceFiles.includes(f));
-    check(`${lang} : mêmes fichiers que ${REFERENCE}`,
+    check(`${lang}: same files as ${REFERENCE}`,
         missing.length === 0 && extra.length === 0,
-        [missing.length ? `manquants : ${missing.join(', ')}` : '',
-         extra.length ? `en trop : ${extra.join(', ')}` : ''].filter(Boolean).join(' ; '));
+        [missing.length ? `missing: ${missing.join(', ')}` : '',
+         extra.length ? `extra: ${extra.join(', ')}` : ''].filter(Boolean).join(' ; '));
 
     const headingsOf = {};
     for (const file of files) {
@@ -137,10 +137,10 @@ for (const lang of langs) {
         if (referenceSkeletons[file]) {
             const ref = referenceSkeletons[file];
             const own = skeleton(source);
-            check(`${lang}/${file} : charpente conservée`,
+            check(`${lang}/${file}: structure preserved`,
                 ref.fences === own.fences && ref.titles === own.titles && ref.tables === own.tables,
-                `blocs ${own.fences}/${ref.fences}, titres ${own.titles}/${ref.titles}, `
-                + `lignes de tableau ${own.tables}/${ref.tables}`);
+                `fences ${own.fences}/${ref.fences}, headings ${own.titles}/${ref.titles}, `
+                + `table rows ${own.tables}/${ref.tables}`);
         }
 
         for (const raw of [...source.matchAll(/\]\(([^)\s]+)\)/g)].map((m) => m[1])) {
@@ -150,9 +150,9 @@ for (const lang of langs) {
 
             // Ancre dans le document courant.
             if (!target) {
-                check(`${lang}/${file} : ancre #${fragment}`,
+                check(`${lang}/${file}: anchor #${fragment}`,
                     headingsOf[file].includes(fragment),
-                    `titres : ${headingsOf[file].slice(0, 5).join(', ')}…`);
+                    `headings: ${headingsOf[file].slice(0, 5).join(', ')}…`);
                 continue;
             }
 
@@ -167,13 +167,13 @@ for (const lang of langs) {
 
             check(`${lang}/${file} : document ${resolved}`, files.includes(resolved));
             if (fragment && files.includes(resolved)) {
-                check(`${lang}/${file} : ancre ${resolved}#${fragment}`,
+                check(`${lang}/${file}: anchor ${resolved}#${fragment}`,
                     headingsOf[resolved].includes(fragment),
-                    `titres : ${headingsOf[resolved].slice(0, 5).join(', ')}…`);
+                    `headings: ${headingsOf[resolved].slice(0, 5).join(', ')}…`);
             }
         }
     }
 }
 
-console.log(`=== ${passed} réussite(s), ${failed} échec(s) ===`);
+console.log(`=== ${passed} passed, ${failed} failed ===`);
 process.exit(failed === 0 ? 0 : 1);

@@ -28,7 +28,7 @@ function applySpeed(queue, speed) {
     if (engine) {
         const value = parseFloat(speed) || 1;
         engine.applySpeed(value).catch((err) => {
-            log.error('[PlaybackSettings] Changement de vitesse impossible :', err.message);
+            log.error('[PlaybackSettings] Speed change impossible:', err.message);
         });
         return;
     }
@@ -44,7 +44,7 @@ function applySpeed(queue, speed) {
         }
         queue.filters.ffmpeg.setFilters(withoutSpeed);
     } catch (err) {
-        log.error('[PlaybackSettings] Erreur d\'application du filtre de vitesse :', err.message);
+        log.error('[PlaybackSettings] Error applying the speed filter:', err.message);
     }
 }
 

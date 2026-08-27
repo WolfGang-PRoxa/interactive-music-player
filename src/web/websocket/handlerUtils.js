@@ -126,8 +126,8 @@ function addToSetAsideQueue(currentGuildId, settings, tracks) {
     toStore.forEach(t => stored.push(toData(t)));
     writeSetAsideQueue(currentGuildId, stored, settings);
 
-    log.info(`[Queue] ${toStore.length} piste(s) ajoutée(s) à la file d'attente ; `
-        + 'la playlist en cours reste la source de lecture.');
+    log.info(`[Queue] ${toStore.length} track(s) added to the pending queue; `
+        + 'the playlist in progress stays the playback source.');
     return true;
 }
 

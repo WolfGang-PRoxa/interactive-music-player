@@ -10,7 +10,7 @@
  *     feuille ;
  *   - **flux** : le document d'un seul tenant, dans une page qui défile. Même
  *     DOM, même rendu du Markdown : la feuille de style neutralise les colonnes
- *     (`.docs-mode-flux`, dans css/docs.css) et ce module met en sommeil tout
+ *     (`.docs-mode-flow`, dans css/docs.css) et ce module met en sommeil tout
  *     ce qui relève de la pagination.
  *
  * Deux visualisations, permutées par le bouton voisin :
@@ -62,7 +62,7 @@ window.MusicPlayer = window.MusicPlayer || {};
     const TURN_DURATION_MS = 760;
 
     /** Un cran de molette par tourne : sans quoi un geste envoie dix pages. */
-    const REPOS_MOLETTE = 420;
+    const WHEEL_REST = 420;
 
     /** Sommaire renvoyé par le serveur. */
     let catalog = [];
@@ -89,7 +89,7 @@ window.MusicPlayer = window.MusicPlayer || {};
      * Markdown : c'est la feuille de style qui neutralise les colonnes, et ce
      * module qui met en sommeil tout ce qui relève de la pagination.
      */
-    let mode = 'livre';
+    let mode = 'book';
 
     /** Index de la première colonne de la double page affichée. */
     let column = 0;
@@ -103,17 +103,17 @@ window.MusicPlayer = window.MusicPlayer || {};
     /** Une tourne est en cours : les commandes de navigation sont suspendues. */
     let turning = false;
     let lastWheelPlate = 0;
-    let initFait = false;
-    let minuterieRedim = null;
+    let initDone = false;
+    let resizeTimer = null;
 
     function el(id) {
         return document.getElementById(id);
     }
 
     function t(key, fallback) {
-        const traduit = typeof window.MusicPlayer.t === 'function' ? window.MusicPlayer.t(key) : key;
+        const translated = typeof window.MusicPlayer.t === 'function' ? window.MusicPlayer.t(key) : key;
         // `t()` renvoie la clé elle-même quand la traduction manque.
-        return traduit && traduit !== key ? traduit : fallback !== undefined ? fallback : key;
+        return translated && translated !== key ? translated : fallback !== undefined ? fallback : key;
     }
 
     function isOpen() {
@@ -121,18 +121,18 @@ window.MusicPlayer = window.MusicPlayer || {};
         return !!modal && !modal.classList.contains('hidden');
     }
 
-    function enFlux() {
-        return mode === 'flux';
+    function isFlowMode() {
+        return mode === 'flow';
     }
 
     /** La fenêtre qui défile en mode flux : la page de gauche, seule affichée. */
-    function fenetreFlux() {
+    function flowWindow() {
         return document.querySelector('.docs-sheet-left .docs-viewport');
     }
 
     /* ═══════════════════════ Rendu du Markdown ═══════════════════════ */
 
-    function echapper(text) {
+    function escapeHtml(text) {
         return String(text)
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
@@ -177,15 +177,15 @@ window.MusicPlayer = window.MusicPlayer || {};
         const raw = String(url);
 
         if (/^https?:\/\//i.test(raw)) {
-            return `<a class="docs-lien docs-lien-externe" href="${raw}" target="_blank" rel="noopener noreferrer">${content}</a>`;
+            return `<a class="docs-link docs-link-external" href="${raw}" target="_blank" rel="noopener noreferrer">${content}</a>`;
         }
         if (raw.startsWith('#')) {
-            return `<a class="docs-lien docs-lien-ancre" href="#" data-ancre="${echapper(raw.slice(1))}">${content}</a>`;
+            return `<a class="docs-link docs-link-anchor" href="#" data-ancre="${escapeHtml(raw.slice(1))}">${content}</a>`;
         }
         if (/\.md(#.*)?$/i.test(raw)) {
-            return `<a class="docs-lien docs-lien-doc" href="#" data-doc="${echapper(raw)}">${content}</a>`;
+            return `<a class="docs-link docs-link-doc" href="#" data-doc="${escapeHtml(raw)}">${content}</a>`;
         }
-        return `<span class="docs-lien-inerte">${content}</span>`;
+        return `<span class="docs-link-inert">${content}</span>`;
     }
 
     /**
@@ -197,7 +197,7 @@ window.MusicPlayer = window.MusicPlayer || {};
      * transformerait un exemple de Markdown en Markdown appliqué.
      */
     function renderInline(text) {
-        let html = echapper(text);
+        let html = escapeHtml(text);
 
         const codes = [];
         html = html.replace(/`([^`]+)`/g, (_, content) => {
@@ -217,10 +217,10 @@ window.MusicPlayer = window.MusicPlayer || {};
     }
 
     /** Une ligne de liste : marqueur, indentation, contenu. */
-    function analyserItem(line) {
+    function parseItem(line) {
         const m = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/.exec(line);
         if (!m) return null;
-        return { indent: m[1].length, ordonne: /\d/.test(m[2]), text: m[3] };
+        return { indent: m[1].length, ordered: /\d/.test(m[2]), text: m[3] };
     }
 
     /**
@@ -231,7 +231,7 @@ window.MusicPlayer = window.MusicPlayer || {};
      * @returns {{ html: string, index: number }} html produit, et premier item non consommé
      */
     function buildList(items, start, indentRef) {
-        const ordonne = items[start].ordonne;
+        const ordered = items[start].ordered;
         const parts = [];
         let i = start;
 
@@ -245,14 +245,14 @@ window.MusicPlayer = window.MusicPlayer || {};
                 continue;
             }
             // Un changement de nature (puces ↔ numéros) ouvre une autre liste.
-            if (items[i].ordonne !== ordonne) break;
+            if (items[i].ordered !== ordered) break;
             parts.push(renderInline(items[i].text));
             i++;
         }
 
-        const balise = ordonne ? 'ol' : 'ul';
+        const tag = ordered ? 'ol' : 'ul';
         const body = parts.map((m) => `<li>${m}</li>`).join('');
-        return { html: `<${balise} class="docs-liste">${body}</${balise}>`, index: i };
+        return { html: `<${tag} class="docs-list">${body}</${tag}>`, index: i };
     }
 
     /** Découpe une ligne de tableau en cellules. */
@@ -265,7 +265,7 @@ window.MusicPlayer = window.MusicPlayer || {};
             .map((c) => c.trim());
     }
 
-    function estSeparateurTableau(line) {
+    function isTableSeparator(line) {
         return !!line && /^[\s|:-]+$/.test(line) && line.includes('-') && line.includes('|');
     }
 
@@ -295,21 +295,21 @@ window.MusicPlayer = window.MusicPlayer || {};
             }
 
             // ── Bloc de code clôturé ──
-            const ouverture = /^\s*(`{3,}|~{3,})\s*([\w+#.-]*)\s*$/.exec(line);
-            if (ouverture) {
-                const marque = ouverture[1][0];
-                const fermeture = new RegExp(`^\\s*\\${marque}{${ouverture[1].length},}\\s*$`);
-                const langue = ouverture[2] || '';
+            const opening = /^\s*(`{3,}|~{3,})\s*([\w+#.-]*)\s*$/.exec(line);
+            if (opening) {
+                const fenceChar = opening[1][0];
+                const closing = new RegExp(`^\\s*\\${fenceChar}{${opening[1].length},}\\s*$`);
+                const codeLang = opening[2] || '';
                 const body = [];
                 i++;
-                while (i < lines.length && !fermeture.test(lines[i])) {
+                while (i < lines.length && !closing.test(lines[i])) {
                     body.push(lines[i]);
                     i++;
                 }
                 i++; // la ligne de fermeture
                 html.push(
-                    `<pre class="docs-bloc-code"${langue ? ` data-langue="${echapper(langue)}"` : ''}>` +
-                        `<code>${echapper(body.join('\n'))}</code></pre>`
+                    `<pre class="docs-code-block"${codeLang ? ` data-lang="${escapeHtml(codeLang)}"` : ''}>` +
+                        `<code>${escapeHtml(body.join('\n'))}</code></pre>`
                 );
                 continue;
             }
@@ -320,7 +320,7 @@ window.MusicPlayer = window.MusicPlayer || {};
                 const level = title[1].length;
                 const text = title[2].replace(/\s+#+\s*$/, '').trim();
                 html.push(
-                    `<h${level} id="${anchor(text)}" class="docs-titre docs-titre-${level}">` +
+                    `<h${level} id="${anchor(text)}" class="docs-title docs-title-${level}">` +
                         `${renderInline(text)}</h${level}>`
                 );
                 i++;
@@ -329,13 +329,13 @@ window.MusicPlayer = window.MusicPlayer || {};
 
             // ── Filet ──
             if (/^\s*([-*_])\s*(\1\s*){2,}$/.test(line)) {
-                html.push('<hr class="docs-filet">');
+                html.push('<hr class="docs-rule">');
                 i++;
                 continue;
             }
 
             // ── Tableau ──
-            if (line.includes('|') && estSeparateurTableau(lines[i + 1])) {
+            if (line.includes('|') && isTableSeparator(lines[i + 1])) {
                 const headers = cells(line);
                 const alignments = cells(lines[i + 1]).map((c) => {
                     if (/^:.*:$/.test(c)) return 'center';
@@ -353,10 +353,10 @@ window.MusicPlayer = window.MusicPlayer || {};
                 const style = (index) => ` style="text-align:${alignments[index] || 'left'}"`;
                 const th = headers.map((c, n) => `<th${style(n)}>${renderInline(c)}</th>`).join('');
                 const tr = body
-                    .map((rangee) => `<tr>${rangee.map((c, n) => `<td${style(n)}>${renderInline(c)}</td>`).join('')}</tr>`)
+                    .map((row) => `<tr>${row.map((c, n) => `<td${style(n)}>${renderInline(c)}</td>`).join('')}</tr>`)
                     .join('');
                 html.push(
-                    `<div class="docs-tableau-cadre"><table class="docs-tableau">` +
+                    `<div class="docs-table-frame"><table class="docs-table">` +
                         `<thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table></div>`
                 );
                 continue;
@@ -364,20 +364,20 @@ window.MusicPlayer = window.MusicPlayer || {};
 
             // ── Citation ──
             if (/^\s*>/.test(line)) {
-                const dedans = [];
-                while (i < lines.length && (/^\s*>/.test(lines[i]) || (dedans.length && lines[i].trim()))) {
-                    dedans.push(lines[i].replace(/^\s*>\s?/, ''));
+                const inside = [];
+                while (i < lines.length && (/^\s*>/.test(lines[i]) || (inside.length && lines[i].trim()))) {
+                    inside.push(lines[i].replace(/^\s*>\s?/, ''));
                     i++;
                 }
-                html.push(`<blockquote class="docs-citation">${renderMarkdown(dedans.join('\n'))}</blockquote>`);
+                html.push(`<blockquote class="docs-quote">${renderMarkdown(inside.join('\n'))}</blockquote>`);
                 continue;
             }
 
             // ── Liste ──
-            if (analyserItem(line)) {
+            if (parseItem(line)) {
                 const items = [];
                 while (i < lines.length) {
-                    const item = analyserItem(lines[i]);
+                    const item = parseItem(lines[i]);
                     if (item) {
                         items.push(item);
                         i++;
@@ -390,7 +390,7 @@ window.MusicPlayer = window.MusicPlayer || {};
                         continue;
                     }
                     // Ligne vide : la liste se poursuit si un point la suit.
-                    if (!lines[i].trim() && analyserItem(lines[i + 1])) {
+                    if (!lines[i].trim() && parseItem(lines[i + 1])) {
                         i++;
                         continue;
                     }
@@ -401,7 +401,7 @@ window.MusicPlayer = window.MusicPlayer || {};
             }
 
             // ── Paragraphe ──
-            const paragraphe = [];
+            const paragraph = [];
             while (
                 i < lines.length &&
                 lines[i].trim() &&
@@ -409,13 +409,13 @@ window.MusicPlayer = window.MusicPlayer || {};
                 !/^\s*(`{3,}|~{3,})/.test(lines[i]) &&
                 !/^\s*>/.test(lines[i]) &&
                 !/^\s*([-*_])\s*(\1\s*){2,}$/.test(lines[i]) &&
-                !analyserItem(lines[i])
+                !parseItem(lines[i])
             ) {
-                paragraphe.push(lines[i]);
+                paragraph.push(lines[i]);
                 i++;
             }
-            if (paragraphe.length) {
-                html.push(`<p class="docs-paragraphe">${renderInline(paragraphe.join('\n'))}</p>`);
+            if (paragraph.length) {
+                html.push(`<p class="docs-paragraph">${renderInline(paragraph.join('\n'))}</p>`);
             } else {
                 // Aucune règle n'a mordu et le paragraphe est vide : la ligne
                 // ouvrirait une boucle sans fin si on ne la consommait pas.
@@ -441,41 +441,41 @@ window.MusicPlayer = window.MusicPlayer || {};
      */
     function renderSource(source) {
         const lines = String(source).replace(/\r\n?/g, '\n').split('\n');
-        let dansCode = false;
+        let inCode = false;
 
         return lines
             .map((line) => {
-                let content = echapper(line);
-                const classes = ['docs-md-ligne'];
+                let content = escapeHtml(line);
+                const classes = ['docs-md-line'];
 
-                const cloture = /^\s*(`{3,}|~{3,})/.test(line);
-                if (cloture) {
-                    dansCode = !dansCode;
-                    classes.push('docs-md-cloture');
+                const closingFence = /^\s*(`{3,}|~{3,})/.test(line);
+                if (closingFence) {
+                    inCode = !inCode;
+                    classes.push('docs-md-fence-close');
                     return `<div class="${classes.join(' ')}">${content}</div>`;
                 }
 
-                if (dansCode) {
+                if (inCode) {
                     classes.push('docs-md-code');
                     return `<div class="${classes.join(' ')}">${content}</div>`;
                 }
 
                 const title = /^(#{1,6})(\s+.*)$/.exec(content);
                 if (title) {
-                    classes.push('docs-md-titre');
-                    content = `<span class="docs-md-sigle">${title[1]}</span>${title[2]}`;
+                    classes.push('docs-md-title');
+                    content = `<span class="docs-md-abbr">${title[1]}</span>${title[2]}`;
                     return `<div class="${classes.join(' ')}">${content}</div>`;
                 }
 
-                if (/^\s*&gt;/.test(content)) classes.push('docs-md-citation');
-                if (/^\s*\|/.test(content)) classes.push('docs-md-tableau');
-                if (/^\s*([-*_])\s*(\1\s*){2,}$/.test(line)) classes.push('docs-md-filet');
+                if (/^\s*&gt;/.test(content)) classes.push('docs-md-quote');
+                if (/^\s*\|/.test(content)) classes.push('docs-md-table');
+                if (/^\s*([-*_])\s*(\1\s*){2,}$/.test(line)) classes.push('docs-md-rule');
 
                 content = content
-                    .replace(/^(\s*)([-*+]|\d+[.)])(\s)/, '$1<span class="docs-md-sigle">$2</span>$3')
-                    .replace(/`([^`]+)`/g, '<span class="docs-md-litteral">`$1`</span>')
-                    .replace(/(\*\*[^*]+\*\*)/g, '<span class="docs-md-fort">$1</span>')
-                    .replace(/(\[[^\]]+\])(\([^)]+\))/g, '<span class="docs-md-lien">$1</span><span class="docs-md-cible">$2</span>');
+                    .replace(/^(\s*)([-*+]|\d+[.)])(\s)/, '$1<span class="docs-md-abbr">$2</span>$3')
+                    .replace(/`([^`]+)`/g, '<span class="docs-md-literal">`$1`</span>')
+                    .replace(/(\*\*[^*]+\*\*)/g, '<span class="docs-md-strong">$1</span>')
+                    .replace(/(\[[^\]]+\])(\([^)]+\))/g, '<span class="docs-md-link">$1</span><span class="docs-md-target">$2</span>');
 
                 return `<div class="${classes.join(' ')}">${content}</div>`;
             })
@@ -490,14 +490,14 @@ window.MusicPlayer = window.MusicPlayer || {};
             left: document.querySelector('.docs-sheet-left .docs-flow'),
             right: document.querySelector('.docs-sheet-right .docs-flow'),
             before: document.querySelector('.docs-leaf-front .docs-flow'),
-            arriere: document.querySelector('.docs-leaf-back .docs-flow'),
+            back: document.querySelector('.docs-leaf-back .docs-flow'),
         };
     }
 
     /** Verse le même contenu dans les quatre rubans. */
-    function poserContenu(html) {
-        const tous = ribbons();
-        Object.values(tous).forEach((ribbon) => {
+    function setContent(html) {
+        const all = ribbons();
+        Object.values(all).forEach((ribbon) => {
             if (ribbon) ribbon.innerHTML = html;
         });
     }
@@ -522,12 +522,12 @@ window.MusicPlayer = window.MusicPlayer || {};
      * rigoureusement identiques, faute de quoi leurs colonnes ne tomberaient
      * plus aux mêmes endroits.
      */
-    function ajusterBlocsCode() {
-        const tous = Object.values(ribbons()).filter(Boolean);
-        const modele = tous[0];
-        if (!modele) return;
+    function fitCodeBlocks() {
+        const all = Object.values(ribbons()).filter(Boolean);
+        const template = all[0];
+        if (!template) return;
 
-        const blocks = Array.from(modele.querySelectorAll('.docs-bloc-code'));
+        const blocks = Array.from(template.querySelectorAll('.docs-code-block'));
         if (!blocks.length) return;
 
         const firstCode = blocks[0].querySelector('code');
@@ -537,40 +537,40 @@ window.MusicPlayer = window.MusicPlayer || {};
         const defaultSize = parseFloat(style.fontSize) || 12;
 
         // Sonde : largeur d'un caractère pour une taille de 100 px.
-        const sonde = document.createElement('span');
-        sonde.style.cssText =
+        const probe = document.createElement('span');
+        probe.style.cssText =
             'position:absolute;visibility:hidden;white-space:pre;font-size:100px;' +
             `font-family:${style.fontFamily};`;
-        sonde.textContent = 'M'.repeat(50);
-        modele.appendChild(sonde);
-        const charWidthPerPixel = sonde.getBoundingClientRect().width / 50 / 100;
-        sonde.remove();
+        probe.textContent = 'M'.repeat(50);
+        template.appendChild(probe);
+        const charWidthPerPixel = probe.getBoundingClientRect().width / 50 / 100;
+        probe.remove();
         if (!charWidthPerPixel) return;
 
-        const autres = tous.slice(1).map((ribbon) => Array.from(ribbon.querySelectorAll('.docs-bloc-code')));
+        const others = all.slice(1).map((ribbon) => Array.from(ribbon.querySelectorAll('.docs-code-block')));
 
         blocks.forEach((block, index) => {
             const code = block.querySelector('code');
             if (!code) return;
 
             const lines = code.textContent.split('\n');
-            const plusLongue = lines.reduce((max, line) => Math.max(max, line.length), 0);
-            if (!plusLongue) return;
+            const longest = lines.reduce((max, line) => Math.max(max, line.length), 0);
+            if (!longest) return;
 
-            const boite = getComputedStyle(block);
-            const dispo =
-                block.clientWidth - parseFloat(boite.paddingLeft || 0) - parseFloat(boite.paddingRight || 0);
-            if (dispo <= 0) return;
+            const box = getComputedStyle(block);
+            const available =
+                block.clientWidth - parseFloat(box.paddingLeft || 0) - parseFloat(box.paddingRight || 0);
+            if (available <= 0) return;
 
-            const fitting = dispo / (plusLongue * charWidthPerPixel);
+            const fitting = available / (longest * charWidthPerPixel);
             const size = Math.min(defaultSize, Math.max(MIN_CODE_PX, fitting));
             if (size >= defaultSize) return;
 
             const value = `${size.toFixed(2)}px`;
             code.style.fontSize = value;
-            autres.forEach((list) => {
-                const jumeau = list[index] && list[index].querySelector('code');
-                if (jumeau) jumeau.style.fontSize = value;
+            others.forEach((list) => {
+                const twin = list[index] && list[index].querySelector('code');
+                if (twin) twin.style.fontSize = value;
             });
         });
     }
@@ -611,43 +611,43 @@ window.MusicPlayer = window.MusicPlayer || {};
      * même chose que celle qu'elle recouvre.
      *
      * @param {number} pageWidth Largeur d'une page, lue sur la fenêtre.
-     * @param {number} gouttiere Espace entre deux colonnes.
+     * @param {number} gutter Espace entre deux colonnes.
      */
-    function preparerRubans(pageWidth, gouttiere) {
+    function prepareRibbons(pageWidth, gutter) {
         const sheet = document.querySelector('.docs-sheet-left');
-        const modele = document.querySelector('.docs-sheet-left .docs-flow');
-        if (!sheet || !modele) return;
+        const template = document.querySelector('.docs-sheet-left .docs-flow');
+        if (!sheet || !template) return;
 
-        const boite = getComputedStyle(sheet);
-        const hauteur = sheet.clientHeight
-            - parseFloat(boite.paddingTop || 0)
-            - parseFloat(boite.paddingBottom || 0);
+        const box = getComputedStyle(sheet);
+        const height = sheet.clientHeight
+            - parseFloat(box.paddingTop || 0)
+            - parseFloat(box.paddingBottom || 0);
 
         // Fenêtre encore repliée, ou pas encore mise en page : mieux vaut ne
         // rien imposer que d'imposer zéro.
-        if (!(hauteur > 0) || !(pageWidth > 0)) return;
+        if (!(height > 0) || !(pageWidth > 0)) return;
 
-        const tous = Object.values(ribbons()).filter(Boolean);
+        const all = Object.values(ribbons()).filter(Boolean);
 
         // Première passe : colonne unique, pour lire la hauteur du document.
-        tous.forEach((ribbon) => {
+        all.forEach((ribbon) => {
             ribbon.style.width = '';
             ribbon.style.columnWidth = '';
             ribbon.style.columnCount = '';
-            ribbon.style.height = `${hauteur}px`;
+            ribbon.style.height = `${height}px`;
         });
 
-        const naturelle = modele.scrollHeight;
-        const nombre = Math.max(1, Math.ceil(naturelle / hauteur) + 2);
+        const natural = template.scrollHeight;
+        const count = Math.max(1, Math.ceil(natural / height) + 2);
 
         // Seconde passe : la largeur qui loge ce nombre de colonnes. `columnCount`
         // doit céder — déclaré à 1 dans la feuille de style, il plafonnerait le
         // découpage quelle que soit la largeur offerte.
-        const largeur = nombre * (pageWidth + gouttiere) - gouttiere;
-        tous.forEach((ribbon) => {
+        const ribbonWidth = count * (pageWidth + gutter) - gutter;
+        all.forEach((ribbon) => {
             ribbon.style.columnCount = 'auto';
             ribbon.style.columnWidth = `${pageWidth}px`;
-            ribbon.style.width = `${largeur}px`;
+            ribbon.style.width = `${ribbonWidth}px`;
         });
     }
 
@@ -658,7 +658,7 @@ window.MusicPlayer = window.MusicPlayer || {};
      * découpage en colonnes est entièrement l'affaire du moteur de rendu, et
      * seule une mesure dit combien il en a produites.
      */
-    function mesurer() {
+    function measure() {
         const left = document.querySelector('.docs-sheet-left .docs-viewport');
         const ribbon = document.querySelector('.docs-sheet-left .docs-flow');
         const right = document.querySelector('.docs-sheet-right');
@@ -668,8 +668,8 @@ window.MusicPlayer = window.MusicPlayer || {};
         // est taillé bien plus large que le cadre, et se mesurer lui-même
         // reviendrait à multiplier la page par le nombre de pages.
         const width = left.clientWidth;
-        const gouttiere = parseFloat(getComputedStyle(ribbon).columnGap) || 0;
-        columnStep = width + gouttiere;
+        const gutter = parseFloat(getComputedStyle(ribbon).columnGap) || 0;
+        columnStep = width + gutter;
 
         // La double page n'existe que si la seconde feuille est affichée : le
         // basculement en page simple est décidé par une requête de média, pas
@@ -677,9 +677,9 @@ window.MusicPlayer = window.MusicPlayer || {};
         perView = right && getComputedStyle(right).display !== 'none' ? 2 : 1;
 
         // Puis on taille : sans colonnes, il n'y a rien à compter.
-        preparerRubans(width, gouttiere);
+        prepareRibbons(width, gutter);
 
-        columnCount = columnStep > 0 ? compterColonnes(ribbon) : 1;
+        columnCount = columnStep > 0 ? countColumns(ribbon) : 1;
     }
 
     /**
@@ -706,17 +706,17 @@ window.MusicPlayer = window.MusicPlayer || {};
      * @param {HTMLElement} ribbon Le ruban de gauche, celui qui fait référence.
      * @returns {number} Au moins 1.
      */
-    function compterColonnes(ribbon) {
-        const sentinelle = document.createElement('span');
-        sentinelle.setAttribute('aria-hidden', 'true');
-        sentinelle.style.cssText = 'display:inline-block;width:0;height:0;';
-        ribbon.appendChild(sentinelle);
-        const fin = sentinelle.offsetLeft;
-        sentinelle.remove();
+    function countColumns(ribbon) {
+        const sentinel = document.createElement('span');
+        sentinel.setAttribute('aria-hidden', 'true');
+        sentinel.style.cssText = 'display:inline-block;width:0;height:0;';
+        ribbon.appendChild(sentinel);
+        const end = sentinel.offsetLeft;
+        sentinel.remove();
 
         // Arrondi et non troncature : la sentinelle se pose sur le bord de sa
         // colonne, à quelques centièmes de pixel près selon le zoom.
-        return Math.max(1, Math.round(fin / columnStep) + 1);
+        return Math.max(1, Math.round(end / columnStep) + 1);
     }
 
     /** Pose une fenêtre sur la colonne demandée, ou la vide si elle n'existe pas. */
@@ -739,8 +739,8 @@ window.MusicPlayer = window.MusicPlayer || {};
         const paginate = el('docs-pager');
         if (paginate) {
             const last = Math.min(column + perView, columnCount);
-            const plage = perView === 2 && last > column + 1 ? `${column + 1}–${last}` : `${column + 1}`;
-            paginate.textContent = `${plage} / ${columnCount}`;
+            const folioRange = perView === 2 && last > column + 1 ? `${column + 1}–${last}` : `${column + 1}`;
+            paginate.textContent = `${folioRange} / ${columnCount}`;
         }
 
         const previous = el('btn-docs-prev');
@@ -751,35 +751,35 @@ window.MusicPlayer = window.MusicPlayer || {};
 
     /** Affiche une double page sans animation. */
     function show(index) {
-        const tous = ribbons();
+        const all = ribbons();
         column = Math.max(0, Math.min(index, Math.max(0, columnCount - 1)));
         // La double page commence toujours sur une colonne paire : sans cela,
         // avancer puis reculer décalerait le texte d'une page à chaque
         // aller-retour.
         if (perView === 2) column -= column % 2;
 
-        place(tous.left, column);
-        place(tous.right, perView === 2 ? column + 1 : -1);
+        place(all.left, column);
+        place(all.right, perView === 2 ? column + 1 : -1);
         updateFolios();
     }
 
     /* ═══════════════════════ Tourne de feuille ═══════════════════════ */
 
     /** Pose la feuille mobile sur l'une des deux pages, à la même place. */
-    function poserFeuille(cote) {
+    function setSheet(side) {
         const sheetEl = el('docs-leaf');
-        const page = document.querySelector(cote === 'gauche' ? '.docs-sheet-left' : '.docs-sheet-right');
-        const livre = el('docs-book');
-        if (!sheetEl || !page || !livre) return null;
+        const page = document.querySelector(side === 'left' ? '.docs-sheet-left' : '.docs-sheet-right');
+        const book = el('docs-book');
+        if (!sheetEl || !page || !book) return null;
 
-        const cadre = livre.getBoundingClientRect();
+        const frame = book.getBoundingClientRect();
         const target = page.getBoundingClientRect();
 
-        sheetEl.style.left = `${target.left - cadre.left}px`;
-        sheetEl.style.top = `${target.top - cadre.top}px`;
+        sheetEl.style.left = `${target.left - frame.left}px`;
+        sheetEl.style.top = `${target.top - frame.top}px`;
         sheetEl.style.width = `${target.width}px`;
         sheetEl.style.height = `${target.height}px`;
-        sheetEl.style.transformOrigin = cote === 'gauche' ? 'right center' : 'left center';
+        sheetEl.style.transformOrigin = side === 'left' ? 'right center' : 'left center';
         return sheetEl;
     }
 
@@ -806,7 +806,7 @@ window.MusicPlayer = window.MusicPlayer || {};
      * instant de l'animation.
      */
     function turn(direction) {
-        if (enFlux()) return;
+        if (isFlowMode()) return;
         if (turning) return;
 
         const forward = direction > 0;
@@ -817,24 +817,24 @@ window.MusicPlayer = window.MusicPlayer || {};
         // glissement latéral dit la même chose sans mentir sur la géométrie.
         if (perView === 1) return drag(direction, target);
 
-        const tous = ribbons();
-        const sheetEl = poserFeuille(forward ? 'droite' : 'gauche');
+        const all = ribbons();
+        const sheetEl = setSheet(forward ? 'right' : 'left');
         if (!sheetEl) return show(target);
 
         turning = true;
 
         if (forward) {
-            place(tous.before, column + 1); // recto : la page de droite qu'on soulève
-            place(tous.arriere, target); // verso : la future page de gauche
-            place(tous.right, target + 1); // dévoilée sous la feuille
+            place(all.before, column + 1); // recto : la page de droite qu'on soulève
+            place(all.back, target); // verso : la future page de gauche
+            place(all.right, target + 1); // dévoilée sous la feuille
         } else {
-            place(tous.before, column); // recto : la page de gauche qu'on soulève
-            place(tous.arriere, target + 1); // verso : la future page de droite
-            place(tous.left, target); // dévoilée sous la feuille
+            place(all.before, column); // recto : la page de gauche qu'on soulève
+            place(all.back, target + 1); // verso : la future page de droite
+            place(all.left, target); // dévoilée sous la feuille
         }
 
         sheetEl.classList.remove('hidden');
-        sheetEl.classList.toggle('docs-leaf-retour', !forward);
+        sheetEl.classList.toggle('docs-leaf-back', !forward);
         // Les deux sens partent à plat sur la page soulevée ; seule la charnière
         // et le signe de la rotation les distinguent. Départ posé, puis rotation
         // au cadre suivant : appliquer les deux dans la même image ferait sauter
@@ -843,30 +843,30 @@ window.MusicPlayer = window.MusicPlayer || {};
 
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-                sheetEl.classList.add('docs-leaf-anime');
+                sheetEl.classList.add('docs-leaf-animated');
                 sheetEl.style.transform = forward ? 'rotateY(-180deg)' : 'rotateY(180deg)';
             });
         });
 
         const finish = () => {
-            sheetEl.classList.remove('docs-leaf-anime');
+            sheetEl.classList.remove('docs-leaf-animated');
             sheetEl.classList.add('hidden');
             sheetEl.style.transform = '';
             turning = false;
             show(target);
         };
 
-        let fait = false;
-        const unefois = () => {
-            if (fait) return;
-            fait = true;
-            sheetEl.removeEventListener('transitionend', unefois);
+        let done = false;
+        const once = () => {
+            if (done) return;
+            done = true;
+            sheetEl.removeEventListener('transitionend', once);
             finish();
         };
-        sheetEl.addEventListener('transitionend', unefois);
+        sheetEl.addEventListener('transitionend', once);
         // Filet : une transition avortée (onglet masqué, animation coupée par
         // les préférences système) ne doit pas laisser le livre bloqué.
-        setTimeout(unefois, TURN_DURATION_MS + 120);
+        setTimeout(once, TURN_DURATION_MS + 120);
     }
 
     /** Transition de repli, en page simple : la page glisse et s'efface. */
@@ -875,14 +875,14 @@ window.MusicPlayer = window.MusicPlayer || {};
         if (!page) return show(target);
 
         turning = true;
-        page.classList.add(direction > 0 ? 'docs-sortie-gauche' : 'docs-sortie-droite');
+        page.classList.add(direction > 0 ? 'docs-exit-left' : 'docs-exit-right');
 
         setTimeout(() => {
             show(target);
-            page.classList.remove('docs-sortie-gauche', 'docs-sortie-droite');
-            page.classList.add(direction > 0 ? 'docs-entree-droite' : 'docs-entree-gauche');
+            page.classList.remove('docs-exit-left', 'docs-exit-right');
+            page.classList.add(direction > 0 ? 'docs-enter-right' : 'docs-enter-left');
             setTimeout(() => {
-                page.classList.remove('docs-entree-droite', 'docs-entree-gauche');
+                page.classList.remove('docs-enter-right', 'docs-enter-left');
                 turning = false;
             }, 220);
         }, 200);
@@ -923,11 +923,11 @@ window.MusicPlayer = window.MusicPlayer || {};
         return catalog;
     }
 
-    async function lireSource(id) {
+    async function readSource(id) {
         if (sources.has(id)) return sources.get(id);
 
         const response = await fetch(
-            `/api/docs/contenu?id=${encodeURIComponent(id)}&lang=${encodeURIComponent(docsLang())}`,
+            `/api/docs/content?id=${encodeURIComponent(id)}&lang=${encodeURIComponent(docsLang())}`,
             { credentials: 'same-origin' },
         );
         if (!response.ok) throw new Error(String(response.status));
@@ -981,7 +981,7 @@ window.MusicPlayer = window.MusicPlayer || {};
 
         if (!catalog.length) {
             const emptyEl = document.createElement('div');
-            emptyEl.className = 'docs-toc-vide';
+            emptyEl.className = 'docs-toc-empty';
             emptyEl.textContent = t('docs_empty', 'Aucun document trouvé dans le dossier docs/.');
             summary.appendChild(emptyEl);
             return;
@@ -992,20 +992,20 @@ window.MusicPlayer = window.MusicPlayer || {};
             if (document_.group !== currentGroup) {
                 currentGroup = document_.group;
                 const title = document.createElement('div');
-                title.className = 'docs-toc-groupe';
+                title.className = 'docs-toc-group';
                 title.textContent = groupLabel(currentGroup);
                 summary.appendChild(title);
             }
 
             const entry = document.createElement('button');
-            entry.className = 'docs-toc-entree';
+            entry.className = 'docs-toc-entry';
             entry.dataset.doc = document_.id;
             if (currentDoc && currentDoc.id === document_.id) entry.classList.add('active');
             entry.innerHTML =
-                `<span class="docs-toc-titre"></span>` +
-                `<span class="docs-toc-fichier"></span>`;
-            entry.querySelector('.docs-toc-titre').textContent = document_.title;
-            entry.querySelector('.docs-toc-fichier').textContent = document_.id.split('/').pop();
+                `<span class="docs-toc-title"></span>` +
+                `<span class="docs-toc-file"></span>`;
+            entry.querySelector('.docs-toc-title').textContent = document_.title;
+            entry.querySelector('.docs-toc-file').textContent = document_.id.split('/').pop();
             entry.addEventListener('click', () => openDocument(document_.id));
             summary.appendChild(entry);
         });
@@ -1015,18 +1015,18 @@ window.MusicPlayer = window.MusicPlayer || {};
     function render(wantedColumn = 0, wantedAnchor = null) {
         if (!currentDoc) return;
 
-        poserContenu(view === 'md' ? renderSource(currentDoc.source) : renderMarkdown(currentDoc.source));
+        setContent(view === 'md' ? renderSource(currentDoc.source) : renderMarkdown(currentDoc.source));
         // L'ajustement change la hauteur des blocs de code, donc le découpage
         // en colonnes : il doit précéder la mesure.
-        if (view !== 'md') ajusterBlocsCode();
+        if (view !== 'md') fitCodeBlocks();
 
-        if (enFlux()) {
-            rendreFlux(wantedAnchor);
+        if (isFlowMode()) {
+            renderFlow(wantedAnchor);
             return;
         }
 
-        mesurer();
-        if (wantedAnchor) allerAncre(wantedAnchor);
+        measure();
+        if (wantedAnchor) goToAnchor(wantedAnchor);
         else show(wantedColumn);
     }
 
@@ -1038,7 +1038,7 @@ window.MusicPlayer = window.MusicPlayer || {};
      * les défaire qu'à coups de `!important`. On les efface donc ici, à la
      * source.
      */
-    function rendreFlux(wantedAnchor) {
+    function renderFlow(wantedAnchor) {
         Object.values(ribbons()).forEach((ribbon) => {
             if (!ribbon) return;
             ribbon.style.transform = '';
@@ -1052,22 +1052,22 @@ window.MusicPlayer = window.MusicPlayer || {};
             ribbon.style.columnCount = '';
         });
 
-        const fenetre = fenetreFlux();
-        if (fenetre) fenetre.scrollTop = 0;
+        const windowEl = flowWindow();
+        if (windowEl) windowEl.scrollTop = 0;
 
-        if (wantedAnchor) allerAncre(wantedAnchor);
-        majPied();
+        if (wantedAnchor) goToAnchor(wantedAnchor);
+        updateFooter();
     }
 
     /** Amène une ancre sous les yeux, dans l'un ou l'autre mode. */
-    function allerAncre(nom) {
-        const target = document.querySelector(`.docs-sheet-left .docs-flow [id="${CSS.escape(nom)}"]`);
+    function goToAnchor(anchorName) {
+        const target = document.querySelector(`.docs-sheet-left .docs-flow [id="${CSS.escape(anchorName)}"]`);
         if (!target) return;
 
-        if (enFlux()) {
-            const fenetre = fenetreFlux();
-            if (fenetre) fenetre.scrollTop = target.offsetTop;
-            majPied();
+        if (isFlowMode()) {
+            const windowEl = flowWindow();
+            if (windowEl) windowEl.scrollTop = target.offsetTop;
+            updateFooter();
             return;
         }
 
@@ -1080,14 +1080,14 @@ window.MusicPlayer = window.MusicPlayer || {};
      * Il n'y a plus de page à numéroter : la part déjà parcourue tient le même
      * rôle — dire où l'on en est du document.
      */
-    function majPied() {
+    function updateFooter() {
         const paginate = el('docs-pager');
-        const fenetre = fenetreFlux();
-        if (!paginate || !fenetre) return;
+        const windowEl = flowWindow();
+        if (!paginate || !windowEl) return;
 
-        const course = fenetre.scrollHeight - fenetre.clientHeight;
+        const travel = windowEl.scrollHeight - windowEl.clientHeight;
         // Un document qui tient dans la fenêtre est lu de bout en bout.
-        const part = course > 4 ? (fenetre.scrollTop / course) * 100 : 100;
+        const part = travel > 4 ? (windowEl.scrollTop / travel) * 100 : 100;
         paginate.textContent = `${Math.max(0, Math.min(100, Math.round(part)))} %`;
     }
 
@@ -1097,16 +1097,16 @@ window.MusicPlayer = window.MusicPlayer || {};
 
         // Le tiroir a fait son office : il se retire tout de suite, sans
         // attendre la lecture de la source, pour que le choix se voie.
-        reglerSommaire(false);
+        setupToc(false);
 
-        const livre = el('docs-book');
-        if (livre) livre.classList.add('docs-book-charge');
+        const book = el('docs-book');
+        if (book) book.classList.add('docs-book-loaded');
 
         let source;
         try {
-            source = await lireSource(id);
+            source = await readSource(id);
         } catch (e) {
-            if (livre) livre.classList.remove('docs-book-charge');
+            if (book) book.classList.remove('docs-book-loaded');
             if (typeof window.MusicPlayer.showToast === 'function') {
                 window.MusicPlayer.showToast(t('docs_load_failed', 'Document illisible.'));
             }
@@ -1124,7 +1124,7 @@ window.MusicPlayer = window.MusicPlayer || {};
         paintSummary();
         render(0, wantedAnchor);
 
-        if (livre) livre.classList.remove('docs-book-charge');
+        if (book) book.classList.remove('docs-book-loaded');
     }
 
     /* ═══════════════════════ Sommaire en tiroir ═══════════════════════ */
@@ -1139,27 +1139,27 @@ window.MusicPlayer = window.MusicPlayer || {};
      * aucune largeur à interroger, ni ici ni ailleurs.
      */
 
-    function corpsDocs() {
+    function docsBody() {
         return el('docs-body');
     }
 
-    function sommaireOuvert() {
-        const corps = corpsDocs();
-        return Boolean(corps && corps.classList.contains('docs-toc-ouvert'));
+    function tocOpen() {
+        const bodyEl = docsBody();
+        return Boolean(bodyEl && bodyEl.classList.contains('docs-toc-open'));
     }
 
     /**
      * Ouvre ou ferme le tiroir du sommaire.
-     * @param {boolean} ouvert
+     * @param {boolean} shouldOpen
      */
-    function reglerSommaire(ouvert) {
-        const corps = corpsDocs();
-        if (corps) corps.classList.toggle('docs-toc-ouvert', ouvert);
+    function setupToc(shouldOpen) {
+        const bodyEl = docsBody();
+        if (bodyEl) bodyEl.classList.toggle('docs-toc-open', shouldOpen);
 
         // Le bouton est la poignée du tiroir : son état doit s'entendre autant
         // qu'il se voit.
-        const bouton = el('btn-docs-toc');
-        if (bouton) bouton.setAttribute('aria-expanded', ouvert ? 'true' : 'false');
+        const buttonEl = el('btn-docs-toc');
+        if (buttonEl) buttonEl.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
     }
 
     /* ═══════════════════════ Vue MD / HTML ═══════════════════════ */
@@ -1178,16 +1178,16 @@ window.MusicPlayer = window.MusicPlayer || {};
             // parcourt les `data-i18n-tooltip` — n'avait aucun moyen de
             // retrouver ce bouton, et son infobulle restait dans la langue
             // précédente jusqu'au prochain basculement de vue ou rechargement.
-            const cle = view === 'html' ? 'docs_tooltip_view_md' : 'docs_tooltip_view_html';
-            button.setAttribute('data-i18n-tooltip', cle);
+            const i18nKey = view === 'html' ? 'docs_tooltip_view_md' : 'docs_tooltip_view_html';
+            button.setAttribute('data-i18n-tooltip', i18nKey);
             button.dataset.tooltip =
                 view === 'html'
-                    ? t(cle, 'Afficher la source Markdown')
-                    : t(cle, 'Afficher la version mise en forme');
+                    ? t(i18nKey, 'Afficher la source Markdown')
+                    : t(i18nKey, 'Afficher la version mise en forme');
         }
 
         const modalEl = el('docs-modal');
-        if (modalEl) modalEl.classList.toggle('docs-vue-md', view === 'md');
+        if (modalEl) modalEl.classList.toggle('docs-view-md', view === 'md');
     }
 
     function toggleView() {
@@ -1195,7 +1195,7 @@ window.MusicPlayer = window.MusicPlayer || {};
 
         // La pagination n'a rien de commun d'une vue à l'autre : on retient la
         // progression dans le document plutôt qu'un numéro de page.
-        const progress = progressionLue();
+        const progress = readProgress();
 
         view = view === 'html' ? 'md' : 'html';
         try {
@@ -1204,7 +1204,7 @@ window.MusicPlayer = window.MusicPlayer || {};
 
         updateViewButton();
         render(0);
-        allerProgression(progress);
+        goToProgress(progress);
     }
 
     /* ═══════════════════ Mode livre / mode flux ═══════════════════ */
@@ -1216,58 +1216,58 @@ window.MusicPlayer = window.MusicPlayer || {};
      * l'autre. Ce qui se transporte d'une mise en page à la suivante — autre
      * vue, autre mode, autre taille de fenêtre —, c'est cette fraction-là.
      */
-    function progressionLue() {
-        if (enFlux()) {
-            const fenetre = fenetreFlux();
-            const course = fenetre ? fenetre.scrollHeight - fenetre.clientHeight : 0;
-            return course > 0 ? fenetre.scrollTop / course : 0;
+    function readProgress() {
+        if (isFlowMode()) {
+            const windowEl = flowWindow();
+            const travel = windowEl ? windowEl.scrollHeight - windowEl.clientHeight : 0;
+            return travel > 0 ? windowEl.scrollTop / travel : 0;
         }
         return columnCount > 1 ? column / columnCount : 0;
     }
 
     /** Reprend la lecture à la fraction donnée du document. */
-    function allerProgression(part) {
-        if (!enFlux()) {
+    function goToProgress(part) {
+        if (!isFlowMode()) {
             show(Math.round(part * columnCount));
             return;
         }
 
-        const fenetre = fenetreFlux();
-        if (!fenetre) return;
-        fenetre.scrollTop = Math.max(0, (fenetre.scrollHeight - fenetre.clientHeight) * part);
-        majPied();
+        const windowEl = flowWindow();
+        if (!windowEl) return;
+        windowEl.scrollTop = Math.max(0, (windowEl.scrollHeight - windowEl.clientHeight) * part);
+        updateFooter();
     }
 
     function updateModeButton() {
-        const groupe = el('docs-mode-switch');
-        if (groupe) {
-            groupe.querySelectorAll('.docs-mode-btn').forEach((bouton) => {
-                bouton.classList.toggle('active', bouton.dataset.mode === mode);
+        const switchEl = el('docs-mode-switch');
+        if (switchEl) {
+            switchEl.querySelectorAll('.docs-mode-btn').forEach((buttonEl) => {
+                buttonEl.classList.toggle('active', buttonEl.dataset.mode === mode);
             });
         }
 
         // C'est cette classe qui neutralise les colonnes, côté feuille de
         // style : elle doit être posée avant tout rendu.
         const modalEl = el('docs-modal');
-        if (modalEl) modalEl.classList.toggle('docs-mode-flux', enFlux());
+        if (modalEl) modalEl.classList.toggle('docs-mode-flow', isFlowMode());
 
         const hint = el('docs-hint');
         if (hint) {
             // On change la clé portée par l'élément, pas seulement son texte :
             // un changement de langue repasse sur `data-i18n` et effacerait
             // sinon l'indication propre au mode.
-            const cle = enFlux() ? 'docs_hint_flow' : 'docs_hint';
-            hint.setAttribute('data-i18n', cle);
-            hint.textContent = enFlux()
-                ? t(cle, 'Molette ou barre de défilement pour parcourir le document')
-                : t(cle, 'Flèches, molette ou clic pour tourner les pages');
+            const i18nKey = isFlowMode() ? 'docs_hint_flow' : 'docs_hint';
+            hint.setAttribute('data-i18n', i18nKey);
+            hint.textContent = isFlowMode()
+                ? t(i18nKey, 'Molette ou barre de défilement pour parcourir le document')
+                : t(i18nKey, 'Flèches, molette ou clic pour tourner les pages');
         }
     }
 
     function setMode(next) {
-        if (turning || next === mode || (next !== 'livre' && next !== 'flux')) return;
+        if (turning || next === mode || (next !== 'book' && next !== 'flow')) return;
 
-        const progress = progressionLue();
+        const progress = readProgress();
 
         mode = next;
         try {
@@ -1276,47 +1276,47 @@ window.MusicPlayer = window.MusicPlayer || {};
 
         updateModeButton();
         render(0);
-        allerProgression(progress);
+        goToProgress(progress);
     }
 
     /* ═════════════════════════ Ouverture ═════════════════════════ */
 
     /** Résout un lien `01-architecture.md#ancre` depuis le document courant. */
-    function resoudreLienDoc(href) {
+    function resolveDocLink(href) {
         const [path, targetAnchor] = String(href).split('#');
         const base = currentDoc && currentDoc.id.includes('/') ? currentDoc.id.replace(/\/[^/]*$/, '') : '';
 
         const segments = (base ? `${base}/${path}` : path).split('/');
-        const pile = [];
+        const stack = [];
         segments.forEach((segment) => {
             if (!segment || segment === '.') return;
-            if (segment === '..') pile.pop();
-            else pile.push(segment);
+            if (segment === '..') stack.pop();
+            else stack.push(segment);
         });
 
-        return { id: pile.join('/'), anchor: targetAnchor || null };
+        return { id: stack.join('/'), anchor: targetAnchor || null };
     }
 
-    function brancherLiens() {
-        const livre = el('docs-book');
-        if (!livre) return;
+    function bindLinks() {
+        const book = el('docs-book');
+        if (!book) return;
 
-        livre.addEventListener('click', (e) => {
-            const linkAnchor = e.target.closest('.docs-lien-ancre');
+        book.addEventListener('click', (e) => {
+            const linkAnchor = e.target.closest('.docs-link-anchor');
             if (linkAnchor) {
                 e.preventDefault();
                 // En flux, le document est déjà entier sous les yeux : il n'y a
                 // qu'à s'y déplacer. En livre, la colonne de destination ne se
                 // connaît qu'après une mise en pages.
-                if (enFlux()) allerAncre(linkAnchor.dataset.anchor);
+                if (isFlowMode()) goToAnchor(linkAnchor.dataset.anchor);
                 else render(column, linkAnchor.dataset.anchor);
                 return;
             }
 
-            const docLien = e.target.closest('.docs-lien-doc');
-            if (docLien) {
+            const docLink = e.target.closest('.docs-link-doc');
+            if (docLink) {
                 e.preventDefault();
-                const { id, anchor: target } = resoudreLienDoc(docLien.dataset.doc);
+                const { id, anchor: target } = resolveDocLink(docLink.dataset.doc);
                 if (catalog.some((d) => d.id === id)) openDocument(id, target);
                 return;
             }
@@ -1330,7 +1330,7 @@ window.MusicPlayer = window.MusicPlayer || {};
         modal.classList.remove('hidden');
         // Un tiroir laissé ouvert à la fermeture précédente masquerait la
         // page dès la réouverture.
-        reglerSommaire(false);
+        setupToc(false);
         // La géométrie ne se mesure que sur une fenêtre affichée : tout ce qui
         // suit attend donc que la fenêtre soit à l'écran.
         if (!catalog.length || catalogLang !== docsLang()) await loadCatalog();
@@ -1370,15 +1370,15 @@ window.MusicPlayer = window.MusicPlayer || {};
             if (e.key === 'Escape') return;
             if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
 
-            if (enFlux()) {
-                clavierFlux(e);
+            if (isFlowMode()) {
+                flowKeyboard(e);
                 return;
             }
 
             const forward = ['ArrowRight', 'PageDown', ' ', 'Spacebar'].includes(e.key);
-            const recule = ['ArrowLeft', 'PageUp'].includes(e.key);
+            const stepBack = ['ArrowLeft', 'PageUp'].includes(e.key);
 
-            if (forward || recule) {
+            if (forward || stepBack) {
                 e.preventDefault();
                 turn(forward ? 1 : -1);
             } else if (e.key === 'Home') {
@@ -1399,54 +1399,54 @@ window.MusicPlayer = window.MusicPlayer || {};
      * défiler tout seul. Un cran de flèche vaut quelques lignes, un cran de
      * page vaut presque un écran : le recouvrement garde le fil de la lecture.
      */
-    function clavierFlux(e) {
-        const fenetre = fenetreFlux();
-        if (!fenetre) return;
+    function flowKeyboard(e) {
+        const windowEl = flowWindow();
+        if (!windowEl) return;
 
-        const ecran = Math.max(120, Math.round(fenetre.clientHeight * 0.9));
+        const screen = Math.max(120, Math.round(windowEl.clientHeight * 0.9));
 
         if (e.key === 'Home' || e.key === 'End') {
             e.preventDefault();
-            fenetre.scrollTo({ top: e.key === 'Home' ? 0 : fenetre.scrollHeight, behavior: 'smooth' });
+            windowEl.scrollTo({ top: e.key === 'Home' ? 0 : windowEl.scrollHeight, behavior: 'smooth' });
             return;
         }
 
-        const pas = {
+        const step = {
             ArrowDown: 96,
             ArrowUp: -96,
-            ArrowRight: ecran,
-            ArrowLeft: -ecran,
-            PageDown: ecran,
-            PageUp: -ecran,
-            ' ': ecran,
-            Spacebar: ecran,
+            ArrowRight: screen,
+            ArrowLeft: -screen,
+            PageDown: screen,
+            PageUp: -screen,
+            ' ': screen,
+            Spacebar: screen,
         }[e.key];
 
-        if (pas === undefined) return;
+        if (step === undefined) return;
         e.preventDefault();
         // Les flèches se répètent sous un appui maintenu : un défilement
         // adouci s'y empilerait et donnerait une lecture élastique.
-        const douceur = Math.abs(pas) > 200 ? 'smooth' : 'auto';
-        fenetre.scrollBy({ top: pas, behavior: douceur });
+        const smoothness = Math.abs(step) > 200 ? 'smooth' : 'auto';
+        windowEl.scrollBy({ top: step, behavior: smoothness });
     }
 
-    function brancherMolette() {
-        const lecteur = document.querySelector('.docs-reader');
-        if (!lecteur) return;
+    function bindWheel() {
+        const readerEl = document.querySelector('.docs-reader');
+        if (!readerEl) return;
 
-        lecteur.addEventListener(
+        readerEl.addEventListener(
             'wheel',
             (e) => {
                 // En flux, la molette fait ce qu'elle fait partout ailleurs :
                 // rien à intercepter.
-                if (enFlux()) return;
+                if (isFlowMode()) return;
 
                 // Un bloc de code qui déborde garde sa barre de défilement : la
                 // molette lui appartient tant que le geste est horizontal.
                 if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
 
                 const now = Date.now();
-                if (now - lastWheelPlate < REPOS_MOLETTE) return;
+                if (now - lastWheelPlate < WHEEL_REST) return;
                 if (Math.abs(e.deltaY) < 8) return;
 
                 lastWheelPlate = now;
@@ -1458,10 +1458,10 @@ window.MusicPlayer = window.MusicPlayer || {};
     }
 
     /** Distance, en pixels, en deçà de laquelle un glissement n'en est pas un. */
-    const GLISSEMENT_MIN = 45;
+    const SWIPE_MIN = 45;
 
     /** Écart à partir duquel on tranche qu'un geste est horizontal. */
-    const GLISSEMENT_EVEIL = 10;
+    const SWIPE_WAKE = 10;
 
     /**
      * Le doigt tourne les pages.
@@ -1484,61 +1484,61 @@ window.MusicPlayer = window.MusicPlayer || {};
      * Le geste n'est revendiqué qu'une fois reconnu : jusque-là, le navigateur
      * garde le sien — défilement vertical du mode flux, pincement, sélection.
      */
-    function brancherGlissement() {
-        const livre = el('docs-book');
-        if (!livre) return;
+    function bindSwipe() {
+        const book = el('docs-book');
+        if (!book) return;
 
-        let trajet = null;
+        let swipe = null;
 
-        livre.addEventListener('touchstart', (e) => {
+        book.addEventListener('touchstart', (e) => {
             // À deux doigts c'est un pincement, et le zoom ne nous regarde pas.
-            if (enFlux() || e.touches.length !== 1) { trajet = null; return; }
-            const doigt = e.touches[0];
-            trajet = { x: doigt.clientX, y: doigt.clientY, horizontal: false };
+            if (isFlowMode() || e.touches.length !== 1) { swipe = null; return; }
+            const finger = e.touches[0];
+            swipe = { x: finger.clientX, y: finger.clientY, horizontal: false };
         }, { passive: true });
 
-        livre.addEventListener('touchmove', (e) => {
-            if (!trajet || e.touches.length !== 1) return;
+        book.addEventListener('touchmove', (e) => {
+            if (!swipe || e.touches.length !== 1) return;
 
-            const doigt = e.touches[0];
-            const dx = doigt.clientX - trajet.x;
-            const dy = doigt.clientY - trajet.y;
+            const finger = e.touches[0];
+            const dx = finger.clientX - swipe.x;
+            const dy = finger.clientY - swipe.y;
 
-            if (!trajet.horizontal
-                && Math.abs(dx) > GLISSEMENT_EVEIL
+            if (!swipe.horizontal
+                && Math.abs(dx) > SWIPE_WAKE
                 && Math.abs(dx) > Math.abs(dy)) {
-                trajet.horizontal = true;
+                swipe.horizontal = true;
             }
 
             // Revendiquer le geste écarte la sélection de texte et le balayage
             // de retour du navigateur.
-            if (trajet.horizontal) e.preventDefault();
+            if (swipe.horizontal) e.preventDefault();
         }, { passive: false });
 
-        livre.addEventListener('touchend', (e) => {
-            const parcours = trajet;
-            trajet = null;
-            if (!parcours || !parcours.horizontal) return;
+        book.addEventListener('touchend', (e) => {
+            const swipePath = swipe;
+            swipe = null;
+            if (!swipePath || !swipePath.horizontal) return;
 
-            const doigt = e.changedTouches && e.changedTouches[0];
-            if (!doigt) return;
+            const finger = e.changedTouches && e.changedTouches[0];
+            if (!finger) return;
 
-            const dx = doigt.clientX - parcours.x;
-            if (Math.abs(dx) < GLISSEMENT_MIN) return;
+            const dx = finger.clientX - swipePath.x;
+            if (Math.abs(dx) < SWIPE_MIN) return;
 
             turn(dx < 0 ? 1 : -1);
         }, { passive: true });
 
         // Appel entrant, notification, geste repris par le système : le trajet
         // n'ira pas à son terme et ne doit pas survivre au suivant.
-        livre.addEventListener('touchcancel', () => { trajet = null; }, { passive: true });
+        book.addEventListener('touchcancel', () => { swipe = null; }, { passive: true });
     }
 
     function initDocs() {
-        if (initFait) return;
+        if (initDone) return;
         const modal = el('docs-modal');
         if (!modal) return;
-        initFait = true;
+        initDone = true;
 
         try {
             const stored = localStorage.getItem(VIEW_KEY);
@@ -1548,7 +1548,7 @@ window.MusicPlayer = window.MusicPlayer || {};
 
         try {
             const range = localStorage.getItem(MODE_KEY);
-            if (range === 'livre' || range === 'flux') mode = range;
+            if (range === 'book' || range === 'flow') mode = range;
         } catch (e) {}
         updateModeButton();
 
@@ -1558,28 +1558,28 @@ window.MusicPlayer = window.MusicPlayer || {};
         const close = el('btn-docs-close');
         if (close) close.addEventListener('click', () => window.MusicPlayer.closeDocsModal());
 
-        const sommaire = el('btn-docs-toc');
-        if (sommaire) sommaire.addEventListener('click', () => reglerSommaire(!sommaireOuvert()));
+        const toc = el('btn-docs-toc');
+        if (toc) toc.addEventListener('click', () => setupToc(!tocOpen()));
 
-        const voile = el('docs-toc-voile');
-        if (voile) voile.addEventListener('click', () => reglerSommaire(false));
+        const scrim = el('docs-toc-scrim');
+        if (scrim) scrim.addEventListener('click', () => setupToc(false));
 
         const toggleEl = el('btn-docs-view');
         if (toggleEl) toggleEl.addEventListener('click', toggleView);
 
         const modeSwitch = el('docs-mode-switch');
         if (modeSwitch) {
-            modeSwitch.querySelectorAll('.docs-mode-btn').forEach((bouton) => {
-                bouton.addEventListener('click', () => setMode(bouton.dataset.mode));
+            modeSwitch.querySelectorAll('.docs-mode-btn').forEach((buttonEl) => {
+                buttonEl.addEventListener('click', () => setMode(buttonEl.dataset.mode));
             });
         }
 
-        const fenetre = fenetreFlux();
-        if (fenetre) {
-            fenetre.addEventListener(
+        const windowEl = flowWindow();
+        if (windowEl) {
+            windowEl.addEventListener(
                 'scroll',
                 () => {
-                    if (enFlux()) majPied();
+                    if (isFlowMode()) updateFooter();
                 },
                 { passive: true }
             );
@@ -1596,13 +1596,13 @@ window.MusicPlayer = window.MusicPlayer || {};
             if (e.target === modal) window.MusicPlayer.closeDocsModal();
         });
 
-        brancherLiens();
+        bindLinks();
         bindKeyboard();
-        brancherMolette();
-        brancherGlissement();
+        bindWheel();
+        bindSwipe();
 
-        window.addEventListener('resize', remettreEnPage);
-        surveillerLaPage();
+        window.addEventListener('resize', relayout);
+        watchPage();
     }
 
     /**
@@ -1618,14 +1618,14 @@ window.MusicPlayer = window.MusicPlayer || {};
      * une animation de tiroir une par image. On ne veut recomposer qu'une fois,
      * à l'arrivée.
      */
-    function remettreEnPage() {
+    function relayout() {
         if (!isOpen() || !currentDoc) return;
 
-        clearTimeout(minuterieRedim);
-        minuterieRedim = setTimeout(() => {
-            const progress = progressionLue();
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            const progress = readProgress();
             render(0);
-            allerProgression(progress);
+            goToProgress(progress);
         }, 180);
     }
 
@@ -1644,13 +1644,13 @@ window.MusicPlayer = window.MusicPlayer || {};
      * masque son débordement, et `.docs-sheet` tient sa largeur du livre, jamais
      * de ce qu'il contient. Pas de boucle, donc.
      */
-    function surveillerLaPage() {
+    function watchPage() {
         if (typeof ResizeObserver !== 'function') return;
 
         const sheet = document.querySelector('.docs-sheet-left');
         if (!sheet) return;
 
-        new ResizeObserver(remettreEnPage).observe(sheet);
+        new ResizeObserver(relayout).observe(sheet);
     }
 
     if (document.readyState === 'loading') {

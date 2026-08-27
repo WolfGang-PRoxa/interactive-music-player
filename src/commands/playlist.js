@@ -86,7 +86,7 @@ module.exports = {
                     });
                     addedCount++;
                 } catch (err) {
-                    log.warn(`[Playlist] Impossible de charger : ${filePath}`, err.message);
+                    log.warn(`[Playlist] Cannot load: ${filePath}`, err.message);
                 }
             }
 
@@ -95,7 +95,7 @@ module.exports = {
             });
 
         } catch (error) {
-            log.error('[Playlist] Erreur :', error);
+            log.error('[Playlist] Error:', error);
             return interaction.followUp({
                 embeds: [embeds.error('Erreur', `Impossible de charger le dossier.\n\`${error.message}\``)],
             });

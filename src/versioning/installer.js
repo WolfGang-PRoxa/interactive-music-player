@@ -43,7 +43,7 @@ function removeQuietly(dir) {
     try {
         fs.rmSync(dir, { recursive: true, force: true });
     } catch (e) {
-        log.warn(`[Versions] Nettoyage impossible pour ${dir} : ${e.message}`);
+        log.warn(`[Versions] Cleanup impossible for ${dir}: ${e.message}`);
     }
 }
 
@@ -88,8 +88,8 @@ function listInstalled() {
             return {
                 tag: marker.tag || e.name,
                 dir,
-                installedAt: marker.installeeLe || null,
-                localDependencies: !!marker.dependancesLocales,
+                installedAt: marker.installedAt || null,
+                localDependencies: !!marker.localDependencies,
                 current: current.type === 'release' && locations.isSameDir(dir, current.root),
             };
         })
@@ -150,7 +150,7 @@ function npmInstall(dir, onLine) {
 
         const timer = setTimeout(() => {
             child.kill();
-            reject(new Error('npm install a dépassé le délai imparti.'));
+            reject(new Error('npm install ran past its time limit.'));
         }, NPM_TIMEOUT_MS);
 
         const relay = (stream) => {
@@ -165,12 +165,12 @@ function npmInstall(dir, onLine) {
 
         child.on('error', (err) => {
             clearTimeout(timer);
-            reject(new Error(`npm introuvable ou non lançable : ${err.message}`));
+            reject(new Error(`npm not found or not runnable: ${err.message}`));
         });
         child.on('close', (code) => {
             clearTimeout(timer);
             if (code === 0) return resolve();
-            reject(new Error(`npm install a échoué (code ${code}).`));
+            reject(new Error(`npm install failed (code ${code}).`));
         });
     });
 }
@@ -191,25 +191,25 @@ async function install(tag, onStep = () => {}) {
     locations.assertTargetInstallable(target);
 
     if (locations.isInstallComplete(target)) {
-        log.info(`[Versions] ${tag} est déjà installée : réutilisation de ${target}.`);
+        log.info(`[Versions] ${tag} is already installed: reusing ${target}.`);
         return { dir: target, tag, alreadyInstalled: true };
     }
 
     // Le dossier existe mais son marqueur manque : extraction interrompue,
     // jamais démarrée. Il n'a donc jamais servi et peut céder la place.
     if (fs.existsSync(target)) {
-        log.warn(`[Versions] Installation incomplète détectée pour ${tag}, elle est reprise à zéro.`);
+        log.warn(`[Versions] Incomplete install detected for ${tag}, starting it over from scratch.`);
         removeQuietly(target);
     }
 
-    onStep({ phase: 'recherche' });
+    onStep({ phase: 'search' });
     const releases = await github.listReleases({ force: true });
     const release = releases.find((r) => r.tag === tag);
     if (!release) {
-        throw new Error(`La release ${tag} est introuvable sur le dépôt.`);
+        throw new Error(`Release ${tag} cannot be found on the repository.`);
     }
 
-    onStep({ phase: 'telechargement', percent: 0 });
+    onStep({ phase: 'download', percent: 0 });
     let lastPercent = -1;
     const archive = await github.downloadArchive(release.tarballUrl, (received, total) => {
         const percent = total ? Math.floor((received / total) * 100) : null;
@@ -217,7 +217,7 @@ async function install(tag, onStep = () => {}) {
         // rien à faire d'un message par paquet TCP.
         if (percent === null || percent !== lastPercent) {
             lastPercent = percent;
-            onStep({ phase: 'telechargement', percent, bytes: received, total });
+            onStep({ phase: 'download', percent, bytes: received, total });
         }
     });
 
@@ -230,7 +230,7 @@ async function install(tag, onStep = () => {}) {
     try {
         onStep({ phase: 'extraction' });
         const result = extractTarGz(archive, tempDir);
-        log.info(`[Versions] ${tag} : ${result.files} fichiers extraits.`);
+        log.info(`[Versions] ${tag}: ${result.files} files extracted.`);
 
         const pkg = locations.readPackage(tempDir);
         if (!pkg) throw new Error('Archive invalide : package.json absent.');
@@ -240,11 +240,11 @@ async function install(tag, onStep = () => {}) {
 
         let localDependencies = false;
         if (dependenciesMatch(pkg)) {
-            log.info('[Versions] Dépendances identiques à la racine : node_modules partagé réutilisé.');
+            log.info('[Versions] Dependencies identical to the root: shared node_modules reused.');
         } else {
-            log.info('[Versions] Dépendances différentes de la racine : npm install local.');
-            onStep({ phase: 'dependances', message: 'npm install' });
-            await npmInstall(tempDir, (line) => onStep({ phase: 'dependances', message: line }));
+            log.info('[Versions] Dependencies differ from the root: local npm install.');
+            onStep({ phase: 'dependencies', message: 'npm install' });
+            await npmInstall(tempDir, (line) => onStep({ phase: 'dependencies', message: line }));
             localDependencies = true;
         }
 
@@ -254,8 +254,8 @@ async function install(tag, onStep = () => {}) {
                 {
                     tag,
                     version: pkg.version || null,
-                    installeeLe: new Date().toISOString(),
-                    dependancesLocales: localDependencies,
+                    installedAt: new Date().toISOString(),
+                    localDependencies: localDependencies,
                     complete: true,
                 },
                 null,
@@ -268,7 +268,7 @@ async function install(tag, onStep = () => {}) {
         // version apparaît complète ou pas du tout.
         fs.renameSync(tempDir, target);
         github.clearCache();
-        log.info(`[Versions] ${tag} installée dans ${target}.`);
+        log.info(`[Versions] ${tag} installed in ${target}.`);
         return { dir: target, tag, alreadyInstalled: false };
     } catch (err) {
         removeQuietly(tempDir);
@@ -302,16 +302,16 @@ function uninstall(tag) {
     locations.assertTargetRemovable(target);
 
     if (!fs.existsSync(target)) {
-        throw new Error(`La version ${tag} n'est pas installée.`);
+        throw new Error(`Version ${tag} is not installed.`);
     }
 
     try {
         fs.rmSync(target, { recursive: true, force: true });
     } catch (err) {
-        throw new Error(`Suppression impossible pour ${tag} : ${err.message}`);
+        throw new Error(`Deletion impossible for ${tag}: ${err.message}`);
     }
 
-    log.info(`[Versions] ${tag} désinstallée (${target} supprimé).`);
+    log.info(`[Versions] ${tag} uninstalled (${target} deleted).`);
     return { dir: target, tag };
 }
 

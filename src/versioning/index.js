@@ -92,20 +92,20 @@ async function catalog() {
  * Point d'entrée Node à lancer pour une version donnée.
  *
  * @param {string} tag - Tag de release, ou `dev` pour le dépôt de développement
- * @returns {{ entree: string, type: 'dev'|'release', tag: string }}
+ * @returns {{ entryPoint: string, type: 'dev'|'release', tag: string }}
  * @throws {Error} si la version n'est pas disponible localement
  */
 function resolveEntryPoint(tag) {
     if (tag === locations.DEV_TAG) {
         const entryPoint = locations.entryPointFor(locations.devRoot());
         if (!locations.devAvailable()) {
-            throw new Error(`Version de développement introuvable (${entryPoint}).`);
+            throw new Error(`Development version not found (${entryPoint}).`);
         }
         return { entryPoint, type: 'dev', tag: locations.DEV_TAG };
     }
 
     const dir = installer.installedDir(tag);
-    if (!dir) throw new Error(`La version ${tag} n'est pas installée.`);
+    if (!dir) throw new Error(`Version ${tag} is not installed.`);
     return { entryPoint: locations.entryPointFor(dir), type: 'release', tag };
 }
 

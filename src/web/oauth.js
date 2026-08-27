@@ -161,11 +161,11 @@ async function exchangeCode(code) {
         // Le corps d'erreur de Discord nomme la cause — le plus souvent une URL
         // de rappel qui ne correspond pas à celle déclarée. Il mérite le journal.
         const detail = await response.text().catch(() => '');
-        throw new Error(`échange du code refusé (HTTP ${response.status}) ${detail}`.trim());
+        throw new Error(`code exchange refused (HTTP ${response.status}) ${detail}`.trim());
     }
 
     const payload = await response.json();
-    if (!payload.access_token) throw new Error('réponse sans jeton d\'accès');
+    if (!payload.access_token) throw new Error('response without an access token');
     return payload.access_token;
 }
 
@@ -180,11 +180,11 @@ async function fetchUser(accessToken) {
     });
 
     if (!response.ok) {
-        throw new Error(`lecture de l'identité refusée (HTTP ${response.status})`);
+        throw new Error(`identity read refused (HTTP ${response.status})`);
     }
 
     const user = await response.json();
-    if (!user || !user.id) throw new Error('identité incomplète');
+    if (!user || !user.id) throw new Error('incomplete identity');
     return user;
 }
 
@@ -201,15 +201,15 @@ async function identifyFromCode(code) {
 /** Trace au démarrage l'état de la configuration, pour éviter la chasse au bug. */
 function logConfiguration() {
     if (!isConfigured()) {
-        log.warn('[OAuth] Partage du contrôle indisponible : DISCORD_CLIENT_ID ou '
-            + 'DISCORD_CLIENT_SECRET manquant dans .env.');
+        log.warn('[OAuth] Control sharing unavailable: DISCORD_CLIENT_ID or '
+            + 'DISCORD_CLIENT_SECRET missing from .env.');
         return;
     }
-    log.info(`[OAuth] Authentification Discord active. URL de rappel à déclarer dans le `
-        + `portail développeur : ${redirectUri()}`);
+    log.info(`[OAuth] Discord authentication active. Callback URL to declare in the `
+        + `developer portal: ${redirectUri()}`);
     if (!process.env.PUBLIC_URL) {
-        log.warn('[OAuth] PUBLIC_URL n\'est pas défini : l\'URL de rappel pointe sur '
-            + 'localhost, et ne vaudra que pour un invité assis devant cette machine.');
+        log.warn('[OAuth] PUBLIC_URL is not set: the callback URL points at '
+            + 'localhost, and will only work for a guest sitting at this machine.');
     }
 }
 

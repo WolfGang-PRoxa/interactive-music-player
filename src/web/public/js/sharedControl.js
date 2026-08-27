@@ -73,15 +73,15 @@ window.MusicPlayer = window.MusicPlayer || {};
     let permissions = null;
     let sharing = null;
     /** Droits en cours de modification, pour ne pas les perdre au prochain état. */
-    const enVol = new Map();
+    const inFlight = new Map();
 
     function el(id) {
         return document.getElementById(id);
     }
 
     function t(key, fallback) {
-        const traduit = typeof window.MusicPlayer.t === 'function' ? window.MusicPlayer.t(key) : key;
-        return traduit && traduit !== key ? traduit : fallback;
+        const translated = typeof window.MusicPlayer.t === 'function' ? window.MusicPlayer.t(key) : key;
+        return translated && translated !== key ? translated : fallback;
     }
 
     function toast(message) {
@@ -98,10 +98,10 @@ window.MusicPlayer = window.MusicPlayer || {};
      * survolable — c'est `brancherBlocage()` qui arrête les gestes, pas un
      * `pointer-events: none` qui emporterait l'infobulle avec le clic.
      */
-    function marquer(element, refuse, motif) {
+    function mark(element, denied, reason) {
         if (!element) return;
 
-        if (!refuse) {
+        if (!denied) {
             if (element.classList.contains('perm-denied')) {
                 element.classList.remove('perm-denied');
                 // Ne restituer que ce qu'on avait soi-même remplacé.
@@ -118,23 +118,23 @@ window.MusicPlayer = window.MusicPlayer || {};
             element.dataset.permTooltipAvant = element.dataset.tooltip || '';
             element.classList.add('perm-denied');
         }
-        element.dataset.tooltip = motif;
+        element.dataset.tooltip = reason;
     }
 
     /** Repasse sur toutes les commandes et accorde le voile aux droits courants. */
-    function appliquerDroits() {
-        const estMaitre = role === 'master';
-        const motif = t('perm_denied_tooltip', 'Droit non accordé par le maître de la session');
-        const motifMaitre = t('perm_master_only_tooltip', 'Réservé au maître de la session');
+    function applyRights() {
+        const isMaster = role === 'master';
+        const reason = t('perm_denied_tooltip', 'Droit non accordé par le maître de la session');
+        const masterReason = t('perm_master_only_tooltip', 'Réservé au maître de la session');
 
-        for (const [groupe, selecteurs] of Object.entries(CONTROLS)) {
-            const refuse = estMaitre
+        for (const [group, selectors] of Object.entries(CONTROLS)) {
+            const denied = isMaster
                 ? false
-                : groupe === 'master' || !(permissions && permissions[groupe]);
+                : group === 'master' || !(permissions && permissions[group]);
 
-            for (const selecteur of selecteurs) {
-                document.querySelectorAll(selecteur).forEach((element) => {
-                    marquer(element, refuse, groupe === 'master' ? motifMaitre : motif);
+            for (const selector of selectors) {
+                document.querySelectorAll(selector).forEach((element) => {
+                    mark(element, denied, group === 'master' ? masterReason : reason);
                 });
             }
         }
@@ -142,7 +142,7 @@ window.MusicPlayer = window.MusicPlayer || {};
         // Le bouton de partage n'a de sens que pour qui a quelque chose à
         // partager. `hidden` plutôt qu'une classe : rien à styler pour cela.
         const wrapper = el('share-controls-wrapper');
-        if (wrapper) wrapper.hidden = !estMaitre;
+        if (wrapper) wrapper.hidden = !isMaster;
 
         document.documentElement.dataset.role = role;
     }
@@ -159,19 +159,19 @@ window.MusicPlayer = window.MusicPlayer || {};
      * l'invité de croire son geste passé, et au tableau de bord de se peindre
      * un état qu'il n'obtiendra pas.
      */
-    function brancherBlocage() {
-        const gestes = ['click', 'mousedown', 'pointerdown', 'keydown', 'input', 'change'];
+    function bindLock() {
+        const blockedEvents = ['click', 'mousedown', 'pointerdown', 'keydown', 'input', 'change'];
 
-        for (const geste of gestes) {
-            document.addEventListener(geste, (e) => {
-                const refuse = e.target && e.target.closest && e.target.closest('.perm-denied');
-                if (!refuse) return;
+        for (const evtName of blockedEvents) {
+            document.addEventListener(evtName, (e) => {
+                const denied = e.target && e.target.closest && e.target.closest('.perm-denied');
+                if (!denied) return;
 
                 e.preventDefault();
                 e.stopPropagation();
                 // Un seul avertissement par geste : `click` suit `mousedown`, et
                 // deux notifications pour un même clic seraient de trop.
-                if (geste === 'click' || geste === 'change') window.MusicPlayer.onPermissionDenied();
+                if (evtName === 'click' || evtName === 'change') window.MusicPlayer.onPermissionDenied();
             }, true);
         }
     }
@@ -186,192 +186,192 @@ window.MusicPlayer = window.MusicPlayer || {};
      * restent en vigueur, et il faut pouvoir les leur retirer sans attendre
      * qu'ils reviennent.
      */
-    function auditeurs() {
+    function listeners() {
         const state = window.MusicPlayer.state || {};
-        const connus = new Map((sharing?.knownUsers || []).map((u) => [u.userId, u]));
+        const knownMembers = new Map((sharing?.knownUsers || []).map((u) => [u.userId, u]));
         const grants = sharing?.grants || {};
-        const liste = [];
-        const vus = new Set();
+        const list = [];
+        const seen = new Set();
 
-        for (const membre of state.members || []) {
-            vus.add(membre.id);
-            liste.push({
-                userId: membre.id,
-                displayName: membre.displayName,
-                avatar: membre.avatar || connus.get(membre.id)?.avatar || null,
-                authentifie: connus.has(membre.id),
-                droits: grants[membre.id] || null,
-                dansLeSalon: true,
+        for (const member of state.members || []) {
+            seen.add(member.id);
+            list.push({
+                userId: member.id,
+                displayName: member.displayName,
+                avatar: member.avatar || knownMembers.get(member.id)?.avatar || null,
+                authenticated: knownMembers.has(member.id),
+                rights: grants[member.id] || null,
+                inChannel: true,
             });
         }
 
-        for (const [userId, connu] of connus) {
-            if (vus.has(userId)) continue;
+        for (const [userId, known] of knownMembers) {
+            if (seen.has(userId)) continue;
             // Un compte authentifié mais parti : on ne le montre que s'il garde
             // des droits, sans quoi la liste s'allongerait de tous les passages.
             if (!grants[userId]) continue;
-            liste.push({
+            list.push({
                 userId,
-                displayName: connu.displayName || userId,
-                avatar: connu.avatar,
-                authentifie: true,
-                droits: grants[userId],
-                dansLeSalon: false,
+                displayName: known.displayName || userId,
+                avatar: known.avatar,
+                authenticated: true,
+                rights: grants[userId],
+                inChannel: false,
             });
         }
 
-        return liste;
+        return list;
     }
 
-    function initiale(nom) {
-        return (nom || '?').trim().charAt(0).toUpperCase() || '?';
+    function initial(name) {
+        return (name || '?').trim().charAt(0).toUpperCase() || '?';
     }
 
     /** Construit la ligne d'un auditeur. */
-    function ligneAuditeur(personne) {
-        const droits = enVol.get(personne.userId) || personne.droits || {};
-        const pourvu = GROUPS.some((g) => droits[g]);
+    function listenerRow(person) {
+        const rights = inFlight.get(person.userId) || person.rights || {};
+        const filled = GROUPS.some((g) => rights[g]);
 
-        const ligne = document.createElement('div');
-        ligne.className = 'share-person'
-            + (pourvu ? ' has-grants' : '')
-            + (personne.authentifie ? '' : ' pending');
-        ligne.dataset.userId = personne.userId;
+        const row = document.createElement('div');
+        row.className = 'share-person'
+            + (filled ? ' has-grants' : '')
+            + (person.authenticated ? '' : ' pending');
+        row.dataset.userId = person.userId;
 
-        const tete = document.createElement('div');
-        tete.className = 'share-person-head';
+        const head = document.createElement('div');
+        head.className = 'share-person-head';
 
-        if (personne.avatar) {
+        if (person.avatar) {
             const img = document.createElement('img');
             img.className = 'share-person-avatar';
-            img.src = personne.avatar;
+            img.src = person.avatar;
             img.alt = '';
-            tete.appendChild(img);
+            head.appendChild(img);
         } else {
-            const rond = document.createElement('div');
-            rond.className = 'share-person-avatar';
-            rond.textContent = initiale(personne.displayName);
-            tete.appendChild(rond);
+            const circle = document.createElement('div');
+            circle.className = 'share-person-avatar';
+            circle.textContent = initial(person.displayName);
+            head.appendChild(circle);
         }
 
-        const nom = document.createElement('span');
-        nom.className = 'share-person-name';
-        nom.textContent = personne.displayName
-            + (personne.dansLeSalon ? '' : ` ${t('share_away', '(absent)')}`);
-        tete.appendChild(nom);
+        const name = document.createElement('span');
+        name.className = 'share-person-name';
+        name.textContent = person.displayName
+            + (person.inChannel ? '' : ` ${t('share_away', '(absent)')}`);
+        head.appendChild(name);
 
-        const etat = document.createElement('span');
-        etat.className = 'share-person-state' + (personne.authentifie ? ' connected' : '');
-        etat.textContent = personne.authentifie
+        const stateEl = document.createElement('span');
+        stateEl.className = 'share-person-state' + (person.authenticated ? ' connected' : '');
+        stateEl.textContent = person.authenticated
             ? t('share_state_connected', 'authentifié')
             : t('share_state_pending', 'pas encore connecté');
-        tete.appendChild(etat);
+        head.appendChild(stateEl);
 
-        if (pourvu) {
-            const revoquer = document.createElement('button');
-            revoquer.className = 'btn-share-revoke';
-            revoquer.dataset.tooltip = t('share_revoke', 'Tout retirer');
-            revoquer.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        if (filled) {
+            const revoke = document.createElement('button');
+            revoke.className = 'btn-share-revoke';
+            revoke.dataset.tooltip = t('share_revoke', 'Tout retirer');
+            revoke.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
                 + 'stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line>'
                 + '<line x1="6" y1="6" x2="18" y2="18"></line></svg>';
-            revoquer.addEventListener('click', () => {
-                enVol.delete(personne.userId);
-                window.MusicPlayer.sendWS({ type: 'revokeControl', data: { userId: personne.userId } });
+            revoke.addEventListener('click', () => {
+                inFlight.delete(person.userId);
+                window.MusicPlayer.sendWS({ type: 'revokeControl', data: { userId: person.userId } });
             });
-            tete.appendChild(revoquer);
+            head.appendChild(revoke);
         }
 
-        ligne.appendChild(tete);
+        row.appendChild(head);
 
         const cases = document.createElement('div');
         cases.className = 'share-grants';
 
-        for (const groupe of GROUPS) {
-            const rangee = document.createElement('div');
-            rangee.className = 'share-grant';
+        for (const group of GROUPS) {
+            const row = document.createElement('div');
+            row.className = 'share-grant';
 
-            const libelle = document.createElement('span');
-            libelle.textContent = t(`share_group_${groupe}`, GROUP_FALLBACK[groupe]);
-            rangee.appendChild(libelle);
+            const label = document.createElement('span');
+            label.textContent = t(`share_group_${group}`, GROUP_FALLBACK[group]);
+            row.appendChild(label);
 
-            const etiquette = document.createElement('label');
-            etiquette.className = 'switch switch-mini';
+            const tagEl = document.createElement('label');
+            tagEl.className = 'switch switch-mini';
 
-            const entree = document.createElement('input');
-            entree.type = 'checkbox';
-            entree.checked = Boolean(droits[groupe]);
-            entree.disabled = !personne.authentifie;
-            entree.addEventListener('change', () => {
-                const suivant = {};
-                ligne.querySelectorAll('.share-grant input').forEach((boite, index) => {
-                    suivant[GROUPS[index]] = boite.checked;
+            const entry = document.createElement('input');
+            entry.type = 'checkbox';
+            entry.checked = Boolean(rights[group]);
+            entry.disabled = !person.authenticated;
+            entry.addEventListener('change', () => {
+                const next = {};
+                row.querySelectorAll('.share-grant input').forEach((box, index) => {
+                    next[GROUPS[index]] = box.checked;
                 });
                 // Retenu localement : l'état renvoyé par le serveur arrive après
                 // un aller-retour, et un rendu entre-temps remettrait la case
                 // dans sa position d'avant.
-                enVol.set(personne.userId, suivant);
+                inFlight.set(person.userId, next);
                 window.MusicPlayer.sendWS({
                     type: 'shareControl',
-                    data: { userId: personne.userId, permissions: suivant },
+                    data: { userId: person.userId, permissions: next },
                 });
             });
 
             const rail = document.createElement('span');
             rail.className = 'switch-slider';
 
-            etiquette.appendChild(entree);
-            etiquette.appendChild(rail);
-            rangee.appendChild(etiquette);
-            cases.appendChild(rangee);
+            tagEl.appendChild(entry);
+            tagEl.appendChild(rail);
+            row.appendChild(tagEl);
+            cases.appendChild(row);
         }
 
-        ligne.appendChild(cases);
-        return ligne;
+        row.appendChild(cases);
+        return row;
     }
 
     /** Redessine la fenêtre de partage. */
-    function rendreFenetre() {
+    function renderModal() {
         const modal = el('share-modal');
         if (!modal || modal.classList.contains('hidden')) return;
 
-        const avertissement = el('share-oauth-warning');
-        if (avertissement) {
-            const manquant = !sharing?.oauthReady;
-            avertissement.classList.toggle('hidden', !manquant);
-            const rappel = el('share-callback-url');
-            if (rappel && sharing?.publicUrl) {
-                rappel.textContent = `${sharing.publicUrl}/auth/discord/callback`;
+        const warning = el('share-oauth-warning');
+        if (warning) {
+            const missing = !sharing?.oauthReady;
+            warning.classList.toggle('hidden', !missing);
+            const reminder = el('share-callback-url');
+            if (reminder && sharing?.publicUrl) {
+                reminder.textContent = `${sharing.publicUrl}/auth/discord/callback`;
             }
         }
 
-        const envoyer = el('btn-send-invite');
-        if (envoyer) envoyer.disabled = !sharing?.oauthReady;
+        const send = el('btn-send-invite');
+        if (send) send.disabled = !sharing?.oauthReady;
 
-        const liste = el('share-people-list');
-        if (!liste) return;
+        const list = el('share-people-list');
+        if (!list) return;
 
-        const personnes = auditeurs();
-        liste.innerHTML = '';
+        const people = listeners();
+        list.innerHTML = '';
 
-        if (!personnes.length) {
-            const vide = document.createElement('div');
-            vide.className = 'share-empty';
-            vide.textContent = t('share_empty', 'Personne dans le salon vocal.');
-            liste.appendChild(vide);
+        if (!people.length) {
+            const empty = document.createElement('div');
+            empty.className = 'share-empty';
+            empty.textContent = t('share_empty', 'Personne dans le salon vocal.');
+            list.appendChild(empty);
             return;
         }
 
-        personnes.forEach((personne) => liste.appendChild(ligneAuditeur(personne)));
+        people.forEach((person) => list.appendChild(listenerRow(person)));
     }
 
     /** Nombre d'invités pourvus, affiché sur le bouton de l'en-tête. */
-    function rendrePastille() {
-        const pastille = el('share-badge');
-        if (!pastille) return;
+    function renderBadge() {
+        const badge = el('share-badge');
+        if (!badge) return;
 
         const total = Object.keys(sharing?.grants || {}).length;
-        pastille.textContent = String(total);
-        pastille.classList.toggle('hidden', total === 0);
+        badge.textContent = String(total);
+        badge.classList.toggle('hidden', total === 0);
     }
 
     /* ═════════════════════ Entrées du module ═════════════════════ */
@@ -387,9 +387,9 @@ window.MusicPlayer = window.MusicPlayer || {};
         if (state.permissions) permissions = state.permissions;
         if (state.sharing) sharing = state.sharing;
 
-        appliquerDroits();
-        rendrePastille();
-        rendreFenetre();
+        applyRights();
+        renderBadge();
+        renderModal();
     };
 
     /** Le serveur a refusé une commande : le dire plutôt que de rester muet. */
@@ -401,7 +401,7 @@ window.MusicPlayer = window.MusicPlayer || {};
     window.MusicPlayer.onControlRevoked = function () {
         toast(t('perm_revoked_toast', 'Votre accès au lecteur a été retiré.'));
         permissions = { playback: false, queue: false, playlists: false, volume: false };
-        appliquerDroits();
+        applyRights();
     };
 
     /** Réponse à une action de partage. */
@@ -415,29 +415,29 @@ window.MusicPlayer = window.MusicPlayer || {};
 
         if (data.ok) return;
 
-        const motifs = {
+        const reasons = {
             oauth_absent: t('share_err_oauth', 'Authentification Discord non configurée.'),
-            salon_absent: t('share_err_channel', 'Aucun salon vocal actif.'),
-            salon_muet: t('share_err_mute', 'Ce salon n\'accepte pas les messages.'),
-            envoi_refuse: t('share_err_send', 'Le bot n\'a pas pu écrire dans ce salon.'),
+            channel_missing: t('share_err_channel', 'Aucun salon vocal actif.'),
+            channel_muted: t('share_err_mute', 'Ce salon n\'accepte pas les messages.'),
+            send_denied: t('share_err_send', 'Le bot n\'a pas pu écrire dans ce salon.'),
         };
-        toast(motifs[data.reason] || t('share_err_generic', 'Le partage a échoué.'));
+        toast(reasons[data.reason] || t('share_err_generic', 'Le partage a échoué.'));
     };
 
     function initShare() {
-        const ouvrir = el('btn-open-share');
-        const fermer = el('btn-close-share');
+        const openBtn = el('btn-open-share');
+        const closeBtn = el('btn-close-share');
         const modal = el('share-modal');
 
-        if (ouvrir && modal) {
-            ouvrir.addEventListener('click', () => {
+        if (openBtn && modal) {
+            openBtn.addEventListener('click', () => {
                 modal.classList.remove('hidden');
-                rendreFenetre();
+                renderModal();
             });
         }
 
-        if (fermer && modal) {
-            fermer.addEventListener('click', () => modal.classList.add('hidden'));
+        if (closeBtn && modal) {
+            closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
         }
 
         if (modal) {
@@ -446,15 +446,15 @@ window.MusicPlayer = window.MusicPlayer || {};
             });
         }
 
-        const envoyer = el('btn-send-invite');
-        if (envoyer) {
-            envoyer.addEventListener('click', () => {
+        const send = el('btn-send-invite');
+        if (send) {
+            send.addEventListener('click', () => {
                 window.MusicPlayer.sendWS({ type: 'sendInviteLink', data: {} });
             });
         }
 
-        brancherBlocage();
-        appliquerDroits();
+        bindLock();
+        applyRights();
     }
 
     if (document.readyState === 'loading') {

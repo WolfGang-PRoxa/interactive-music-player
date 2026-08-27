@@ -32,8 +32,8 @@ function isUrl(value) {
  * Les extracteurs ne s'accordent pas sur un type de retour : URL nue, objet
  * portant une `url`, flux lisible, ou objet enveloppant un flux.
  *
- * @param {*} brut
- * @returns {{ entree: string, flux: import('stream').Readable|null }|null}
+ * @param {*} raw
+ * @returns {{ input: string, stream: import('stream').Readable|null }|null}
  */
 function normalizeExtractorOutput(raw) {
     if (!raw) return null;
@@ -82,7 +82,7 @@ function localPath(track) {
  *
  * @param {object} piste
  * @param {import('discord-player').Player} player
- * @returns {Promise<{ entree: string, flux: import('stream').Readable|null }|null>}
+ * @returns {Promise<{ input: string, stream: import('stream').Readable|null }|null>}
  */
 async function viaExtractors(track, player) {
     if (!player?.extractors) return null;
@@ -98,7 +98,7 @@ async function viaExtractors(track, player) {
             });
             return normalizeExtractorOutput(result?.result);
         } catch (err) {
-            log.error(`[MixEntree] Échec de l'extraction pour ${track?.title} :`, err.message);
+            log.error(`[MixInput] Extraction failed for ${track?.title}:`, err.message);
             return null;
         }
     };
@@ -121,7 +121,7 @@ async function viaExtractors(track, player) {
  *
  * @param {object} piste
  * @param {import('discord-player').Player} player
- * @returns {Promise<{ entree: string, flux: import('stream').Readable|null, local: boolean }>}
+ * @returns {Promise<{ input: string, stream: import('stream').Readable|null, local: boolean }>}
  * @throws {Error} Si aucune entrée n'a pu être obtenue.
  */
 async function resolveInput(track, player) {
@@ -135,7 +135,7 @@ async function resolveInput(track, player) {
     // adresse HTTP directe, ce qui couvre les fichiers hébergés en clair.
     if (isUrl(track?.url)) return { input: track.url, stream: null, local: false };
 
-    throw new Error(`Aucune entrée audio exploitable pour « ${track?.title || '?'} »`);
+    throw new Error(`No usable audio input for « ${track?.title || '?'} »`);
 }
 
 module.exports = { resolveInput, isUrl };

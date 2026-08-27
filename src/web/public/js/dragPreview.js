@@ -140,7 +140,7 @@
         } catch (err) {
             // Vignette indisponible : le navigateur reprend la sienne, le
             // glisser fonctionne exactement comme avant.
-            console.warn('[dragPreview] Vignette personnalisée impossible :', err);
+            console.warn('[dragPreview] Custom thumbnail impossible:', err);
         }
     }, true);
 

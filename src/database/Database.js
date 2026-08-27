@@ -55,7 +55,7 @@ class GuildDatabase {
         // Migration : deplacer les playlists par guild vers le stockage global
         this._migratePerGuildPlaylists();
 
-        log.info('[Database] Donnees chargees depuis settings.json.');
+        log.info('[Database] Data loaded from settings.json.');
     }
 
     /**
@@ -81,7 +81,7 @@ class GuildDatabase {
         }
 
         if (migrated) {
-            log.info('[Database] Migration des playlists par guild vers le stockage global effectuee.');
+            log.info('[Database] Migration of per-guild playlists to global storage done.');
             this._save();
         }
     }
@@ -116,7 +116,7 @@ class GuildDatabase {
             }
             writeJsonAtomic(this.filepath, data);
         } catch (err) {
-            log.error('[Database] Erreur lors de l\'ecriture de settings.json', err.message);
+            log.error('[Database] Error while writing settings.json', err.message);
         }
     }
 
@@ -342,7 +342,7 @@ class GuildDatabase {
      * Change la qualite souhaitee d'une piste.
      * @param {string} url
      * @param {{ audio?: string, video?: string }} patch
-     * @param {{ audio: string, video: string }} defauts - Repli si la piste n'etait pas figee
+     * @param {{ audio: string, video: string }} defaults - Repli si la piste n'etait pas figee
      */
     setTrackQuality(url, patch, defaults) {
         if (!url) return;

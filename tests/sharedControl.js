@@ -25,7 +25,7 @@ let failed = 0;
 let passed = 0;
 const check = (label, ok, detail = '') => {
     if (ok) { passed++; console.log(`  ok    ${label}${detail ? ` — ${detail}` : ''}`); }
-    else { failed++; console.log(`  ECHEC ${label}${detail ? ` — ${detail}` : ''}`); }
+    else { failed++; console.log(`  FAIL ${label}${detail ? ` — ${detail}` : ''}`); }
 };
 
 /** Remplace un module par un double avant que quiconque ne le charge. */
@@ -53,83 +53,83 @@ const routes = require('../src/web/websocket/handlers');
 const GUILD = 'guilde-test';
 const PAUL = '111111111111111111';
 
-const MAITRE = { master: true };
-const invite = (droits) => ({ master: false, permissions: permissions.sanitize(droits) });
+const MASTER = { master: true };
+const invite = (rights) => ({ master: false, permissions: permissions.sanitize(rights) });
 
-console.log('Contrôle partagé — barrière des droits\n');
+console.log('Shared control — the rights barrier\n');
 
 // ───────────────────── 1. Le maître n'est bridé par rien ─────────────────────
 
-console.log('=== 1. Le maître ===\n');
+console.log('=== 1. The master ===\n');
 
-check('le maître peut éteindre le bot', permissions.canSend(MAITRE, 'shutdownBot'));
-check('le maître peut changer de version', permissions.canSend(MAITRE, 'installVersion'));
-check('le maître peut partager le contrôle', permissions.canSend(MAITRE, 'shareControl'));
-check('le maître garde tous ses réglages',
-    Object.keys(permissions.filterSettings(MAITRE, { baseVolume: 20, preloading: {} }).allowed).length === 2);
+check('the master can shut the bot down', permissions.canSend(MASTER, 'shutdownBot'));
+check('the master can change version', permissions.canSend(MASTER, 'installVersion'));
+check('the master can share control', permissions.canSend(MASTER, 'shareControl'));
+check('the master keeps all their settings',
+    Object.keys(permissions.filterSettings(MASTER, { baseVolume: 20, preloading: {} }).allowed).length === 2);
 
 // ─────────────────── 2. Un invité n'a que ce qu'on lui donne ───────────────────
 
-console.log('\n=== 2. Les groupes ===\n');
+console.log('\n=== 2. The groups ===\n');
 
-const lecteur = invite({ playback: true });
-check('lecture accordée : mettre en pause', permissions.canSend(lecteur, 'pause'));
-check('lecture accordée : chercher dans la piste', permissions.canSend(lecteur, 'seek'));
-check('lecture seule : pas de vidage de file', !permissions.canSend(lecteur, 'clearQueue'));
-check('lecture seule : pas de suppression de playlist', !permissions.canSend(lecteur, 'deletePlaylist'));
-check('lecture seule : pas de changement de salon', !permissions.canSend(lecteur, 'selectChannel'));
+const player = invite({ playback: true });
+check('playback granted: pause', permissions.canSend(player, 'pause'));
+check('playback granted: seek within the track', permissions.canSend(player, 'seek'));
+check('playback only: no clearing the queue', !permissions.canSend(player, 'clearQueue'));
+check('playback only: no deleting a playlist', !permissions.canSend(player, 'deletePlaylist'));
+check('playback only: no changing channel', !permissions.canSend(player, 'selectChannel'));
 
-const fileur = invite({ queue: true });
-check('file accordée : ajouter depuis la recherche', permissions.canSend(fileur, 'play'));
-check('file accordée : jouer immédiatement', permissions.canSend(fileur, 'playNow'));
-check('file accordée : vider l\'historique', permissions.canSend(fileur, 'clearHistory'));
-check('file seule : pas de pause', !permissions.canSend(fileur, 'pause'));
+const queueGuest = invite({ queue: true });
+check('queue granted: add from the search', permissions.canSend(queueGuest, 'play'));
+check('queue granted: play immediately', permissions.canSend(queueGuest, 'playNow'));
+check('queue granted: clear the history', permissions.canSend(queueGuest, 'clearHistory'));
+check('queue only: no pausing', !permissions.canSend(queueGuest, 'pause'));
 
-const listeur = invite({ playlists: true });
-check('playlists accordées : créer', permissions.canSend(listeur, 'createPlaylist'));
-check('playlists accordées : y ajouter un titre', permissions.canSend(listeur, 'addTrackToPlaylist'));
-check('playlists seules : pas de retrait de la file', !permissions.canSend(listeur, 'removeTrack'));
+const playlistGuest = invite({ playlists: true });
+check('playlists granted: create', permissions.canSend(playlistGuest, 'createPlaylist'));
+check('playlists granted: add a track to one', permissions.canSend(playlistGuest, 'addTrackToPlaylist'));
+check('playlists only: no removing from the queue', !permissions.canSend(playlistGuest, 'removeTrack'));
 
-const sondier = invite({ volume: true });
-check('volume accordé : changer de salon', permissions.canSend(sondier, 'selectChannel'));
-check('volume accordé : couper la détection d\'un membre', permissions.canSend(sondier, 'toggleVoiceDetection'));
-check('volume seul : pas de saut de piste', !permissions.canSend(sondier, 'skip'));
+const volumeGuest = invite({ volume: true });
+check('volume granted: change channel', permissions.canSend(volumeGuest, 'selectChannel'));
+check('volume granted: mute detection for a member', permissions.canSend(volumeGuest, 'toggleVoiceDetection'));
+check('volume only: no skipping a track', !permissions.canSend(volumeGuest, 'skip'));
 
-const rien = invite({});
-check('sans droit : rien de tout cela',
-    !['pause', 'play', 'createPlaylist', 'selectChannel'].some((t) => permissions.canSend(rien, t)));
+const none = invite({});
+check('without any right: none of this',
+    !['pause', 'play', 'createPlaylist', 'selectChannel'].some((t) => permissions.canSend(none, t)));
 
 // ─────────────────────── 3. Ce qui reste au maître seul ───────────────────────
 
-console.log('\n=== 3. Réservé au maître ===\n');
+console.log('\n=== 3. Master only ===\n');
 
-const toutPuissant = invite({ playback: true, queue: true, playlists: true, volume: true });
-for (const interdit of ['shutdownBot', 'restartBot', 'installVersion', 'uninstallVersion',
+const allPowerful = invite({ playback: true, queue: true, playlists: true, volume: true });
+for (const forbidden of ['shutdownBot', 'restartBot', 'installVersion', 'uninstallVersion',
     'listVersions', 'leaveGuild', 'setDefaultChannel']) {
-    check(`un invité comblé ne peut pas « ${interdit} »`, !permissions.canSend(toutPuissant, interdit));
+    check(`a fully granted guest still cannot « ${forbidden} »`, !permissions.canSend(allPowerful, forbidden));
 }
-check('un invité ne s\'accorde pas de droits', !permissions.canSend(toutPuissant, 'shareControl'));
-check('un invité ne révoque personne', !permissions.canSend(toutPuissant, 'revokeControl'));
-check('un invité ne poste pas le lien d\'invitation', !permissions.canSend(toutPuissant, 'sendInviteLink'));
+check('a guest does not grant themselves rights', !permissions.canSend(allPowerful, 'shareControl'));
+check('a guest revokes nobody', !permissions.canSend(allPowerful, 'revokeControl'));
+check('a guest does not post the invitation link', !permissions.canSend(allPowerful, 'sendInviteLink'));
 
 // ──────────────────────── 4. Fermé par défaut ────────────────────────
 
 console.log('\n=== 4. Commande inconnue ===\n');
 
-check('une commande absente de la table est refusée',
-    !permissions.canSend(toutPuissant, 'commandeAjouteePlusTard'));
-check('toute route déclarée a un droit associé',
+check('a command absent from the table is refused',
+    !permissions.canSend(allPowerful, 'commandAddedLater'));
+check('every declared route has a matching right',
     Object.keys(routes).every((type) =>
         Object.prototype.hasOwnProperty.call(permissions.ACTION_GROUPS, type)),
     `${Object.keys(routes).length} routes`);
-check('tout droit déclaré correspond à une route',
+check('every declared right matches a route',
     Object.keys(permissions.ACTION_GROUPS).every((type) => Boolean(routes[type])));
 
 // ─────────────────── 5. updateSettings, champ par champ ───────────────────
 
-console.log('\n=== 5. Filtrage des réglages ===\n');
+console.log('\n=== 5. Filtering the settings ===\n');
 
-const melange = {
+const mixed = {
     baseVolume: 20,          // groupe volume
     duckingLevel: 35,        // groupe volume
     playbackSpeed: 1.5,      // groupe playback
@@ -137,53 +137,53 @@ const melange = {
     presenceDepartureDelay: 0,        // maître seul
 };
 
-const filtreVolume = permissions.filterSettings(sondier, melange);
-check('volume accordé : baseVolume passe', filtreVolume.allowed.baseVolume === 20);
-check('volume accordé : duckingLevel passe', filtreVolume.allowed.duckingLevel === 35);
-check('volume accordé : playbackSpeed écarté', filtreVolume.allowed.playbackSpeed === undefined);
-check('volume accordé : préchargement écarté', filtreVolume.allowed.preloading === undefined);
-check('volume accordé : délai de départ écarté', filtreVolume.allowed.presenceDepartureDelay === undefined);
-check('les champs refusés sont nommés', filtreVolume.refused.includes('preloading'));
+const volumeFilter = permissions.filterSettings(volumeGuest, mixed);
+check('volume granted: baseVolume goes through', volumeFilter.allowed.baseVolume === 20);
+check('volume granted: duckingLevel goes through', volumeFilter.allowed.duckingLevel === 35);
+check('volume granted: playbackSpeed dropped', volumeFilter.allowed.playbackSpeed === undefined);
+check('volume granted: preloading dropped', volumeFilter.allowed.preloading === undefined);
+check('volume granted: start delay dropped', volumeFilter.allowed.presenceDepartureDelay === undefined);
+check('the refused fields are named', volumeFilter.refused.includes('preloading'));
 
-const filtreRien = permissions.filterSettings(rien, melange);
-check('sans droit : plus rien ne passe', Object.keys(filtreRien.allowed).length === 0);
+const emptyFilter = permissions.filterSettings(none, mixed);
+check('without any right: nothing goes through at all', Object.keys(emptyFilter.allowed).length === 0);
 
-check('la porte laisse entrer updateSettings, le filtre tranche',
-    permissions.canSend(rien, 'updateSettings'));
+check('the gate lets updateSettings in, the filter decides',
+    permissions.canSend(none, 'updateSettings'));
 
 // ─────────────────── 6. Enregistrement et révocation ───────────────────
 
-console.log('\n=== 6. Stockage des droits ===\n');
+console.log('\n=== 6. Storing the rights ===\n');
 
-check('inconnu : aucun droit',
+check('unknown: no rights',
     !permissions.hasAny(database.getUserPermissions(GUILD, PAUL)));
 
 database.setUserPermissions(GUILD, PAUL, { playback: true, queue: true });
-const relus = database.getUserPermissions(GUILD, PAUL);
-check('droits relus après enregistrement', relus.playback === true && relus.queue === true);
-check('les groupes non accordés restent faux', relus.playlists === false && relus.volume === false);
-check('l\'invité figure dans les partages',
+const reloaded = database.getUserPermissions(GUILD, PAUL);
+check('rights read back after being saved', reloaded.playback === true && reloaded.queue === true);
+check('groups not granted stay false', reloaded.playlists === false && reloaded.volume === false);
+check('the guest appears among the shares',
     Object.prototype.hasOwnProperty.call(database.getSharedControl(GUILD), PAUL));
 
 database.setUserPermissions(GUILD, PAUL, { playback: false, queue: false });
-check('retirer le dernier droit efface l\'entrée',
+check('removing the last right erases the entry',
     !Object.prototype.hasOwnProperty.call(database.getSharedControl(GUILD), PAUL));
 
 database.setUserPermissions(GUILD, PAUL, { volume: true });
 database.revokeUserPermissions(GUILD, PAUL);
-check('la révocation vide les droits',
+check('revocation empties the rights',
     !permissions.hasAny(database.getUserPermissions(GUILD, PAUL)));
 
 // Une charge utile venue du réseau n'a pas à être crue sur parole.
-const salies = database.setUserPermissions(GUILD, PAUL, {
+const revoked = database.setUserPermissions(GUILD, PAUL, {
     playback: 'oui', queue: 1, playlists: {}, volume: true, master: true, admin: true,
 });
-check('seul un vrai booléen accorde un droit',
-    salies.playback === false && salies.queue === false && salies.playlists === false);
-check('un groupe inventé n\'est pas retenu', salies.master === undefined && salies.admin === undefined);
-check('le droit légitime survit à l\'assainissement', salies.volume === true);
+check('only a real boolean grants a right',
+    revoked.playback === false && revoked.queue === false && revoked.playlists === false);
+check('a made-up group is not kept', revoked.master === undefined && revoked.admin === undefined);
+check('the legitimate right survives the sanitising', revoked.volume === true);
 
 // ─────────────────────────────── Bilan ───────────────────────────────
 
-console.log(`\n=== ${passed} réussite(s), ${failed} échec(s) ===`);
+console.log(`\n=== ${passed} passed, ${failed} failed ===`);
 process.exit(failed > 0 ? 1 : 0);

@@ -219,8 +219,8 @@ class MixSource extends EventEmitter {
     }
 
     /**
-     * @param {string} entree
-     * @param {import('stream').Readable|null} flux
+     * @param {string} input
+     * @param {import('stream').Readable|null} stream
      */
     _spawnFfmpeg(input, stream) {
         const args = ['-hide_banner', '-loglevel', 'error', '-nostdin'];
@@ -264,14 +264,14 @@ class MixSource extends EventEmitter {
         ffmpegProcess.stdout.on('end', () => this._endStream());
 
         ffmpegProcess.on('error', (err) => {
-            log.error(`[MixSource] FFmpeg n'a pas pu démarrer pour ${this.track?.title} :`, err.message);
+            log.error(`[MixSource] FFmpeg could not start for ${this.track?.title}:`, err.message);
             this._endStream();
-            this.emit('erreur', err);
+            this.emit('sourceError', err);
         });
 
         ffmpegProcess.on('close', (code) => {
             if (code !== 0 && !this._halted) {
-                log.error(`[MixSource] FFmpeg s'est arrêté en ${code} pour ${this.track?.title} :`,
+                log.error(`[MixSource] FFmpeg stopped with ${code} for ${this.track?.title}:`,
                     ffmpegLog.slice(-5).join(' | '));
             }
             this._endStream();
@@ -283,7 +283,7 @@ class MixSource extends EventEmitter {
 
         if (stream) {
             stream.on('error', (err) => {
-                log.error(`[MixSource] Flux amont interrompu pour ${this.track?.title} :`, err.message);
+                log.error(`[MixSource] Upstream feed interrupted for ${this.track?.title}:`, err.message);
                 this._endStream();
             });
             stream.pipe(ffmpegProcess.stdin);
@@ -341,7 +341,7 @@ class MixSource extends EventEmitter {
 
             const deadline = setTimeout(() => {
                 if (this._available > 0) finish();
-                else finish(new Error(`Aucun son décodé après ${MAX_PRIMING_DELAY_MS / 1000} s.`));
+                else finish(new Error(`No sound decoded after ${MAX_PRIMING_DELAY_MS / 1000} s.`));
             }, MAX_PRIMING_DELAY_MS);
             if (deadline.unref) deadline.unref();
 

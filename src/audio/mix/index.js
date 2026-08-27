@@ -77,7 +77,7 @@ function ensureEngine(queue) {
     try {
         if (!engine.start()) return null;
     } catch (err) {
-        log.error('[MixEngine] Le bus de mixage n\'a pas pu être monté :', err.message);
+        log.error('[MixEngine] The mix bus could not be mounted:', err.message);
         return null;
     }
 

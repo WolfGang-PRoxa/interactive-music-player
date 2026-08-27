@@ -27,7 +27,7 @@ function handleStartupFadeinConsumed(ctx) {
 
         if (queue && queue.pendingStartupFadein) {
             queue.pendingStartupFadein = null;
-            log.info('[WebServer] Fade-in de démarrage joué par le tableau de bord.');
+            log.info('[WebServer] Startup fade-in played by the dashboard.');
             webServer.broadcastState(currentGuildId);
         }
 }
@@ -62,7 +62,7 @@ function handleClientLog(ctx) {
  * dossier d'où son code est chargé. Voir src/versioning/emplacements.js.
  *
  * @param {object} webServer
- * @param {{ entree?: string }} [options]
+ * @param {{ entryPoint?: string }} [options]
  */
 function restartProcess(webServer, options = {}) {
     const entryPoint = options.entryPoint || process.argv[1];
@@ -71,16 +71,16 @@ function restartProcess(webServer, options = {}) {
             const { useMainPlayer } = require('discord-player');
             const player = useMainPlayer();
             playbackStateManager.saveState(player);
-            log.info('[WebServer] État de lecture sauvegardé instantanément avant redémarrage.');
+            log.info('[WebServer] Playback state saved instantly before the restart.');
         } catch (saveErr) {
-            log.error('[WebServer] Erreur sauvegarde état avant redémarrage :', saveErr.message);
+            log.error('[WebServer] Error saving the state before the restart:', saveErr.message);
         }
 
         try {
             webServer.wss.close();
             webServer.server.close();
 
-            log.info(`[WebServer] Serveur arrêté. Démarrage de la nouvelle instance : ${entryPoint}`);
+            log.info(`[WebServer] Server stopped. Starting the new instance: ${entryPoint}`);
 
             const spawn = require('child_process').spawn;
             const args = [entryPoint, ...process.argv.slice(2)];
@@ -101,7 +101,7 @@ function restartProcess(webServer, options = {}) {
 
             process.exit(0);
         } catch (err) {
-            log.error('[WebServer] Erreur lors du redémarrage :', err.message);
+            log.error('[WebServer] Error during the restart:', err.message);
             process.exit(1);
         }
 }
@@ -109,7 +109,7 @@ function restartProcess(webServer, options = {}) {
 function handleRestartBot(ctx) {
     const { webServer } = ctx;
 
-        log.info('[WebServer] Requête de redémarrage reçue. Sauvegarde instantanée de l\'état (musique continue sans fade-out)...');
+        log.info('[WebServer] Restart request received. Instant state save (the music keeps going, no fade-out)...');
 
         const payload = JSON.stringify({ type: 'status', data: { status: 'restarting' } });
         webServer.wss.clients.forEach((client) => {
@@ -130,7 +130,7 @@ async function handleShutdownBot(ctx) {
         const fadeoutDurationSecs = settings.fadeoutDuration !== undefined ? parseFloat(settings.fadeoutDuration) : 5;
         const fadeDurationMs = fadeoutEnabled ? Math.round(fadeoutDurationSecs * 1000) : 0;
 
-        log.info(`[WebServer] Requête d'extinction reçue. Démarrage du fade-out de ${fadeDurationMs / 1000}s...`);
+        log.info(`[WebServer] Shutdown request received. Starting the ${fadeDurationMs / 1000}s fade-out...`);
 
         const payload = JSON.stringify({
             type: 'status',
@@ -151,7 +151,7 @@ async function handleShutdownBot(ctx) {
             const player = useMainPlayer();
             await playbackStateManager.fadeOutAndSaveState(player, fadeDurationMs);
         } catch (saveErr) {
-            log.error('[WebServer] Erreur fade-out avant extinction :', saveErr.message);
+            log.error('[WebServer] Fade-out error before shutdown:', saveErr.message);
         }
 
         try {
@@ -175,11 +175,11 @@ async function handleShutdownBot(ctx) {
                 try { cl.destroy(); } catch (e) {}
             }
 
-            log.info('[WebServer] Serveur arrêté après fade-out. Extinction complète du bot.');
+            log.info('[WebServer] Server stopped after the fade-out. Bot fully shut down.');
             setTimeout(() => process.exit(0), 100);
             process.exit(0);
         } catch (err) {
-            log.error('[WebServer] Erreur lors de l\'extinction :', err.message);
+            log.error('[WebServer] Error during the shutdown:', err.message);
             process.exit(1);
         }
 }

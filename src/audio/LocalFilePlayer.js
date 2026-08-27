@@ -27,7 +27,7 @@ class LocalFilePlayer {
         const resolvedPath = path.resolve(dirPath);
 
         if (!fs.existsSync(resolvedPath)) {
-            throw new Error(`Le dossier n'existe pas : ${resolvedPath}`);
+            throw new Error(`The folder does not exist: ${resolvedPath}`);
         }
 
         const stat = fs.statSync(resolvedPath);
@@ -36,7 +36,7 @@ class LocalFilePlayer {
             if (LocalFilePlayer.isAudioFile(resolvedPath)) {
                 return [resolvedPath];
             }
-            throw new Error(`Le fichier n'est pas un format audio supporté : ${path.basename(resolvedPath)}`);
+            throw new Error(`The file is not a supported audio format: ${path.basename(resolvedPath)}`);
         }
 
         const audioFiles = [];

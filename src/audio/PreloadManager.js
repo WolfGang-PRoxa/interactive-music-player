@@ -459,15 +459,15 @@ class PreloadManager {
             }
 
             resumed++;
-            log.info(`[PreloadManager] Préchargement partiel retrouvé (${parsed.bitrate} kbps) : `
-                + `${resumeInfo.seconds.toFixed(0)} s déjà encodées, la reprise s'y raccordera.`);
+            log.info(`[PreloadManager] Partial preload found again (${parsed.bitrate} kbps): `
+                + `${resumeInfo.seconds.toFixed(0)} s already encoded, the resume will pick up from there.`);
         }
 
         if (discarded > 0) {
-            log.info(`[PreloadManager] ${discarded} fichier(s) temporaire(s) inexploitable(s) supprimé(s).`);
+            log.info(`[PreloadManager] ${discarded} unusable temporary file(s) deleted.`);
         }
         if (resumed > 0) {
-            log.success(`[PreloadManager] ${resumed} préchargement(s) reprendront là où ils s'étaient arrêtés.`);
+            log.success(`[PreloadManager] ${resumed} preload(s) will resume where they left off.`);
         }
     }
 
@@ -522,11 +522,11 @@ class PreloadManager {
         }
 
         if (removed > 0) {
-            log.info(`[PreloadManager] Plafond du cache atteint : ${removed} fichier(s) évincé(s), `
-                + `${(total / 1024 / 1024).toFixed(0)} Mo restants sur ${MAX_CACHE_BYTES / 1024 / 1024} Mo.`);
+            log.info(`[PreloadManager] Cache ceiling reached: ${removed} file(s) evicted, `
+                + `${(total / 1024 / 1024).toFixed(0)} MB left out of ${MAX_CACHE_BYTES / 1024 / 1024} MB.`);
         } else {
-            log.warn('[PreloadManager] Plafond du cache dépassé mais aucun fichier évinçable '
-                + '(toutes les pistes sont en cours de lecture).');
+            log.warn('[PreloadManager] Cache ceiling exceeded but no file can be evicted '
+                + '(every track is currently playing).');
         }
         return removed;
     }
@@ -613,7 +613,7 @@ class PreloadManager {
         if (entry.bitrate === String(newBitrate)) return false;
         if (this.activeDownloads.has(this._downloadKey(key, newBitrate))) return false;
 
-        log.info(`[PreloadManager] Requalification de ${track.title} : ${entry.bitrate || 'inconnu'} → ${newBitrate} kbps.`);
+        log.info(`[PreloadManager] Requalifying ${track.title}: ${entry.bitrate || 'unknown'} → ${newBitrate} kbps.`);
         this.startDownload(track, key, String(newBitrate), entry.bitrate);
         return true;
     }
@@ -635,7 +635,7 @@ class PreloadManager {
         try {
             this._sortTempFiles();
         } catch (e) {
-            log.error('[PreloadManager] Erreur tri des fichiers temporaires au démarrage:', e.message);
+            log.error('[PreloadManager] Error sorting the temporary files at startup:', e.message);
         }
 
         this._buildCacheIndex();
@@ -647,7 +647,7 @@ class PreloadManager {
                 extractor.stream = async (track, ...args) => {
                     const cachedPath = this.getCachedPath(track);
                     if (cachedPath) {
-                        log.info(`[PreloadManager] Stream cached de ${track.title} servi depuis le disque local.`);
+                        log.info(`[PreloadManager] Cached stream of ${track.title} served from the local disk.`);
                         return fs.createReadStream(cachedPath);
                     }
 
@@ -664,7 +664,7 @@ class PreloadManager {
             }
         });
 
-        log.info('[PreloadManager] Initialisé et extracteurs de flux interceptés.');
+        log.info('[PreloadManager] Initialised, stream extractors intercepted.');
     }
 
     /**
@@ -852,7 +852,7 @@ class PreloadManager {
         this.lastTargets.set(guildId, urls);
 
         if (!unchanged) {
-            log.info(`[PreloadManager] Cibles de préchargement mises à jour pour la guild ${guildId} (${urls.length} pistes).`);
+            log.info(`[PreloadManager] Preload targets updated for guild ${guildId} (${urls.length} tracks).`);
         }
 
         // 1. Annuler les téléchargements actifs obsolètes (qui ne sont cibles pour AUCUNE guild active)
@@ -871,7 +871,7 @@ class PreloadManager {
                 if (download.startTime && (now - download.startTime < 5000)) {
                     continue;
                 }
-                log.info(`[PreloadManager] Annulation du préchargement obsolète pour la clé : ${dlKey}`);
+                log.info(`[PreloadManager] Cancelling the stale preload for key: ${dlKey}`);
                 download.cancel();
             }
         }
@@ -891,7 +891,7 @@ class PreloadManager {
                     const isActive = this.activeDownloads.has(this._downloadKey(tmp.key, tmp.bitrate));
                     if (!isActive && (!isTarget || this.cacheIndex.has(tmp.key))) {
                         this._deleteTemp(path.join(this.cacheDir, file));
-                        log.info(`[PreloadManager] Préchargement partiel inutile supprimé : ${file}`);
+                        log.info(`[PreloadManager] Useless partial preload deleted: ${file}`);
                     }
                     return;
                 }
@@ -908,13 +908,13 @@ class PreloadManager {
                     if (this.cacheIndex.get(parsed.key)?.file === file) {
                         this.cacheIndex.delete(parsed.key);
                     }
-                    log.info(`[PreloadManager] Fichier cache inutilisé supprimé : ${file}`);
+                    log.info(`[PreloadManager] Unused cache file deleted: ${file}`);
                 } catch (e) {
-                    log.error(`[PreloadManager] Échec suppression fichier cache ${file} :`, e.message);
+                    log.error(`[PreloadManager] Failed to delete cache file ${file}:`, e.message);
                 }
             });
         } catch (err) {
-            log.error('[PreloadManager] Erreur lecture dossier cache pour nettoyage :', err.message);
+            log.error('[PreloadManager] Error reading the cache folder for cleanup:', err.message);
         }
 
         // 3. Ramener le cache sous son plafond de taille. La purge par
@@ -965,7 +965,7 @@ class PreloadManager {
      * mode de diffusion à l'autre.
      *
      * @param {object} track - Piste à ponter
-     * @param {string} [libelle] - Titre à journaliser
+     * @param {string} [label] - Titre à journaliser
      * @returns {Promise<object|null>} Piste diffusable, ou null si le pont
      *   n'est pas nécessaire ou n'a pas abouti — l'appelant garde alors la
      *   piste d'origine et son propre repli.
@@ -983,7 +983,7 @@ class PreloadManager {
 
             // Vidéo supprimée à la source depuis : le pont est refait, sans
             // quoi la piste resterait injouable indéfiniment.
-            log.warn(`[PreloadManager] Pont mémorisé de ${name} devenu irrésolvable, nouvelle recherche.`);
+            log.warn(`[PreloadManager] Remembered bridge for ${name} no longer resolves, searching again.`);
             database.clearBridge(track.url);
         }
 
@@ -993,12 +993,12 @@ class PreloadManager {
             const res = await this.player.search(query, { requestedBy: null });
             candidates = (res && res.tracks) || [];
         } catch (e) {
-            log.error(`[PreloadManager] Échec de la recherche du pont pour ${name} :`, e.message);
+            log.error(`[PreloadManager] Bridge search failed for ${name}:`, e.message);
             return null;
         }
 
         if (candidates.length === 0) {
-            log.warn(`[PreloadManager] Aucun candidat trouvé pour ponter ${name}.`);
+            log.warn(`[PreloadManager] No candidate found to bridge ${name}.`);
             return null;
         }
 
@@ -1008,13 +1008,13 @@ class PreloadManager {
         database.setBridge(track.url, match.url);
 
         if (verified) {
-            log.success(`[PreloadManager] Pont établi pour ${name} : ${match.url} `
-                + `(écart de durée ${(gapMs / 1000).toFixed(1)} s).`);
+            log.success(`[PreloadManager] Bridge established for ${name}: ${match.url} `
+                + `(duration gap ${(gapMs / 1000).toFixed(1)} s).`);
         } else {
             // Mémorisé quand même : un enregistrement approximatif mais stable
             // vaut mieux qu'un titre qui change à chaque lecture.
-            log.warn(`[PreloadManager] Pont établi pour ${name} sans correspondance de durée `
-                + `${gapMs !== null ? `(meilleur écart ${(gapMs / 1000).toFixed(1)} s) ` : ''}`
+            log.warn(`[PreloadManager] Bridge established for ${name} without a duration match `
+                + `${gapMs !== null ? `(best gap ${(gapMs / 1000).toFixed(1)} s) ` : ''}`
                 + `: ${match.url}`);
         }
         return match;
@@ -1042,14 +1042,14 @@ class PreloadManager {
             if (!bridged || !bridged.url || bridged.url === track.url) return null;
             if (!bridged.extractor || typeof bridged.extractor.stream !== 'function') return null;
 
-            log.info(`[PreloadManager] ${track.title} lu via le pont mémorisé : ${bridged.url}`);
+            log.info(`[PreloadManager] ${track.title} read through the remembered bridge: ${bridged.url}`);
             // L'extracteur cible est lui aussi intercepté : sa piste étant une
             // source normale, il retombera sur son flux d'origine sans repasser
             // par ici.
             return await bridged.extractor.stream(bridged);
         } catch (e) {
-            log.error(`[PreloadManager] Pont indisponible pour ${track.title}, `
-                + `repli sur l'extracteur :`, e.message);
+            log.error(`[PreloadManager] Bridge unavailable for ${track.title}, `
+                + `falling back to the extractor:`, e.message);
             return null;
         }
     }
@@ -1093,10 +1093,10 @@ class PreloadManager {
         let resumeInfo = this._resumableFrom(tmpPath);
 
         if (resumeInfo) {
-            log.info(`[PreloadManager] Reprise du préchargement de : ${track.title} (${bitrate} kbps) `
-                + `à ${resumeInfo.seconds.toFixed(0)} s (${percentOf(resumeInfo.bytes)} %)`);
+            log.info(`[PreloadManager] Resuming the preload of: ${track.title} (${bitrate} kbps) `
+                + `at ${resumeInfo.seconds.toFixed(0)} s (${percentOf(resumeInfo.bytes)} %)`);
         } else {
-            log.info(`[PreloadManager] Début du préchargement de : ${track.title} (${bitrate} kbps)`);
+            log.info(`[PreloadManager] Starting the preload of: ${track.title} (${bitrate} kbps)`);
         }
 
         let stream = null;
@@ -1117,7 +1117,7 @@ class PreloadManager {
          *
          * Le motif est retenu ici pour être rendu au moment de l'échec.
          */
-        let refusReseau = null;
+        let networkRefusal = null;
 
         const cleanup = () => {
             if (finished) return;
@@ -1154,7 +1154,7 @@ class PreloadManager {
                 const searchRes = await this.player.search(track.url);
                 if (searchRes && searchRes.tracks.length > 0) {
                     targetTrack = searchRes.tracks[0];
-                    log.info(`[PreloadManager] Piste hydratée dynamiquement via player.search pour : ${targetTrack.title}`);
+                    log.info(`[PreloadManager] Track hydrated on the fly through player.search for: ${targetTrack.title}`);
                 }
             } catch (e) {}
         }
@@ -1176,7 +1176,7 @@ class PreloadManager {
                 try {
                     if (await ext.validate(targetUrl, targetTrack.queryType)) {
                         targetTrack.extractor = ext;
-                        log.info(`[PreloadManager] Extractor résolu dynamiquement pour ${targetTrack.title} : ${ext.constructor.name}`);
+                        log.info(`[PreloadManager] Extractor resolved on the fly for ${targetTrack.title}: ${ext.constructor.name}`);
                         break;
                     }
                 } catch (e) {}
@@ -1184,7 +1184,7 @@ class PreloadManager {
         }
 
         if (isCancelled) {
-            log.info(`[PreloadManager] Préchargement annulé pour ${track.title}.`);
+            log.info(`[PreloadManager] Preload cancelled for ${track.title}.`);
             cleanup();
             return;
         }
@@ -1201,8 +1201,8 @@ class PreloadManager {
                 || (crypto.createHash('sha256').update(targetUrl).digest('hex') === key ? targetUrl : null);
 
             if (partialSource !== targetUrl) {
-                log.info(`[PreloadManager] Partiel de ${track.title} écarté : `
-                    + `source ${partialSource ? 'différente' : 'inconnue'}, réencodage complet.`);
+                log.info(`[PreloadManager] Partial file of ${track.title} discarded: `
+                    + `${partialSource ? 'different' : 'unknown'} source, full re-encode.`);
                 this._deleteTemp(tmpPath);
                 resumeInfo = null;
                 downloadObj.progress = 5;
@@ -1230,10 +1230,10 @@ class PreloadManager {
                     });
                     if (streamInfo && streamInfo.result) {
                         rawStreamObj = streamInfo.result;
-                        log.info(`[PreloadManager Debug] Stream extrait via player.extractors.run (Extracteur: ${streamInfo.extractor?.constructor?.name})`);
+                        log.info(`[PreloadManager Debug] Stream extracted through player.extractors.run (Extractor: ${streamInfo.extractor?.constructor?.name})`);
                     }
                 } catch (e) {
-                    log.error(`[PreloadManager Debug] Échec player.extractors.run:`, e.message);
+                    log.error(`[PreloadManager Debug] player.extractors.run failed:`, e.message);
                 }
             }
 
@@ -1264,7 +1264,7 @@ class PreloadManager {
             if ((!ffmpegInput || ffmpegInput === 'pipe:0') && /^https?:\/\//i.test(targetUrl)) {
                 try {
                     const youtubedl = require('youtube-dl-exec');
-                    log.info(`[PreloadManager] Résolution URL audio directe via youtube-dl-exec pour : ${targetTrack.title}`);
+                    log.info(`[PreloadManager] Resolving a direct audio URL through youtube-dl-exec for: ${targetTrack.title}`);
                     const info = await youtubedl(targetUrl, {
                         dumpSingleJson: true,
                         noCheckCertificates: true,
@@ -1280,14 +1280,14 @@ class PreloadManager {
                         if (bestAudio && bestAudio.url) {
                             ffmpegInput = bestAudio.url;
                             inputStream = null;
-                            log.success(`[PreloadManager] URL directe extraite avec succès pour : ${targetTrack.title}`);
+                            log.success(`[PreloadManager] Direct URL extracted successfully for: ${targetTrack.title}`);
                         }
                     } else if (entry && entry.url) {
                         ffmpegInput = entry.url;
                         inputStream = null;
                     }
                 } catch (ytdlErr) {
-                    log.error(`[PreloadManager] Avertissement résolution youtube-dl-exec pour ${targetTrack.title}:`, ytdlErr.message);
+                    log.error(`[PreloadManager] youtube-dl-exec resolution warning for ${targetTrack.title}:`, ytdlErr.message);
                 }
             }
 
@@ -1298,7 +1298,7 @@ class PreloadManager {
             if (isCancelled) return;
 
             if (!ffmpegInput && !inputStream) {
-                throw new Error(`Flux de préchargement invalide/null pour ${track.title}`);
+                throw new Error(`Invalid/null preload stream for ${track.title}`);
             }
 
             const ffmpegArgs = [];
@@ -1326,7 +1326,7 @@ class PreloadManager {
                 ffmpegProcess.stdin.on('error', (err) => {
                     // EPIPE attendu si ffmpeg a déjà fermé son entrée après une erreur amont
                     if (err.code !== 'EPIPE') {
-                        log.error(`[PreloadManager Debug] Erreur stdin ffmpeg pour ${track.title}:`, err.message);
+                        log.error(`[PreloadManager Debug] ffmpeg stdin error for ${track.title}:`, err.message);
                     }
                 });
             }
@@ -1341,15 +1341,15 @@ class PreloadManager {
                     // `HTTP error 403 Forbidden` chez ffmpeg, `Server returned
                     // 403 Forbidden` selon le protocole : les deux formes
                     // désignent le même refus.
-                    const refus = /(?:HTTP error|Server returned)\s+(\d{3}[^\n]*)/i.exec(msg);
-                    if (refus && !refusReseau) refusReseau = refus[1].trim();
+                    const refusal = /(?:HTTP error|Server returned)\s+(\d{3}[^\n]*)/i.exec(msg);
+                    if (refusal && !networkRefusal) networkRefusal = refusal[1].trim();
                 });
             }
             ffmpegProcess.on('close', (code) => {
                 if (code !== 0) {
-                    log.error(`[PreloadManager FFmpeg Error] Code de sortie ${code}:`, ffmpegLogs.slice(-10).join('\n'));
+                    log.error(`[PreloadManager FFmpeg Error] Exit code ${code}:`, ffmpegLogs.slice(-10).join('\n'));
                 } else {
-                    log.success(`[PreloadManager FFmpeg] Transcodage terminé avec succès (code 0).`);
+                    log.success(`[PreloadManager FFmpeg] Transcoding finished successfully (code 0).`);
                 }
             });
 
@@ -1368,7 +1368,7 @@ class PreloadManager {
                 bytesWritten += chunk.length;
                 const pct = percentOf(bytesWritten);
                 if (pct > lastReportedPct + 2) {
-                    log.info(`[PreloadManager Debug] Écriture en cours pour ${track.title}: ${bytesWritten} octets (${pct}%)`);
+                    log.info(`[PreloadManager Debug] Writing in progress for ${track.title}: ${bytesWritten} bytes (${pct}%)`);
                     lastReportedPct = pct;
                     downloadObj.progress = pct;
                     this.notifyProgress();
@@ -1380,21 +1380,21 @@ class PreloadManager {
 
             await new Promise((resolve, reject) => {
                 ffmpegProcess.on('error', (err) => {
-                    log.error(`[PreloadManager Debug] FFmpeg process error pour ${track.title}:`, err.message);
+                    log.error(`[PreloadManager Debug] FFmpeg process error for ${track.title}:`, err.message);
                     reject(err);
                 });
                 if (inputStream && typeof inputStream.on === 'function') {
                     inputStream.on('error', (err) => {
-                        log.error(`[PreloadManager Debug] InputStream error pour ${track.title}:`, err.message);
+                        log.error(`[PreloadManager Debug] InputStream error for ${track.title}:`, err.message);
                         reject(err);
                     });
                 }
                 outStream.on('error', (err) => {
-                    log.error(`[PreloadManager Debug] OutStream error pour ${track.title}:`, err.message);
+                    log.error(`[PreloadManager Debug] OutStream error for ${track.title}:`, err.message);
                     reject(err);
                 });
                 outStream.on('finish', () => {
-                    log.info(`[PreloadManager Debug] OutStream finish déclenché pour ${track.title}. Octets écrits au total: ${bytesWritten}`);
+                    log.info(`[PreloadManager Debug] OutStream finish fired for ${track.title}. Total bytes written: ${bytesWritten}`);
                     resolve();
                 });
             });
@@ -1424,7 +1424,7 @@ class PreloadManager {
                     const expected = resolvedDurationMs / 1000;
                     if (expected && encode.seconds < expected * 0.95) {
                         throw new Error(`Encodage incomplet : ${encode.seconds.toFixed(0)} s `
-                            + `sur ${expected.toFixed(0)} s annoncées.`);
+                            + `out of the ${expected.toFixed(0)} s announced.`);
                     }
 
                     // Bascule : le fichier précédent n'est retiré qu'ici, une
@@ -1445,26 +1445,26 @@ class PreloadManager {
 
                     if (previous && previous.file !== cacheFileName(key, bitrate)) {
                         this._deleteCacheFile(key, previous.file);
-                        log.success(`[PreloadManager] Requalification terminée pour ${track.title} : `
-                            + `${previous.bitrate || 'inconnu'} → ${bitrate} kbps, ancien fichier retiré.`);
+                        log.success(`[PreloadManager] Requalification finished for ${track.title}: `
+                            + `${previous.bitrate || 'unknown'} → ${bitrate} kbps, old file removed.`);
                     } else {
-                        log.success(`[PreloadManager] Préchargement réussi et validé pour : ${track.title} (${bitrate} kbps)`);
+                        log.success(`[PreloadManager] Preload succeeded and validated for: ${track.title} (${bitrate} kbps)`);
                     }
-                } else if (refusReseau) {
+                } else if (networkRefusal) {
                     // Zéro octet parce que rien n'est arrivé : le disque n'y est
                     // pour rien, et le dire évite de chercher du côté du cache.
-                    throw new Error(`La source a refusé la connexion (${refusReseau}) — `
-                        + `${stat.size} octet(s) reçu(s). Sur une piste YouTube, c'est le `
-                        + `symptôme habituel d'un yt-dlp périmé : « npm run update-ytdlp ».`);
+                    throw new Error(`The source refused the connection (${networkRefusal}) — `
+                        + `${stat.size} byte(s) received. On a YouTube track this is the `
+                        + `usual symptom of an outdated yt-dlp: « npm run update-ytdlp ».`);
                 } else {
-                    throw new Error(`Fichier trop petit (${stat.size} octets), considéré comme corrompu.`);
+                    throw new Error(`File too small (${stat.size} bytes), treated as corrupted.`);
                 }
-            } else if (refusReseau) {
-                throw new Error(`La source a refusé la connexion (${refusReseau}) — rien n'a été écrit. `
-                    + `Sur une piste YouTube, c'est le symptôme habituel d'un yt-dlp périmé : `
+            } else if (networkRefusal) {
+                throw new Error(`The source refused the connection (${networkRefusal}) — nothing was written. `
+                    + `On a YouTube track this is the usual symptom of an outdated yt-dlp: `
                     + `« npm run update-ytdlp ».`);
             } else {
-                throw new Error("Le fichier temporaire n'existe pas.");
+                throw new Error("The temporary file does not exist.");
             }
             cleanup();
             this.notifyProgress();
@@ -1477,8 +1477,8 @@ class PreloadManager {
             // cancel() a déjà fait le ménage.
             const leftover = isCancelled ? null : this._resumableFrom(tmpPath);
             if (leftover) {
-                log.info(`[PreloadManager] Partiel conservé pour ${track.title} : `
-                    + `${leftover.seconds.toFixed(0)} s encodées, reprise à la prochaine tentative.`);
+                log.info(`[PreloadManager] Partial file kept for ${track.title}: `
+                    + `${leftover.seconds.toFixed(0)} s encoded, resuming on the next attempt.`);
             } else {
                 this._deleteTemp(tmpPath);
             }
@@ -1487,13 +1487,13 @@ class PreloadManager {
                 // La piste n'est plus une cible : rien à retenter, et la
                 // mémoire d'un échec antérieur n'a plus lieu d'être.
                 this.failures.delete(key);
-                log.info(`[PreloadManager] Préchargement annulé pour ${track.title}.`);
+                log.info(`[PreloadManager] Preload cancelled for ${track.title}.`);
             } else {
                 const attempts = (this.failures.get(key)?.attempts || 0) + 1;
                 this.failures.set(key, { at: Date.now(), attempts });
                 const retryIn = Math.round(this._retryDelayMs(attempts) / 1000);
-                log.error(`[PreloadManager] Échec du préchargement pour ${track.title} `
-                    + `(tentative ${attempts}, nouvel essai dans ${retryIn} s) :`, err.message);
+                log.error(`[PreloadManager] Preload failed for ${track.title} `
+                    + `(attempt ${attempts}, retrying in ${retryIn} s):`, err.message);
             }
             this.notifyProgress();
         }

@@ -111,7 +111,7 @@ module.exports = {
                 });
 
             } catch (error) {
-                log.error('[Play personal] Erreur :', error);
+                log.error('[Play personal] Error:', error);
                 return interaction.followUp({
                     embeds: [embeds.error('Erreur', `Impossible d'ajouter en mode personnel : ${error.message}`)]
                 });
@@ -150,7 +150,7 @@ module.exports = {
             const resolvedPath = path.resolve(query);
             if (fs.existsSync(resolvedPath) && LocalFilePlayer.isAudioFile(resolvedPath)) {
                 const trackInfo = LocalFilePlayer.getTrackInfo(resolvedPath);
-                log.info(`[Play] Fichier local détecté : ${resolvedPath}`);
+                log.info(`[Play] Local file detected: ${resolvedPath}`);
 
                 // Utiliser discord-player avec le type Attachment pour les fichiers locaux
                 const result = await player.play(voiceChannel, resolvedPath, {
@@ -166,7 +166,7 @@ module.exports = {
                     searchEngine: QueryType.FILE,
                 });
 
-                log.debug(`[Play] Résultat : track=${result.track?.title}, searchResult=${result.searchResult?.hasPlaylist()}`);
+                log.debug(`[Play] Result: track=${result.track?.title}, searchResult=${result.searchResult?.hasPlaylist()}`);
 
                 return interaction.followUp({
                     embeds: [embeds.success('▶️ En lecture', `**${trackInfo.title}**\n*Source : fichier local*`)],
@@ -199,7 +199,7 @@ module.exports = {
             return interaction.followUp({ embeds: [embed] });
 
         } catch (error) {
-            log.error('[Play] Erreur :', error);
+            log.error('[Play] Error:', error);
             return interaction.followUp({
                 embeds: [embeds.error('Erreur de lecture', `Impossible de jouer ce morceau.\n\`${error.message}\``)],
             });

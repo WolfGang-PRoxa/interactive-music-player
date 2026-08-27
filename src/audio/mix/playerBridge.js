@@ -49,13 +49,13 @@ function announcedDurationMs(track) {
  * Remplace une méthode du prototype par une version qui interroge d'abord le bus.
  *
  * @param {object} prototype
- * @param {string} nom
- * @param {(original: Function) => Function} fabrique
+ * @param {string} name
+ * @param {(original: Function) => Function} factory
  */
 function wrap(prototype, name, factory) {
     const original = prototype[name];
     if (typeof original !== 'function') {
-        log.warn(`[MixBridge] Méthode « ${name} » absente : le pont ne peut pas s'y greffer.`);
+        log.warn(`[MixBridge] Method « ${name} » missing: the bridge cannot graft onto it.`);
         return;
     }
     Object.defineProperty(prototype, name, {
@@ -99,7 +99,7 @@ function installBridge() {
         const track = res || this.queue.tracks.dispatch();
         if (!track) {
             this.queue.emit(GuildQueueEvent.Error, this.queue,
-                new Error('Demande de lecture reçue sans piste à jouer.'));
+                new Error('Playback request received with no track to play.'));
             return;
         }
 
@@ -162,7 +162,7 @@ function installBridge() {
         if (total && duration > total) {
             return this.skip({
                 reason: TrackSkipReason.SEEK_OVER_THRESHOLD,
-                description: `Position demandée (${duration}ms) au-delà de la durée du morceau.`,
+                description: `Requested position (${duration}ms) is past the end of the track.`,
             });
         }
 
@@ -293,7 +293,7 @@ function installBridge() {
         enumerable: false,
     });
 
-    log.info('[MixBridge] Le lecteur est branché sur le bus de mixage.');
+    log.info('[MixBridge] The player is wired to the mix bus.');
 }
 
 module.exports = { installBridge };

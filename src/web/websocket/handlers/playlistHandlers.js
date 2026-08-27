@@ -85,7 +85,7 @@ async function handleAddPlaylistTrack(ctx) {
                 webServer._sendError(`Impossible de trouver le morceau : ${url}`);
             }
         } catch (err) {
-            log.error('[WebServer] Erreur addPlaylistTrack :', err.message);
+            log.error('[WebServer] addPlaylistTrack error:', err.message);
         }
 }
 

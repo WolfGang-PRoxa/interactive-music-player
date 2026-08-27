@@ -15,7 +15,7 @@
 window.MusicPlayer = window.MusicPlayer || {};
 
 /** Débits MP3 proposés, du plus élevé au plus faible. */
-const DEBITS_AUDIO = [
+const AUDIO_BITRATES = [
     { value: '320', label: '320 kbps' },
     { value: '256', label: '256 kbps' },
     { value: '192', label: '192 kbps' },
@@ -33,24 +33,24 @@ const VIDEO_HEIGHTS = [
     { value: '360', label: '360p' }
 ];
 
-const ICONE_AUDIO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>';
-const ICONE_VIDEO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>';
-const ICONE_CHEVRON = '<svg class="quality-menu-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
-const ICONE_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
-const ICONE_LIEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>';
+const ICON_AUDIO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>';
+const ICON_VIDEO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>';
+const ICON_CHEVRON = '<svg class="quality-menu-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+const ICON_LINK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>';
 const FOLDER_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>';
-const ICONE_COPIE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+const ICON_COPY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
 
 let menuEl = null;
-let sousMenuEl = null;
+let submenuEl = null;
 /** URL de la piste ouverte : sert à retrouver son état frais à chaque diffusion. */
-let urlOuverte = null;
+let openedUrl = null;
 /** 'audio' | 'video' | null — sous-menu actuellement déplié. */
-let sousMenuOuvert = null;
+let submenuOpen = null;
 
 function t(key, fallback) {
-    const traduit = window.MusicPlayer.t ? window.MusicPlayer.t(key) : key;
-    return traduit === key ? fallback : traduit;
+    const translated = window.MusicPlayer.t ? window.MusicPlayer.t(key) : key;
+    return translated === key ? fallback : translated;
 }
 
 /**
@@ -68,15 +68,15 @@ function findTrack(url) {
 
     // La piste en cours d'abord : c'est celle que vise la roue de la fenêtre
     // vidéo, et elle n'appartient plus à la file une fois lancée.
-    const viviers = [
+    const pools = [
         state.currentTrack ? [state.currentTrack] : [],
         state.queue || [],
         state.history || []
     ];
-    (state.playlists || []).forEach(p => viviers.push(p.tracks || []));
+    (state.playlists || []).forEach(p => pools.push(p.tracks || []));
 
-    for (const vivier of viviers) {
-        const found = vivier.find(t => t && t.url === url);
+    for (const pool of pools) {
+        const found = pool.find(t => t && t.url === url);
         if (found) return found;
     }
     return null;
@@ -90,7 +90,7 @@ function findTrack(url) {
  *
  * @returns {HTMLElement}
  */
-function conteneurMenu() {
+function menuContainer() {
     return document.fullscreenElement || document.webkitFullscreenElement || document.body;
 }
 
@@ -118,12 +118,12 @@ function raiseToFront(el) {
  * Son contenu est ensuite entièrement piloté par `majStatut()`, y compris à la
  * construction : la ligne peut ainsi changer d'état sans reconstruire le menu.
  */
-function construireStatut(track) {
+function buildStatus(track) {
     const row = document.createElement('div');
     row.className = 'quality-menu-status';
 
-    const pastille = document.createElement('span');
-    pastille.className = 'quality-menu-dot';
+    const badge = document.createElement('span');
+    badge.className = 'quality-menu-dot';
 
     const text = document.createElement('span');
     text.className = 'quality-menu-status-text';
@@ -131,7 +131,7 @@ function construireStatut(track) {
     const value = document.createElement('span');
     value.className = 'quality-menu-status-value';
 
-    row.appendChild(pastille);
+    row.appendChild(badge);
     row.appendChild(text);
     row.appendChild(value);
     updateStatus(row, track);
@@ -145,7 +145,7 @@ function construireStatut(track) {
  * ligne est la seule partie du menu qui évolue en continu. La reconstruire
  * emporterait les boutons voisins et ferait clignoter le survol.
  *
- * @param {HTMLElement} ligne
+ * @param {HTMLElement} row
  * @param {object} track
  */
 function updateStatus(row, track) {
@@ -155,49 +155,49 @@ function updateStatus(row, track) {
 
     let classes = [];
     let label;
-    let chiffre;
+    let digit;
 
     if (track.isLocal) {
         classes = ['is-local'];
         label = t('quality_menu_local', 'Fichier local');
-        chiffre = t('quality_menu_local_short', 'tel quel');
+        digit = t('quality_menu_local_short', 'tel quel');
     } else if (track.requalify) {
         classes = ['is-requalifying', track.requalify.direction === 'down' ? 'is-down' : 'is-up'];
         label = t('quality_menu_requalifying', 'Nouvelle qualité en cours');
-        chiffre = `${Math.round(track.requalify.progress || 0)} %`;
+        digit = `${Math.round(track.requalify.progress || 0)} %`;
     } else if (track.isPreloaded) {
         classes = ['is-preloaded'];
         label = t('quality_menu_preloaded', 'Préchargé');
-        chiffre = '100 %';
+        digit = '100 %';
     } else if (track.isPreloading) {
         classes = ['is-preloading'];
         label = t('quality_menu_preloading', 'Préchargement…');
-        chiffre = `${Math.round(track.preloadProgress || 0)} %`;
+        digit = `${Math.round(track.preloadProgress || 0)} %`;
     } else {
         label = t('quality_menu_not_preloaded', 'Non préchargé');
-        chiffre = '—';
+        digit = '—';
     }
 
     const target = `quality-menu-status ${classes.join(' ')}`.trim();
     if (row.className !== target) row.className = target;
     if (text && text.textContent !== label) text.textContent = label;
-    if (value && value.textContent !== chiffre) value.textContent = chiffre;
+    if (value && value.textContent !== digit) value.textContent = digit;
 }
 
 /**
  * Construit un bouton de qualité.
  * @param {'audio'|'video'} type
  * @param {string} valeurAffichee
- * @param {boolean} estReelle - true si la valeur décrit le fichier en cache
+ * @param {boolean} isReal - true si la valeur décrit le fichier en cache
  */
-function buildButton(type, displayedValue, estReelle) {
+function buildButton(type, displayedValue, isReal) {
     const btn = document.createElement('button');
     btn.className = 'quality-menu-item';
     btn.dataset.qualityType = type;
 
-    const icone = document.createElement('span');
-    icone.className = 'quality-menu-icon';
-    icone.innerHTML = type === 'audio' ? ICONE_AUDIO : ICONE_VIDEO;
+    const icon = document.createElement('span');
+    icon.className = 'quality-menu-icon';
+    icon.innerHTML = type === 'audio' ? ICON_AUDIO : ICON_VIDEO;
 
     const label = document.createElement('span');
     label.className = 'quality-menu-label';
@@ -211,16 +211,16 @@ function buildButton(type, displayedValue, estReelle) {
     // Une valeur simplement souhaitée n'engage rien tant que le fichier n'est
     // pas préchargé : elle est signalée comme telle plutôt que présentée
     // comme la qualité effective du média.
-    if (!estReelle) value.classList.add('is-desired');
-    value.dataset.tooltip = estReelle
+    if (!isReal) value.classList.add('is-desired');
+    value.dataset.tooltip = isReal
         ? t('quality_menu_actual_hint', 'Qualité du fichier préchargé')
         : t('quality_menu_desired_hint', 'Qualité souhaitée, appliquée au préchargement');
 
     const chevron = document.createElement('span');
     chevron.className = 'quality-menu-arrow';
-    chevron.innerHTML = ICONE_CHEVRON;
+    chevron.innerHTML = ICON_CHEVRON;
 
-    btn.appendChild(icone);
+    btn.appendChild(icon);
     btn.appendChild(label);
     btn.appendChild(value);
     btn.appendChild(chevron);
@@ -244,7 +244,7 @@ function buildButton(type, displayedValue, estReelle) {
  * @param {object} track
  * @returns {boolean}
  */
-function sourceEstUnLien(track) {
+function sourceIsLink(track) {
     return /^[a-z][a-z0-9+.-]*:\/\//i.test(track?.url || '');
 }
 
@@ -259,18 +259,18 @@ function sourceEstUnLien(track) {
  * @returns {HTMLElement}
  */
 function buildSourceButton(track) {
-    const estLien = sourceEstUnLien(track);
+    const isLink = sourceIsLink(track);
 
     const btn = document.createElement('button');
     btn.className = 'quality-menu-item quality-menu-source';
 
-    const icone = document.createElement('span');
-    icone.className = 'quality-menu-icon';
-    icone.innerHTML = estLien ? ICONE_LIEN : FOLDER_ICON;
+    const icon = document.createElement('span');
+    icon.className = 'quality-menu-icon';
+    icon.innerHTML = isLink ? ICON_LINK : FOLDER_ICON;
 
     const label = document.createElement('span');
     label.className = 'quality-menu-label';
-    label.textContent = estLien
+    label.textContent = isLink
         ? t('quality_menu_copy_link', 'Copier le lien')
         : t('quality_menu_copy_path', 'Copier le chemin d\'accès');
 
@@ -278,33 +278,33 @@ function buildSourceButton(track) {
     // et c'est pourtant elle qu'on s'apprête à copier.
     btn.dataset.tooltip = track.url || '';
 
-    const marque = document.createElement('span');
-    marque.className = 'quality-menu-arrow quality-menu-copy-mark';
-    marque.innerHTML = ICONE_COPIE;
+    const markEl = document.createElement('span');
+    markEl.className = 'quality-menu-arrow quality-menu-copy-mark';
+    markEl.innerHTML = ICON_COPY;
 
-    btn.appendChild(icone);
+    btn.appendChild(icon);
     btn.appendChild(label);
-    btn.appendChild(marque);
+    btn.appendChild(markEl);
 
     btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        const copie = await window.MusicPlayer.copyToClipboard(track.url);
+        const copy = await window.MusicPlayer.copyToClipboard(track.url);
 
         // Le menu reste ouvert : la coche confirme sur place, sans chasser
         // l'utilisateur d'un menu où il a peut-être encore à faire.
-        btn.classList.toggle('is-copied', copie);
-        label.textContent = copie
+        btn.classList.toggle('is-copied', copy);
+        label.textContent = copy
             ? t('quality_menu_copied', 'Copié')
             : t('quality_menu_copy_failed', 'Copie impossible');
-        marque.innerHTML = copie ? ICONE_CHECK : ICONE_COPIE;
+        markEl.innerHTML = copy ? ICON_CHECK : ICON_COPY;
 
         clearTimeout(btn._retour);
         btn._retour = setTimeout(() => {
             btn.classList.remove('is-copied');
-            label.textContent = estLien
+            label.textContent = isLink
                 ? t('quality_menu_copy_link', 'Copier le lien')
                 : t('quality_menu_copy_path', 'Copier le chemin d\'accès');
-            marque.innerHTML = ICONE_COPIE;
+            markEl.innerHTML = ICON_COPY;
         }, 1500);
     });
 
@@ -313,75 +313,75 @@ function buildSourceButton(track) {
 
 /** Ouvre (ou referme) le sous-menu de choix rattaché à un bouton. */
 function toggleSubmenu(type, btn) {
-    if (sousMenuOuvert === type) {
+    if (submenuOpen === type) {
         closeSubmenu();
         return;
     }
     closeSubmenu();
-    sousMenuOuvert = type;
+    submenuOpen = type;
     btn.classList.add('is-open');
 
-    const track = findTrack(urlOuverte);
+    const track = findTrack(openedUrl);
     if (!track) return;
 
-    const options = type === 'audio' ? DEBITS_AUDIO : VIDEO_HEIGHTS;
+    const options = type === 'audio' ? AUDIO_BITRATES : VIDEO_HEIGHTS;
     const current = type === 'audio'
         ? (track.cachedAudioQuality || track.desiredAudioQuality)
         : track.desiredVideoQuality;
 
-    sousMenuEl = document.createElement('div');
-    sousMenuEl.className = 'quality-submenu glass-card';
+    submenuEl = document.createElement('div');
+    submenuEl.className = 'quality-submenu glass-card';
     // Posé sur <body> pour échapper au découpage du menu : ses clics doivent
     // donc être retenus ici, sinon ils remonteraient à la fermeture globale.
-    sousMenuEl.addEventListener('click', (e) => e.stopPropagation());
-    sousMenuEl.addEventListener('contextmenu', (e) => e.preventDefault());
+    submenuEl.addEventListener('click', (e) => e.stopPropagation());
+    submenuEl.addEventListener('contextmenu', (e) => e.preventDefault());
 
     options.forEach(opt => {
         const choice = document.createElement('button');
         choice.className = 'quality-submenu-item';
         if (String(opt.value) === String(current)) choice.classList.add('is-current');
 
-        const marque = document.createElement('span');
-        marque.className = 'quality-submenu-check';
-        marque.innerHTML = String(opt.value) === String(current) ? ICONE_CHECK : '';
+        const markEl = document.createElement('span');
+        markEl.className = 'quality-submenu-check';
+        markEl.innerHTML = String(opt.value) === String(current) ? ICON_CHECK : '';
 
         const text = document.createElement('span');
         text.textContent = opt.label;
 
-        choice.appendChild(marque);
+        choice.appendChild(markEl);
         choice.appendChild(text);
 
         choice.addEventListener('click', (e) => {
             e.stopPropagation();
-            appliquerQualite(type, opt.value);
+            applyQuality(type, opt.value);
         });
 
-        sousMenuEl.appendChild(choice);
+        submenuEl.appendChild(choice);
     });
 
-    conteneurMenu().appendChild(sousMenuEl);
+    menuContainer().appendChild(submenuEl);
     // Ouvert après le menu : le compteur lui donne naturellement le dessus.
-    raiseToFront(sousMenuEl);
-    positionnerSousMenu(btn);
+    raiseToFront(submenuEl);
+    positionSubmenu(btn);
 }
 
 function closeSubmenu() {
-    if (sousMenuEl) {
-        sousMenuEl.remove();
-        sousMenuEl = null;
+    if (submenuEl) {
+        submenuEl.remove();
+        submenuEl = null;
     }
-    sousMenuOuvert = null;
+    submenuOpen = null;
     if (menuEl) {
         menuEl.querySelectorAll('.quality-menu-item.is-open').forEach(b => b.classList.remove('is-open'));
     }
 }
 
 /** Place le sous-menu à droite du bouton, en basculant à gauche si l'écran manque. */
-function positionnerSousMenu(btn) {
-    if (!sousMenuEl) return;
+function positionSubmenu(btn) {
+    if (!submenuEl) return;
     const rectBtn = btn.getBoundingClientRect();
     const rectMenu = menuEl.getBoundingClientRect();
-    const size = sousMenuEl.getBoundingClientRect();
+    const size = submenuEl.getBoundingClientRect();
 
     let left = rectMenu.right + 6;
     if (left + size.width > window.innerWidth - 8) {
@@ -395,12 +395,12 @@ function positionnerSousMenu(btn) {
     }
     if (top < 8) top = 8;
 
-    sousMenuEl.style.left = `${left}px`;
-    sousMenuEl.style.top = `${top}px`;
+    submenuEl.style.left = `${left}px`;
+    submenuEl.style.top = `${top}px`;
 }
 
-function appliquerQualite(type, value) {
-    const track = findTrack(urlOuverte);
+function applyQuality(type, value) {
+    const track = findTrack(openedUrl);
     if (!track) return;
 
     const data = { url: track.url, title: track.title };
@@ -444,10 +444,10 @@ function updateMenuValues(track) {
 
 /**
  * Reconstruit le contenu du menu à partir de l'état courant de la piste.
- * @param {boolean} [forcer] - Rebâtit même si rien n'a changé
+ * @param {boolean} [force] - Rebâtit même si rien n'a changé
  */
-function rendreMenu(force) {
-    const track = findTrack(urlOuverte);
+function renderMenu(force) {
+    const track = findTrack(openedUrl);
     if (!menuEl) return;
     if (!track) {
         window.MusicPlayer.hideTrackQualityMenu();
@@ -470,7 +470,7 @@ function rendreMenu(force) {
     title.textContent = track.title || '';
     menuEl.appendChild(title);
 
-    menuEl.appendChild(construireStatut(track));
+    menuEl.appendChild(buildStatus(track));
 
     if (track.isLocal) {
         const note = document.createElement('div');
@@ -479,9 +479,9 @@ function rendreMenu(force) {
         menuEl.appendChild(note);
     }
 
-    const separateur = document.createElement('div');
-    separateur.className = 'quality-menu-separator';
-    menuEl.appendChild(separateur);
+    const separator = document.createElement('div');
+    separator.className = 'quality-menu-separator';
+    menuEl.appendChild(separator);
 
     // Au-dessus des réglages de qualité : la source décrit la piste, elle ne se
     // règle pas. Elle vaut aussi pour un fichier local, dont c'est même le seul
@@ -490,11 +490,11 @@ function rendreMenu(force) {
 
     if (track.isLocal) return;
 
-    const audioReelle = !!track.cachedAudioQuality;
+    const realAudio = !!track.cachedAudioQuality;
     menuEl.appendChild(buildButton(
         'audio',
         `${track.cachedAudioQuality || track.desiredAudioQuality} kbps`,
-        audioReelle
+        realAudio
     ));
 
     if (track.hasVideo) {
@@ -511,16 +511,16 @@ function openMenu(track) {
     if (!track || !track.url) return false;
     window.MusicPlayer.hideTrackQualityMenu();
 
-    urlOuverte = track.url;
+    openedUrl = track.url;
     menuEl = document.createElement('div');
     menuEl.className = 'quality-menu glass-card';
     // Un clic à l'intérieur ne doit pas déclencher la fermeture globale
     menuEl.addEventListener('click', (ev) => ev.stopPropagation());
     menuEl.addEventListener('contextmenu', (ev) => ev.preventDefault());
 
-    conteneurMenu().appendChild(menuEl);
+    menuContainer().appendChild(menuEl);
     raiseToFront(menuEl);
-    rendreMenu();
+    renderMenu();
     return true;
 }
 
@@ -559,7 +559,7 @@ window.MusicPlayer.showTrackQualityMenuForElement = function(anchorEl, track) {
     if (!anchorEl || !track || !track.url) return;
 
     // Second clic sur la roue : on referme, comme tout menu de ce genre.
-    if (menuEl && urlOuverte === track.url && menuEl._ancre === anchorEl) {
+    if (menuEl && openedUrl === track.url && menuEl._ancre === anchorEl) {
         window.MusicPlayer.hideTrackQualityMenu();
         return;
     }
@@ -595,7 +595,7 @@ window.MusicPlayer.hideTrackQualityMenu = function() {
         menuEl.remove();
         menuEl = null;
     }
-    urlOuverte = null;
+    openedUrl = null;
 };
 
 /**
@@ -603,26 +603,26 @@ window.MusicPlayer.hideTrackQualityMenu = function() {
  * Appelée à chaque mise à jour de la file, de l'historique ou des playlists.
  */
 window.MusicPlayer.refreshTrackQualityMenu = function() {
-    if (!menuEl || !urlOuverte) return;
+    if (!menuEl || !openedUrl) return;
 
     const before = menuEl._signature;
-    const typeOuvert = sousMenuOuvert;
-    rendreMenu();
+    const openType = submenuOpen;
+    renderMenu();
     if (menuEl._signature === before) return; // Rien n'a bougé, sous-menu intact
 
     // Le sous-menu déplié a été emporté par la reconstruction : on le rouvre
     // pour qu'il reflète la nouvelle sélection.
-    if (typeOuvert) {
-        const btn = menuEl.querySelector(`.quality-menu-item[data-quality-type="${typeOuvert}"]`);
+    if (openType) {
+        const btn = menuEl.querySelector(`.quality-menu-item[data-quality-type="${openType}"]`);
         if (btn) {
-            sousMenuOuvert = null;
-            toggleSubmenu(typeOuvert, btn);
+            submenuOpen = null;
+            toggleSubmenu(openType, btn);
         }
     }
 };
 
 /** Nombre de flèches animées le long d'un élément en cours de requalification. */
-const NB_FLECHES = 5;
+const ARROW_COUNT = 5;
 
 /**
  * Ajoute à un élément de liste les calques de requalification : une barre de
@@ -640,18 +640,18 @@ window.MusicPlayer.setupRequalifyLayer = function(item) {
     bar.className = 'requalify-fill-bar';
     item.appendChild(bar);
 
-    const calque = document.createElement('div');
-    calque.className = 'requalify-arrows';
-    for (let i = 0; i < NB_FLECHES; i++) {
-        const fleche = document.createElement('span');
-        fleche.className = 'requalify-arrow';
+    const layer = document.createElement('div');
+    layer.className = 'requalify-arrows';
+    for (let i = 0; i < ARROW_COUNT; i++) {
+        const arrow = document.createElement('span');
+        arrow.className = 'requalify-arrow';
         // Réparties sur la largeur, décalées dans le temps : le flux paraît
         // continu sans qu'aucune flèche n'en double une autre.
-        fleche.style.left = `${8 + (i * 84 / NB_FLECHES) + (i % 2 ? 6 : 0)}%`;
-        fleche.style.animationDelay = `${(i * 2.2 / NB_FLECHES).toFixed(2)}s`;
-        calque.appendChild(fleche);
+        arrow.style.left = `${8 + (i * 84 / ARROW_COUNT) + (i % 2 ? 6 : 0)}%`;
+        arrow.style.animationDelay = `${(i * 2.2 / ARROW_COUNT).toFixed(2)}s`;
+        layer.appendChild(arrow);
     }
-    item.appendChild(calque);
+    item.appendChild(layer);
 };
 
 /**
@@ -676,9 +676,9 @@ window.MusicPlayer.applyRequalifyState = function(item, track) {
     }
 
     const pct = Math.min(100, Math.max(0, requalify.progress || 0));
-    const echelle = Math.max(0.0001, pct / 100);
+    const scale = Math.max(0.0001, pct / 100);
     bar.style.transform = `scaleX(${pct / 100})`;
-    bar.style.setProperty('--requalify-scale', echelle);
+    bar.style.setProperty('--requalify-scale', scale);
 
     // Distance de vol des flèches : la hauteur de l'élément, pour qu'elles le
     // traversent exactement de bord à bord quelle que soit la liste.
@@ -689,7 +689,7 @@ window.MusicPlayer.applyRequalifyState = function(item, track) {
 /**
  * Branche le clic droit d'un élément de liste sur le menu de qualité.
  * @param {HTMLElement} item
- * @param {() => object} resoudrePiste - Relit la piste à l'ouverture, pas au branchement
+ * @param {() => object} resolveTrack - Relit la piste à l'ouverture, pas au branchement
  */
 window.MusicPlayer.attachQualityMenu = function(item, resolveTrack) {
     if (!item) return;
@@ -719,6 +719,6 @@ document.addEventListener('keydown', (e) => {
 window.addEventListener('wheel', (e) => {
     if (!menuEl) return;
     if (menuEl.contains(e.target)) return;
-    if (sousMenuEl && sousMenuEl.contains(e.target)) return;
+    if (submenuEl && submenuEl.contains(e.target)) return;
     window.MusicPlayer.hideTrackQualityMenu();
 }, { passive: true, capture: true });

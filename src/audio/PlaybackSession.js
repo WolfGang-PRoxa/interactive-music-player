@@ -228,7 +228,7 @@ class PlaybackSession {
      * message : « la lecture reprendra à l'arrivée de quelqu'un » quand elle est
      * en cours, « le bot rejoindra le salon » quand elle est en pause.
      *
-     * @returns {{enLecture: boolean}|null} `null` si rien n'est à expliquer.
+     * @returns {{playing: boolean}|null} `null` si rien n'est à expliquer.
      */
     listenerWait() {
         if (!this.isFrozen() || !this.getCurrentTrack()) return null;

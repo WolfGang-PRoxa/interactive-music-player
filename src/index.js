@@ -71,8 +71,8 @@ const log = require('./utils/logger');
 
 // --- Validate env ---
 if (!process.env.DISCORD_TOKEN) {
-    log.error('[FATAL] DISCORD_TOKEN manquant dans le fichier .env');
-    log.error('Copiez .env.example vers .env et renseignez votre token.');
+    log.error('[FATAL] DISCORD_TOKEN missing from the .env file');
+    log.error('Copy .env.example to .env and fill in your token.');
     process.exit(1);
 }
 
@@ -113,7 +113,7 @@ function loadCommands() {
         }
     }
 
-    log.info(`[Commands] ${client.commands.size} commandes chargées.`);
+    log.info(`[Commands] ${client.commands.size} commands loaded.`);
 }
 
 // --- Initialize discord-player ---
@@ -141,7 +141,7 @@ async function initPlayer() {
     const { registerPlayerEvents } = require('./audio/PlayerEvents');
     registerPlayerEvents(player, client);
 
-    log.info('[Player] discord-player initialisé avec les extracteurs par défaut.');
+    log.info('[Player] discord-player initialised with the default extractors.');
 
     // Initialiser le PreloadManager
     preloadManager.init(player);
@@ -188,7 +188,7 @@ function setupDucking(guildId) {
                     queue.node.setVolume(0);
                 } catch (err) {}
             }
-            log.info(`[Ducking] Node de la queue et connexion mis à jour pour guild ${guildId}`);
+            log.info(`[Ducking] Queue node and connection updated for guild ${guildId}`);
         }
         return;
     }
@@ -212,7 +212,7 @@ function setupDucking(guildId) {
     // Store volumeController reference on the duckingManager for commands access
     duckingManager.volumeController = volumeController;
 
-    log.info(`[Ducking] Ducking configuré pour guild ${guildId} (enabled: ${settings.duckingEnabled})`);
+    log.info(`[Ducking] Ducking configured for guild ${guildId} (enabled: ${settings.duckingEnabled})`);
 }
 
 function startSilencePlayer(queue) {
@@ -248,7 +248,7 @@ function startSilencePlayer(queue) {
     const silencePlayer = createAudioPlayer();
 
     silencePlayer.on('error', (err) => {
-        log.error('[SilencePlayer] Erreur sur le lecteur de silence :', err.message);
+        log.error('[SilencePlayer] Error on the silence player:', err.message);
     });
 
     silencePlayer.play(resource);
@@ -256,7 +256,7 @@ function startSilencePlayer(queue) {
 
     queue.silencePlayer = silencePlayer;
     queue.silenceStream = silenceStream;
-    log.info(`[SilencePlayer] Diffuseur de silence démarré (objectMode: true) pour guild ${queue.guild.id}`);
+    log.info(`[SilencePlayer] Silence feed started (objectMode: true) for guild ${queue.guild.id}`);
 }
 
 function stopSilencePlayer(queue) {
@@ -272,7 +272,7 @@ function stopSilencePlayer(queue) {
         } catch (e) {}
         queue.silenceStream = null;
     }
-    log.info(`[SilencePlayer] Diffuseur de silence arrêté pour guild ${queue.guild.id}`);
+    log.info(`[SilencePlayer] Silence feed stopped for guild ${queue.guild.id}`);
 }
 
 function cleanupDucking(guildId) {
@@ -280,7 +280,7 @@ function cleanupDucking(guildId) {
     if (manager) {
         manager.destroy();
         client.duckingManagers.delete(guildId);
-        log.info(`[Ducking] Ducking nettoyé pour guild ${guildId}`);
+        log.info(`[Ducking] Ducking cleaned up for guild ${guildId}`);
     }
     if (playerInstance) {
         const queue = playerInstance.queues.get(guildId);
@@ -305,7 +305,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     try {
         await command.execute(interaction);
     } catch (error) {
-        log.error(`[Command] Erreur dans /${interaction.commandName} :`, error);
+        log.error(`[Command] Error in /${interaction.commandName}:`, error);
 
         const errorEmbed = embeds.error('Erreur', `Une erreur est survenue lors de l'exécution de la commande.\n\`${error.message}\``);
 
@@ -370,10 +370,10 @@ client.once(Events.ClientReady, async (readyClient) => {
         : version.tag;
 
     log.success('╔══════════════════════════════════════════════════╗');
-    log.success('║   🎵 Bot Musique Interactive — Prêt !            ║');
-    log.success(`║   Connecté : ${readyClient.user.tag.padEnd(31)}     ║`);
-    log.success(`║   Serveurs : ${String(readyClient.guilds.cache.size).padEnd(31)}     ║`);
-    log.success(`║   Version  : ${versionLabel.padEnd(31)}     ║`);
+    log.success('║   🎵 Interactive Music Bot — Ready!              ║');
+    log.success(`║   Connected: ${readyClient.user.tag.padEnd(31)}     ║`);
+    log.success(`║   Guilds:    ${String(readyClient.guilds.cache.size).padEnd(31)}     ║`);
+    log.success(`║   Version:   ${versionLabel.padEnd(31)}     ║`);
     log.success('╚══════════════════════════════════════════════════╝');
 
     // Une installation interrompue laisse une extraction partielle. Elle n'a
@@ -388,7 +388,7 @@ client.once(Events.ClientReady, async (readyClient) => {
     // ce salon pour le reste de la session.
     const favorite = database.applyFavoriteChannel();
     if (favorite) {
-        log.info(`[Startup] Salon favori appliqué : ${favorite.channelId} (serveur ${favorite.guildId}).`);
+        log.info(`[Startup] Favorite channel applied: ${favorite.channelId} (guild ${favorite.guildId}).`);
     }
 
     // Démarrer le serveur Web intégré pour le Dashboard
@@ -428,14 +428,14 @@ client.once(Events.ClientReady, async (readyClient) => {
 
 // --- Graceful Shutdown ---
 process.on('SIGINT', async () => {
-    log.info('\n[Shutdown] Arrêt en cours avec fade-out...');
+    log.info('\n[Shutdown] Shutting down with a fade-out...');
 
     // Sauvegarder l'état de lecture avec fade-out avant l'arrêt
     if (playerInstance) {
         try {
             await playbackStateManager.fadeOutAndSaveState(playerInstance, 3000);
         } catch (err) {
-            log.error('[Shutdown] Erreur fade-out :', err.message);
+            log.error('[Shutdown] Fade-out error:', err.message);
         }
     }
 
@@ -451,7 +451,7 @@ process.on('SIGINT', async () => {
     // Destroy client
     client.destroy();
 
-    log.info('[Shutdown] Bot arrêté proprement.');
+    log.info('[Shutdown] Bot stopped cleanly.');
     process.exit(0);
 });
 

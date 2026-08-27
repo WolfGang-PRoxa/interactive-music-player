@@ -21,10 +21,10 @@ const sessions = require('../sessions');
 const log = require('../../utils/logger');
 
 /** Page d'erreur du trajet, dans le style de celle de web/auth.js. */
-function errorPage(titre, message, detail) {
-    const bloc = detail ? `<p class="detail"><code>${String(detail).slice(0, 300)}</code></p>` : '';
+function errorPage(title, message, detail) {
+    const block = detail ? `<p class="detail"><code>${String(detail).slice(0, 300)}</code></p>` : '';
     return `<!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><title>${titre}</title>
+<html lang="fr"><head><meta charset="utf-8"><title>${title}</title>
 <style>
   body { font-family: system-ui, sans-serif; background: #16161d; color: #e6e6ec;
          display: grid; place-items: center; height: 100vh; margin: 0; }
@@ -36,9 +36,9 @@ function errorPage(titre, message, detail) {
   a { color: #8ea1ff; }
 </style></head>
 <body><main>
-  <h1>${titre}</h1>
+  <h1>${title}</h1>
   <p>${message}</p>
-  ${bloc}
+  ${block}
   <p><a href="/auth/discord">Réessayer</a></p>
 </main></body></html>`;
 }
@@ -69,7 +69,7 @@ function errorPage(titre, message, detail) {
  * @param {string} userId
  * @returns {Promise<boolean>}
  */
-async function estMembreConnu(client, userId) {
+async function isKnownMember(client, userId) {
     if (!client || !client.guilds) return false;
 
     for (const guild of client.guilds.cache.values()) {
@@ -106,9 +106,9 @@ function createAuthRouter(webServer) {
         const returnTo = typeof req.query.returnTo === 'string' ? req.query.returnTo : '/';
         // Une destination ne peut être qu'un chemin de ce serveur : une URL
         // absolue ferait de cette adresse un tremplin vers n'importe quel site.
-        const sur = returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : '/';
+        const safeReturnTo = returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : '/';
 
-        res.redirect(302, oauth.buildAuthorizeUrl(sur));
+        res.redirect(302, oauth.buildAuthorizeUrl(safeReturnTo));
     });
 
     router.get('/discord/callback', async (req, res) => {
@@ -122,8 +122,8 @@ function createAuthRouter(webServer) {
             ));
         }
 
-        const trajet = oauth.consumeState(typeof state === 'string' ? state : '');
-        if (!trajet) {
+        const route = oauth.consumeState(typeof state === 'string' ? state : '');
+        if (!route) {
             // Rappel sans `state` valable : lien périmé, rejoué, ou forgé.
             return res.status(400).type('html').send(errorPage(
                 'Lien expiré',
@@ -142,7 +142,7 @@ function createAuthRouter(webServer) {
         try {
             user = await oauth.identifyFromCode(code);
         } catch (err) {
-            log.error(`[OAuth] Authentification échouée : ${err.message}`);
+            log.error(`[OAuth] Authentication failed: ${err.message}`);
             return res.status(502).type('html').send(errorPage(
                 'Authentification impossible',
                 'Discord a refusé la demande. L\'URL de rappel déclarée dans le portail '
@@ -151,8 +151,8 @@ function createAuthRouter(webServer) {
             ));
         }
 
-        if (!(await estMembreConnu(webServer?.client, user.id))) {
-            log.warn(`[OAuth] Accès refusé à ${user.username} (${user.id}) : membre d'aucun serveur du bot.`);
+        if (!(await isKnownMember(webServer?.client, user.id))) {
+            log.warn(`[OAuth] Access denied to ${user.username} (${user.id}): member of no guild the bot is in.`);
             return res.status(403).type('html').send(errorPage(
                 'Accès refusé',
                 'Votre compte Discord ne fait partie d\'aucun serveur où ce bot est présent.'
@@ -166,7 +166,7 @@ function createAuthRouter(webServer) {
             maxAge: sessions.MAX_AGE_MS,
         });
 
-        res.redirect(302, trajet.returnTo);
+        res.redirect(302, route.returnTo);
     });
 
     return router;

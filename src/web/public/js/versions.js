@@ -26,16 +26,16 @@ window.MusicPlayer = window.MusicPlayer || {};
     /** Tag en attente de confirmation dans le pop-up. */
     let pendingTag = null;
     /** Une bascule est engagée : les boutons du pop-up sont neutralisés. */
-    let basculeEngagee = false;
+    let toggleEngaged = false;
     /** Tag en attente de confirmation dans le pop-up de désinstallation. */
     let tagToUninstall = null;
     /** Une désinstallation est engagée : sa confirmation est neutralisée. */
     let uninstallStarted = false;
 
     function t(key, fallback) {
-        const traduit = typeof window.MusicPlayer.t === 'function' ? window.MusicPlayer.t(key) : key;
+        const translated = typeof window.MusicPlayer.t === 'function' ? window.MusicPlayer.t(key) : key;
         // `t()` renvoie la clé elle-même quand la traduction manque.
-        return traduit && traduit !== key ? traduit : (fallback !== undefined ? fallback : key);
+        return translated && translated !== key ? translated : (fallback !== undefined ? fallback : key);
     }
 
     function el(id) {
@@ -100,7 +100,7 @@ window.MusicPlayer = window.MusicPlayer || {};
         return el('setting-version-select');
     }
 
-    function synchroniserMenu() {
+    function syncMenu() {
         const select = selectEl();
         if (select && select._customSelect) select._customSelect.sync(true);
     }
@@ -131,7 +131,7 @@ window.MusicPlayer = window.MusicPlayer || {};
         const currentTag = currentVersion ? currentVersion.tag : DEV_TAG;
         addOption(select, currentTag, versionLabel(currentVersion), { selected: true });
         addOption(select, '__recherche__', t('version_searching', 'Recherche des versions…'), { disabled: true });
-        synchroniserMenu();
+        syncMenu();
     }
 
     /** Suffixes d'une entrée : état d'installation, préversion, version active. */
@@ -190,11 +190,11 @@ window.MusicPlayer = window.MusicPlayer || {};
             addOption(select, '__erreur__', `⚠ ${catalog.error.message}`, { disabled: true });
         }
 
-        synchroniserMenu();
+        syncMenu();
     }
 
-    function demanderCatalogue() {
-        if (basculeEngagee) return;
+    function requestCatalog() {
+        if (toggleEngaged) return;
 
         // `sendWS` ignore silencieusement un envoi hors connexion : sans cette
         // vérification, le menu resterait bloqué sur « Recherche… » sans que
@@ -223,7 +223,7 @@ window.MusicPlayer = window.MusicPlayer || {};
         if (Array.from(select.options).some((o) => o.value === currentTag)) {
             select.value = currentTag;
         }
-        synchroniserMenu();
+        syncMenu();
     }
 
     /* ──────────────────────────── Pop-up ──────────────────────────── */
@@ -241,7 +241,7 @@ window.MusicPlayer = window.MusicPlayer || {};
         if (phaseEl) phaseEl.textContent = phase;
         if (fill) {
             const hasNumber = Number.isFinite(percent);
-            fill.classList.toggle('indetermine', !hasNumber && !isError);
+            fill.classList.toggle('indeterminate', !hasNumber && !isError);
             fill.style.width = hasNumber ? `${Math.max(0, Math.min(100, percent))}%` : '';
             if (isError) fill.style.width = '0';
         }
@@ -256,7 +256,7 @@ window.MusicPlayer = window.MusicPlayer || {};
         if (!modal) return;
 
         pendingTag = tag;
-        basculeEngagee = false;
+        toggleEngaged = false;
 
         const entry = (catalog && (catalog.releases || []).find((r) => r.tag === tag)) || null;
         const toDev = tag === DEV_TAG;
@@ -293,34 +293,34 @@ window.MusicPlayer = window.MusicPlayer || {};
                 : t('version_btn_install', 'Télécharger et installer');
         }
 
-        const confirmer = el('btn-version-confirm');
-        const annuler = el('btn-version-cancel');
-        if (confirmer) confirmer.disabled = false;
-        if (annuler) annuler.disabled = false;
+        const confirmBtn = el('btn-version-confirm');
+        const cancelBtn = el('btn-version-cancel');
+        if (confirmBtn) confirmBtn.disabled = false;
+        if (cancelBtn) cancelBtn.disabled = false;
 
         showProgress(false);
         updateProgress('', null, '');
         modal.classList.remove('hidden');
     }
 
-    function closePopup(retablirSelection = true) {
+    function closePopup(restoreSelection = true) {
         const modal = el('version-modal');
         if (modal) modal.classList.add('hidden');
         pendingTag = null;
-        basculeEngagee = false;
-        if (retablirSelection) reselectCurrent();
+        toggleEngaged = false;
+        if (restoreSelection) reselectCurrent();
     }
 
-    function confirmerBascule() {
-        if (!pendingTag || basculeEngagee) return;
+    function confirmToggle() {
+        if (!pendingTag || toggleEngaged) return;
 
-        basculeEngagee = true;
-        const confirmer = el('btn-version-confirm');
-        const annuler = el('btn-version-cancel');
-        if (confirmer) confirmer.disabled = true;
+        toggleEngaged = true;
+        const confirmBtn = el('btn-version-confirm');
+        const cancelBtn = el('btn-version-cancel');
+        if (confirmBtn) confirmBtn.disabled = true;
         // L'annulation n'a plus de sens une fois la bascule lancée : elle se
         // termine par un redémarrage que le tableau de bord ne peut pas retenir.
-        if (annuler) annuler.disabled = true;
+        if (cancelBtn) cancelBtn.disabled = true;
 
         showProgress(true);
         updateProgress(t('version_phase_search', 'Recherche de la version…'), null, '');
@@ -337,7 +337,7 @@ window.MusicPlayer = window.MusicPlayer || {};
         if (!modal || !tag || tag === DEV_TAG) return;
         // Une bascule en cours se termine par un redémarrage : rien d'autre ne
         // doit toucher au dossier des versions entre-temps.
-        if (basculeEngagee) return;
+        if (toggleEngaged) return;
 
         tagToUninstall = tag;
         uninstallStarted = false;
@@ -345,10 +345,10 @@ window.MusicPlayer = window.MusicPlayer || {};
         const targetEl = el('version-uninstall-tag');
         if (targetEl) targetEl.textContent = tag;
 
-        const confirmer = el('btn-version-uninstall-confirm');
-        const annuler = el('btn-version-uninstall-cancel');
-        if (confirmer) confirmer.disabled = false;
-        if (annuler) annuler.disabled = false;
+        const confirmBtn = el('btn-version-uninstall-confirm');
+        const cancelBtn = el('btn-version-uninstall-cancel');
+        if (confirmBtn) confirmBtn.disabled = false;
+        if (cancelBtn) cancelBtn.disabled = false;
 
         modal.classList.remove('hidden');
     }
@@ -360,16 +360,16 @@ window.MusicPlayer = window.MusicPlayer || {};
         uninstallStarted = false;
     }
 
-    function confirmerDesinstallation() {
+    function confirmUninstall() {
         if (!tagToUninstall || uninstallStarted) return;
 
         uninstallStarted = true;
-        const confirmer = el('btn-version-uninstall-confirm');
-        const annuler = el('btn-version-uninstall-cancel');
+        const confirmBtn = el('btn-version-uninstall-confirm');
+        const cancelBtn = el('btn-version-uninstall-cancel');
         // La suppression est brève : plutôt qu'une barre de progression, les
         // boutons se neutralisent le temps de la réponse du serveur.
-        if (confirmer) confirmer.disabled = true;
-        if (annuler) annuler.disabled = true;
+        if (confirmBtn) confirmBtn.disabled = true;
+        if (cancelBtn) cancelBtn.disabled = true;
 
         if (typeof window.MusicPlayer.sendWS === 'function') {
             window.MusicPlayer.sendWS({ type: 'uninstallVersion', data: { tag: tagToUninstall } });
@@ -398,10 +398,10 @@ window.MusicPlayer = window.MusicPlayer || {};
 
         if (failed) {
             uninstallStarted = false;
-            const confirmer = el('btn-version-uninstall-confirm');
-            const annuler = el('btn-version-uninstall-cancel');
-            if (confirmer) confirmer.disabled = false;
-            if (annuler) annuler.disabled = false;
+            const confirmBtn = el('btn-version-uninstall-confirm');
+            const cancelBtn = el('btn-version-uninstall-cancel');
+            if (confirmBtn) confirmBtn.disabled = false;
+            if (cancelBtn) cancelBtn.disabled = false;
             if (typeof window.MusicPlayer.showToast === 'function') {
                 window.MusicPlayer.showToast(message || t('version_uninstall_failed', 'La désinstallation a échoué.'));
             }
@@ -419,21 +419,21 @@ window.MusicPlayer = window.MusicPlayer || {};
     window.MusicPlayer.onVersionProgress = function (data) {
         const phase = (data && data.phase) || '';
 
-        if (phase === 'erreur') {
-            basculeEngagee = false;
+        if (phase === 'error') {
+            toggleEngaged = false;
             showProgress(true);
             updateProgress(t('version_phase_error', 'Échec'), null, (data && data.message) || '', true);
-            const confirmer = el('btn-version-confirm');
-            const annuler = el('btn-version-cancel');
-            if (confirmer) confirmer.disabled = false;
-            if (annuler) annuler.disabled = false;
+            const confirmBtn = el('btn-version-confirm');
+            const cancelBtn = el('btn-version-cancel');
+            if (confirmBtn) confirmBtn.disabled = false;
+            if (cancelBtn) cancelBtn.disabled = false;
             if (typeof window.MusicPlayer.showToast === 'function') {
                 window.MusicPlayer.showToast((data && data.message) || t('version_phase_error', 'Échec'));
             }
             return;
         }
 
-        if (phase === 'deja') {
+        if (phase === 'already') {
             closePopup();
             if (typeof window.MusicPlayer.showToast === 'function') {
                 window.MusicPlayer.showToast(t('version_already_running', 'Cette version est déjà celle qui tourne.'));
@@ -443,9 +443,9 @@ window.MusicPlayer = window.MusicPlayer || {};
 
         showProgress(true);
 
-        if (phase === 'recherche') {
+        if (phase === 'search') {
             updateProgress(t('version_phase_search', 'Recherche de la version…'), null, '');
-        } else if (phase === 'telechargement') {
+        } else if (phase === 'download') {
             const percent = Number.isFinite(data.percent) ? data.percent : null;
             const received = formatBytes(data.bytes);
             const total = formatBytes(data.total);
@@ -457,13 +457,13 @@ window.MusicPlayer = window.MusicPlayer || {};
             );
         } else if (phase === 'extraction') {
             updateProgress(t('version_phase_extract', 'Extraction des fichiers…'), null, '');
-        } else if (phase === 'dependances') {
+        } else if (phase === 'dependencies') {
             updateProgress(
                 t('version_phase_deps', 'Installation des dépendances…'),
                 null,
                 (data && data.message) || ''
             );
-        } else if (phase === 'redemarrage') {
+        } else if (phase === 'restart') {
             updateProgress(t('version_phase_restart', 'Redémarrage du bot…'), 100, '');
         }
     };
@@ -480,17 +480,17 @@ window.MusicPlayer = window.MusicPlayer || {};
         if (!select || select.dataset.versionsInit) return;
         select.dataset.versionsInit = 'true';
 
-        const conteneur = select._customSelect && select._customSelect.container;
-        if (conteneur) {
+        const container = select._customSelect && select._customSelect.container;
+        if (container) {
             // Chaque ouverture du menu relance la recherche : une release
             // publiée à l'instant doit apparaître sans recharger la page.
-            const declencheur = conteneur.querySelector('.custom-select-trigger');
-            if (declencheur) {
-                declencheur.addEventListener('click', () => {
+            const trigger = container.querySelector('.custom-select-trigger');
+            if (trigger) {
+                trigger.addEventListener('click', () => {
                     // Le CustomSelect a déjà basculé son état au moment où ce
                     // gestionnaire s'exécute : ne relancer la recherche que si le
                     // clic vient d'ouvrir le menu, et non de le refermer.
-                    if (conteneur.classList.contains('open')) demanderCatalogue();
+                    if (container.classList.contains('open')) requestCatalog();
                 });
             }
         }
@@ -502,11 +502,11 @@ window.MusicPlayer = window.MusicPlayer || {};
             openPopup(tag);
         });
 
-        const confirmer = el('btn-version-confirm');
-        if (confirmer) confirmer.addEventListener('click', confirmerBascule);
+        const confirmBtn = el('btn-version-confirm');
+        if (confirmBtn) confirmBtn.addEventListener('click', confirmToggle);
 
-        const annuler = el('btn-version-cancel');
-        if (annuler) annuler.addEventListener('click', () => closePopup());
+        const cancelBtn = el('btn-version-cancel');
+        if (cancelBtn) cancelBtn.addEventListener('click', () => closePopup());
 
         // Corbeille d'une entrée du menu : le composant ne sait que signaler le
         // geste, c'est ici qu'il prend le sens d'une désinstallation.
@@ -515,11 +515,11 @@ window.MusicPlayer = window.MusicPlayer || {};
         });
 
         const uninstallBtn = el('btn-version-uninstall-confirm');
-        if (uninstallBtn) uninstallBtn.addEventListener('click', confirmerDesinstallation);
+        if (uninstallBtn) uninstallBtn.addEventListener('click', confirmUninstall);
 
-        const annulerDesinstallation = el('btn-version-uninstall-cancel');
-        if (annulerDesinstallation) {
-            annulerDesinstallation.addEventListener('click', closeUninstallPopup);
+        const cancelUninstall = el('btn-version-uninstall-cancel');
+        if (cancelUninstall) {
+            cancelUninstall.addEventListener('click', closeUninstallPopup);
         }
 
         paintCurrentVersion();
@@ -536,7 +536,7 @@ window.MusicPlayer = window.MusicPlayer || {};
      */
     window.MusicPlayer.refreshVersionBadge = async function () {
         await refreshCurrentVersion();
-        basculeEngagee = false;
+        toggleEngaged = false;
         const modal = el('version-modal');
         if (modal && !modal.classList.contains('hidden')) closePopup();
         closeUninstallPopup();
@@ -560,7 +560,7 @@ window.MusicPlayer = window.MusicPlayer || {};
 
         const modal = el('version-modal');
         if (!modal || modal.classList.contains('hidden')) return false;
-        if (basculeEngagee) return true;
+        if (toggleEngaged) return true;
         closePopup();
         return true;
     };

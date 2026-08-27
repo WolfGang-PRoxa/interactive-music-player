@@ -58,7 +58,7 @@ function load() {
     purgeExpired();
     const after = Object.keys(store).length;
     if (before !== after) {
-        log.info(`[Sessions] ${before - after} session(s) expirée(s) écartée(s) au chargement.`);
+        log.info(`[Sessions] ${before - after} expired session(s) dropped at load time.`);
     }
 
     return store;
@@ -129,7 +129,7 @@ function create(user) {
     };
 
     save();
-    log.info(`[Sessions] Session ouverte pour ${store[id].displayName} (${user.id}).`);
+    log.info(`[Sessions] Session opened for ${store[id].displayName} (${user.id}).`);
     return { id, session: store[id] };
 }
 
@@ -183,7 +183,7 @@ function revokeUser(userId) {
     }
     if (count) {
         save();
-        log.info(`[Sessions] ${count} session(s) fermée(s) pour l'utilisateur ${userId}.`);
+        log.info(`[Sessions] ${count} session(s) closed for user ${userId}.`);
     }
     return count;
 }

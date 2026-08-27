@@ -23,11 +23,11 @@ let loadedCoverUrl = null;
  */
 let videoTimeAfterResync = -1;
 let lastResyncAt = 0;
-let resyncsSansProgres = 0;
+let resyncsWithoutProgress = 0;
 let videoStreamAbandoned = false;
 
 /** Nombre de resynchronisations infructueuses avant de renoncer au flux. */
-const RESYNCS_AVANT_ABANDON = 3;
+const RESYNCS_BEFORE_GIVEUP = 3;
 
 /**
  * Dérive en deçà de laquelle on ne touche à rien.
@@ -37,7 +37,7 @@ const RESYNCS_AVANT_ABANDON = 3;
  * 40 ms. Descendre plus bas ne servirait à rien — la référence de progression
  * est elle-même extrapolée entre deux messages du serveur.
  */
-const DERIVE_MORTE_S = 0.035;
+const DRIFT_DEADBAND_S = 0.035;
 
 /**
  * Dérive au-delà de laquelle le saut franc devient inévitable.
@@ -47,7 +47,7 @@ const DERIVE_MORTE_S = 0.035;
  * l'écart bien en deçà ; ce seuil ne sert donc qu'aux accidents : mise en
  * mémoire tampon, onglet masqué, changement de piste.
  */
-const DERIVE_SAUT_S = 1.0;
+const DRIFT_SEEK_S = 1.0;
 
 /**
  * Écart de vitesse maximal pour rattraper une dérive, en proportion.
@@ -60,14 +60,14 @@ const DERIVE_SAUT_S = 1.0;
 const MAX_SPEED_CORRECTION = 0.15;
 
 /** Dérive à laquelle la correction atteint son maximum. */
-const DERIVE_CORRECTION_PLEINE_S = 0.5;
+const DRIFT_FULL_CORRECTION_S = 0.5;
 
 /**
  * Resynchronisation franche réclamée par un événement extérieur — typiquement
  * le retour sur l'onglet, où la vidéo a pu être gelée par le navigateur
  * pendant que l'audio, lui, continuait côté serveur.
  */
-let resyncFrancDemande = false;
+let hardResyncRequested = false;
 
 /**
  * Applique une vitesse de lecture au lecteur, avec tolérance.
@@ -97,23 +97,23 @@ function applyVideoSpeed(videoElement, speed) {
 const MIN_DELAY_BETWEEN_FAILURES_MS = 1000;
 
 /** Réarme la surveillance : appelé à chaque nouvelle source chargée. */
-function reinitialiserSurveillanceVideo() {
+function resetVideoWatch() {
     videoTimeAfterResync = -1;
     lastResyncAt = 0;
-    resyncsSansProgres = 0;
+    resyncsWithoutProgress = 0;
     videoStreamAbandoned = false;
 }
 
 /**
  * Renonce au flux vidéo et repasse au visualiseur audio.
  * @param {HTMLVideoElement} videoElement
- * @param {string} raison
+ * @param {string} reason
  */
-function abandonVideoStream(videoElement, raison) {
+function abandonVideoStream(videoElement, reason) {
     if (videoStreamAbandoned) return;
     videoStreamAbandoned = true;
 
-    console.warn(`[Video] Flux illisible par le navigateur (${raison}). Retour au visualiseur audio.`);
+    console.warn(`[Video] Stream unreadable by the browser (${reason}). Falling back to the audio visualiser.`);
 
     try {
         videoElement.pause();
@@ -210,7 +210,7 @@ function qualityWheelTrack() {
  *
  * @returns {HTMLElement[]}
  */
-function rouesQualite() {
+function qualityWheels() {
     return [...document.querySelectorAll('.quality-gear-btn')];
 }
 
@@ -219,11 +219,11 @@ function rouesQualite() {
  * @param {object|null} track
  */
 function updateQualityWheel(track) {
-    const buttons = rouesQualite();
+    const buttons = qualityWheels();
     if (buttons.length === 0) return;
 
-    const exploitable = !!(track && track.url && !track.isLocal);
-    buttons.forEach(b => b.classList.toggle('hidden', !exploitable));
+    const usable = !!(track && track.url && !track.isLocal);
+    buttons.forEach(b => b.classList.toggle('hidden', !usable));
 
     // Une roue qui s'efface emporte le menu qu'elle avait ouvert — il pointerait
     // sinon dans le vide. Mais le menu du clic droit sur un élément de liste
@@ -231,7 +231,7 @@ function updateQualityWheel(track) {
     // le refermer ici le rendait inutilisable tant que rien de réglable n'était
     // en lecture, l'état étant rediffusé toutes les 150 ms pendant qu'un
     // préchargement progresse — soit exactement la situation d'un démarrage.
-    if (!exploitable && typeof window.MusicPlayer.hideAnchoredTrackQualityMenu === 'function') {
+    if (!usable && typeof window.MusicPlayer.hideAnchoredTrackQualityMenu === 'function') {
         window.MusicPlayer.hideAnchoredTrackQualityMenu();
     }
 
@@ -253,7 +253,7 @@ function updateQualityWheel(track) {
  * fraîche renvoyée par le serveur, et non celle d'avant la mise en veille.
  */
 window.MusicPlayer.requestVideoResync = function() {
-    resyncFrancDemande = true;
+    hardResyncRequested = true;
 };
 
 window.MusicPlayer.syncVideoProgress = function(currentMs, isExplicitSeek = false) {
@@ -268,12 +268,12 @@ window.MusicPlayer.syncVideoProgress = function(currentMs, isExplicitSeek = fals
         const derive = videoElement.currentTime - seconds;
         const gap = Math.abs(derive);
 
-        const force = isExplicitSeek || resyncFrancDemande;
+        const force = isExplicitSeek || hardResyncRequested;
         // À l'arrêt, la vitesse n'a aucune prise : seul un repositionnement
         // remet la vidéo en place, et il ne se voit pas sur une image figée.
-        const saut = force || gap >= DERIVE_SAUT_S || (videoElement.paused && gap > DERIVE_MORTE_S);
+        const seek = force || gap >= DRIFT_SEEK_S || (videoElement.paused && gap > DRIFT_DEADBAND_S);
 
-        if (saut) {
+        if (seek) {
             // Un repositionnement automatique qui n'a rien débloqué au
             // précédent passage signale un flux figé : insister ne ferait
             // qu'entretenir le clignotement image par image.
@@ -281,13 +281,13 @@ window.MusicPlayer.syncVideoProgress = function(currentMs, isExplicitSeek = fals
             if (!force && !videoElement.paused && videoTimeAfterResync >= 0
                 && (nowMs - lastResyncAt) >= MIN_DELAY_BETWEEN_FAILURES_MS) {
                 if (videoElement.currentTime <= videoTimeAfterResync + 0.2) {
-                    resyncsSansProgres++;
-                    if (resyncsSansProgres >= RESYNCS_AVANT_ABANDON) {
-                        abandonVideoStream(videoElement, 'lecture bloquée après plusieurs resynchronisations');
+                    resyncsWithoutProgress++;
+                    if (resyncsWithoutProgress >= RESYNCS_BEFORE_GIVEUP) {
+                        abandonVideoStream(videoElement, 'playback stuck after several resyncs');
                         return;
                     }
                 } else {
-                    resyncsSansProgres = 0;
+                    resyncsWithoutProgress = 0;
                 }
             }
 
@@ -296,16 +296,16 @@ window.MusicPlayer.syncVideoProgress = function(currentMs, isExplicitSeek = fals
                 videoTimeAfterResync = videoElement.currentTime;
                 lastResyncAt = nowMs;
             } catch (err) {}
-            resyncFrancDemande = false;
+            hardResyncRequested = false;
             applyVideoSpeed(videoElement, speed);
-        } else if (gap <= DERIVE_MORTE_S) {
+        } else if (gap <= DRIFT_DEADBAND_S) {
             applyVideoSpeed(videoElement, speed);
         } else {
             // Rattrapage progressif : on joue légèrement plus vite quand la
             // vidéo est en retard, plus lentement quand elle est en avance.
             // L'écart se résorbe sans jamais vider le décodeur, donc sans
             // coupure visible.
-            const proportion = Math.max(-1, Math.min(1, derive / DERIVE_CORRECTION_PLEINE_S));
+            const proportion = Math.max(-1, Math.min(1, derive / DRIFT_FULL_CORRECTION_S));
             applyVideoSpeed(videoElement, speed * (1 - proportion * MAX_SPEED_CORRECTION));
         }
     }
@@ -659,11 +659,11 @@ window.MusicPlayer.updateVideoPlayer = async function(track) {
     // La qualité entre dans le critère de « même piste » : sans cela, le flux
     // déjà chargé serait conservé indéfiniment et un changement de qualité
     // depuis la roue ou le menu contextuel resterait sans effet à l'écran.
-    const qualiteVoulue = String(effectiveTrack.desiredVideoQuality || '');
+    const wantedQuality = String(effectiveTrack.desiredVideoQuality || '');
     const loadedQuality = videoElement ? (videoElement.getAttribute('data-loaded-quality') || '') : '';
-    const memeQualite = qualiteVoulue === loadedQuality;
+    const sameQuality = wantedQuality === loadedQuality;
 
-    if (isSameTrack && memeQualite && videoElement && !videoElement.classList.contains('hidden')
+    if (isSameTrack && sameQuality && videoElement && !videoElement.classList.contains('hidden')
         && videoElement.src && videoElement.readyState >= 1) {
         window.MusicPlayer.syncVideoProgress(currentMs, false);
         window.MusicPlayer.syncVideoPlayState(state.isPlaying, state.isPaused);
@@ -706,13 +706,13 @@ window.MusicPlayer.updateVideoPlayer = async function(track) {
             if (!videoElement.src || videoElement.getAttribute('data-loaded-src') !== targetVideoSrc) {
                 videoElement.setAttribute('data-loaded-src', targetVideoSrc);
                 videoElement.src = targetVideoSrc;
-                reinitialiserSurveillanceVideo();
+                resetVideoWatch();
                 videoElement.load();
             }
             // Un fichier direct n'a pas de définition négociée ; on inscrit tout
             // de même la valeur voulue pour que le critère de rechargement
             // ci-dessus reste stable d'un passage à l'autre.
-            videoElement.setAttribute('data-loaded-quality', qualiteVoulue);
+            videoElement.setAttribute('data-loaded-quality', wantedQuality);
 
             if (videoCanvas) videoCanvas.classList.add('hidden');
             videoElement.classList.remove('hidden');
@@ -759,7 +759,7 @@ window.MusicPlayer.updateVideoPlayer = async function(track) {
                         if (!videoElement.src || videoElement.getAttribute('data-loaded-src') !== data.videoUrl) {
                             videoElement.setAttribute('data-loaded-src', data.videoUrl);
                             videoElement.src = data.videoUrl;
-                            reinitialiserSurveillanceVideo();
+                            resetVideoWatch();
                             videoElement.load();
                             // Un flux fraîchement chargé repart de zéro alors que
                             // l'audio, lui, n'a pas bougé : il faut le recaler
@@ -767,14 +767,14 @@ window.MusicPlayer.updateVideoPlayer = async function(track) {
                             // progressif, calibré pour des écarts d'une seconde.
                             window.MusicPlayer.requestVideoResync();
                             if (data.requestedHeight && data.height && data.height !== data.requestedHeight) {
-                                console.info(`[Video] ${data.requestedHeight}p indisponible en codec lisible : `
-                                    + `${data.height}p (${data.codec || '?'}) servi à la place.`);
+                                console.info(`[Video] ${data.requestedHeight}p unavailable in a readable codec: `
+                                    + `${data.height}p (${data.codec || '?'}) served instead.`);
                             }
                         }
                         // Mémorise la définition demandée pour ce flux : c'est ce
                         // qui permet de détecter un changement de qualité et de
                         // relancer une résolution.
-                        videoElement.setAttribute('data-loaded-quality', qualiteVoulue);
+                        videoElement.setAttribute('data-loaded-quality', wantedQuality);
                         // Un flux déjà écarté ne doit pas être réaffiché à chaque
                         // passage : le visualiseur reste en place jusqu'à la
                         // piste suivante, qui réarmera la surveillance.
@@ -791,7 +791,7 @@ window.MusicPlayer.updateVideoPlayer = async function(track) {
                 }
             }
         } catch (err) {
-            console.log('[Video] Rendu scène canvas active:', err.message);
+            console.log('[Video] Active canvas scene rendering:', err.message);
         }
     }
 
@@ -833,12 +833,12 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
 
     // Codec refusé d'emblée : inutile d'attendre les trois resynchronisations
     // de la détection par dérive, le navigateur a déjà tranché.
-    const videoElementSurveille = document.getElementById('video-element');
-    if (videoElementSurveille) {
-        videoElementSurveille.addEventListener('error', () => {
-            if (!videoElementSurveille.getAttribute('data-loaded-src')) return;
-            const code = videoElementSurveille.error && videoElementSurveille.error.code;
-            abandonVideoStream(videoElementSurveille, `erreur de lecture (code ${code || '?'})`);
+    const watchedVideoElement = document.getElementById('video-element');
+    if (watchedVideoElement) {
+        watchedVideoElement.addEventListener('error', () => {
+            if (!watchedVideoElement.getAttribute('data-loaded-src')) return;
+            const code = watchedVideoElement.error && watchedVideoElement.error.code;
+            abandonVideoStream(watchedVideoElement, `erreur de lecture (code ${code || '?'})`);
         });
     }
 
@@ -1016,7 +1016,7 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
         }
         const now = Date.now();
         if (now - window.MusicPlayer.lastMuteClickTime < 500) {
-            console.log('[Video Mute Diagnostic] Ignoré par l\'anti-rebond global (< 500ms)');
+            console.log('[Video Mute Diagnostic] Ignored by the global debounce (< 500ms)');
             return;
         }
         window.MusicPlayer.lastMuteClickTime = now;
@@ -1036,12 +1036,12 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
             newVol = window.MusicPlayer.lastNonMuteVolume || 70;
         }
 
-        const logMsg = `Clic sur le bouton de sourdine (#video-btn-mute). Volume actuel: ${currentVol}%, Nouveau volume calculé: ${newVol}%`;
+        const logMsg = `Click on the mute button (#video-btn-mute). Current volume: ${currentVol}%, new computed volume: ${newVol}%`;
         console.log(`[Video Mute Diagnostic] ${logMsg}`);
         if (typeof window.MusicPlayer.sendWS === 'function') {
             window.MusicPlayer.sendWS({
                 type: 'clientLog',
-                data: { source: 'Vidéo Mute', message: logMsg }
+                data: { source: 'Video Mute', message: logMsg }
             });
         }
 
@@ -1237,7 +1237,7 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
                 await videoWindow.mozRequestFullScreen();
             }
         } catch (err) {
-            console.log('[Video] Mode plein écran CSS actif');
+            console.log('[Video] CSS fullscreen mode active');
         }
         updateFullscreenIcons();
     }
@@ -1585,8 +1585,8 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
  * ce qu'on y ajouterait ne serait jamais branché. La roue a sa propre garde,
  * posée sur le bouton lui-même.
  */
-function brancherRoueQualite() {
-    rouesQualite().forEach((button) => {
+function bindQualityWheel() {
+    qualityWheels().forEach((button) => {
         if (button.dataset.qualityBound === 'true') return;
         button.dataset.qualityBound = 'true';
 
@@ -1596,8 +1596,8 @@ function brancherRoueQualite() {
 
             const track = qualityWheelTrack();
             if (!track) {
-                console.warn('[Video] Roue de qualité sans piste exploitable '
-                    + '(aucune lecture en cours, ou fichier local).');
+                console.warn('[Video] Quality wheel with no usable track '
+                    + '(nothing playing, or a local file).');
                 return;
             }
             // Le menu s'ancre sur la roue pressée : ouvrir depuis l'une alors
@@ -1611,9 +1611,9 @@ function brancherRoueQualite() {
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         window.MusicPlayer.setupFloatingVideoWindow();
-        brancherRoueQualite();
+        bindQualityWheel();
     });
 } else {
     window.MusicPlayer.setupFloatingVideoWindow();
-    brancherRoueQualite();
+    bindQualityWheel();
 }

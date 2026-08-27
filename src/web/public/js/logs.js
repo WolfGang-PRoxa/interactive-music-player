@@ -42,7 +42,7 @@ function tr(key, fallback) {
     return (value && value !== key) ? value : fallback;
 }
 
-function notifier(message) {
+function notify(message) {
     if (typeof window.MusicPlayer.showToast === 'function') {
         window.MusicPlayer.showToast(message);
     }
@@ -83,30 +83,30 @@ async function copyText(text) {
 
 async function copyLines(lines) {
     if (!lines.length) {
-        notifier(tr('logs_copy_empty', 'Aucune ligne à copier.'));
+        notify(tr('logs_copy_empty', 'Aucune ligne à copier.'));
         return;
     }
     const ok = await copyText(lines.join('\n'));
     if (ok) {
-        notifier(lines.length === 1
+        notify(lines.length === 1
             ? tr('logs_copied_one', 'Ligne copiée.')
             : `${lines.length} ${tr('logs_copied_many', 'lignes copiées.')}`);
     } else {
-        notifier(tr('logs_copy_failed', 'Copie impossible dans ce navigateur.'));
+        notify(tr('logs_copy_failed', 'Copie impossible dans ce navigateur.'));
     }
 }
 
 /** Lignes actuellement affichées, filtres actifs pris en compte. */
 function visibleEntries() {
-    const conteneur = document.getElementById('logs-terminal-container');
-    if (!conteneur) return [];
-    return [...conteneur.querySelectorAll('.log-entry:not(.filtered-out)')];
+    const container = document.getElementById('logs-terminal-container');
+    if (!container) return [];
+    return [...container.querySelectorAll('.log-entry:not(.filtered-out)')];
 }
 
 function selectedEntries() {
-    const conteneur = document.getElementById('logs-terminal-container');
-    if (!conteneur) return [];
-    return [...conteneur.querySelectorAll('.log-entry.log-selected')];
+    const container = document.getElementById('logs-terminal-container');
+    if (!container) return [];
+    return [...container.querySelectorAll('.log-entry.log-selected')];
 }
 
 function clearSelection() {
@@ -114,10 +114,10 @@ function clearSelection() {
 }
 
 /** Sélectionne toutes les lignes visibles entre deux bornes, incluses. */
-function selectRange(since, jusqua) {
+function selectRange(since, until) {
     const visibleOnes = visibleEntries();
     const i = visibleOnes.indexOf(since);
-    const j = visibleOnes.indexOf(jusqua);
+    const j = visibleOnes.indexOf(until);
     if (i === -1 || j === -1) return;
 
     clearSelection();
@@ -146,19 +146,19 @@ window.MusicPlayer.updateLogsSelectionBar = function() {
 };
 
 window.MusicPlayer.setupLogsSelection = function() {
-    const conteneur = document.getElementById('logs-terminal-container');
-    if (!conteneur || conteneur.dataset.selectionReady) return;
-    conteneur.dataset.selectionReady = '1';
+    const container = document.getElementById('logs-terminal-container');
+    if (!container || container.dataset.selectionReady) return;
+    container.dataset.selectionReady = '1';
 
     const updateBar = window.MusicPlayer.updateLogsSelectionBar;
 
     // Maj+clic étendrait la sélection de texte native : on la neutralise ici,
     // au moment du mousedown, avant que le navigateur ne s'en saisisse.
-    conteneur.addEventListener('mousedown', (e) => {
+    container.addEventListener('mousedown', (e) => {
         if (e.shiftKey && e.target.closest('.log-entry')) e.preventDefault();
     });
 
-    conteneur.addEventListener('click', async (e) => {
+    container.addEventListener('click', async (e) => {
         const copyButton = e.target.closest('.log-copy-btn');
         if (copyButton) {
             e.stopPropagation();
@@ -180,10 +180,10 @@ window.MusicPlayer.setupLogsSelection = function() {
             entryEl.classList.toggle('log-selected');
             logAnchor = entryEl;
         } else {
-            const seuleEtDejaChoisie = entryEl.classList.contains('log-selected')
+            const onlyAndAlreadySelected = entryEl.classList.contains('log-selected')
                 && selectedEntries().length === 1;
             clearSelection();
-            if (!seuleEtDejaChoisie) {
+            if (!onlyAndAlreadySelected) {
                 entryEl.classList.add('log-selected');
                 logAnchor = entryEl;
             }
@@ -605,14 +605,14 @@ window.MusicPlayer.appendLogEntry = function(logData) {
     logsContainer.appendChild(entryDiv);
 
     // Maintain max 300 elements in DOM
-    let elague = false;
+    let pruned = false;
     while (logsContainer.children.length > 300) {
-        const retiree = logsContainer.firstChild;
-        if (retiree.classList && retiree.classList.contains('log-selected')) elague = true;
-        logsContainer.removeChild(retiree);
+        const removed = logsContainer.firstChild;
+        if (removed.classList && removed.classList.contains('log-selected')) pruned = true;
+        logsContainer.removeChild(removed);
     }
     // Une ligne sélectionnée a pu disparaître : le compteur doit suivre
-    if (elague) window.MusicPlayer.updateLogsSelectionBar();
+    if (pruned) window.MusicPlayer.updateLogsSelectionBar();
 
     if (!wasScrolledUp) {
         logsContainer.scrollTop = logsContainer.scrollHeight;

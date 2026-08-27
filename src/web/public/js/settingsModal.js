@@ -115,13 +115,13 @@ window.MusicPlayer.showToast = function(message) {
  *
  * Elle reste en position fixe : sa place à l'écran ne bouge pas.
  */
-let parentToastOrigine = null;
+let toastOriginParent = null;
 
-function suivrePleinEcran() {
+function watchFullscreen() {
     const toast = document.getElementById('error-toast');
     if (!toast) return;
 
-    const pleinEcran = document.fullscreenElement
+    const fullscreen = document.fullscreenElement
         || document.webkitFullscreenElement
         || document.mozFullScreenElement
         || null;
@@ -129,7 +129,7 @@ function suivrePleinEcran() {
     // Retour à l'emplacement d'origine, et non au corps du document : la
     // notification est déclarée en dernier dans son conteneur, et c'est de
     // cette place qu'elle tient son avantage sur les calques à z-index égal.
-    const parent = pleinEcran || parentToastOrigine || document.body;
+    const parent = fullscreen || toastOriginParent || document.body;
     if (toast.parentElement !== parent) {
         parent.appendChild(toast);
     }
@@ -140,9 +140,9 @@ window.MusicPlayer.setupToastInteractions = function() {
     if (!toast || toast.dataset.interactionsInit === 'true') return;
     toast.dataset.interactionsInit = 'true';
 
-    parentToastOrigine = toast.parentElement;
+    toastOriginParent = toast.parentElement;
     ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange'].forEach(evt => {
-        document.addEventListener(evt, suivrePleinEcran);
+        document.addEventListener(evt, watchFullscreen);
     });
 
     toast.addEventListener('mouseenter', () => {
@@ -412,7 +412,7 @@ window.MusicPlayer.initSettingsModal = function() {
             try {
                 window.MusicPlayer.renderConnectedGuildsList();
             } catch (gErr) {
-                console.error('[SettingsModal] Erreur render connected guilds :', gErr);
+                console.error('[SettingsModal] Error rendering connected guilds:', gErr);
             }
             // Nouvelle tentative si le bot n'était pas encore prêt au chargement.
             window.MusicPlayer.loadInviteLink();
@@ -806,7 +806,7 @@ window.MusicPlayer.initSettingsModal = function() {
             }
         }
     } catch (err) {
-        console.error('[SettingsModal] Erreur initialisation des contrôles :', err);
+        console.error('[SettingsModal] Error initialising the controls:', err);
     }
 };
 
@@ -850,10 +850,10 @@ window.MusicPlayer.initDeviceModeSetting = function(select) {
             ? t(`device_mode_${deviceMode.get()}`)
             : deviceMode.get();
         const template = typeof t === 'function' ? t('device_mode_detected') : '';
-        const detecte = template && template !== 'device_mode_detected'
+        const detected = template && template !== 'device_mode_detected'
             ? template.replace('{mode}', label)
             : `→ ${label}`;
-        hint.textContent = `${detecte} — ${size}`;
+        hint.textContent = `${detected} — ${size}`;
     };
 
     select.value = deviceMode.getChoice();
@@ -865,10 +865,10 @@ window.MusicPlayer.initDeviceModeSetting = function(select) {
      * cette écoute, l'indication resterait celle de l'orientation précédente.
      * L'attente évite de la recalculer à chaque étape du redimensionnement.
      */
-    let minuterieTaille = null;
+    let sizeTimer = null;
     window.addEventListener('resize', () => {
-        clearTimeout(minuterieTaille);
-        minuterieTaille = setTimeout(refreshHint, 200);
+        clearTimeout(sizeTimer);
+        sizeTimer = setTimeout(refreshHint, 200);
     });
 
     select.addEventListener('change', () => {

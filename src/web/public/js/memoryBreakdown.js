@@ -32,11 +32,11 @@
      * style calculé et son objet de mise en page. L'ordre de grandeur vaut
      * mieux qu'un silence, et il est affiché à l'utilisateur.
      */
-    const COUT_ELEMENT = 256;
-    const COUT_ATTRIBUT = 48;
-    const COUT_CARACTERE = 2;      // chaînes UTF-16
+    const COST_ELEMENT = 256;
+    const COST_ATTRIBUTE = 48;
+    const COST_CHARACTER = 2;      // chaînes UTF-16
     const BYTES_PER_PIXEL = 4;    // RGBA
-    const PERIODE_MS = 2000;
+    const PERIOD_MS = 2000;
     /** Au-delà, les zones les plus légères sont fondues dans « Autres ». */
     const MAX_ROWS = 8;
 
@@ -58,12 +58,12 @@
 
     function formatBytes(bytes) {
         const v = Math.max(0, bytes || 0);
-        const ko = tr('unit_kb', 'Ko');
-        const mo = tr('unit_mb', 'Mo');
+        const kb = tr('unit_kb', 'Ko');
+        const mb = tr('unit_mb', 'Mo');
         const go = tr('unit_gb', 'Go');
         if (v >= 1024 * 1024 * 1024) return `${(v / (1024 ** 3)).toFixed(2)} ${go}`;
-        if (v >= 1024 * 1024) return `${(v / (1024 * 1024)).toFixed(1)} ${mo}`;
-        if (v >= 1024) return `${Math.round(v / 1024)} ${ko}`;
+        if (v >= 1024 * 1024) return `${(v / (1024 * 1024)).toFixed(1)} ${mb}`;
+        if (v >= 1024) return `${Math.round(v / 1024)} ${kb}`;
         return `${Math.round(v)} o`;
     }
 
@@ -99,7 +99,7 @@
 
         let elements = 0;
         let attrs = 0;
-        let caracteres = 0;
+        let characters = 0;
         let bitmaps = 0;
         let images = 0;
 
@@ -119,16 +119,16 @@
                     images++;
                 }
             } else if (node.nodeType === 3 && node.nodeValue) {
-                caracteres += node.nodeValue.length;
+                characters += node.nodeValue.length;
             }
             node = walker.nextNode();
         }
 
         return {
-            elements, attrs, caracteres, bitmaps, images,
-            bytes: elements * COUT_ELEMENT
-                  + attrs * COUT_ATTRIBUT
-                  + caracteres * COUT_CARACTERE
+            elements, attrs, characters, bitmaps, images,
+            bytes: elements * COST_ELEMENT
+                  + attrs * COST_ATTRIBUTE
+                  + characters * COST_CHARACTER
                   + bitmaps
         };
     }
@@ -137,7 +137,7 @@
         return {
             elements: a.elements + b.elements,
             attrs: a.attrs + b.attrs,
-            caracteres: a.caracteres + b.caracteres,
+            characters: a.characters + b.characters,
             bitmaps: a.bitmaps + b.bitmaps,
             images: a.images + b.images,
             bytes: a.bytes + b.bytes
@@ -148,29 +148,29 @@
         return {
             elements: Math.max(0, a.elements - b.elements),
             attrs: Math.max(0, a.attrs - b.attrs),
-            caracteres: Math.max(0, a.caracteres - b.caracteres),
+            characters: Math.max(0, a.characters - b.characters),
             bitmaps: Math.max(0, a.bitmaps - b.bitmaps),
             images: Math.max(0, a.images - b.images),
             bytes: Math.max(0, a.bytes - b.bytes)
         };
     }
 
-    const ZERO = { elements: 0, attrs: 0, caracteres: 0, bitmaps: 0, images: 0, bytes: 0 };
+    const ZERO = { elements: 0, attrs: 0, characters: 0, bitmaps: 0, images: 0, bytes: 0 };
 
     /** Titre visible d'une carte, débarrassé de sa poignée et de son cadenas. */
     function cardTitle(card) {
         const title = card.querySelector('.card-title');
         if (!title) return card.id || '?';
-        const copie = title.cloneNode(true);
-        copie.querySelectorAll('svg, button').forEach(el => el.remove());
-        return copie.textContent.trim() || card.id;
+        const copy = title.cloneNode(true);
+        copy.querySelectorAll('svg, button').forEach(el => el.remove());
+        return copy.textContent.trim() || card.id;
     }
 
     /**
      * Zones disjointes du document. Le reste de `<body>` — en-tête, fenêtres
      * modales, menus contextuels, décor — est déduit par soustraction.
      */
-    function zonesMesurables() {
+    function measurableAreas() {
         const list = [];
 
         const grid = document.getElementById('dashboard-grid');
@@ -195,7 +195,7 @@
 
     function measureElements() {
         const total = weighZone(document.body) || ZERO;
-        const zones = zonesMesurables();
+        const zones = measurableAreas();
 
         let running = ZERO;
         const rows = zones.map((zone, i) => {
@@ -218,22 +218,22 @@
         // liste. On repart d'un cumul unique : le fourre-tout figure déjà
         // parmi les lignes triées, et en créer un second le dédoublerait.
         if (rows.length > MAX_ROWS) {
-            const gardees = [];
+            const kept = [];
             let remainder = ZERO;
             for (const l of rows) {
-                if (gardees.length < MAX_ROWS - 1 && l.key !== '__reste__') {
-                    gardees.push(l);
+                if (kept.length < MAX_ROWS - 1 && l.key !== '__reste__') {
+                    kept.push(l);
                 } else {
                     remainder = addTotals(remainder, l.weight);
                 }
             }
-            gardees.push({
+            kept.push({
                 key: '__reste__',
                 label: tr('mem_zone_other', 'Autres éléments'),
                 weight: remainder,
                 color: 'rgba(160, 160, 176, 0.75)'
             });
-            return { total, rows: gardees };
+            return { total, rows: kept };
         }
 
         return { total, rows };
@@ -242,10 +242,10 @@
     // ── Mesure hors DOM ─────────────────────────────────────────────
 
     /** Tas JavaScript, quand le navigateur le publie (Chromium). */
-    function tasJavaScript() {
+    function javascriptHeap() {
         const m = window.performance && window.performance.memory;
         if (!m || typeof m.usedJSHeapSize !== 'number') return null;
-        return { utilise: m.usedJSHeapSize, total: m.totalJSHeapSize, limit: m.jsHeapSizeLimit };
+        return { used: m.usedJSHeapSize, total: m.totalJSHeapSize, limit: m.jsHeapSizeLimit };
     }
 
     /**
@@ -253,7 +253,7 @@
      * origine ne publient pas leur taille sans `Timing-Allow-Origin` : elles
      * comptent pour zéro plutôt que d'être devinées.
      */
-    function codeCharge() {
+    function loadedCode() {
         if (!window.performance || typeof window.performance.getEntriesByType !== 'function') return null;
         const types = ['script', 'link', 'css'];
         let bytes = 0;
@@ -326,10 +326,10 @@
         gauge.style.background = color;
         row.appendChild(gauge);
 
-        const pastille = document.createElement('span');
-        pastille.className = 'breakdown-dot';
-        pastille.style.background = color;
-        row.appendChild(pastille);
+        const badgeEl = document.createElement('span');
+        badgeEl.className = 'breakdown-dot';
+        badgeEl.style.background = color;
+        row.appendChild(badgeEl);
 
         const nameEl = document.createElement('span');
         nameEl.className = 'breakdown-label';
@@ -373,11 +373,11 @@
         if (!list || !bar) return;
 
         const elements = measureElements();
-        const tas = tasJavaScript();
-        const code = codeCharge();
+        const heap = javascriptHeap();
+        const code = loadedCode();
 
         const elementBytes = elements.total.bytes;
-        const heapBytes = tas ? tas.utilise : 0;
+        const heapBytes = heap ? heap.used : 0;
         const codeBytes = code ? code.bytes : 0;
         const grandTotal = elementBytes + heapBytes + codeBytes;
 
@@ -406,7 +406,7 @@
             formatBytes(elementBytes)
         ));
 
-        const plusLourd = elements.rows.length > 0 ? elements.rows[0].weight.bytes : 1;
+        const heaviest = elements.rows.length > 0 ? elements.rows[0].weight.bytes : 1;
         const nodesWord = tr('mem_unit_nodes', 'nœuds');
         const imagesWord = tr('mem_unit_images', 'img.');
 
@@ -417,7 +417,7 @@
             }
             list.appendChild(buildRow(
                 l.color, l.label, detail, formatBytes(l.weight.bytes),
-                plusLourd > 0 ? l.weight.bytes / plusLourd : 0
+                heaviest > 0 ? l.weight.bytes / heaviest : 0
             ));
         });
 
@@ -429,12 +429,12 @@
 
         const reference = Math.max(heapBytes, codeBytes, 1);
 
-        if (tas) {
+        if (heap) {
             list.appendChild(buildRow(
                 HEAP_COLOR,
                 tr('mem_row_heap', 'Tas JavaScript'),
-                `${formatBytes(tas.total)} ${tr('mem_reserved', 'réservés')}`,
-                formatBytes(tas.utilise),
+                `${formatBytes(heap.total)} ${tr('mem_reserved', 'réservés')}`,
+                formatBytes(heap.used),
                 heapBytes / reference
             ));
         } else {
@@ -495,7 +495,7 @@
         try {
             render();
         } catch (err) {
-            console.error('[Répartition mémoire] Rendu impossible :', err);
+            console.error('[MemoryBreakdown] Rendering impossible:', err);
         }
     };
 
@@ -510,6 +510,6 @@
         }
         if (!active) return;
         window.MusicPlayer.refreshMemoryBreakdown();
-        timer = setInterval(window.MusicPlayer.refreshMemoryBreakdown, PERIODE_MS);
+        timer = setInterval(window.MusicPlayer.refreshMemoryBreakdown, PERIOD_MS);
     };
 })();

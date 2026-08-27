@@ -52,8 +52,8 @@ function identityOf(ws, guildId) {
 }
 
 /** Prévient l'invité que le maître ne lui a pas accordé ce droit. */
-function refuse(ws, type, identity) {
-    log.warn(`[WebServer] Message « ${type} » refusé à l'invité ${identity.userId || '?'} : droit non accordé.`);
+function denied(ws, type, identity) {
+    log.warn(`[WebServer] Message « ${type} » refused to guest ${identity.userId || '?'}: right not granted.`);
     try {
         ws.send(JSON.stringify({
             type: 'permissionDenied',
@@ -81,7 +81,7 @@ async function handleMessage(ws, payload, webServer, options = {}) {
 
     const handler = routes[type];
     if (!handler) {
-        log.warn(`[WebServer] Message WebSocket de type inconnu : ${type}`);
+        log.warn(`[WebServer] WebSocket message of unknown type: ${type}`);
         return;
     }
 
@@ -93,7 +93,7 @@ async function handleMessage(ws, payload, webServer, options = {}) {
         const identity = identityOf(ws, currentGuildId);
 
         if (!permissions.canSend(identity, type)) {
-            refuse(ws, type, identity);
+            denied(ws, type, identity);
             return;
         }
 
@@ -102,9 +102,9 @@ async function handleMessage(ws, payload, webServer, options = {}) {
         if (type === 'updateSettings') {
             const { allowed, refused } = permissions.filterSettings(identity, effectiveData);
             if (refused.length) {
-                log.warn(`[WebServer] Réglages écartés pour l'invité ${identity.userId || '?'} : ${refused.join(', ')}.`);
+                log.warn(`[WebServer] Settings dropped for guest ${identity.userId || '?'}: ${refused.join(', ')}.`);
                 if (!Object.keys(allowed).length) {
-                    refuse(ws, type, identity);
+                    denied(ws, type, identity);
                     return;
                 }
             }

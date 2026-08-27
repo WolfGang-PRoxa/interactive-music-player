@@ -203,7 +203,7 @@ class VolumeController {
             try {
                 this.queueNode.setVolume(this.currentVolume);
             } catch (err) {
-                log.error('[VolumeController] Erreur setVolume:', err.message);
+                log.error('[VolumeController] setVolume error:', err.message);
             }
         }
     }

@@ -29,7 +29,7 @@ const log = require('../../../utils/logger');
  *
  * @returns {import('discord.js').VoiceBasedChannel|null}
  */
-function salonVise(ctx) {
+function targetChannel(ctx) {
     const { ws, webServer, currentGuildId } = ctx;
     const guild = webServer.client?.guilds?.cache?.get(currentGuildId);
     if (!guild) return null;
@@ -52,35 +52,35 @@ async function handleSendInviteLink(ctx) {
     const { ws, webServer, currentGuildId } = ctx;
 
     if (!oauth.isConfigured()) {
-        return repondre(ws, false, 'oauth_absent');
+        return reply(ws, false, 'oauth_absent');
     }
 
-    const channel = salonVise(ctx);
+    const channel = targetChannel(ctx);
     if (!channel) {
-        return repondre(ws, false, 'salon_absent');
+        return reply(ws, false, 'channel_missing');
     }
 
     // Un salon vocal accepte les messages depuis 2022, mais rien ne garantit
     // que celui-ci en soit un, ni que le bot ait le droit d'y écrire.
     if (typeof channel.send !== 'function') {
-        return repondre(ws, false, 'salon_muet');
+        return reply(ws, false, 'channel_muted');
     }
 
-    const lien = `${oauth.publicUrl()}/auth/discord`;
+    const link = `${oauth.publicUrl()}/auth/discord`;
 
     try {
         await channel.send(
             '🎛️ **Partage du contrôle du lecteur**\n'
-            + `Connectez-vous avec votre compte Discord pour prendre la main : ${lien}\n`
+            + `Connectez-vous avec votre compte Discord pour prendre la main : ${link}\n`
             + '_Le maître de la session décide ensuite de ce que chacun peut faire._'
         );
     } catch (err) {
-        log.error(`[Partage] Envoi du lien impossible dans #${channel.name} : ${err.message}`);
-        return repondre(ws, false, 'envoi_refuse');
+        log.error(`[Share] Cannot post the link in #${channel.name}: ${err.message}`);
+        return reply(ws, false, 'send_denied');
     }
 
-    log.info(`[Partage] Lien d'authentification posté dans #${channel.name}.`);
-    repondre(ws, true, null, { channelName: channel.name });
+    log.info(`[Share] Authentication link posted in #${channel.name}.`);
+    reply(ws, true, null, { channelName: channel.name });
     webServer.broadcastState(currentGuildId);
 }
 
@@ -96,13 +96,13 @@ function handleShareControl(ctx) {
     const { userId } = data;
     if (!userId) return;
 
-    const accordes = database.setUserPermissions(currentGuildId, userId, data.permissions);
-    log.info(`[Partage] Droits de ${userId} : `
-        + (permissions.hasAny(accordes)
-            ? permissions.GROUPS.filter((g) => accordes[g]).join(', ')
+    const granted = database.setUserPermissions(currentGuildId, userId, data.permissions);
+    log.info(`[Share] Rights of ${userId}: `
+        + (permissions.hasAny(granted)
+            ? permissions.GROUPS.filter((g) => granted[g]).join(', ')
             : 'aucun'));
 
-    repondre(ws, true, null, { userId, permissions: accordes });
+    reply(ws, true, null, { userId, permissions: granted });
     // L'invité concerné doit voir son tableau de bord s'ouvrir ou se fermer sans
     // avoir à recharger : la diffusion d'état le lui apprend.
     webServer.broadcastState(currentGuildId);
@@ -121,9 +121,9 @@ function handleRevokeControl(ctx) {
     if (!userId) return;
 
     database.revokeUserPermissions(currentGuildId, userId);
-    const fermees = sessions.revokeUser(userId);
+    const closed = sessions.revokeUser(userId);
 
-    log.info(`[Partage] Contrôle révoqué pour ${userId} (${fermees} session(s) fermée(s)).`);
+    log.info(`[Share] Control revoked for ${userId} (${closed} session(s) closed).`);
 
     // L'onglet de l'invité perd son identité : sa prochaine requête le renverra
     // vers l'authentification. Le prévenir tout de suite évite qu'il continue à
@@ -136,16 +136,16 @@ function handleRevokeControl(ctx) {
         }
     }
 
-    repondre(ws, true, null, { userId });
+    reply(ws, true, null, { userId });
     webServer.broadcastState(currentGuildId);
 }
 
 /** Réponse au tableau de bord du maître, pour qu'il sache quoi afficher. */
-function repondre(ws, ok, raison, extra = {}) {
+function reply(ws, ok, reason, extra = {}) {
     try {
         ws.send(JSON.stringify({
             type: 'shareResult',
-            data: { ok, reason: raison, ...extra },
+            data: { ok, reason: reason, ...extra },
         }));
     } catch (e) {
         // Socket fermée entre-temps.
