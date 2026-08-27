@@ -321,6 +321,18 @@ window.MusicPlayer.initSpeedPad = function() {
         let startX = 0;
         let startTranslateX = 0;
         let activeDragSpeed = window.MusicPlayer.currentSpeed;
+        /*
+         * Vitesse d'avant le geste, relevée une fois pour toutes au poser du
+         * doigt.
+         *
+         * `currentSpeed` ne peut pas servir de référence : l'aperçu du
+         * glissement passe par `updateSpeedPad()`, qui l'écrit à chaque
+         * déplacement. Au relâchement, elle vaut donc déjà la valeur choisie,
+         * la comparaison ne voit aucun changement et rien ne part vers le
+         * serveur — le pad revenait alors à la vitesse du serveur au message
+         * d'état suivant.
+         */
+        let speedAtDragStart = window.MusicPlayer.currentSpeed;
 
         let clickStartTime = 0;
         let clickStartX = 0;
@@ -351,6 +363,7 @@ window.MusicPlayer.initSpeedPad = function() {
             startX = e.clientX;
             startTranslateX = parseFloat(track.dataset.translateX || 0);
             activeDragSpeed = window.MusicPlayer.currentSpeed;
+            speedAtDragStart = window.MusicPlayer.currentSpeed;
 
             if (!track.classList.contains('switching')) {
                 track.style.transition = 'none';
@@ -387,6 +400,20 @@ window.MusicPlayer.initSpeedPad = function() {
                 activeDragSpeed = closestEl.dataset.speed;
                 window.MusicPlayer.updateSpeedPad(activeDragSpeed, true);
             }
+
+            /*
+             * Le ruban suit le doigt.
+             *
+             * `updateSpeedPad()` vient de le recentrer sur la valeur retenue :
+             * le ruban sautait donc d'un cran à l'autre au lieu d'accompagner
+             * le geste. À la souris, les événements sont assez serrés pour que
+             * ça passe pour du continu ; au doigt, il n'y en a qu'une douzaine
+             * sur toute la course, et chaque saut se voit.
+             *
+             * On rétablit ici la position réelle du glissement. Le recentrage
+             * sur la valeur choisie a lieu au relâchement, avec sa transition.
+             */
+            track.style.transform = `translateX(${currentTranslate}px)`;
         };
 
         const onPointerUp = (e) => {
@@ -429,7 +456,7 @@ window.MusicPlayer.initSpeedPad = function() {
 
             if (track.classList.contains('switching')) return;
 
-            if (activeDragSpeed !== window.MusicPlayer.currentSpeed) {
+            if (activeDragSpeed !== speedAtDragStart) {
                 window.MusicPlayer.sendSpeedUpdate(activeDragSpeed);
                 window.MusicPlayer.updateSpeedPad(activeDragSpeed);
             } else {
