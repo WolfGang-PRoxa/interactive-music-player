@@ -613,6 +613,88 @@ class WebServer {
     }
 
     /**
+     * La file de lecture du serveur, créée à la demande en diffusion personnelle.
+     *
+     * ## Pourquoi
+     *
+     * La file de discord-player n'existe qu'une fois le bot entré dans un salon
+     * vocal. Or elle ne sert pas qu'à la voix : c'est elle qui héberge tout
+     * l'état de lecture, `virtualCurrentTrack` compris — celui du mode
+     * personnel, où le son sort du navigateur et où Discord n'a rien à faire.
+     *
+     * Loin de chez soi, personne n'est dans le salon, le gardien de présence
+     * l'y fait sortir, et la file s'en va avec la connexion. Tout ce qui touche
+     * à la lecture repartait alors sur `if (!queue) return` : le bouton de
+     * lecture écrivait bien l'index en base puis ne jouait rien, un dépôt dans
+     * la file d'attente était annoncé au journal sans jamais y apparaître, et
+     * rien — ni erreur, ni ligne de journal, ni message à l'écran — ne disait
+     * pourquoi.
+     *
+     * `queues.create()` ne rejoint aucun salon ; c'est `queue.connect()`, appelé
+     * séparément, qui branche la voix. Créer le contenant sans le brancher rend
+     * donc au mode personnel l'indépendance qu'il aurait toujours dû avoir.
+     *
+     * En diffusion « everyone », rien n'est créé : là, le son sort du bot, et
+     * une file sans connexion ne jouerait pas davantage. L'appelant retrouve son
+     * `null` et le comportement d'avant.
+     *
+     * @param {string} guildId
+     * @returns {import('discord-player').GuildQueue|null}
+     */
+    ensurePlaybackQueue(guildId) {
+        // Un onglet qui n'a pas encore choisi de serveur passe ici à chaque
+        // message : sans cette garde, la lecture des réglages porterait sur
+        // `undefined`.
+        if (!guildId) return null;
+
+        const { useMainPlayer } = require('discord-player');
+        const player = useMainPlayer();
+
+        const existing = player.queues.get(guildId);
+        if (existing) return existing;
+
+        const settings = database.getSettings(guildId);
+        if (settings.broadcastMode !== 'personal') return null;
+
+        const guild = this.client?.guilds?.cache?.get(guildId);
+        if (!guild) return null;
+
+        try {
+            const queue = player.queues.create(guild, {
+                nodeOptions: {
+                    selfDeaf: false,
+                    leaveOnEmpty: false,
+                    leaveOnEmptyCooldown: 30000,
+                    leaveOnEnd: false,
+                    leaveOnEndCooldown: 60000,
+                    volume: settings.baseVolume,
+                }
+            });
+            /*
+             * Le salon que le tableau de bord regarde, sans y entrer.
+             *
+             * `getChannelPlaybackState` ne renvoie l'état vivant — dont
+             * `virtualCurrentTrack` — que si le salon demandé est celui de la
+             * file. Sans cette ligne, le contenant existait, la piste s'y
+             * posait, et l'état diffusé restait vide : on avait déplacé le
+             * silence d'un cran sans le lever. Le champ ne branche aucune voix,
+             * il ne fait que désigner ; `_initClient` le pose déjà ainsi sur une
+             * file sans connexion.
+             */
+            queue.activeChannelId = settings.lastVoiceChannelId
+                || settings.defaultVoiceChannelId
+                || null;
+
+            log.info(`[WebServer] Playback container created without a voice connection `
+                + `(personal broadcast, guild ${guildId}, channel ${queue.activeChannelId || 'none'}).`);
+            return queue;
+        } catch (err) {
+            log.error('[WebServer] Could not create the playback container:', err.message);
+            return null;
+        }
+    }
+
+    /**
      * Ce tableau de bord est-il celui qui pilote la lecture de ce serveur ?
      * @param {import('ws').WebSocket} ws
      * @param {string} guildId
@@ -1122,7 +1204,7 @@ class WebServer {
     async _syncPlaylistToPlayer(guildId, playlistId, startIndex = 0, forceRestart = false, startProgressMs = 0) {
         const { useMainPlayer, Track } = require('discord-player');
         const player = useMainPlayer();
-        const queue = player.queues.get(guildId);
+        const queue = this.ensurePlaybackQueue(guildId);
         if (!queue) return;
 
         const globalPlaylists = database.getGlobalPlaylists();

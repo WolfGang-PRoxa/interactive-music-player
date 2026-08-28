@@ -123,7 +123,10 @@ async function handleMessage(ws, payload, webServer, options = {}) {
         data: effectiveData,
         webServer,
         player,
-        queue: player.queues.get(currentGuildId),
+        // Créée à la demande en diffusion personnelle, où la lecture n'a pas
+        // besoin de salon vocal — voir `ensurePlaybackQueue`. Ailleurs, c'est
+        // toujours la file existante, ou `null`.
+        queue: webServer.ensurePlaybackQueue(currentGuildId),
         currentGuildId,
         // Permet à un handler d'en réutiliser un autre (playNow délègue à play).
         // Le relais est marqué interne : le droit a été vérifié à l'entrée, et
