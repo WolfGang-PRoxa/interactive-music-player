@@ -13,6 +13,59 @@ let loadedCoverImage = null;
 let loadedCoverUrl = null;
 
 /**
+ * Charge la pochette en réclamant le partage d'origine.
+ *
+ * ## Pourquoi
+ *
+ * Le visualiseur dessine la pochette sur son canevas, et ces images viennent
+ * d'ailleurs — `i.ytimg.com`, `upload.wikimedia.org`, `scdn.co`. Un canevas qui
+ * reçoit une image étrangère chargée sans en-tête de partage devient « teinté » :
+ * le navigateur refuse alors d'en extraire quoi que ce soit. `getImageData` s'y
+ * heurte, et `captureStream()` aussi — c'est-à-dire précisément ce dont dépend
+ * le plein écran du système sur une piste audio, où il n'y a pas d'autre vidéo
+ * à agrandir. L'appareil le disait sans détour : « Canvas is tainted ».
+ *
+ * `crossOrigin` suffit à l'éviter, à condition que l'hôte l'autorise. Les trois
+ * hôtes de ce projet répondent tous `Access-Control-Allow-Origin: *` — vérifié.
+ *
+ * ## Le repli
+ *
+ * Un hôte qui refuserait le partage ferait échouer le chargement tout court, et
+ * la pochette disparaîtrait. On réessaie donc sans, et l'image revient : le
+ * canevas est teinté, le plein écran du système s'en trouve perdu pour la
+ * session, mais une pochette visible vaut mieux qu'une fonction rarement
+ * employée. L'échec est de toute façon rapporté quand on l'atteint.
+ *
+ * Le canevas ne se « détache » jamais : une seule image teintée le condamne pour
+ * la vie de l'élément. D'où la demande de partage dès le premier essai.
+ *
+ * @param {string} url
+ * @param {boolean} [withCors=true] Faux au second essai, sans partage.
+ */
+function loadCoverImage(url, withCors = true) {
+    const img = new Image();
+    if (withCors) img.crossOrigin = 'anonymous';
+
+    img.onload = () => {
+        // Une autre piste a pu passer pendant le chargement : sa pochette a la
+        // priorité, celle-ci n'a plus lieu d'être posée.
+        if (loadedCoverUrl !== url) return;
+        loadedCoverImage = img;
+    };
+
+    img.onerror = () => {
+        if (loadedCoverUrl !== url) return;
+        if (withCors) {
+            loadCoverImage(url, false);
+            return;
+        }
+        loadedCoverImage = null;
+    };
+
+    img.src = url;
+}
+
+/**
  * Surveillance du flux vidéo distant.
  *
  * Un flux que le navigateur ne sait pas décoder ne fait pas avancer
@@ -489,10 +542,7 @@ window.MusicPlayer.drawCanvasStage = function() {
     // Load cover image if available
     if (track.thumbnail && loadedCoverUrl !== track.thumbnail) {
         loadedCoverUrl = track.thumbnail;
-        const img = new Image();
-        img.onload = () => { loadedCoverImage = img; };
-        img.onerror = () => { loadedCoverImage = null; };
-        img.src = track.thumbnail;
+        loadCoverImage(track.thumbnail);
     } else if (!track.thumbnail) {
         loadedCoverImage = null;
         loadedCoverUrl = null;
