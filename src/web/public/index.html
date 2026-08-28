@@ -32,6 +32,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <!--
+        En tout premier : il écoute les erreurs, et une exception levée pendant
+        le chargement d'un script arriverait sinon avant qu'on écoute. Or c'est
+        le cas le plus destructeur, puisqu'elle interrompt le reste du fichier
+        qui la lève. Voir js/clientErrors.js.
+    -->
+    <script src="js/clientErrors.js"></script>
+    <!--
         Chargé dans l'en-tête, et non en pied de page avec les autres : il pose
         le mode de support sur <html> avant le premier rendu. Plus bas, on
         verrait la mise en page bureau s'afficher puis se replier.
