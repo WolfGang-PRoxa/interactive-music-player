@@ -556,9 +556,23 @@ body.video-fullscreen-active #video-floating-window .video-custom-controls {
     height: clamp(38px, 13cqmin, 52px);
     border-radius: 50%;
     border: 1px solid rgba(255, 255, 255, 0.16);
+    /*
+     * Un fond translucide, et pas de verre dépoli.
+     *
+     * Ces cercles portaient un `backdrop-filter`, qui arrivait toujours en
+     * retard : les boutons apparaissaient nets pendant que la couche montait en
+     * opacité, puis le flou s'y posait d'un coup, une demi-seconde après. Ce
+     * n'est pas un défaut de réglage. Une couche dont l'opacité s'anime forme un
+     * groupe de transparence, et un `backdrop-filter` à l'intérieur n'a rien de
+     * stable à échantillonner tant que l'animation dure : le navigateur le rend
+     * sans filtre, puis le calcule une fois le groupe figé. Le saut se voyait à
+     * chaque apparition.
+     *
+     * On garde donc l'aspect qu'ils avaient pendant la transition — celui que
+     * l'œil suit sans heurt. Le fond noir à 45 % suffit à détacher les icônes
+     * d'une image claire, ce que le flou ne faisait qu'appuyer.
+     */
     background: rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
     color: #ffffff;
     display: flex;
     align-items: center;
@@ -855,8 +869,11 @@ body.video-fullscreen-active #video-floating-window .video-custom-controls {
     transform: translateY(-50%);
     width: 90px;
     height: 90px;
+    /* Même raison qu'au transport du centre, un cran plus loin : cette pastille
+       ne vit que six dixièmes de seconde, opacité animée de bout en bout. Le
+       flou n'avait jamais le temps de se poser — il ne pouvait que sauter, ou
+       ne rien faire. Le fond blanc à 25 % et l'ombre portée suffisent. */
     background: rgba(255, 255, 255, 0.25);
-    backdrop-filter: blur(4px);
     border-radius: 50%;
     display: flex;
     align-items: center;
