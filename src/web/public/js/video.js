@@ -1201,76 +1201,145 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
         let tapCameFromTouch = false;
         let controlsShownAtTouch = false;
 
-        videoBodyElement.addEventListener('touchstart', () => {
+        /*
+         * Au doigt, le geste se lit sur les événements tactiles, pas sur les
+         * clics.
+         *
+         * Le double appui reculait ou avançait de dix secondes tant que les
+         * commandes étaient déjà visibles, et jamais quand elles étaient
+         * effacées. La raison tient à WebKit : la première tape sur un élément
+         * dont l'apparence dépend de `:hover` y est consommée comme un survol et
+         * non comme un clic — et les règles de révélation portent encore
+         * `.video-window-body:hover`. Il n'arrivait donc qu'un seul clic, jamais
+         * deux, et la fenêtre de 300 ms ne se refermait sur rien.
+         *
+         * Compter les tapes elles-mêmes retire toute dépendance à cette
+         * heuristique, qu'aucun navigateur de bureau ne reproduit et que je ne
+         * pouvais donc pas mesurer. Le clic reste la voie de la souris.
+         */
+        /*
+         * L'attente d'un simple appui ne peut pas être plus courte que la
+         * fenêtre du double.
+         *
+         * Elle l'était — 250 ms contre 300 — et une seconde tape arrivée entre
+         * les deux trouvait le masquage déjà fait : les commandes
+         * apparaissaient puis repartaient aussitôt, et le geste se scindait en
+         * deux moitiés qui s'annulaient. L'action simple attend donc désormais
+         * que la fenêtre soit close, jamais moins.
+         *
+         * Et 300 ms est trop serré pour un doigt : c'est une valeur de souris,
+         * là où iOS lui-même compte plutôt 350 à 400 entre deux tapes. D'où deux
+         * durées, l'une par dispositif — le retard supplémentaire ne coûte qu'à
+         * l'effacement, qui n'est jamais pressé, la révélation restant immédiate.
+         */
+        const DOUBLE_TAP_MS = 400;
+        const DOUBLE_CLICK_MS = 300;
+        const DOUBLE_TAP_SLOP = 40;
+
+        let lastTapAt = 0;
+        let lastTapX = 0;
+        let lastTapY = 0;
+        let tapTimer = null;
+
+        /** Les commandes et l'en-tête gardent leurs propres gestes. */
+        function tapOnOwnControl(target) {
+            return !!(target && target.closest && (
+                target.closest('.video-custom-controls')
+                || target.closest('.video-window-header')
+                || target.closest('button')
+                || target.closest('input')
+                || target.closest('.speed-pad-overlay')
+                || target.closest('.video-center-controls')
+            ));
+        }
+
+        videoBodyElement.addEventListener('touchstart', (e) => {
             tapCameFromTouch = true;
             controlsShownAtTouch = videoWindow.classList.contains('user-active');
         }, { passive: true });
 
-        videoBodyElement.addEventListener('click', (e) => {
-            /*
-             * Un clic sans appui qui le précède vient d'une souris. Le drapeau
-             * se consomme ici, avant tout renvoi : un appui sur un bouton de la
-             * barre sort juste en dessous, et le laisserait armé pour le clic
-             * suivant — celui d'une souris, sur un appareil qui a les deux.
-             */
-            const fromTouch = tapCameFromTouch;
-            const wasShown = controlsShownAtTouch;
-            tapCameFromTouch = false;
+        videoBodyElement.addEventListener('touchend', (e) => {
+            if (tapOnOwnControl(e.target)) return;
 
-            // Ignore clicks on interactive controls (buttons, volume slider, progress bar, header drag area)
-            if (e.target.closest('.video-custom-controls') ||
-                e.target.closest('.video-window-header') ||
-                e.target.closest('button') ||
-                e.target.closest('input') ||
-                e.target.closest('.speed-pad-overlay')) {
+            const touch = e.changedTouches && e.changedTouches[0];
+            if (!touch) return;
+
+            const now = Date.now();
+            const close = Math.abs(touch.clientX - lastTapX) < DOUBLE_TAP_SLOP
+                && Math.abs(touch.clientY - lastTapY) < DOUBLE_TAP_SLOP;
+
+            // Seconde tape, assez rapprochée dans le temps et dans l'espace.
+            if (now - lastTapAt < DOUBLE_TAP_MS && close) {
+                clearTimeout(tapTimer);
+                tapTimer = null;
+                lastTapAt = 0;
+
+                const rect = videoBodyElement.getBoundingClientRect();
+                const isRightHalf = (touch.clientX - rect.left) >= rect.width / 2;
+                if (typeof window.MusicPlayer.seekRelative === 'function') {
+                    window.MusicPlayer.seekRelative(isRightHalf ? 10000 : -10000);
+                }
+                showVideoSeekIndicator(isRightHalf ? '+10s' : '-10s', isRightHalf);
                 return;
             }
 
+            /*
+             * Première tape : on attend de savoir si une seconde suit. Sans ce
+             * délai, la barre se serait déjà retirée quand la seconde arrive
+             * pour reculer de dix secondes.
+             *
+             * L'état relevé est celui d'avant la tape : le `mousemove` simulé a
+             * déjà rappelé les commandes entre-temps, et c'est bien la question
+             * « étaient-elles visibles ? » qui décide de masquer ou non.
+             */
+            const wasShown = controlsShownAtTouch;
+            lastTapAt = now;
+            lastTapX = touch.clientX;
+            lastTapY = touch.clientY;
+
+            clearTimeout(tapTimer);
+            tapTimer = setTimeout(() => {
+                lastTapAt = 0;
+                if (wasShown) hideOverlayNow();
+            }, DOUBLE_TAP_MS);
+        }, { passive: true });
+
+        videoBodyElement.addEventListener('click', (e) => {
+            /*
+             * Un clic précédé d'un appui a déjà été traité au doigt, ci-dessus.
+             * Le drapeau se consomme avant tout renvoi : un appui sur un bouton
+             * de la barre sort juste en dessous, et le laisserait armé pour le
+             * clic suivant — celui d'une souris, sur un appareil qui a les deux.
+             */
+            const fromTouch = tapCameFromTouch;
+            tapCameFromTouch = false;
+            if (fromTouch) return;
+
+            if (tapOnOwnControl(e.target)) return;
+
             const now = Date.now();
             const rect = videoBodyElement.getBoundingClientRect();
-            const clickX = e.clientX - rect.left;
-            const isRightHalf = clickX >= (rect.width / 2);
+            const isRightHalf = (e.clientX - rect.left) >= rect.width / 2;
 
-            if (now - lastVideoClickTime < 300) {
-                // Double Click
+            if (now - lastVideoClickTime < DOUBLE_CLICK_MS) {
                 clearTimeout(videoClickTimer);
                 videoClickTimer = null;
                 lastVideoClickTime = 0;
 
-                if (isRightHalf) {
-                    if (typeof window.MusicPlayer.seekRelative === 'function') {
-                        window.MusicPlayer.seekRelative(10000);
-                    }
-                    showVideoSeekIndicator('+10s', true);
-                } else {
-                    if (typeof window.MusicPlayer.seekRelative === 'function') {
-                        window.MusicPlayer.seekRelative(-10000);
-                    }
-                    showVideoSeekIndicator('-10s', false);
+                if (typeof window.MusicPlayer.seekRelative === 'function') {
+                    window.MusicPlayer.seekRelative(isRightHalf ? 10000 : -10000);
                 }
+                showVideoSeekIndicator(isRightHalf ? '+10s' : '-10s', isRightHalf);
             } else {
-                /*
-                 * Simple clic — mais on attend 250 ms, le temps de savoir si un
-                 * second suit. C'est ce délai qui rend le double appui possible,
-                 * et il vaut pour l'effacement comme pour la lecture : sans lui,
-                 * la barre se serait déjà retirée quand le second appui arrive
-                 * pour reculer de dix secondes.
-                 *
-                 * L'appui qui vient de révéler les commandes n'a, lui, plus rien
-                 * à faire : le `mousemove` simulé les a déjà rappelées.
-                 */
+                // À la souris, le simple clic bascule la lecture, comme toujours.
                 lastVideoClickTime = now;
                 clearTimeout(videoClickTimer);
                 videoClickTimer = setTimeout(() => {
                     lastVideoClickTime = 0;
-                    if (fromTouch) {
-                        if (wasShown) hideOverlayNow();
-                        return;
-                    }
                     if (typeof window.MusicPlayer.togglePlayPause === 'function') {
                         window.MusicPlayer.togglePlayPause();
                     }
-                }, 250);
+                }, DOUBLE_CLICK_MS);
             }
         });
     }
