@@ -887,11 +887,20 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
 
         overlayInactivityTimeout = setTimeout(() => {
             if (window.MusicPlayer.isSpeedPadDragging) return;
-            videoWindow.classList.remove('user-active');
-            videoWindow.classList.add('user-inactive');
-            document.body.classList.remove('user-active');
-            document.body.classList.add('user-inactive');
+            hideOverlayNow();
         }, delay);
+    }
+
+    /** Efface les incrustations sans attendre la minuterie, et la désarme. */
+    function hideOverlayNow() {
+        if (overlayInactivityTimeout) {
+            clearTimeout(overlayInactivityTimeout);
+            overlayInactivityTimeout = null;
+        }
+        videoWindow.classList.remove('user-active');
+        videoWindow.classList.add('user-inactive');
+        document.body.classList.remove('user-active');
+        document.body.classList.add('user-inactive');
     }
 
     /**
@@ -928,13 +937,7 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
             !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
 
         if (!isFullscreen && !window.MusicPlayer.isSpeedPadDragging) {
-            if (overlayInactivityTimeout) {
-                clearTimeout(overlayInactivityTimeout);
-            }
-            videoWindow.classList.remove('user-active');
-            videoWindow.classList.add('user-inactive');
-            document.body.classList.remove('user-active');
-            document.body.classList.add('user-inactive');
+            hideOverlayNow();
         }
     });
 
@@ -973,41 +976,49 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
         videoBodyElement.dataset.clickBound = 'true';
 
         /*
-         * Au doigt, le premier appui ne fait que rappeler les commandes
-         * effacées.
+         * Au doigt, l'appui sur l'image commande l'affichage des incrustations,
+         * et rien d'autre : caché, il révèle ; visible, il efface.
          *
-         * Elles s'effacent après quelques secondes sans mouvement de souris,
-         * pour dégager l'image — en plein écran comme dans le tiroir, depuis
-         * que css/touchDrawers.css a retiré la clause de survol qui les figeait
-         * là. Mais un doigt ne survole pas. Le seul geste qui les ramenait était
-         * l'appui sur l'image, celui-là même qui bascule la lecture : on tapait
-         * pour revoir la barre, et on mettait la musique en pause au passage.
-         * C'est le partage qu'ont retenu tous les lecteurs mobiles — l'appui
-         * révèle quand les commandes sont cachées, il agit quand elles sont là.
+         * Elles s'effacent seules après quelques secondes, pour dégager l'image.
+         * Mais un doigt ne survole pas : le seul geste qui les ramenait était
+         * l'appui, celui-là même qui bascule la lecture. On tapait pour revoir
+         * la barre et on mettait la musique en pause au passage — puis, la barre
+         * revenue, plus rien ne permettait de la renvoyer avant la fin du délai.
+         * L'appui devient donc l'interrupteur des deux sens, comme sur les
+         * lecteurs mobiles, et la lecture reste au bouton qu'elle a dans la
+         * barre. À la souris, rien ne change : un clic bascule toujours la
+         * lecture, le survol suffisant à montrer les commandes.
          *
          * L'état est relevé sur `touchstart`, et pas dans le gestionnaire de
          * clic : un navigateur mobile émet un `mousemove` simulé entre les deux,
          * lequel a déjà rappelé les commandes. Au moment du clic, la réponse à
-         * « étaient-elles cachées ? » a donc toujours changé.
+         * « étaient-elles visibles ? » a donc toujours changé.
          */
-        let touchOnlyRevealedControls = false;
+        let tapCameFromTouch = false;
+        let controlsShownAtTouch = false;
 
         videoBodyElement.addEventListener('touchstart', () => {
-            touchOnlyRevealedControls = !videoWindow.classList.contains('user-active');
+            tapCameFromTouch = true;
+            controlsShownAtTouch = videoWindow.classList.contains('user-active');
         }, { passive: true });
 
         videoBodyElement.addEventListener('click', (e) => {
+            /*
+             * Un clic sans appui qui le précède vient d'une souris. Le drapeau
+             * se consomme ici, avant tout renvoi : un appui sur un bouton de la
+             * barre sort juste en dessous, et le laisserait armé pour le clic
+             * suivant — celui d'une souris, sur un appareil qui a les deux.
+             */
+            const fromTouch = tapCameFromTouch;
+            const wasShown = controlsShownAtTouch;
+            tapCameFromTouch = false;
+
             // Ignore clicks on interactive controls (buttons, volume slider, progress bar, header drag area)
             if (e.target.closest('.video-custom-controls') ||
                 e.target.closest('.video-window-header') ||
                 e.target.closest('button') ||
                 e.target.closest('input') ||
                 e.target.closest('.speed-pad-overlay')) {
-                return;
-            }
-
-            if (touchOnlyRevealedControls) {
-                touchOnlyRevealedControls = false;
                 return;
             }
 
@@ -1034,11 +1045,24 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
                     showVideoSeekIndicator('-10s', false);
                 }
             } else {
-                // Single Click -> wait 250ms before toggling play/pause
+                /*
+                 * Simple clic — mais on attend 250 ms, le temps de savoir si un
+                 * second suit. C'est ce délai qui rend le double appui possible,
+                 * et il vaut pour l'effacement comme pour la lecture : sans lui,
+                 * la barre se serait déjà retirée quand le second appui arrive
+                 * pour reculer de dix secondes.
+                 *
+                 * L'appui qui vient de révéler les commandes n'a, lui, plus rien
+                 * à faire : le `mousemove` simulé les a déjà rappelées.
+                 */
                 lastVideoClickTime = now;
                 clearTimeout(videoClickTimer);
                 videoClickTimer = setTimeout(() => {
                     lastVideoClickTime = 0;
+                    if (fromTouch) {
+                        if (wasShown) hideOverlayNow();
+                        return;
+                    }
                     if (typeof window.MusicPlayer.togglePlayPause === 'function') {
                         window.MusicPlayer.togglePlayPause();
                     }
