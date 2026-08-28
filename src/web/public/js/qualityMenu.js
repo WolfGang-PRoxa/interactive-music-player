@@ -274,11 +274,17 @@ const ICON_EXPAND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
     + '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>'
     + '</svg>';
 
-/** Y a-t-il une fenêtre vidéo ouverte à agrandir ? */
+/**
+ * Y a-t-il une vraie vidéo à confier au système ?
+ *
+ * La réponse vit dans js/video.js, auprès de l'appel lui-même : afficher une
+ * entrée dans un cas et la refuser dans l'autre serait deux vérités à tenir en
+ * phase. Une piste audio est dessinée sur un canevas et n'a pas de vidéo — le
+ * lecteur du système n'y montrerait rien.
+ */
 function nativeFullscreenAvailable() {
-    const window_ = document.getElementById('video-floating-window');
-    return !!(window_ && !window_.classList.contains('hidden')
-        && typeof window.MusicPlayer.enterNativeVideoFullscreen === 'function');
+    return typeof window.MusicPlayer.canEnterNativeVideoFullscreen === 'function'
+        && window.MusicPlayer.canEnterNativeVideoFullscreen();
 }
 
 function buildNativeFullscreenButton() {
