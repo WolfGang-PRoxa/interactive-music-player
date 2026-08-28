@@ -171,6 +171,22 @@
      * que le journal du bot tronque à la connexion.
      */
     window.addEventListener('load', () => {
-        enqueue(`rapporteur actif — ${navigator.userAgent}`);
+        /*
+         * Le mode d'affichage part avec la trace d'ouverture.
+         *
+         * Sur iPhone, les barres du navigateur ne disparaissent que si la page a
+         * été ajoutée à l'écran d'accueil : aucune page web ne peut les retirer
+         * elle-même, WebKit n'accordant le plein écran qu'à un `<video>`. Savoir
+         * depuis le journal si un lancement vient de l'écran d'accueil ou d'un
+         * onglet évite d'avoir à le demander, et distingue « l'installation n'a
+         * pas pris » de « le plein écran ne fait pas ce qu'on croit ».
+         *
+         * Les deux sources se complètent : `navigator.standalone` est propre à
+         * iOS, la requête de média est la voie standard, honorée ailleurs.
+         */
+        const standalone = navigator.standalone === true
+            || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+        const lancement = standalone ? 'écran d\'accueil' : 'onglet de navigateur';
+        enqueue(`rapporteur actif — lancement : ${lancement} — ${navigator.userAgent}`);
     });
 })();
