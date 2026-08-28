@@ -187,6 +187,32 @@
         const standalone = navigator.standalone === true
             || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
         const lancement = standalone ? 'écran d\'accueil' : 'onglet de navigateur';
-        enqueue(`rapporteur actif — lancement : ${lancement} — ${navigator.userAgent}`);
+
+        /*
+         * Ce que l'appareil accorde en matière de plein écran.
+         *
+         * La question n'a qu'une réponse utile : un élément ordinaire peut-il
+         * passer en plein écran ? Si oui, le lecteur garde ses commandes ; si
+         * non, il ne reste que celui d'un `<video>`, où le lecteur du système
+         * prend la main. Historiquement, l'iPhone refuse le premier et l'iPad
+         * l'accorde — mais cela se vérifie par version d'iOS, et se demander à
+         * l'appareil coûte moins cher que de s'en remettre à une mémoire.
+         *
+         * `fullscreenEnabled` est la réponse qui fait autorité : la méthode peut
+         * exister et le document refuser malgré tout.
+         */
+        const root = document.documentElement;
+        const probe = document.createElement('video');
+        const capacites = [
+            root.requestFullscreen ? 'element.requestFullscreen' : null,
+            root.webkitRequestFullscreen ? 'element.webkitRequestFullscreen' : null,
+            document.fullscreenEnabled ? 'document.fullscreenEnabled' : null,
+            document.webkitFullscreenEnabled ? 'document.webkitFullscreenEnabled' : null,
+            probe.webkitEnterFullscreen ? 'video.webkitEnterFullscreen' : null,
+        ].filter(Boolean);
+
+        enqueue(`rapporteur actif — lancement : ${lancement}`
+            + ` — plein écran : ${capacites.length ? capacites.join(', ') : 'aucune API'}`
+            + ` — ${navigator.userAgent}`);
     });
 })();
