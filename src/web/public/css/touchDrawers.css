@@ -307,19 +307,26 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
 }
 
 /*
- * Les incrustations de la vidéo — titre en haut, commandes en bas — restent
- * affichées.
+ * Les incrustations de la vidéo s'effacent dans le tiroir comme en plein écran.
  *
- * Elles se révélaient au survol et s'effaçaient après deux secondes et demie
- * sans mouvement de souris. Au doigt, il n'y a ni survol ni mouvement : elles
- * ne se montraient qu'à un appui, celui-là même qui met en pause. Un tiroir
- * dédié à la vidéo peut se permettre de les garder sous les yeux. Le plein
- * écran, lui, garde son effacement, qui est là pour dégager l'image.
+ * Elles ne le faisaient pas, à cause du `:hover` que css/video.css interpose :
+ * hors plein écran, l'effacement est écrit `.user-inactive:not(:hover)`, pour
+ * qu'une souris posée sur la fenêtre les garde sous les yeux. Or un écran
+ * tactile ne relâche pas le survol. L'appui laisse l'élément en `:hover`
+ * jusqu'à ce qu'on touche ailleurs, et cette clause, faite pour une souris
+ * présente, restait vraie pour un doigt parti depuis longtemps : les commandes
+ * ne s'effaçaient plus jamais. Le plein écran, lui, a sa propre règle sans
+ * cette clause — d'où une fenêtre qui se comportait de deux façons selon
+ * qu'elle occupait l'écran ou seulement toute sa largeur.
+ *
+ * Au doigt, le survol ne veut rien dire : la minuterie d'inactivité décide
+ * seule. La spécificité — un identifiant et trois classes — passe devant
+ * toutes les règles de révélation, qui n'en portent que deux.
  */
-[data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen) .video-top-overlay,
-[data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen) .video-custom-controls {
-    opacity: 1 !important;
-    pointer-events: auto !important;
+[data-touch-mode="true"] #video-floating-window.user-inactive .video-top-overlay,
+[data-touch-mode="true"] #video-floating-window.user-inactive .video-custom-controls {
+    opacity: 0 !important;
+    pointer-events: none !important;
 }
 
 /*

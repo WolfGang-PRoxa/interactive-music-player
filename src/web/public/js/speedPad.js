@@ -9,7 +9,24 @@ window.MusicPlayer.currentSpeed = "1.00";
 let preciseState = 0;
 let lastSpeedInteractionTime = 0;
 let speedPadSwitchTimeout = null;
+/*
+ * Le glissement en cours, publié sur `window.MusicPlayer`.
+ *
+ * js/video.js le consulte pour ne pas effacer les incrustations sous le doigt
+ * qui les manipule. Il ne lisait qu'`undefined` : ce fichier tenait le drapeau
+ * en portée de module, où rien d'autre ne pouvait l'atteindre, et la garde
+ * d'en face n'a jamais rien gardé. Le pad s'évanouissait donc au milieu d'un
+ * glissement de plus de deux secondes et demie.
+ *
+ * La variable locale reste la source : `setDragging()` tient les deux en phase,
+ * de sorte qu'aucun des trois points de bascule ne puisse en oublier une.
+ */
 let isSpeedPadDragging = false;
+
+function setDragging(active) {
+    isSpeedPadDragging = active;
+    window.MusicPlayer.isSpeedPadDragging = active;
+}
 
 const classicSpeeds = ["0.25", "0.50", "0.75", "1.00", "1.25", "1.50", "1.75", "2.00", "2.50", "3.00"];
 const preciseSpeeds = [];
@@ -358,7 +375,7 @@ window.MusicPlayer.initSpeedPad = function() {
             e.preventDefault();
             e.stopPropagation();
             isDragging = true;
-            isSpeedPadDragging = true;
+            setDragging(true);
             activePointer = e.pointerId;
             startX = e.clientX;
             startTranslateX = parseFloat(track.dataset.translateX || 0);
@@ -419,7 +436,7 @@ window.MusicPlayer.initSpeedPad = function() {
         const onPointerUp = (e) => {
             if (!isDragging || e.pointerId !== activePointer) return;
             isDragging = false;
-            isSpeedPadDragging = false;
+            setDragging(false);
             activePointer = null;
 
             const clickDuration = Date.now() - clickStartTime;
@@ -477,7 +494,7 @@ window.MusicPlayer.initSpeedPad = function() {
         const onPointerCancel = (e) => {
             if (!isDragging || e.pointerId !== activePointer) return;
             isDragging = false;
-            isSpeedPadDragging = false;
+            setDragging(false);
             activePointer = null;
             window.MusicPlayer.updateSpeedPad(window.MusicPlayer.currentSpeed);
         };

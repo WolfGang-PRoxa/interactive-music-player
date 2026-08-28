@@ -625,7 +625,17 @@ window.MusicPlayer.updateVideoPlayer = async function(track) {
         return;
     }
 
+    // Ouverture du tiroir tactile : les commandes se montrent, puis s'effacent
+    // comme après n'importe quel geste. Seulement au passage de caché à
+    // affiché — `updateVideoPlayer` est rappelée à chaque état reçu, et la
+    // relancer chaque fois les figerait à l'écran.
+    const wasHidden = videoContainer.classList.contains('hidden');
     videoContainer.classList.remove('hidden');
+    if (wasHidden
+        && window.MusicPlayer.deviceMode && window.MusicPlayer.deviceMode.isTouch()
+        && typeof window.MusicPlayer.pokeVideoOverlay === 'function') {
+        window.MusicPlayer.pokeVideoOverlay();
+    }
 
     const effectiveTrack = track || state.currentTrack;
     const trackUrl = effectiveTrack ? (effectiveTrack.url || effectiveTrack.uri || effectiveTrack.link || '') : '';
@@ -884,6 +894,17 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
         }, delay);
     }
 
+    /**
+     * Montre les incrustations et relance leur minuterie, de l'extérieur.
+     *
+     * Le tiroir tactile s'ouvre sans qu'aucune souris n'ait traversé la
+     * fenêtre : ni `mousemove` ni `mouseenter`, donc aucune des deux classes
+     * d'activité, et des commandes invisibles jusqu'au premier appui. On les
+     * annonce donc à l'ouverture, comme le ferait le curseur au bureau, et
+     * elles s'effacent ensuite d'elles-mêmes.
+     */
+    window.MusicPlayer.pokeVideoOverlay = resetOverlayActivity;
+
     document.addEventListener('mousemove', (e) => {
         const isFullscreen = document.body.classList.contains('video-fullscreen-active') ||
             videoWindow.classList.contains('is-fullscreen') ||
@@ -952,33 +973,27 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
         videoBodyElement.dataset.clickBound = 'true';
 
         /*
-         * Au doigt et en plein écran, le premier appui ne fait que rappeler les
-         * commandes effacées.
+         * Au doigt, le premier appui ne fait que rappeler les commandes
+         * effacées.
          *
-         * Elles s'effacent au bout d'une seconde et demie sans mouvement de
-         * souris, ce qui est le propos du plein écran : dégager l'image. Mais un
-         * doigt ne survole pas. Le seul geste qui les ramenait était l'appui sur
-         * l'image — et cet appui-là bascule la lecture. On tapait donc pour
-         * revoir la barre, et on mettait la musique en pause au passage. C'est
-         * le partage qu'ont retenu tous les lecteurs mobiles : l'appui révèle
-         * quand les commandes sont cachées, il agit quand elles sont là.
+         * Elles s'effacent après quelques secondes sans mouvement de souris,
+         * pour dégager l'image — en plein écran comme dans le tiroir, depuis
+         * que css/touchDrawers.css a retiré la clause de survol qui les figeait
+         * là. Mais un doigt ne survole pas. Le seul geste qui les ramenait était
+         * l'appui sur l'image, celui-là même qui bascule la lecture : on tapait
+         * pour revoir la barre, et on mettait la musique en pause au passage.
+         * C'est le partage qu'ont retenu tous les lecteurs mobiles — l'appui
+         * révèle quand les commandes sont cachées, il agit quand elles sont là.
          *
          * L'état est relevé sur `touchstart`, et pas dans le gestionnaire de
          * clic : un navigateur mobile émet un `mousemove` simulé entre les deux,
          * lequel a déjà rappelé les commandes. Au moment du clic, la réponse à
          * « étaient-elles cachées ? » a donc toujours changé.
-         *
-         * Hors plein écran, la question ne se pose pas : css/touchDrawers.css y
-         * laisse les commandes affichées en permanence, le tiroir leur faisant
-         * une place qui n'est prise à personne.
          */
         let touchOnlyRevealedControls = false;
 
         videoBodyElement.addEventListener('touchstart', () => {
-            const isFullscreen = document.body.classList.contains('video-fullscreen-active') ||
-                videoWindow.classList.contains('is-fullscreen') ||
-                !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
-            touchOnlyRevealedControls = isFullscreen && !videoWindow.classList.contains('user-active');
+            touchOnlyRevealedControls = !videoWindow.classList.contains('user-active');
         }, { passive: true });
 
         videoBodyElement.addEventListener('click', (e) => {
