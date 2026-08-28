@@ -1004,11 +1004,17 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
             clearTimeout(overlayInactivityTimeout);
         }
 
-        const isFullscreen = document.body.classList.contains('video-fullscreen-active') ||
-            videoWindow.classList.contains('is-fullscreen') ||
-            !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
-
-        const delay = isFullscreen ? 1500 : 2500;
+        /*
+         * Trois secondes, en fenêtre comme en plein écran.
+         *
+         * Les deux durées différaient — une seconde et demie en plein écran,
+         * deux et demie ailleurs — dans l'idée que le plein écran a plus à
+         * gagner à dégager l'image. À l'usage c'est l'inverse qui se produit :
+         * c'est là qu'on lit une barre de progression et qu'on vise un bouton,
+         * et elle s'effaçait avant qu'on ait fini. Un seul délai, plus long, et
+         * la fenêtre ne se comporte plus de deux façons selon sa taille.
+         */
+        const delay = 3000;
 
         /*
          * Retenue : on repousse d'un délai entier, on n'abandonne pas.
