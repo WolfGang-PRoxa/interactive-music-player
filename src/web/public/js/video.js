@@ -249,14 +249,8 @@ window.MusicPlayer.syncVideoSpeed = function(speedStr) {
 function qualityWheelTrack() {
     const state = window.MusicPlayer.state || {};
     const track = state.currentTrack;
-    /*
-     * Un fichier local n'est jamais transcodé : sa qualité ne se règle pas, et
-     * le menu n'aurait rien à en dire. Il s'ouvre malgré tout quand ce fichier
-     * joue une vraie vidéo, seul cas où il porte alors le plein écran du
-     * système. Même condition qu'à l'affichage de la roue, juste au-dessus.
-     */
-    if (!track || !track.url) return null;
-    if (track.isLocal && !window.MusicPlayer.canEnterNativeVideoFullscreen()) return null;
+    // Un fichier local n'est jamais transcodé : sa qualité ne se règle pas.
+    if (!track || !track.url || track.isLocal) return null;
     return track;
 }
 
@@ -281,14 +275,7 @@ function updateQualityWheel(track) {
     const buttons = qualityWheels();
     if (buttons.length === 0) return;
 
-    /*
-     * La roue reste masquée sur un fichier importé, dont la qualité ne se règle
-     * pas — sauf s'il joue une vraie vidéo, cas où le menu porte le plein écran
-     * du système et redevient utile. Un `.mp4` déposé dans la bibliothèque entre
-     * dans cette exception ; un `.wav`, non.
-     */
-    const usable = !!(track && track.url
-        && (!track.isLocal || window.MusicPlayer.canEnterNativeVideoFullscreen()));
+    const usable = !!(track && track.url && !track.isLocal);
     buttons.forEach(b => b.classList.toggle('hidden', !usable));
 
     // Une roue qui s'efface emporte le menu qu'elle avait ouvert — il pointerait
@@ -918,92 +905,6 @@ window.MusicPlayer.updateVideoPlayer = async function(track) {
         window.MusicPlayer.syncVideoProgress(state.progress.currentMs);
     }
     window.MusicPlayer.syncVideoPlayState(state.isPlaying, state.isPaused);
-};
-
-/*
- * ═══════════════════════════════════════════════════════════════
- * Le plein écran que le système accorde vraiment
- * ═══════════════════════════════════════════════════════════════
- *
- * Le bouton plein écran de la barre agrandit la fenêtre du lecteur à la page.
- * C'est tout ce qu'il peut : sur iPhone, les barres du navigateur restent, et
- * aucune page web ne peut les retirer. L'appareil l'a dit lui-même — interrogé
- * depuis js/clientErrors.js sous iOS 26.5.2, il n'annonce qu'une seule capacité,
- * `video.webkitEnterFullscreen`. Ni `element.requestFullscreen`, ni
- * `document.fullscreenEnabled` : un `<div>` n'y a pas droit.
- *
- * ## Aux vraies vidéos, et à elles seules
- *
- * Ce plein écran-là remet la lecture au lecteur du système, avec ses commandes :
- * lecture, volume, image dans l'image, fermer. Ni précédent, ni suivant, ni
- * vitesse, ni notre barre de progression — et rien ne peut les y ajouter.
- *
- * Sur une vidéo, c'est exactement ce qu'on attend en touchant « plein écran »
- * sur un téléphone, et l'image s'affiche puisque c'est le système qui la décode.
- *
- * Sur une piste audio, non. Le visualiseur dessine sur un canevas ; le diffuser
- * dans un `<video>` par `captureStream()` fonctionnait — le système acceptait —
- * mais donnait un écran noir : la boucle de dessin repose sur
- * `requestAnimationFrame`, que le navigateur suspend dès que la page n'est plus
- * à l'écran, et le flux capturé ne transportait donc plus rien. Une autre
- * minuterie l'aurait ranimé, sans rien changer aux commandes manquantes. Essayé,
- * mesuré, retiré : l'entrée ne s'affiche plus quand il n'y a pas de vidéo.
- */
-
-/** Signale l'échec à l'écran et dans le journal du bot, jamais en silence. */
-function reportFullscreenFailure(message, detail) {
-    if (typeof window.MusicPlayer.showToast === 'function') {
-        window.MusicPlayer.showToast(message);
-    }
-    if (typeof window.MusicPlayer.sendWS === 'function') {
-        window.MusicPlayer.sendWS({
-            type: 'clientLog',
-            data: { source: 'Video', message: `plein écran système refusé — ${detail}` }
-        });
-    }
-}
-
-/**
- * Une vraie vidéo est-elle à l'écran, prête à être confiée au système ?
- *
- * `readyState` compte autant que le reste : demander le plein écran d'un
- * élément sans métadonnées lève « The object is in an invalid state », ce que le
- * journal a rapporté avant que cette condition n'existe.
- *
- * @returns {boolean}
- */
-window.MusicPlayer.canEnterNativeVideoFullscreen = function() {
-    const container = document.getElementById('video-floating-window');
-    const video = document.getElementById('video-element');
-    return !!(container && !container.classList.contains('hidden')
-        && video && typeof video.webkitEnterFullscreen === 'function'
-        && !video.classList.contains('hidden')
-        && video.readyState >= 1);
-};
-
-/**
- * Demande au système son plein écran, celui qui n'a pas de barres.
- *
- * À appeler depuis un geste de l'utilisateur : iOS refuse la demande autrement.
- *
- * @returns {boolean} false si rien n'a pu être tenté
- */
-window.MusicPlayer.enterNativeVideoFullscreen = function() {
-    const t = window.MusicPlayer.t || ((x) => x);
-    const refus = t('toast_native_fullscreen_failed');
-
-    if (!window.MusicPlayer.canEnterNativeVideoFullscreen()) {
-        reportFullscreenFailure(refus, 'aucune vidéo prête à passer en plein écran');
-        return false;
-    }
-
-    try {
-        document.getElementById('video-element').webkitEnterFullscreen();
-        return true;
-    } catch (err) {
-        reportFullscreenFailure(refus, `sur la vidéo : ${err && err.message}`);
-        return false;
-    }
 };
 
 window.MusicPlayer.applyDefaultVideoWindowGeometry = function() {
