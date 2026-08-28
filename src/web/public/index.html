@@ -1525,6 +1525,29 @@
                 <span data-i18n="video_no_source">Aucune vidéo disponible pour ce morceau</span>
             </div>
 
+            <!--
+                Transport au centre de l'image : précédent, lecture/pause,
+                suivant. Les mêmes commandes que la barre du bas, en grand et
+                sous le pouce, révélées et effacées en même temps qu'elle.
+                Chaque bouton délègue à son jumeau de la barre, qui délègue
+                lui-même à la carte « En cours de lecture » — une seule source
+                pour chaque commande. Voir css/video.css.
+            -->
+            <div class="video-center-controls" id="video-center-controls">
+                <button id="video-center-btn-prev" class="video-center-btn" data-tooltip="Musique précédente" data-i18n-tooltip="tooltip_previous">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="5" x2="5" y2="19" stroke="currentColor" stroke-width="3" stroke-linecap="round"></line></svg>
+                </button>
+
+                <button id="video-center-btn-play-pause" class="video-center-btn video-center-btn-main" data-tooltip="Lecture / Pause" data-i18n-tooltip="tooltip_play_pause">
+                    <svg id="video-center-svg-play" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    <svg id="video-center-svg-pause" class="hidden" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"></rect><rect x="14" y="4" width="4" height="16" rx="1"></rect></svg>
+                </button>
+
+                <button id="video-center-btn-next" class="video-center-btn" data-tooltip="Passer au morceau suivant" data-i18n-tooltip="tooltip_video_next">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="3" stroke-linecap="round"></line></svg>
+                </button>
+            </div>
+
             <!-- Custom Video Player Controls Overlay -->
             <div class="video-custom-controls" id="video-custom-controls">
                 <!-- Timeline Progress Bar with Extremity Time Badges -->

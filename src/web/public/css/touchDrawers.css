@@ -329,6 +329,13 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
     pointer-events: none !important;
 }
 
+/* Le transport du centre suit, avec le `visibility` qui lui tient lieu de
+   `pointer-events` — voir le bloc qui le décrit dans css/video.css. */
+[data-touch-mode="true"] #video-floating-window.user-inactive .video-center-controls {
+    opacity: 0 !important;
+    visibility: hidden !important;
+}
+
 /*
  * La barre de commandes tient dans la largeur.
  *

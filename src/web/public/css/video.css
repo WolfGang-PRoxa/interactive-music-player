@@ -191,6 +191,15 @@ html[data-theme="light"] .video-header-opacity {
 .video-window-body {
     position: relative;
     width: 100%;
+    /*
+     * Le double appui recule ou avance de dix secondes. Sans cette déclaration,
+     * un navigateur mobile y voit d'abord son propre geste — le double tap qui
+     * zoome — et retient les clics le temps d'en décider : le second appui
+     * arrive trop tard pour la fenêtre de 300 ms, quand il n'est pas mangé.
+     * `manipulation` lui retire le zoom par double tap sur cette zone, et lui
+     * laisse le défilement et le pincement.
+     */
+    touch-action: manipulation;
     height: calc(100% - 40px);
     background: rgba(0, 0, 0, calc(0.85 * var(--video-bg-opacity, 1)));
     display: flex;
@@ -455,6 +464,142 @@ body.video-fullscreen-active #video-floating-window .video-custom-controls {
 
 #video-floating-window.user-inactive.is-fullscreen {
     cursor: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Transport au centre de l'image
+   ═══════════════════════════════════════════════════════════════
+
+   Précédent, lecture/pause et suivant, en double de la barre du bas. Au doigt,
+   viser une cible de 28 px au ras du bord bas demande de l'application ; au
+   centre, en grand, la même commande se prend sans regarder. La barre garde
+   tout le reste — volume, vitesse, mode de lecture, plein écran —, qui ne
+   gagnerait rien à doubler.
+
+   La couche n'occupe que ses trois boutons, et non toute l'image : c'est ce qui
+   laisse l'appui sur le reste du cadre commander l'affichage des incrustations,
+   et le double appui reculer ou avancer de dix secondes.
+   ═══════════════════════════════════════════════════════════════ */
+
+.video-center-controls {
+    position: absolute;
+    /*
+     * Centré sur ce que la barre laisse, et non sur le cadre entier.
+     *
+     * La barre du bas est haute : 139 px dans la fenêtre de 440 px par défaut,
+     * où ses onze commandes se replient sur trois rangées. Il ne restait que
+     * 91 px au-dessus d'elle, et un cluster centré à mi-hauteur du corps —
+     * 115 px — se retrouvait dessous, invisible et hors d'atteinte. Sa hauteur
+     * n'est pas devinable en CSS puisqu'elle dépend du repli ; js/video.js la
+     * mesure et la dépose ici, comme il le fait déjà pour le ruban de la doc.
+     */
+    top: calc((100% - var(--video-controls-height, 0px)) / 2);
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    /* Au-dessus de l'image et de son voile d'iframe, sous la barre et le titre,
+       qu'elle ne croise de toute façon jamais. */
+    z-index: 22;
+    gap: clamp(14px, 6cqmin, 32px);
+
+    /*
+     * `visibility` plutôt qu'un jeu sur `pointer-events`.
+     *
+     * Une opacité nulle laisse l'élément cliquable : les trois boutons, posés
+     * au milieu du cadre, auraient happé l'appui qui sert à rappeler les
+     * commandes — on aurait changé de piste en croyant révéler la barre.
+     * `visibility` retire la couche du test de survol et se transmet aux
+     * enfants, là où `pointer-events` aurait demandé une règle par état et par
+     * bouton. Le délai de transition la retient le temps du fondu, sans quoi la
+     * couche disparaîtrait d'un coup au lieu de s'effacer.
+     */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s ease, visibility 0s linear 0.25s;
+}
+
+/* Révélées avec la barre, et par les mêmes conditions qu'elle. */
+#video-floating-window.user-active .video-center-controls,
+.video-window-body:hover .video-center-controls,
+#video-floating-window:hover .video-center-controls,
+.video-center-controls.active {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
+}
+
+/* Effacées avec elle, par les mêmes conditions encore. */
+#video-floating-window.user-inactive:not(:hover) .video-center-controls,
+#video-floating-window.user-inactive.is-fullscreen .video-center-controls {
+    opacity: 0 !important;
+    visibility: hidden !important;
+}
+
+/*
+ * Et retirées quand la barre ne laisse plus la place : au plus petit format
+ * autorisé, 300 × 200, elle occupe 139 px des 142 du corps. Trois pixels ne
+ * reçoivent pas un cluster ; il vaut mieux ne rien montrer qu'un rang de
+ * boutons écrasé contre le bord. La classe est posée par js/video.js, seul à
+ * connaître la hauteur réelle de la barre.
+ */
+#video-floating-window.center-controls-cramped .video-center-controls {
+    opacity: 0 !important;
+    visibility: hidden !important;
+}
+
+.video-center-btn {
+    /* Le cercle suit la taille du cadre, entre deux bornes : assez grand pour
+       le pouce sur un téléphone, jamais au point de manger l'image dans une
+       petite fenêtre flottante. */
+    width: clamp(38px, 13cqmin, 52px);
+    height: clamp(38px, 13cqmin, 52px);
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s ease, transform 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.video-center-btn svg {
+    width: 42%;
+    height: 42%;
+}
+
+.video-center-btn-main {
+    width: clamp(52px, 18cqmin, 72px);
+    height: clamp(52px, 18cqmin, 72px);
+    background: rgba(0, 0, 0, 0.55);
+    border-color: rgba(255, 255, 255, 0.22);
+}
+
+.video-center-btn:hover {
+    background: rgba(0, 0, 0, 0.7);
+    border-color: var(--c-accent);
+    transform: scale(1.06);
+}
+
+.video-center-btn:active {
+    transform: scale(0.94);
+}
+
+.video-center-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.video-center-btn:disabled:hover {
+    background: rgba(0, 0, 0, 0.45);
+    border-color: rgba(255, 255, 255, 0.16);
+    transform: none;
 }
 
 .video-timeline-container {

@@ -405,6 +405,33 @@ window.MusicPlayer.syncVideoOverlayButtons = function(passedState) {
             videoSvgPause.classList.add('hidden');
         }
     }
+
+    /*
+     * Le transport du centre est le reflet de celui de la barre : il en reprend
+     * l'état désactivé, l'infobulle et l'icône, plutôt que de refaire le calcul.
+     * Les trois boutons de la barre viennent eux-mêmes d'être alignés sur ceux
+     * de la carte « En cours de lecture », si bien qu'une seule chaîne mène de
+     * l'état du lecteur à ce qui s'affiche, où qu'on regarde.
+     */
+    const centerTwins = [
+        ['video-center-btn-prev', videoBtnPrev],
+        ['video-center-btn-next', videoBtnNext],
+        ['video-center-btn-play-pause', videoBtnPlayPause],
+    ];
+    for (const [centerId, twin] of centerTwins) {
+        const button = document.getElementById(centerId);
+        if (!button || !twin) continue;
+        button.disabled = twin.disabled;
+        if (twin.dataset.tooltip) button.dataset.tooltip = twin.dataset.tooltip;
+    }
+
+    const centerSvgPlay = document.getElementById('video-center-svg-play');
+    const centerSvgPause = document.getElementById('video-center-svg-pause');
+    if (centerSvgPlay && centerSvgPause) {
+        const playing = state.isPlaying && !state.isPaused;
+        centerSvgPlay.classList.toggle('hidden', !!playing);
+        centerSvgPause.classList.toggle('hidden', !playing);
+    }
 };
 
 /**
@@ -972,6 +999,47 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
     }
 
     const videoBodyElement = document.querySelector('#video-floating-window .video-window-body') || videoWindow;
+
+    /*
+     * Hauteur de la barre du bas, relevée pour le transport du centre.
+     *
+     * Il se centre sur ce que la barre laisse, pas sur le cadre entier — voir
+     * `.video-center-controls` dans css/video.css. Cette hauteur dépend du
+     * repli des onze commandes sur une, deux ou trois rangées, donc de la
+     * largeur : aucune valeur écrite d'avance ne conviendrait, et le CSS ne
+     * sait pas mesurer un frère. On la mesure ici, et on retire le cluster
+     * quand la place restante ne suffit plus à le poser.
+     *
+     * Aucune boucle à craindre : la propriété déplace le cluster, la classe
+     * joue sur son opacité, et ni l'une ni l'autre ne change la taille des deux
+     * éléments observés.
+     */
+    (function trackControlsHeight() {
+        const centerControls = document.getElementById('video-center-controls');
+        const customControls = document.getElementById('video-custom-controls');
+        if (!centerControls || !customControls || !videoBodyElement) return;
+
+        const fit = () => {
+            const bodyTop = videoBodyElement.getBoundingClientRect().top;
+            const bar = customControls.getBoundingClientRect();
+            videoWindow.style.setProperty('--video-controls-height', `${Math.round(bar.height)}px`);
+            const free = bar.top - bodyTop;
+            videoWindow.classList.toggle(
+                'center-controls-cramped',
+                free < centerControls.offsetHeight + 16
+            );
+        };
+
+        if (typeof ResizeObserver === 'function') {
+            const observer = new ResizeObserver(fit);
+            observer.observe(videoBodyElement);
+            observer.observe(customControls);
+        } else {
+            window.addEventListener('resize', fit);
+        }
+        fit();
+    })();
+
     if (videoBodyElement && !videoBodyElement.dataset.clickBound) {
         videoBodyElement.dataset.clickBound = 'true';
 
@@ -1163,6 +1231,27 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
             if (btnSkip && !btnSkip.disabled) {
                 btnSkip.click();
             }
+        });
+    }
+
+    /*
+     * Le transport du centre délègue à son jumeau de la barre, qui délègue à
+     * son tour à la carte « En cours de lecture ». Rien n'est réémis ici : la
+     * commande garde une seule source, et un bouton désactivé ne fait rien —
+     * `click()` sur un bouton inerte ne déclenche pas son écouteur.
+     */
+    for (const [centerId, twinId] of [
+        ['video-center-btn-prev', 'video-btn-prev'],
+        ['video-center-btn-play-pause', 'video-btn-play-pause'],
+        ['video-center-btn-next', 'video-btn-next'],
+    ]) {
+        const button = document.getElementById(centerId);
+        if (!button) continue;
+        button.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const twin = document.getElementById(twinId);
+            if (twin && !twin.disabled) twin.click();
         });
     }
 
