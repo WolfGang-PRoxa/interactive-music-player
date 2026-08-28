@@ -867,8 +867,18 @@ body.video-fullscreen-active #video-floating-window .video-custom-controls {
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
-    width: 90px;
-    height: 90px;
+    /*
+     * La taille suit le cadre.
+     *
+     * Le transport du centre occupe 218 px sur une image de 390 — celle d'un
+     * téléphone debout — et ne laisse que 86 px de chaque côté. Une pastille
+     * de 90 px fixes ne pouvait pas s'y loger : elle recouvrait « précédent »
+     * et « suivant », quel que soit le bord vers lequel on la poussait. Elle se
+     * mesure donc sur le conteneur, comme les boutons qu'elle doit éviter, et
+     * garde ses 90 px là où la place existe.
+     */
+    width: clamp(56px, 18cqmin, 90px);
+    height: clamp(56px, 18cqmin, 90px);
     /* Même raison qu'au transport du centre, un cran plus loin : cette pastille
        ne vit que six dixièmes de seconde, opacité animée de bout en bout. Le
        flou n'avait jamais le temps de se poser — il ne pouvait que sauter, ou
@@ -886,11 +896,17 @@ body.video-fullscreen-active #video-floating-window .video-custom-controls {
     animation: seekRippleAnim 0.6s ease-out forwards;
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
 }
+/*
+ * Contre le bord, et non à 15 % de lui : c'est le seul endroit que le
+ * transport ne réclame pas. Le repère marque la moitié de l'image qu'on a
+ * touchée — il n'a aucune raison de revenir vers le centre, où il se posait
+ * sur les boutons.
+ */
 .video-seek-ripple.left {
-    left: 15%;
+    left: 6px;
 }
 .video-seek-ripple.right {
-    right: 15%;
+    right: 6px;
 }
 @keyframes seekRippleAnim {
     0% { opacity: 0; transform: translateY(-50%) scale(0.4); }
