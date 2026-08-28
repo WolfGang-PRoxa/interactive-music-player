@@ -196,8 +196,18 @@ window.MusicPlayer.syncVideoSpeed = function(speedStr) {
 function qualityWheelTrack() {
     const state = window.MusicPlayer.state || {};
     const track = state.currentTrack;
-    // Un fichier local n'est jamais transcodé : sa qualité ne se règle pas.
-    if (!track || !track.url || track.isLocal) return null;
+    /*
+     * Un fichier local passe désormais, comme pour l'affichage de la roue.
+     *
+     * Sa qualité ne se règle toujours pas — il n'est jamais transcodé — et le
+     * menu le dit lui-même, par sa note puis en s'arrêtant avant les réglages.
+     * Mais il y porte deux entrées qui ne dépendent pas de la piste : copier son
+     * chemin, et le plein écran du système. Refuser d'ouvrir ici les rendait
+     * inatteignables sur une piste importée, alors que c'est justement là que la
+     * seconde compte — une piste audio se dessine sur le visualiseur, et c'est
+     * le seul plein écran qui retire les barres du navigateur.
+     */
+    if (!track || !track.url) return null;
     return track;
 }
 
@@ -222,7 +232,22 @@ function updateQualityWheel(track) {
     const buttons = qualityWheels();
     if (buttons.length === 0) return;
 
-    const usable = !!(track && track.url && !track.isLocal);
+    /*
+     * La roue s'affiche dès qu'il y a une piste, fichier importé compris.
+     *
+     * Elle disparaissait sur un fichier local, et c'était juste tant que ce menu
+     * ne parlait que de qualité : celle d'un fichier importé ne se négocie pas.
+     * Il porte depuis « copier le chemin » — dont c'est même le seul bouton dans
+     * ce cas — et le plein écran du système, deux entrées qui valent pour toute
+     * piste. Une roue masquée les rendait inatteignables précisément là où la
+     * seconde compte le plus : une piste audio se dessine sur le visualiseur, et
+     * c'est le seul plein écran qui retire les barres du navigateur.
+     *
+     * Le menu, lui, savait déjà se taire sur ce qui ne s'applique pas : il pose
+     * sa note « sans effet sur les fichiers locaux » et s'arrête avant les
+     * réglages de qualité.
+     */
+    const usable = !!(track && track.url);
     buttons.forEach(b => b.classList.toggle('hidden', !usable));
 
     // Une roue qui s'efface emporte le menu qu'elle avait ouvert — il pointerait
@@ -855,6 +880,128 @@ window.MusicPlayer.updateVideoPlayer = async function(track) {
         window.MusicPlayer.syncVideoProgress(state.progress.currentMs);
     }
     window.MusicPlayer.syncVideoPlayState(state.isPlaying, state.isPaused);
+};
+
+/*
+ * ═══════════════════════════════════════════════════════════════
+ * Le plein écran que le système accorde vraiment
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * Le bouton plein écran de la barre agrandit la fenêtre du lecteur à la page.
+ * C'est tout ce qu'il peut : sur iPhone, les barres du navigateur restent, et
+ * aucune page web ne peut les retirer. L'appareil l'a dit lui-même — interrogé
+ * depuis js/clientErrors.js sous iOS 26.5.2, il n'annonce qu'une seule capacité,
+ * `video.webkitEnterFullscreen`. Ni `element.requestFullscreen`, ni
+ * `document.fullscreenEnabled` : un `<div>` n'y a pas droit.
+ *
+ * Reste donc ce plein écran-là, et il coûte quelque chose : le lecteur du
+ * système prend la main, avec ses commandes à lui. Plus de pad de vitesse, plus
+ * de sélecteur de mode. C'est pourquoi il est proposé à part, dans le menu de la
+ * roue, plutôt que substitué au bouton existant : les deux répondent à des
+ * besoins différents et l'utilisateur choisit.
+ *
+ * Deux cas, selon ce qui est à l'écran :
+ *
+ *   • une vraie vidéo joue — on la passe en plein écran, sans détour ;
+ *   • le visualiseur dessine sur un canevas, ce qui est le cas de toute piste
+ *     audio. Il n'y a alors pas de vidéo à agrandir, et c'est justement le cas
+ *     le plus fréquent. On diffuse donc le canevas dans un `<video>` dédié, par
+ *     `captureStream()`, et c'est lui qui part en plein écran.
+ *
+ * Le second chemin est une tentative, et le code la traite comme telle : tout
+ * échec est signalé à l'écran et consigné dans le journal du bot, plutôt que de
+ * laisser un bouton qui ne fait rien.
+ */
+
+/** Le `<video>` qui sert de support au canevas. Créé au premier besoin. */
+let fullscreenSurface = null;
+
+function ensureFullscreenSurface() {
+    if (fullscreenSurface) return fullscreenSurface;
+
+    const surface = document.createElement('video');
+    surface.id = 'video-fullscreen-surface';
+    // `playsinline` évite que l'élément ouvre de lui-même le lecteur du système
+    // dès la lecture : on veut décider du moment. Muet, car le son sort déjà de
+    // l'élément audio de la diffusion personnelle.
+    surface.setAttribute('playsinline', '');
+    surface.setAttribute('muted', '');
+    surface.muted = true;
+    surface.style.cssText = 'position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;';
+    document.body.appendChild(surface);
+
+    fullscreenSurface = surface;
+    return surface;
+}
+
+/** Signale l'échec à l'écran et dans le journal du bot, jamais en silence. */
+function reportFullscreenFailure(message, detail) {
+    if (typeof window.MusicPlayer.showToast === 'function') {
+        window.MusicPlayer.showToast(message);
+    }
+    if (typeof window.MusicPlayer.sendWS === 'function') {
+        window.MusicPlayer.sendWS({
+            type: 'clientLog',
+            data: { source: 'Video', message: `plein écran système refusé — ${detail}` }
+        });
+    }
+}
+
+/**
+ * Demande au système son plein écran, celui qui n'a pas de barres.
+ *
+ * À appeler depuis un geste de l'utilisateur : iOS refuse la demande autrement,
+ * et c'est aussi pour cela que le canevas part en plein écran sans attendre que
+ * sa diffusion soit prête — patienter romprait la chaîne du geste.
+ *
+ * @returns {boolean} false si rien n'a pu être tenté
+ */
+window.MusicPlayer.enterNativeVideoFullscreen = function() {
+    const video = document.getElementById('video-element');
+    const canvas = document.getElementById('video-canvas');
+    const t = window.MusicPlayer.t || ((x) => x);
+    const refus = t('toast_native_fullscreen_failed');
+
+    // 1. Une vraie vidéo est à l'écran : c'est elle qu'on agrandit.
+    if (video
+        && typeof video.webkitEnterFullscreen === 'function'
+        && !video.classList.contains('hidden')
+        && video.readyState >= 1) {
+        try {
+            video.webkitEnterFullscreen();
+            return true;
+        } catch (err) {
+            reportFullscreenFailure(refus, `sur la vidéo : ${err && err.message}`);
+            return false;
+        }
+    }
+
+    // 2. Le visualiseur : on lui donne un support vidéo.
+    if (!canvas || canvas.classList.contains('hidden')) {
+        reportFullscreenFailure(refus, 'ni vidéo ni visualiseur à l\'écran');
+        return false;
+    }
+    if (typeof canvas.captureStream !== 'function') {
+        reportFullscreenFailure(refus, 'captureStream absent de ce navigateur');
+        return false;
+    }
+
+    const surface = ensureFullscreenSurface();
+    if (typeof surface.webkitEnterFullscreen !== 'function') {
+        reportFullscreenFailure(refus, 'webkitEnterFullscreen absent de ce navigateur');
+        return false;
+    }
+
+    try {
+        if (!surface.srcObject) surface.srcObject = canvas.captureStream(30);
+        const started = surface.play();
+        if (started && typeof started.catch === 'function') started.catch(() => {});
+        surface.webkitEnterFullscreen();
+        return true;
+    } catch (err) {
+        reportFullscreenFailure(refus, `sur le visualiseur : ${err && err.message}`);
+        return false;
+    }
 };
 
 window.MusicPlayer.applyDefaultVideoWindowGeometry = function() {

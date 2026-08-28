@@ -258,6 +258,60 @@ function sourceIsLink(track) {
  * @param {object} track
  * @returns {HTMLElement}
  */
+/*
+ * ── Le plein écran du système ──────────────────────────────────
+ *
+ * Le bouton de la barre agrandit la fenêtre du lecteur à la page ; sur iPhone,
+ * les barres du navigateur restent, et rien dans une page web ne peut les
+ * retirer. Le seul plein écran qu'iOS accorde est celui d'un `<video>`, où son
+ * propre lecteur prend la main — nos commandes disparaissent le temps de la
+ * séance. Les deux ne se remplacent donc pas : celui-ci vit ici, à côté, et
+ * s'annonce pour ce qu'il coûte.
+ */
+
+const ICON_EXPAND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+    + 'stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>'
+    + '</svg>';
+
+/** Y a-t-il une fenêtre vidéo ouverte à agrandir ? */
+function nativeFullscreenAvailable() {
+    const window_ = document.getElementById('video-floating-window');
+    return !!(window_ && !window_.classList.contains('hidden')
+        && typeof window.MusicPlayer.enterNativeVideoFullscreen === 'function');
+}
+
+function buildNativeFullscreenButton() {
+    const btn = document.createElement('button');
+    btn.className = 'quality-menu-item quality-menu-source';
+
+    const icon = document.createElement('span');
+    icon.className = 'quality-menu-icon';
+    icon.innerHTML = ICON_EXPAND;
+
+    const label = document.createElement('span');
+    label.className = 'quality-menu-label';
+    label.textContent = t('quality_menu_native_fullscreen', 'Vrai plein écran');
+
+    // Ce que l'entrée coûte, dit avant le clic et non après.
+    btn.dataset.tooltip = t(
+        'quality_menu_native_fullscreen_hint',
+        'Plein écran du système, sans les barres du navigateur. Les commandes du lecteur laissent la place à celles du système.'
+    );
+
+    btn.appendChild(icon);
+    btn.appendChild(label);
+
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Depuis le geste lui-même : iOS refuse la demande autrement.
+        window.MusicPlayer.enterNativeVideoFullscreen();
+        window.MusicPlayer.hideTrackQualityMenu();
+    });
+
+    return btn;
+}
+
 function buildSourceButton(track) {
     const isLink = sourceIsLink(track);
 
@@ -487,6 +541,17 @@ function renderMenu(force) {
     // règle pas. Elle vaut aussi pour un fichier local, dont c'est même le seul
     // bouton — sa qualité, elle, n'est pas négociable.
     menuEl.appendChild(buildSourceButton(track));
+
+    /*
+     * Avant la sortie réservée aux fichiers locaux, et non après : un `.wav`
+     * importé se joue par le visualiseur, et c'est précisément le cas où ce
+     * plein écran-ci est le seul à savoir retirer les barres du navigateur.
+     * L'entrée n'apparaît que si le lecteur vidéo est ouvert — elle agrandit sa
+     * fenêtre, elle n'a pas de sens quand il n'y en a pas.
+     */
+    if (nativeFullscreenAvailable()) {
+        menuEl.appendChild(buildNativeFullscreenButton());
+    }
 
     if (track.isLocal) return;
 
