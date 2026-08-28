@@ -27,6 +27,31 @@
     <meta name="theme-color" id="app-theme-color" content="#0a090f">
     <title>Music Dashboard</title>
     <link rel="icon" id="app-favicon" type="image/svg+xml" href="favicons/favicon-glassmorphism.svg">
+    <!--
+        Ajouté à l'écran d'accueil, le tableau de bord s'ouvre sans aucune barre
+        de navigateur. C'est le seul moyen d'y parvenir sur iPhone : WebKit
+        n'accorde le plein écran qu'à un `<video>`, jamais à un `<div>`, et le
+        plein écran du lecteur s'y rabat donc sur du CSS, qui remplit la page
+        sans pouvoir sortir de son cadre.
+
+        `use-credentials` n'est pas décoratif : un manifeste se récupère sans
+        cookies par défaut, et celui-ci est derrière l'authentification comme
+        tout le reste. Sans cet attribut, la requête part anonyme, reçoit un 401,
+        et le raccourci n'est jamais proposé.
+
+        `black-translucent` laisse la page passer sous la barre d'état — la
+        marge de sécurité est déjà prise par `env(safe-area-inset-*)`, voir
+        css/layout.css et css/touchDrawers.css.
+
+        Le raccourci se crée depuis Safari : Firefox sur iOS ne sait pas en
+        poser.
+    -->
+    <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Music">
+    <link rel="apple-touch-icon" href="favicons/app-icon-180.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">

@@ -303,6 +303,48 @@ class WebServer {
         const createAuthRouter = require('./routes/auth');
         this.app.use('/auth', createAuthRouter(this));
 
+        /*
+         * Manifeste d'application web, servi et non déposé en fichier.
+         *
+         * Sur iPhone, aucune page ne peut faire disparaître les barres du
+         * navigateur : WebKit n'accorde le plein écran qu'à un `<video>`, jamais
+         * à un `<div>`, si bien que le plein écran du lecteur se rabat sur du
+         * CSS et reste encadré. Le seul moyen d'obtenir l'écran entier est
+         * d'ajouter le tableau de bord à l'écran d'accueil, ce qui demande ce
+         * manifeste.
+         *
+         * Il est calculé à chaque requête pour une raison : tout le site exige
+         * le jeton, et un raccourci ouvrant sur `/` tomberait sur un 401 — une
+         * application installée n'hérite pas des cookies du navigateur. L'URL de
+         * départ emporte donc le jeton que cette requête-ci a présenté. Écrire
+         * ce fichier sur le disque l'aurait fait entrer dans le dépôt, ce qu'un
+         * secret n'a rien à y faire.
+         *
+         * `no-store` pour la même raison : un jeton renouvelé ne doit pas
+         * survivre dans un manifeste mis en cache.
+         */
+        this.app.get('/manifest.webmanifest', (req, res) => {
+            const identity = auth.identify(req);
+            const token = identity.master ? auth.getToken() : null;
+
+            res.set('Cache-Control', 'no-store');
+            res.type('application/manifest+json').send(JSON.stringify({
+                name: 'Music Dashboard',
+                short_name: 'Music',
+                description: 'Tableau de bord du lecteur de musique interactif.',
+                start_url: token ? `/?token=${encodeURIComponent(token)}` : '/',
+                scope: '/',
+                display: 'standalone',
+                orientation: 'any',
+                background_color: '#0a090f',
+                theme_color: '#0a090f',
+                icons: [
+                    { src: '/favicons/app-icon-192.png', sizes: '192x192', type: 'image/png' },
+                    { src: '/favicons/app-icon-512.png', sizes: '512x512', type: 'image/png' },
+                ],
+            }, null, 2));
+        });
+
         // Servir les fichiers statiques du dashboard
         this.app.use(express.static(path.join(__dirname, 'public')));
         // Les corps JSON du dashboard sont petits ; les fichiers passent par /api/upload
