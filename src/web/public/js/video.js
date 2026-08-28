@@ -896,6 +896,41 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
 
     let overlayInactivityTimeout = null;
 
+    /*
+     * Ce qui retient les incrustations à l'écran.
+     *
+     * La minuterie d'inactivité compte le temps sans mouvement de souris. Au
+     * doigt, il n'y en a jamais : un réglage qui dure plus que le délai voyait
+     * donc la barre s'effacer sous la main qui s'en servait — le curseur de
+     * volume qu'on fait glisser, le menu de la roue qu'on parcourt. Le pad de
+     * vitesse avait déjà son garde ; il lui manquait des semblables.
+     *
+     * Deux signaux suffisent. Un pointeur maintenu sur une commande qui se
+     * règle par glissement — les curseurs, la barre de progression — et un menu
+     * ouvert, que sa roue signale d'une classe.
+     */
+    const SUSTAINED_CONTROLS = 'input[type="range"], .progress-bar-wrapper, .speed-pad-container';
+    let pointerHeldOnControl = false;
+
+    videoWindow.addEventListener('pointerdown', (e) => {
+        if (e.target.closest && e.target.closest(SUSTAINED_CONTROLS)) pointerHeldOnControl = true;
+    }, true);
+
+    // Le relâchement est écouté sur la fenêtre du navigateur, et non sur la
+    // commande : un glissement se termine souvent en dehors d'elle, et l'appui
+    // serait resté « en cours » indéfiniment.
+    ['pointerup', 'pointercancel'].forEach((evt) => {
+        window.addEventListener(evt, () => { pointerHeldOnControl = false; }, true);
+    });
+
+    /** @returns {boolean} vrai tant qu'une commande est en main. */
+    function overlayHeldOpen() {
+        if (window.MusicPlayer.isSpeedPadDragging) return true;
+        if (pointerHeldOnControl) return true;
+        const gear = document.getElementById('btn-video-quality');
+        return !!(gear && gear.classList.contains('is-open'));
+    }
+
     function resetOverlayActivity() {
         videoWindow.classList.add('user-active');
         videoWindow.classList.remove('user-inactive');
@@ -912,8 +947,20 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
 
         const delay = isFullscreen ? 1500 : 2500;
 
-        overlayInactivityTimeout = setTimeout(() => {
-            if (window.MusicPlayer.isSpeedPadDragging) return;
+        /*
+         * Retenue : on repousse d'un délai entier, on n'abandonne pas.
+         *
+         * L'ancien garde se contentait de sortir sans réarmer. La barre restait
+         * alors affichée pour de bon — jusqu'au prochain mouvement, qui au doigt
+         * n'arrive pas. Un délai plein après le relâchement est aussi ce qu'on
+         * attend : lâcher le curseur de volume ne doit pas faire disparaître la
+         * barre dans la seconde.
+         */
+        overlayInactivityTimeout = setTimeout(function tick() {
+            if (overlayHeldOpen()) {
+                overlayInactivityTimeout = setTimeout(tick, delay);
+                return;
+            }
             hideOverlayNow();
         }, delay);
     }
@@ -963,7 +1010,10 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
             videoWindow.classList.contains('is-fullscreen') ||
             !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
 
-        if (!isFullscreen && !window.MusicPlayer.isSpeedPadDragging) {
+        // Même retenue qu'à la minuterie : un glissement de curseur mène souvent
+        // le pointeur hors de la fenêtre, et la barre ne doit pas s'effacer sous
+        // la main qui s'en sert.
+        if (!isFullscreen && !overlayHeldOpen()) {
             hideOverlayNow();
         }
     });
