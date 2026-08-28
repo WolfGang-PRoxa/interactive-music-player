@@ -337,6 +337,56 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
 }
 
 /*
+ * L'image se centre sur ce que la barre laisse, elle aussi.
+ *
+ * Le transport du centre le faisait déjà ; l'image, non. Elle restait centrée
+ * sur le cadre entier, alors que la barre en occupe le bas — d'autant plus que
+ * l'écran est étroit, puisque c'est l'étroitesse qui replie ses onze commandes
+ * sur deux ou trois rangées. Sur un téléphone debout, la barre prend la moitié
+ * de la hauteur : l'image se retrouvait posée trop bas, décalée de tout le
+ * reste, avec un grand vide au-dessus d'elle.
+ *
+ * On remonte donc l'image, sans jamais la redimensionner. Dans un conteneur qui
+ * centre, c'est la boîte de marge qui se centre : une marge basse de H remonte
+ * l'image de H/2, exactement ce qu'il faut pour la recentrer sur ce qui reste.
+ *
+ * Mais le décalage se limite au jeu réellement disponible — la hauteur que
+ * l'image n'occupe pas. Borner l'image sur la hauteur libre, ma première
+ * version, la faisait rétrécir : couché, elle tombait à 407 px de large sur un
+ * écran de 844, deux grandes bandes noires sur les côtés. Et la décaler sans
+ * limite lui aurait coupé le haut, puisqu'elle occupe alors toute la hauteur.
+ * Avec cette borne, le téléphone debout obtient le décalage entier — l'image y
+ * est petite, le jeu est large —, et le couché n'en prend aucun : la barre y
+ * tient sur une ligne et recouvre le bas de l'image, comme sur tout lecteur.
+ *
+ * Le calcul suit la barre, et ne bouge pas quand les commandes s'effacent —
+ * leur boîte reste, seule l'opacité tombe. C'est voulu : une image qui
+ * sauterait à chaque apparition se verrait bien plus que le vide qu'elle laisse.
+ *
+ * Le plein écran en est exclu : les commandes y sont faites pour disparaître,
+ * et l'image doit prendre tout l'écran.
+ */
+[data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen) .video-aspect-wrapper,
+[data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen) .video-placeholder {
+    /* Répétée depuis `.video-aspect-wrapper` : un élément ne peut pas interroger
+       son propre conteneur, la valeur doit donc se calculer chez les enfants. */
+    --video-picture-height: min(100cqh, calc(100cqw * 9 / 16));
+    --video-picture-shift: min(
+        var(--video-controls-height, 0px),
+        max(0px, calc(100cqh - var(--video-picture-height)))
+    );
+}
+
+[data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen) .video-aspect-wrapper {
+    margin-bottom: var(--video-picture-shift);
+}
+
+/* Le message « aucune vidéo » couvre le cadre : il se retire du même bas. */
+[data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen) .video-placeholder {
+    bottom: var(--video-picture-shift);
+}
+
+/*
  * La barre de commandes tient dans la largeur.
  *
  * Elle porte onze contrôles en deux groupes, calibrés pour une fenêtre de
