@@ -516,7 +516,20 @@ window.MusicPlayer.drawCanvasStage = function() {
     });
 
     const centerX = w / 2;
-    const centerY = h * 0.48;
+    /*
+     * Le disque au centre exact de l'image, et non à 48 % de sa hauteur.
+     *
+     * Ces deux pour cent le remontaient de quelques pixels — quatre sur une
+     * image de 219 px de haut, celle d'un téléphone debout. Assez peu pour
+     * passer inaperçu tant que rien ne servait de repère, assez pour se voir
+     * depuis que le transport se pose dessus : le bouton de lecture, lui, est
+     * au centre géométrique, et le disque flottait juste au-dessus de lui.
+     *
+     * Rien ne réclamait ce relèvement. La vague du bas est tracée à `h - 35`,
+     * indépendamment du reste ; le disque en occupe 48 de rayon et s'arrête à
+     * 26 px d'elle une fois recentré — il ne l'a jamais approchée.
+     */
+    const centerY = h / 2;
     const baseRadius = Math.max(10, Math.min(w, h) * 0.22);
     const innerRadius = Math.max(1, baseRadius - 2);
 
@@ -1033,13 +1046,30 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
     let lastVideoClickTime = 0;
 
     function showVideoSeekIndicator(text, isRight) {
-        const videoBody = document.querySelector('#video-floating-window .video-window-body') || videoWindow;
-        if (!videoBody) return;
+        /*
+         * La pastille se pose sur l'image, et non sur le cadre.
+         *
+         * Ses `top: 50%` et `left/right: 15%` se lisent dans le parent. Accrochée
+         * au corps de la fenêtre, elle se plaçait donc au milieu de celui-ci —
+         * commandes comprises — alors que l'image occupe désormais le haut,
+         * remontée de la hauteur de la barre. Elle apparaissait à cheval sur le
+         * bord bas de l'image, moitié dans le noir.
+         *
+         * L'accrocher au cadre de l'image remet les mêmes pourcentages sur ce
+         * qu'ils désignaient : le geste vise l'image, le repère y répond. Aucune
+         * constante à régler, et la mise en page peut encore bouger sans le
+         * décaler à nouveau.
+         */
+        const picture = document.querySelector('#video-floating-window .video-aspect-wrapper');
+        const host = picture
+            || document.querySelector('#video-floating-window .video-window-body')
+            || videoWindow;
+        if (!host) return;
 
         const indicator = document.createElement('div');
         indicator.className = `video-seek-ripple ${isRight ? 'right' : 'left'}`;
         indicator.innerHTML = `<span>${text}</span>`;
-        videoBody.appendChild(indicator);
+        host.appendChild(indicator);
 
         setTimeout(() => {
             if (indicator.parentNode) {
