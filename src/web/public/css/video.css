@@ -24,11 +24,27 @@
     transition: transform 0.3s ease;
 }
 
+/*
+ * Le plein écran, par les classes et par elles seules.
+ *
+ * Cette liste portait aussi `:fullscreen`, `:-webkit-full-screen` et
+ * `:-moz-full-screen`. Une liste de sélecteurs est indivisible : un seul
+ * membre que le navigateur ne connaît pas et il jette le bloc entier. Chrome
+ * et Safari ignorent la variante Mozilla, Firefox ignore celle de WebKit —
+ * cette règle ne s'appliquait donc nulle part, et le plein écran ne tenait
+ * qu'au calque de tête que le navigateur accorde de lui-même au plein écran
+ * natif. Là où ce dernier est refusé — Safari sur iPhone ne le donne qu'à un
+ * `<video>`, jamais à un `<div>` —, il ne se passait rien du tout : la fenêtre
+ * restait sa petite boîte de 440 px, coins arrondis compris.
+ *
+ * Les trois pseudo-classes n'apportaient rien que les classes n'aient déjà :
+ * js/video.js les pose à l'entrée et écoute `fullscreenchange` dans ses trois
+ * orthographes, si bien qu'un plein écran déclenché par le navigateur lui-même
+ * les met à jour aussi. Le reste du fichier sépare d'ailleurs chaque variante
+ * dans son propre bloc, précisément pour qu'aucune n'emporte les autres.
+ */
 body.video-fullscreen-active #video-floating-window,
-.floating-video-window.is-fullscreen,
-.floating-video-window:fullscreen,
-.floating-video-window:-webkit-full-screen,
-.floating-video-window:-moz-full-screen {
+.floating-video-window.is-fullscreen {
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;

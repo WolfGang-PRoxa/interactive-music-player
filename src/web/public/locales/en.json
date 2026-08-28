@@ -290,6 +290,8 @@
     "tooltip_drawer_close": "Close",
     "tooltip_drawer_widget_drag": "Drag to reorder widgets",
     "tooltip_drawer_edge": "Move the mouse here to open the drawer",
+    "tooltip_video_drawer_edge": "Open the video player",
+    "tooltip_logs_drawer_edge": "Open the log terminal",
     "unit_bytes": "bytes",
     "unit_kb": "KB",
     "unit_mb": "MB",

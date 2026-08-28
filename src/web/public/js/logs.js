@@ -426,10 +426,27 @@ window.MusicPlayer.setupFloatingLogsWindow = function() {
     let dragStartX = 0, dragStartY = 0;
     let windowStartX = 0, windowStartY = 0;
 
+    /**
+     * Le glissement et le redimensionnement n'ont pas cours en mode tactile : la
+     * fenêtre y est un tiroir ancré au bord droit, que css/touchDrawers.css
+     * dimensionne lui-même.
+     *
+     * Il ne suffit pas de les laisser sans effet visible. Un navigateur mobile
+     * simule `mousedown` puis `mouseup` sur un simple appui, et l'appui sur
+     * l'en-tête aurait ouvert puis clos un glissement de longueur nulle — au
+     * terme duquel la géométrie plein écran du tiroir aurait été enregistrée à
+     * la place de celle, patiemment réglée, du bureau.
+     */
+    function isTouchMode() {
+        const deviceMode = window.MusicPlayer.deviceMode;
+        return !!(deviceMode && deviceMode.isTouch());
+    }
+
     logsHeader.addEventListener('mousedown', (e) => {
         if (typeof window.MusicPlayer.bringToFront === 'function') {
             window.MusicPlayer.bringToFront(logsWindow);
         }
+        if (isTouchMode()) return;
         if (e.target.closest('.logs-control-btn') || e.target.closest('.log-filter-btn') || e.target.closest('.logs-header-opacity')) return;
         isDragging = true;
         dragStartX = e.clientX;
@@ -453,6 +470,7 @@ window.MusicPlayer.setupFloatingLogsWindow = function() {
 
     if (resizeHandle) {
         resizeHandle.addEventListener('mousedown', (e) => {
+            if (isTouchMode()) return;
             e.preventDefault();
             e.stopPropagation();
             isResizing = true;

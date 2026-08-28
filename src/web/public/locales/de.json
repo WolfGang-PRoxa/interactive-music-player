@@ -290,6 +290,8 @@
     "tooltip_drawer_close": "Schließen",
     "tooltip_drawer_widget_drag": "Zum Neuanordnen der Widgets ziehen",
     "tooltip_drawer_edge": "Maus hierher bewegen, um die Leiste zu öffnen",
+    "tooltip_video_drawer_edge": "Videoplayer öffnen",
+    "tooltip_logs_drawer_edge": "Log-Terminal öffnen",
     "unit_bytes": "Bytes",
     "unit_kb": "KB",
     "unit_mb": "MB",

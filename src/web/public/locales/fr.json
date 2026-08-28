@@ -290,6 +290,8 @@
     "tooltip_drawer_close": "Fermer",
     "tooltip_drawer_widget_drag": "Glisser pour réorganiser les widgets",
     "tooltip_drawer_edge": "Approcher la souris pour ouvrir le tiroir",
+    "tooltip_video_drawer_edge": "Ouvrir le lecteur vidéo",
+    "tooltip_logs_drawer_edge": "Ouvrir le terminal de logs",
     "unit_bytes": "octets",
     "unit_kb": "Ko",
     "unit_mb": "Mo",

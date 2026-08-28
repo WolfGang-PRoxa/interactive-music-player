@@ -906,8 +906,19 @@
             });
         }
 
-        // Top-Right Screen Corner Mouse Proximity Activation
+        /*
+         * Top-Right Screen Corner Mouse Proximity Activation
+         *
+         * Une commande de souris, et d'elle seule : il s'agit d'approcher sans
+         * cliquer. Au doigt, elle n'a rien à ouvrir et beaucoup à casser — un
+         * navigateur mobile émet un `mousemove` simulé à chaque appui, et deux
+         * autres languettes ont depuis pris place sous celle-ci, dans la bande
+         * de 30 à 180 px que cette zone couvre. Y toucher aurait ouvert le
+         * tiroir d'activité par-dessus celui qu'on demandait.
+         */
         document.addEventListener('mousemove', (e) => {
+            const deviceMode = window.MusicPlayer.deviceMode;
+            if (deviceMode && deviceMode.isTouch()) return;
             if (!drawerPanel || drawerPanel.classList.contains('open')) return;
             if (e.clientX >= window.innerWidth - 12 && e.clientY >= 30 && e.clientY <= 180) {
                 openDrawer();

@@ -939,13 +939,14 @@ body.touch-dragging * {
     min-width: 0;
 }
 
-/* La fenêtre vidéo flottante n'a nulle part où flotter sur un téléphone. */
-[data-device-mode="phone"] #video-window {
-    position: static !important;
-    width: 100% !important;
-    height: auto !important;
-    transform: none !important;
-}
+/*
+ * La fenêtre vidéo flottante n'a nulle part où flotter sur un téléphone — pas
+ * plus que celle des journaux. Les deux passent en tiroirs, sur les deux modes
+ * tactiles : voir css/touchDrawers.css.
+ *
+ * Une règle vivait ici pour le même motif, et ne servait à rien : elle visait
+ * `#video-window`, quand la fenêtre s'appelle `#video-floating-window`.
+ */
 
 /* --- Tablette ---------------------------------------------------------- */
 

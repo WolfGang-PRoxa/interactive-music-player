@@ -1,0 +1,397 @@
+/* ═══════════════════════════════════════════════════════════════
+   Les fenêtres flottantes deviennent des tiroirs, au doigt
+   ═══════════════════════════════════════════════════════════════
+
+   La vidéo et les journaux vivent dans des fenêtres qu'on attrape par leur
+   en-tête et qu'on redimensionne par leur coin. Ces deux gestes n'existent pas
+   au doigt : le glissement est écrit en `mousedown`/`mousemove`, et la poignée
+   de coin mesure 14 px. Sur téléphone, les fenêtres arrivaient donc à leur
+   géométrie de bureau — 440 px de large, posées à 100 px du bord — hors de
+   l'écran pour partie, et rien ne permettait de les ramener.
+
+   Elles reprennent ici la forme du tiroir latéral, qui résout déjà le problème
+   à côté : un panneau ancré au bord droit, large de tout l'écran, qui glisse.
+
+   Le rang dans la pile suit le rang à l'écran : le tiroir d'activité passe
+   devant les deux autres, la vidéo devant les journaux. Un voile commun se
+   range sous les deux nouveaux.
+
+   Ces règles ne valent que pour les modes tactiles ; au bureau, les fenêtres
+   restent flottantes et rien de ce fichier ne s'active. La même bascule est
+   reprise côté script par js/touchDrawers.js, qui pose le voile et ferme au
+   voile.
+   ═══════════════════════════════════════════════════════════════ */
+
+/*
+ * Le plein écran de la vidéo est exclu de bout en bout.
+ *
+ * Il pose sa propre géométrie, en `!important`, et il fonctionne déjà au doigt :
+ * les navigateurs mobiles simulent `mousemove` sur un appui, ce dont sa logique
+ * d'inactivité se contente. La garde est écrite deux fois parce que le plein
+ * écran s'annonce de deux façons — une classe sur la fenêtre, une autre sur le
+ * corps du document — et que les bascules natives passent par les deux.
+ */
+
+/* ── Le panneau ─────────────────────────────────────────────── */
+
+[data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen),
+[data-touch-mode="true"] .floating-logs-window {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    /* `auto` entre `top` et `bottom` : la hauteur est celle de la fenêtre du
+       navigateur, y compris quand sa barre d'adresse se replie. */
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    border: none !important;
+    border-left: 1px solid var(--border-card, rgba(255, 255, 255, 0.08)) !important;
+    border-radius: 0 !important;
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5) !important;
+    transform: translateX(0);
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/*
+ * Fermé, le tiroir sort de l'écran au lieu de disparaître.
+ *
+ * `.hidden` est la seule marque d'état que portent déjà ces fenêtres, et les
+ * interrupteurs la posent et la retirent : c'est donc elle qui dit « fermé »,
+ * sans qu'aucun code n'ait à tenir un second état en parallèle. Il suffit de
+ * lui retirer son `display: none`, qui interdirait toute animation, et de le
+ * remplacer par une translation. Un élément `position: fixed` sorti de l'écran
+ * n'y ajoute pas de défilement horizontal.
+ */
+[data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window.hidden:not(.is-fullscreen),
+[data-touch-mode="true"] .floating-logs-window.hidden {
+    display: flex !important;
+    opacity: 1;
+    pointer-events: none;
+    transform: translateX(100%) !important;
+}
+
+/*
+ * Le rang dans la pile est imposé : `bringToFront()` distribue des z-index en
+ * ligne à chaque appui, ce qui a du sens entre fenêtres flottantes mais ferait
+ * ici passer les journaux devant la vidéo au premier défilement du terminal.
+ */
+/*
+ * Le plein écran est excepté, et il le faut.
+ *
+ * Il réclame `2147483647` pour passer devant tout le reste. Cette règle-ci,
+ * plus tardive et `!important`, le ramenait à 9980 : sous les paramètres
+ * (20 000) et sous le tiroir d'activité (9999), qui se serait peint par-dessus.
+ * En plein écran natif le navigateur élève la fenêtre dans son calque de tête
+ * et le défaut ne se voit pas — mais Safari sur iPhone refuse le plein écran
+ * natif sur autre chose qu'un `<video>`, et js/video.js se rabat alors sur un
+ * plein écran de pure CSS, où seul le z-index décide.
+ */
+[data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen) {
+    z-index: 9980 !important;
+}
+
+[data-touch-mode="true"] .floating-logs-window {
+    z-index: 9970 !important;
+}
+
+/*
+ * Le voile des deux tiroirs. Il reprend la classe `.drawer-backdrop` — donc son
+ * apparence, sa transition, et le gel du défilement que js/scrollLock.js
+ * accroche à `.drawer-backdrop.active` — mais se range sous les panneaux.
+ */
+.touch-drawer-backdrop {
+    z-index: 9960;
+}
+
+/* Au bureau, il n'a rien à voiler : les fenêtres y flottent. */
+html:not([data-touch-mode="true"]) .touch-drawer-backdrop {
+    display: none;
+}
+
+/*
+ * La languette du tiroir d'activité se retire de la même façon devant les
+ * nouveaux tiroirs que devant le sien.
+ *
+ * Elle est posée à 9998, au-dessus d'eux : elle traversait le panneau, et une
+ * écharde de dégradé flottait sur le bord droit de la vidéo comme des journaux.
+ * L'abaisser dans la pile la rendrait invisible sans la rendre inoffensive —
+ * elle resterait sensible au doigt, sous un panneau qui n'a rien à ouvrir là.
+ * Elle disparaît donc, exactement comme drawer.css la fait disparaître quand
+ * c'est le tiroir d'activité qui s'ouvre.
+ */
+body.touch-drawer-is-open .drawer-edge-tab {
+    transform: translateX(100%) scaleX(0);
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* ── Les languettes, une par tiroir ─────────────────────────── */
+
+/*
+ * Le tiroir d'activité s'ouvre en effleurant le bord droit ; les deux nouveaux
+ * n'avaient que leur interrupteur, l'un dans la carte « En cours de lecture »,
+ * l'autre au fond des paramètres. Ils reçoivent donc la même languette, rangée
+ * sous la première, dans l'ordre où les trois tiroirs s'empilent.
+ *
+ * La hauteur passe de 80 px à 64 : trois languettes à 80 descendaient à 342 px
+ * du haut, soit presque la totalité d'un téléphone couché. À 64 elles tiennent
+ * dans 286 px, et gardent leur allure.
+ */
+[data-touch-mode="true"] .drawer-edge-tab {
+    --edge-tab-top: 70px;
+    --edge-tab-height: 64px;
+    --edge-tab-gap: 12px;
+    --edge-tab-pitch: calc(var(--edge-tab-height) + var(--edge-tab-gap));
+
+    height: var(--edge-tab-height);
+    /* Une languette de 6 px se vise à la souris, pas au doigt. */
+    width: 10px;
+}
+
+[data-touch-mode="true"] #drawer-edge-tab {
+    top: var(--edge-tab-top);
+}
+
+[data-touch-mode="true"] #video-drawer-edge-tab {
+    top: calc(var(--edge-tab-top) + var(--edge-tab-pitch));
+}
+
+[data-touch-mode="true"] #logs-drawer-edge-tab {
+    top: calc(var(--edge-tab-top) + 2 * var(--edge-tab-pitch));
+}
+
+/*
+ * Chacune porte la couleur de sa fenêtre : le rose du lecteur vidéo, dont il
+ * borde déjà le cadre, et un vert de terminal pour les journaux. C'est le seul
+ * indice qu'une languette de dix pixels peut porter — trop étroite pour une
+ * icône, et le survol qui révélerait une infobulle n'existe pas au doigt.
+ */
+[data-touch-mode="true"] #video-drawer-edge-tab {
+    background: linear-gradient(180deg, var(--c-accent), var(--c-violet));
+    box-shadow: -3px 0 12px color-mix(in srgb, var(--c-accent) 45%, transparent);
+}
+
+[data-touch-mode="true"] #video-drawer-edge-tab:hover {
+    box-shadow: -5px 0 20px var(--c-accent), 0 0 10px rgba(255, 255, 255, 0.8);
+}
+
+[data-touch-mode="true"] #logs-drawer-edge-tab {
+    background: linear-gradient(180deg, var(--c-success), var(--c-primary));
+    box-shadow: -3px 0 12px color-mix(in srgb, var(--c-success) 45%, transparent);
+}
+
+[data-touch-mode="true"] #logs-drawer-edge-tab:hover {
+    box-shadow: -5px 0 20px var(--c-success), 0 0 10px rgba(255, 255, 255, 0.8);
+}
+
+/* Au bureau, les deux fenêtres flottent : il n'y a pas de tiroir à tirer. */
+html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
+    display: none;
+}
+
+/* ── Ce que le tiroir rend inutile ──────────────────────────── */
+
+/*
+ * Plus de poignée de coin ni de curseur de déplacement : le panneau occupe
+ * l'écran et ne bouge plus. Le script refuse de son côté les glissements, pour
+ * que l'appui simulé d'un navigateur mobile n'enregistre pas la géométrie du
+ * tiroir à la place de celle du bureau.
+ */
+[data-touch-mode="true"] .video-window-resize-handle,
+[data-touch-mode="true"] .logs-window-resize-handle {
+    display: none !important;
+}
+
+[data-touch-mode="true"] .video-window-header,
+[data-touch-mode="true"] .logs-window-header {
+    cursor: default;
+}
+
+/*
+ * La transparence de la fenêtre non plus. Elle avait un sens pour un cadre posé
+ * sur le tableau de bord, qu'on voulait laisser entrevoir ; un tiroir plein
+ * écran n'a rien derrière lui que son propre voile, et l'atténuer ne rendrait
+ * que son texte illisible. Le curseur se retire, et la valeur revient à
+ * l'opacité pleine — l'interrupteur du bureau ayant pu la laisser ailleurs.
+ */
+[data-touch-mode="true"] .video-header-opacity,
+[data-touch-mode="true"] .logs-header-opacity {
+    display: none;
+}
+
+[data-touch-mode="true"] .floating-video-window {
+    --video-bg-opacity: 1 !important;
+}
+
+[data-touch-mode="true"] .floating-logs-window {
+    --logs-bg-opacity: 1 !important;
+}
+
+/* ── L'en-tête, au doigt ────────────────────────────────────── */
+
+/*
+ * Les zones de sécurité s'appliquent à l'en-tête et au corps, jamais à la
+ * boîte : une bordure qui s'arrêterait avant le bord se verrait davantage que
+ * ce qu'elle protège. Même partage que pour la documentation, voir
+ * css/device.css.
+ */
+[data-touch-mode="true"] .video-window-header,
+[data-touch-mode="true"] .logs-window-header {
+    padding-top: max(0.6rem, env(safe-area-inset-top));
+    padding-left: max(0.9rem, env(safe-area-inset-left));
+    padding-right: max(0.9rem, env(safe-area-inset-right));
+    flex-shrink: 0;
+}
+
+/*
+ * L'en-tête des journaux alignait quatre groupes sur une rangée : le titre, six
+ * filtres, la transparence et trois boutons. La transparence est partie
+ * ci-dessus ; les filtres restent trop larges pour un téléphone. On laisse donc
+ * la rangée se replier — titre et boutons sur la première ligne, filtres sur la
+ * seconde.
+ */
+[data-touch-mode="true"] .logs-window-header {
+    flex-wrap: wrap;
+    row-gap: 8px;
+}
+
+[data-touch-mode="true"] .logs-header-filters {
+    order: 3;
+    /* Une base de 100 % force le passage à la ligne : les filtres ont la
+       seconde pour eux seuls. */
+    flex-basis: 100%;
+    margin: 0;
+    /* Six filtres ne tiennent pas toujours sur la largeur d'un téléphone
+       debout : ils défilent alors du doigt plutôt que de se replier à leur
+       tour, ce qui coûterait une troisième ligne d'en-tête. */
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+[data-touch-mode="true"] .logs-header-filters::-webkit-scrollbar {
+    display: none;
+}
+
+[data-touch-mode="true"] .log-filter-btn {
+    flex-shrink: 0;
+}
+
+[data-touch-mode="true"] .logs-header-actions {
+    margin-left: auto;
+}
+
+/* ── Le corps ───────────────────────────────────────────────── */
+
+/*
+ * `.video-window-body` retranchait de la fenêtre les 40 px annoncés de son
+ * en-tête. Cette hauteur n'est plus connue d'avance — l'en-tête grandit de la
+ * zone de sécurité, et la fenêtre fait toute la page —, le corps prend donc
+ * simplement ce qui reste.
+ */
+[data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen) .video-window-body {
+    flex: 1;
+    height: auto;
+    min-height: 0;
+}
+
+/* Le terminal longe le bord bas, rogné sur les téléphones sans bouton
+   d'accueil. */
+[data-touch-mode="true"] .logs-terminal-container {
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+/*
+ * Les incrustations de la vidéo — titre en haut, commandes en bas — restent
+ * affichées.
+ *
+ * Elles se révélaient au survol et s'effaçaient après deux secondes et demie
+ * sans mouvement de souris. Au doigt, il n'y a ni survol ni mouvement : elles
+ * ne se montraient qu'à un appui, celui-là même qui met en pause. Un tiroir
+ * dédié à la vidéo peut se permettre de les garder sous les yeux. Le plein
+ * écran, lui, garde son effacement, qui est là pour dégager l'image.
+ */
+[data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen) .video-top-overlay,
+[data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen) .video-custom-controls {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+/*
+ * La barre de commandes tient dans la largeur.
+ *
+ * Elle porte onze contrôles en deux groupes, calibrés pour une fenêtre de
+ * 440 px : lecture et volume à gauche, vitesse et plein écran à droite. La
+ * rangée se replie déjà quand les deux groupes ne tiennent pas côte à côte,
+ * mais les groupes eux-mêmes étaient incompressibles — sur un téléphone
+ * debout, celui de gauche débordait à lui seul, et le sélecteur de mode de
+ * lecture passait sous le bord de l'écran.
+ *
+ * On les laisse donc se replier à leur tour. Rien n'est retiré : tout reste
+ * atteignable, sur une ligne de plus si la largeur l'exige.
+ *
+ * `flex-wrap` seul n'y suffisait pas. Un groupe déclaré `flex-shrink: 0` garde
+ * la largeur de son contenu déployé, quelle que soit celle de la rangée : ses
+ * enfants n'ont alors jamais de raison de passer à la ligne, et le groupe
+ * débordait des deux côtés à la fois une fois la rangée centrée. Il faut donc
+ * l'autoriser à se rétrécir d'abord ; le repli vient ensuite, tout seul.
+ *
+ * Ce repli-ci vaut en plein écran comme en tiroir, et c'est la seule règle de
+ * ce fichier dans ce cas. Le reste de l'adaptation ne concerne que le tiroir —
+ * sa géométrie, ses bords, ses incrustations —, mais la largeur d'un téléphone
+ * ne change pas quand on passe en plein écran : la barre y débordait
+ * exactement pareil, de 80 px sur un écran de 390.
+ */
+[data-touch-mode="true"] #video-floating-window .video-controls-left,
+[data-touch-mode="true"] #video-floating-window .video-controls-right {
+    flex-wrap: wrap;
+    flex-shrink: 1;
+    justify-content: center;
+    min-width: 0;
+}
+
+[data-touch-mode="true"] #video-floating-window .video-controls-bar {
+    justify-content: center;
+}
+
+/*
+ * La réserve de 24 px sur le bord droit protégeait le coin de
+ * redimensionnement, qui n'existe plus ici. Elle revient à la barre, et les
+ * zones de sécurité prennent le relais sur les trois bords que la barre longe.
+ */
+[data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen) .video-custom-controls {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+
+/*
+ * En plein écran, la barre longe les trois bords de l'écran lui-même, et non
+ * plus ceux d'un panneau. C'est là que les zones de sécurité comptent le plus :
+ * couché, un téléphone à encoche rogne quarante bons pixels sur un côté, et
+ * les 20 px que pose css/video.css y laissaient passer les commandes sous la
+ * découpe. Le plancher de 20 px est conservé, c'est le dégagement voulu ; il
+ * n'est relevé que là où le matériel l'exige.
+ *
+ * L'`!important` n'est pas un choix : les quatre variantes de plein écran de
+ * css/video.css posent leur propre remplissage de la même façon.
+ */
+[data-touch-mode="true"] #video-floating-window.is-fullscreen .video-custom-controls,
+[data-touch-mode="true"] body.video-fullscreen-active #video-floating-window .video-custom-controls {
+    padding-left: max(20px, env(safe-area-inset-left)) !important;
+    padding-right: max(20px, env(safe-area-inset-right)) !important;
+    padding-bottom: max(14px, env(safe-area-inset-bottom)) !important;
+}
+
+/* Le titre incrusté en haut longe les mêmes bords. */
+[data-touch-mode="true"] #video-floating-window.is-fullscreen .video-top-overlay,
+[data-touch-mode="true"] body.video-fullscreen-active #video-floating-window .video-top-overlay {
+    padding-top: max(10px, env(safe-area-inset-top));
+    padding-left: max(14px, env(safe-area-inset-left));
+    padding-right: max(14px, env(safe-area-inset-right));
+}

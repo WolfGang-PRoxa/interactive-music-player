@@ -10,6 +10,7 @@
 @import './css/docs.css';
 @import './css/logs.css';
 @import './css/drawer.css';
-/* En dernier : ses règles doivent primer sur celles des modules ci-dessus,
+/* En dernier : leurs règles doivent primer sur celles des modules ci-dessus,
    dont elles corrigent la mise en page selon le mode de support. */
 @import './css/device.css';
+@import './css/touchDrawers.css';

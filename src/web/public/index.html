@@ -1474,6 +1474,14 @@
         </div>
     </div>
 
+    <!--
+        Voile des deux fenêtres ci-dessous, une fois passées en tiroirs sur
+        écran tactile. Il reprend la classe du voile du tiroir latéral pour en
+        hériter l'apparence et le gel du défilement, et se range sous les deux
+        panneaux — voir css/touchDrawers.css.
+    -->
+    <div class="drawer-backdrop touch-drawer-backdrop" id="touch-drawer-backdrop"></div>
+
     <!-- Floating Draggable & Resizable Video Window -->
     <div id="video-floating-window" class="floating-video-window glass-card hidden">
         <div class="video-window-header" id="video-window-header">
@@ -1678,6 +1686,15 @@
 
     <!-- Top-Right Edge Trigger Tab for Drawer -->
     <div class="drawer-edge-tab" id="drawer-edge-tab" data-tooltip="Approcher la souris pour ouvrir le tiroir" data-i18n-tooltip="tooltip_drawer_edge"></div>
+
+    <!--
+        Languettes des deux tiroirs tactiles, rangées sous la précédente et
+        colorées comme les fenêtres qu'elles ouvrent. Elles ne paraissent qu'en
+        mode tactile, seul cas où ces fenêtres sont des tiroirs — au bureau
+        elles flottent et n'ont pas de bord à saisir. Voir css/touchDrawers.css.
+    -->
+    <div class="drawer-edge-tab touch-drawer-edge-tab" id="video-drawer-edge-tab" data-tooltip="Ouvrir le lecteur vidéo" data-i18n-tooltip="tooltip_video_drawer_edge"></div>
+    <div class="drawer-edge-tab touch-drawer-edge-tab" id="logs-drawer-edge-tab" data-tooltip="Ouvrir le terminal de logs" data-i18n-tooltip="tooltip_logs_drawer_edge"></div>
 
     <!-- Drawer Backdrop Overlay -->
     <div class="drawer-backdrop" id="drawer-backdrop"></div>
@@ -1946,6 +1963,7 @@
     <script src="js/headerButtonAnimations.js"></script>
     <script src="js/drawer.js"></script>
     <script src="js/drawerWidgets.js"></script>
+    <script src="js/touchDrawers.js"></script>
     <script src="js/versions.js"></script>
     <script src="js/docs.js"></script>
     <script src="js/memoryBreakdown.js"></script>

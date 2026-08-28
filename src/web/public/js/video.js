@@ -950,6 +950,37 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
     const videoBodyElement = document.querySelector('#video-floating-window .video-window-body') || videoWindow;
     if (videoBodyElement && !videoBodyElement.dataset.clickBound) {
         videoBodyElement.dataset.clickBound = 'true';
+
+        /*
+         * Au doigt et en plein écran, le premier appui ne fait que rappeler les
+         * commandes effacées.
+         *
+         * Elles s'effacent au bout d'une seconde et demie sans mouvement de
+         * souris, ce qui est le propos du plein écran : dégager l'image. Mais un
+         * doigt ne survole pas. Le seul geste qui les ramenait était l'appui sur
+         * l'image — et cet appui-là bascule la lecture. On tapait donc pour
+         * revoir la barre, et on mettait la musique en pause au passage. C'est
+         * le partage qu'ont retenu tous les lecteurs mobiles : l'appui révèle
+         * quand les commandes sont cachées, il agit quand elles sont là.
+         *
+         * L'état est relevé sur `touchstart`, et pas dans le gestionnaire de
+         * clic : un navigateur mobile émet un `mousemove` simulé entre les deux,
+         * lequel a déjà rappelé les commandes. Au moment du clic, la réponse à
+         * « étaient-elles cachées ? » a donc toujours changé.
+         *
+         * Hors plein écran, la question ne se pose pas : css/touchDrawers.css y
+         * laisse les commandes affichées en permanence, le tiroir leur faisant
+         * une place qui n'est prise à personne.
+         */
+        let touchOnlyRevealedControls = false;
+
+        videoBodyElement.addEventListener('touchstart', () => {
+            const isFullscreen = document.body.classList.contains('video-fullscreen-active') ||
+                videoWindow.classList.contains('is-fullscreen') ||
+                !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
+            touchOnlyRevealedControls = isFullscreen && !videoWindow.classList.contains('user-active');
+        }, { passive: true });
+
         videoBodyElement.addEventListener('click', (e) => {
             // Ignore clicks on interactive controls (buttons, volume slider, progress bar, header drag area)
             if (e.target.closest('.video-custom-controls') ||
@@ -957,6 +988,11 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
                 e.target.closest('button') ||
                 e.target.closest('input') ||
                 e.target.closest('.speed-pad-overlay')) {
+                return;
+            }
+
+            if (touchOnlyRevealedControls) {
+                touchOnlyRevealedControls = false;
                 return;
             }
 
@@ -1494,10 +1530,27 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
     let dragStartX = 0, dragStartY = 0;
     let windowStartX = 0, windowStartY = 0;
 
+    /**
+     * Le glissement et le redimensionnement n'ont pas cours en mode tactile : la
+     * fenêtre y est un tiroir ancré au bord droit, que css/touchDrawers.css
+     * dimensionne lui-même.
+     *
+     * Il ne suffit pas de les laisser sans effet visible. Un navigateur mobile
+     * simule `mousedown` puis `mouseup` sur un simple appui, et l'appui sur
+     * l'en-tête aurait ouvert puis clos un glissement de longueur nulle — au
+     * terme duquel la géométrie plein écran du tiroir aurait été enregistrée à
+     * la place de celle, patiemment réglée, du bureau.
+     */
+    function isTouchMode() {
+        const deviceMode = window.MusicPlayer.deviceMode;
+        return !!(deviceMode && deviceMode.isTouch());
+    }
+
     videoHeader.addEventListener('mousedown', (e) => {
         if (typeof window.MusicPlayer.bringToFront === 'function') {
             window.MusicPlayer.bringToFront(videoWindow);
         }
+        if (isTouchMode()) return;
         if (e.target.closest('.video-control-btn') || e.target.closest('.video-header-opacity')) return;
         isDragging = true;
         dragStartX = e.clientX;
@@ -1521,6 +1574,7 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
 
     if (resizeHandle) {
         resizeHandle.addEventListener('mousedown', (e) => {
+            if (isTouchMode()) return;
             e.preventDefault();
             e.stopPropagation();
             isResizing = true;
