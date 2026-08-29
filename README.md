@@ -236,6 +236,17 @@ diffusés. Voir [Sécurité — restriction des chemins](docs/fr/technique/07-se
 
 ---
 
-## Licence
+## Licence et conditions
 
-MIT.
+Le code est publié sous licence **[MIT](LICENSE)**.
+
+Le bot est **auto-hébergé** : chaque personne crée sa propre application Discord
+et fait tourner sa propre instance, sur sa propre machine. Aucune donnée ne
+remonte à l'auteur — pas de télémétrie, pas de statistiques, pas de serveur
+central. Aucun audio n'est enregistré : le ducking ne lit que l'événement
+« untel parle », jamais ce qui est dit.
+
+| Document | Français | English |
+|---|---|---|
+| Conditions d'utilisation | **[CONDITIONS.md](CONDITIONS.md)** | **[TERMS.md](TERMS.md)** |
+| Politique de confidentialité | **[CONFIDENTIALITE.md](CONFIDENTIALITE.md)** | **[PRIVACY.md](PRIVACY.md)** |
