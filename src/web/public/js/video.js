@@ -79,6 +79,23 @@ let lastResyncAt = 0;
 let resyncsWithoutProgress = 0;
 let videoStreamAbandoned = false;
 
+/**
+ * Résolutions vidéo refusées par le serveur, par piste et par définition.
+ *
+ * L'adresse du flux est redemandée à chaque rafraîchissement d'état, soit une
+ * fois par seconde : tant que la réponse arrive, elle sort du cache du serveur
+ * et ne coûte rien. Un refus, lui, ne se mettait nulle part — vidéo protégée
+ * par DRM, retirée, introuvable —, si bien que la même demande repartait à la
+ * seconde suivante, et que le serveur relançait un processus yt-dlp à chaque
+ * fois. Le serveur retient désormais ses échecs (voir routes/api.js) ; le
+ * client s'épargne en plus l'aller-retour.
+ *
+ * La clé porte la définition : changer de qualité mérite un nouvel essai. Le
+ * jeu est vidé au chargement de la page — c'est la durée pendant laquelle
+ * réessayer n'a aucune chance d'apprendre autre chose.
+ */
+const videoInfoRefused = new Set();
+
 /** Nombre de resynchronisations infructueuses avant de renoncer au flux. */
 const RESYNCS_BEFORE_GIVEUP = 3;
 
@@ -845,12 +862,23 @@ window.MusicPlayer.updateVideoPlayer = async function(track) {
             videoCanvas.classList.remove('hidden');
             startCanvasLoop();
         }
+        // Une résolution déjà refusée n'est pas redemandée avant que la piste ou
+        // la qualité change : le visualiseur reste en place, et la suite de la
+        // synchronisation — volume, vitesse, position — se fait comme d'habitude
+        // en bas de cette fonction.
+        const refusalKey = `${trackKey}|${wantedQuality}`;
+
         try {
             // guildId transmis pour que le serveur applique la qualité vidéo choisie
             const guildId = (window.MusicPlayer.state && window.MusicPlayer.state.guildId) || '';
             const apiUrl = `/api/video-info?guildId=${encodeURIComponent(guildId)}&trackUrl=${encodeURIComponent(trackUrl)}&title=${encodeURIComponent(effectiveTrack.title || '')}&author=${encodeURIComponent(effectiveTrack.author || '')}`;
-            const res = await fetch(apiUrl);
-            if (res.ok) {
+            const res = videoInfoRefused.has(refusalKey) ? null : await fetch(apiUrl);
+            if (res && !res.ok) {
+                videoInfoRefused.add(refusalKey);
+                console.info(`[Video] No video stream for this track (HTTP ${res.status}): `
+                    + 'the audio visualiser takes over.');
+            }
+            if (res && res.ok) {
                 const data = await res.json();
                 if (data.videoUrl && currentVideoTrackUrl === trackKey) {
                     if (videoElement) {

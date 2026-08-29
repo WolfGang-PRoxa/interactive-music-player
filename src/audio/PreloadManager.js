@@ -58,6 +58,47 @@ function resolveAudioBitrate(track) {
     }
 }
 
+/**
+ * Chemin du fichier que cette piste désigne sur le disque du bot, ou null.
+ *
+ * Un fichier téléversé n'est local que pour le bot : le navigateur d'un
+ * téléphone, lui, doit le télécharger comme n'importe quoi d'autre — et un WAV
+ * de trente mégaoctets sur un réseau mobile se coupe en route. C'est pourquoi
+ * ces fichiers sont désormais transcodés et mis en cache comme les pistes
+ * distantes ; voir `getTrackKey`.
+ *
+ * L'existence est vérifiée : un chemin qui ne mène nulle part ne doit surtout
+ * pas être pris pour une recherche textuelle, qui rapporterait un morceau au
+ * hasard portant à peu près ce nom.
+ *
+ * @param {object} track
+ * @returns {string|null}
+ */
+function localFilePath(track) {
+    if (!track || !track.url || typeof track.url !== 'string') return null;
+    if (/^https?:\/\//i.test(track.url)) return null;
+    try {
+        return fs.existsSync(track.url) ? track.url : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+/**
+ * Échecs consécutifs d'une même piste distante avant d'aller voir si yt-dlp a
+ * pris une ride.
+ *
+ * Trois : en deçà, c'est du réseau qui hoquette ; au-delà, on aurait cherché
+ * longtemps avant de soupçonner le binaire.
+ */
+const FAILURES_BEFORE_VERSION_CHECK = 3;
+
+/** Dernière version publiée de yt-dlp. */
+const YTDLP_LATEST_URL = 'https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest';
+
+/** Une vérification par heure au plus : l'API de GitHub compte les appels. */
+const VERSION_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+
 /** Plafond du cache de préchargement, en octets. */
 const MAX_CACHE_BYTES = (Number(process.env.MAX_CACHE_MB) || 2048) * 1024 * 1024;
 
@@ -282,6 +323,122 @@ class PreloadManager {
          * définitivement morte soit reprise à chaque seconde.
          */
         this.failures = new Map();
+
+        /** Horodatage de la dernière vérification de version de yt-dlp. */
+        this._lastVersionCheckAt = 0;
+    }
+
+    /**
+     * Va voir si yt-dlp a une version plus récente, après plusieurs échecs.
+     *
+     * YouTube change ses défenses toutes les quelques semaines, et yt-dlp suit
+     * en publiant presque aussi souvent. Un binaire vieux de dix jours suffit à
+     * faire échouer toutes les pistes distantes — « Sign in to confirm you're
+     * not a bot », « Streaming data not available » — pendant que les fichiers
+     * locaux, eux, continuent de fonctionner. Rien dans ces messages ne désigne
+     * la version comme coupable, et on cherche ailleurs.
+     *
+     * La vérification n'a lieu qu'après plusieurs échecs de la même piste : un
+     * réseau qui hoquette ne mérite pas qu'on interroge GitHub. Elle ne
+     * s'adresse qu'aux sources distantes — un fichier du disque n'a jamais eu
+     * besoin de yt-dlp — et une fois l'heure au plus, l'API de GitHub comptant
+     * les appels anonymes.
+     *
+     * Elle ne met rien à jour : elle dit ce qu'elle voit. Remplacer un binaire
+     * sous les pieds d'un bot qui joue est une décision qui revient à
+     * l'utilisateur, et le projet lui donne déjà « npm run update-ytdlp ».
+     *
+     * Aucune erreur ne remonte : un diagnostic qui échoue ne doit pas ajouter sa
+     * panne à celle qu'il cherchait à expliquer.
+     *
+     * @param {object} track - Piste dont le préchargement vient d'échouer.
+     * @param {number} attempts - Nombre d'échecs essuyés par cette piste.
+     */
+    async _checkYtdlpFreshness(track, attempts) {
+        if (attempts !== FAILURES_BEFORE_VERSION_CHECK) return;
+        if (!track || !/^https?:\/\//i.test(track.url || '')) return;
+
+        const now = Date.now();
+        if (this._lastVersionCheckAt && now - this._lastVersionCheckAt < VERSION_CHECK_INTERVAL_MS) return;
+        this._lastVersionCheckAt = now;
+
+        try {
+            const installed = await this._installedYtdlpVersion();
+            const latest = await this._latestYtdlpVersion();
+            if (!installed || !latest) return;
+
+            // Les versions de yt-dlp sont des dates — « 2026.08.19 » : l'ordre
+            // lexicographique est l'ordre chronologique.
+            if (latest > installed) {
+                log.warn(`[PreloadManager] ${attempts} failed preloads in a row for a remote track. `
+                    + `yt-dlp installed: ${installed}, latest published: ${latest} — a newer version exists. `
+                    + `YouTube changes its defences often; « npm run update-ytdlp » is usually what unblocks this.`);
+            } else {
+                log.info(`[PreloadManager] ${attempts} failed preloads in a row for a remote track, `
+                    + `but yt-dlp is up to date (${installed}): the cause lies elsewhere — `
+                    + `throttling by the source, or a track that is no longer available.`);
+            }
+        } catch (e) {
+            // Diagnostic muet : voir l'en-tête.
+        }
+    }
+
+    /**
+     * Version du binaire yt-dlp réellement installé.
+     * @returns {Promise<string|null>}
+     */
+    _installedYtdlpVersion() {
+        return new Promise((resolve) => {
+            let binary;
+            try {
+                binary = require('youtube-dl-exec').constants.YOUTUBE_DL_PATH;
+            } catch (e) {
+                return resolve(null);
+            }
+
+            let output = '';
+            let child;
+            try {
+                child = cp.spawn(binary, ['--version'], { windowsHide: true });
+            } catch (e) {
+                return resolve(null);
+            }
+
+            const done = (value) => {
+                try { child.kill(); } catch (e) {}
+                resolve(value);
+            };
+
+            const timer = setTimeout(() => done(null), 10000);
+            child.stdout.on('data', (chunk) => { output += chunk.toString(); });
+            child.on('error', () => { clearTimeout(timer); resolve(null); });
+            child.on('close', () => {
+                clearTimeout(timer);
+                resolve(output.trim() || null);
+            });
+        });
+    }
+
+    /**
+     * Dernière version publiée de yt-dlp, d'après GitHub.
+     * @returns {Promise<string|null>}
+     */
+    async _latestYtdlpVersion() {
+        try {
+            const response = await fetch(YTDLP_LATEST_URL, {
+                headers: {
+                    Accept: 'application/vnd.github+json',
+                    // GitHub refuse les requêtes anonymes sans en-tête d'agent.
+                    'User-Agent': 'interactive-music-player',
+                },
+                signal: AbortSignal.timeout(8000),
+            });
+            if (!response.ok) return null;
+            const data = await response.json();
+            return (data && typeof data.tag_name === 'string') ? data.tag_name.trim() : null;
+        } catch (e) {
+            return null;
+        }
     }
 
     /**
@@ -645,7 +802,11 @@ class PreloadManager {
             if (typeof extractor.stream === 'function') {
                 const originalStream = extractor.stream;
                 extractor.stream = async (track, ...args) => {
-                    const cachedPath = this.getCachedPath(track);
+                    // Le cache sert les navigateurs, à qui il épargne un
+                    // téléchargement. Le bot, lui, a le fichier d'origine sous
+                    // la main : lui servir la copie compressée retirerait de la
+                    // qualité à la diffusion Discord sans rien faire gagner.
+                    const cachedPath = localFilePath(track) ? null : this.getCachedPath(track);
                     if (cachedPath) {
                         log.info(`[PreloadManager] Cached stream of ${track.title} served from the local disk.`);
                         return fs.createReadStream(cachedPath);
@@ -674,14 +835,188 @@ class PreloadManager {
      */
     getTrackKey(track) {
         if (!track || !track.url) return null;
-        // Ne pas précharger ou cacher si c'est déjà un fichier local sur le disque.
-        // Une URL http(s) ne peut pas désigner un fichier local : on évite alors
-        // l'appel disque, qui serait fait pour chaque piste distante.
-        if (track.queryType === 'file') return null;
-        if (!/^https?:\/\//i.test(track.url) && fs.existsSync(track.url)) {
-            return null;
-        }
+
+        // Les fichiers du disque entrent dans le cache comme les autres. Ils en
+        // étaient exclus au motif qu'ils sont « déjà locaux » — ce qui est vrai
+        // pour le bot, et faux pour le navigateur qui les écoute : en diffusion
+        // personnelle, un WAV de trente mégaoctets traverse le réseau à chaque
+        // lecture. Transcodés une fois, ils en font cinq.
+        //
+        // Reste à écarter ce qui ne mène nulle part : ni URL, ni fichier.
+        if (!/^https?:\/\//i.test(track.url) && !localFilePath(track)) return null;
+
         return crypto.createHash('sha256').update(track.url).digest('hex');
+    }
+
+    /**
+     * Rend une piste réellement jouable : hydratée, pontée, extracteur en main.
+     *
+     * Une piste venue d'une playlist enregistrée n'est qu'un objet nu — titre,
+     * auteur, URL —, relu du disque et jamais passé par le lecteur. Aucun
+     * extracteur ne sait quoi en faire : appeler `stream()` dessus rend un flux
+     * qui ne produit rien, sans lever la moindre erreur. C'est `player.search`
+     * qui la ramène à une vraie piste, avec son extracteur et ses métadonnées.
+     *
+     * Le pont vient ensuite : une source sans audio — Spotify et consorts —
+     * doit être renvoyée vers une source qui en a, faute de quoi la résolution
+     * suivante buterait sur le DRM.
+     *
+     * @param {object} track - Piste, éventuellement réduite à son URL.
+     * @returns {Promise<{ track: object, url: string }>}
+     */
+    async resolvePlayableTrack(track) {
+        let targetTrack = track;
+        if (this.player && (!targetTrack.extractor || typeof targetTrack.extractor.stream !== 'function')) {
+            try {
+                // Un chemin disque doit être annoncé comme tel : livré à la
+                // recherche ordinaire, il partirait pour une requête textuelle
+                // sur YouTube et rapporterait un tout autre morceau.
+                const { QueryType } = require('discord-player');
+                const searchRes = await this.player.search(track.url,
+                    localFilePath(track) ? { searchEngine: QueryType.FILE } : {});
+                if (searchRes && searchRes.tracks.length > 0) {
+                    targetTrack = searchRes.tracks[0];
+                    log.info(`[PreloadManager] Track hydrated on the fly through player.search for: ${targetTrack.title}`);
+                }
+            } catch (e) {}
+        }
+
+        // Le pont est vérifié par la durée et mémorisé, pour que le fichier mis
+        // en cache soit celui que la lecture directe emploie.
+        const bridgedTrack = await this._resolveBridge(targetTrack, track.title);
+        if (bridgedTrack) targetTrack = bridgedTrack;
+
+        let targetUrl = targetTrack && targetTrack.url ? targetTrack.url : (track.url || '');
+        if (targetUrl.includes('music.youtube.com')) {
+            targetUrl = targetUrl.replace('music.youtube.com', 'www.youtube.com');
+        }
+
+        if (!targetTrack.extractor && this.player) {
+            for (const [_, ext] of this.player.extractors.store.entries()) {
+                try {
+                    if (await ext.validate(targetUrl, targetTrack.queryType)) {
+                        targetTrack.extractor = ext;
+                        log.info(`[PreloadManager] Extractor resolved on the fly for ${targetTrack.title}: ${ext.constructor.name}`);
+                        break;
+                    }
+                } catch (e) {}
+            }
+        }
+
+        return { track: targetTrack, url: targetUrl };
+    }
+
+    /**
+     * De quoi alimenter ffmpeg pour une piste distante : une URL directe, ou un
+     * flux à pousser dans son entrée standard.
+     *
+     * Un extracteur rend l'un ou l'autre selon sa nature, et parfois un objet
+     * qui enveloppe l'un des deux. Les quatre formes sont ramenées ici aux deux
+     * seules que ffmpeg connaisse. Quand aucune ne se dégage — cas courant de
+     * YouTube, dont le flux direct se refuse ou expire —, youtube-dl-exec est
+     * interrogé pour une URL audio directe.
+     *
+     * L'appelant fournit le contexte d'extraction s'il en faut un : la méthode
+     * n'en pose pas, pour ne pas le refermer avant que le flux qu'elle rend ait
+     * fini d'être lu.
+     *
+     * @param {object} track - Piste jouable, telle que rendue par
+     *   `resolvePlayableTrack`.
+     * @param {string} url - URL résolue de cette piste.
+     * @returns {Promise<{ ffmpegInput: string|null, inputStream: object|null }>}
+     *   `ffmpegInput` vaut `pipe:0` lorsque c'est `inputStream` qui alimente.
+     *   Les deux sont nuls quand rien n'a pu être résolu.
+     */
+    async resolveAudioInput(track, url) {
+        // Fichier du disque : ffmpeg le lit à même le chemin. Rien à extraire,
+        // et il peut s'y déplacer — ce qu'un flux poussé dans son entrée
+        // standard ne permet pas, et dont la reprise d'un encodage interrompu a
+        // besoin.
+        const local = localFilePath(track);
+        if (local) return { ffmpegInput: local, inputStream: null };
+
+        let rawStreamObj = null;
+        if (this.player && this.player.extractors) {
+            try {
+                const streamInfo = await this.player.extractors.run(async (ext) => {
+                    if (track.extractor && ext.identifier !== track.extractor.identifier) {
+                        return false;
+                    }
+                    if (await ext.validate(url, track.queryType)) {
+                        return await ext.stream(track);
+                    }
+                    return false;
+                });
+                if (streamInfo && streamInfo.result) {
+                    rawStreamObj = streamInfo.result;
+                    log.info(`[PreloadManager Debug] Stream extracted through player.extractors.run (Extractor: ${streamInfo.extractor?.constructor?.name})`);
+                }
+            } catch (e) {
+                log.error(`[PreloadManager Debug] player.extractors.run failed:`, e.message);
+            }
+        }
+
+        if (!rawStreamObj) {
+            if (track.extractor && typeof track.extractor.stream === 'function') {
+                rawStreamObj = await track.extractor.stream(track);
+            } else if (this.player && typeof this.player.extractors.stream === 'function') {
+                rawStreamObj = await this.player.extractors.stream(track);
+            }
+        }
+
+        let ffmpegInput = null;
+        let inputStream = null;
+
+        if (rawStreamObj) {
+            if (typeof rawStreamObj === 'string' && (rawStreamObj.startsWith('http://') || rawStreamObj.startsWith('https://'))) {
+                ffmpegInput = rawStreamObj;
+            } else if (rawStreamObj.url && typeof rawStreamObj.url === 'string' && (rawStreamObj.url.startsWith('http://') || rawStreamObj.url.startsWith('https://'))) {
+                ffmpegInput = rawStreamObj.url;
+            } else if (typeof rawStreamObj.pipe === 'function') {
+                inputStream = rawStreamObj;
+            } else if (rawStreamObj.stream && typeof rawStreamObj.stream.pipe === 'function') {
+                inputStream = rawStreamObj.stream;
+            }
+        }
+
+        // Pas encore d'URL directe, et la piste vient du web : youtube-dl en
+        // sait plus que l'extracteur sur les formats réellement servis.
+        if ((!ffmpegInput || ffmpegInput === 'pipe:0') && /^https?:\/\//i.test(url)) {
+            try {
+                const youtubedl = require('youtube-dl-exec');
+                log.info(`[PreloadManager] Resolving a direct audio URL through youtube-dl-exec for: ${track.title}`);
+                const info = await youtubedl(url, {
+                    dumpSingleJson: true,
+                    noCheckCertificates: true,
+                    noWarnings: true,
+                    preferFreeFormats: true,
+                    addHeader: ['referer:youtube.com', 'user-agent:googlebot']
+                }, { windowsHide: true });
+
+                const entry = (info.entries && info.entries[0]) ? info.entries[0] : info;
+                if (entry && entry.formats) {
+                    const audioFormats = entry.formats.filter(f => f.acodec !== 'none');
+                    const bestAudio = audioFormats.find(f => f.vcodec === 'none') || audioFormats[0];
+                    if (bestAudio && bestAudio.url) {
+                        ffmpegInput = bestAudio.url;
+                        inputStream = null;
+                        log.success(`[PreloadManager] Direct URL extracted successfully for: ${track.title}`);
+                    }
+                } else if (entry && entry.url) {
+                    ffmpegInput = entry.url;
+                    inputStream = null;
+                }
+            } catch (ytdlErr) {
+                log.error(`[PreloadManager] youtube-dl-exec resolution warning for ${track.title}:`,
+                    (ytdlErr && ytdlErr.message) || ytdlErr);
+            }
+        }
+
+        if (!ffmpegInput && inputStream) {
+            ffmpegInput = 'pipe:0';
+        }
+
+        return { ffmpegInput, inputStream };
     }
 
     /**
@@ -1148,40 +1483,7 @@ class PreloadManager {
         this.activeDownloads.set(dlKey, downloadObj);
         this.notifyProgress();
 
-        let targetTrack = track;
-        if (this.player && (!targetTrack.extractor || typeof targetTrack.extractor.stream !== 'function')) {
-            try {
-                const searchRes = await this.player.search(track.url);
-                if (searchRes && searchRes.tracks.length > 0) {
-                    targetTrack = searchRes.tracks[0];
-                    log.info(`[PreloadManager] Track hydrated on the fly through player.search for: ${targetTrack.title}`);
-                }
-            } catch (e) {}
-        }
-
-        // Une source sans audio doit être pontée avant la suite : youtube-dl-exec,
-        // plus bas, se verrait sinon remettre une URL protégée et échouerait sur
-        // le DRM. Le pont est désormais vérifié par la durée et mémorisé, pour
-        // que le fichier mis en cache soit celui que la lecture directe emploie.
-        const bridgedTrack = await this._resolveBridge(targetTrack, track.title);
-        if (bridgedTrack) targetTrack = bridgedTrack;
-
-        let targetUrl = targetTrack && targetTrack.url ? targetTrack.url : (track.url || '');
-        if (targetUrl.includes('music.youtube.com')) {
-            targetUrl = targetUrl.replace('music.youtube.com', 'www.youtube.com');
-        }
-
-        if (!targetTrack.extractor && this.player) {
-            for (const [_, ext] of this.player.extractors.store.entries()) {
-                try {
-                    if (await ext.validate(targetUrl, targetTrack.queryType)) {
-                        targetTrack.extractor = ext;
-                        log.info(`[PreloadManager] Extractor resolved on the fly for ${targetTrack.title}: ${ext.constructor.name}`);
-                        break;
-                    }
-                } catch (e) {}
-            }
-        }
+        const { track: targetTrack, url: targetUrl } = await this.resolvePlayableTrack(track);
 
         if (isCancelled) {
             log.info(`[PreloadManager] Preload cancelled for ${track.title}.`);
@@ -1216,84 +1518,9 @@ class PreloadManager {
         if (resolvedDurationMs) estTotalBytes = Math.max(100 * 1024, (resolvedDurationMs / 1000) * bytesPerSecond);
 
         const runPipeline = async () => {
-            let rawStreamObj = null;
-            if (this.player && this.player.extractors) {
-                try {
-                    const streamInfo = await this.player.extractors.run(async (ext) => {
-                        if (targetTrack.extractor && ext.identifier !== targetTrack.extractor.identifier) {
-                            return false;
-                        }
-                        if (await ext.validate(targetUrl, targetTrack.queryType)) {
-                            return await ext.stream(targetTrack);
-                        }
-                        return false;
-                    });
-                    if (streamInfo && streamInfo.result) {
-                        rawStreamObj = streamInfo.result;
-                        log.info(`[PreloadManager Debug] Stream extracted through player.extractors.run (Extractor: ${streamInfo.extractor?.constructor?.name})`);
-                    }
-                } catch (e) {
-                    log.error(`[PreloadManager Debug] player.extractors.run failed:`, e.message);
-                }
-            }
-
-            if (!rawStreamObj) {
-                if (targetTrack.extractor && typeof targetTrack.extractor.stream === 'function') {
-                    rawStreamObj = await targetTrack.extractor.stream(targetTrack);
-                } else if (this.player && typeof this.player.extractors.stream === 'function') {
-                    rawStreamObj = await this.player.extractors.stream(targetTrack);
-                }
-            }
-
-            let ffmpegInput = null;
-            let inputStream = null;
-
-            if (rawStreamObj) {
-                if (typeof rawStreamObj === 'string' && (rawStreamObj.startsWith('http://') || rawStreamObj.startsWith('https://'))) {
-                    ffmpegInput = rawStreamObj;
-                } else if (rawStreamObj.url && typeof rawStreamObj.url === 'string' && (rawStreamObj.url.startsWith('http://') || rawStreamObj.url.startsWith('https://'))) {
-                    ffmpegInput = rawStreamObj.url;
-                } else if (typeof rawStreamObj.pipe === 'function') {
-                    inputStream = rawStreamObj;
-                } else if (rawStreamObj.stream && typeof rawStreamObj.stream.pipe === 'function') {
-                    inputStream = rawStreamObj.stream;
-                }
-            }
-
-            // Si ffmpegInput n'est pas encore une URL directe et que la piste provient du web/YouTube
-            if ((!ffmpegInput || ffmpegInput === 'pipe:0') && /^https?:\/\//i.test(targetUrl)) {
-                try {
-                    const youtubedl = require('youtube-dl-exec');
-                    log.info(`[PreloadManager] Resolving a direct audio URL through youtube-dl-exec for: ${targetTrack.title}`);
-                    const info = await youtubedl(targetUrl, {
-                        dumpSingleJson: true,
-                        noCheckCertificates: true,
-                        noWarnings: true,
-                        preferFreeFormats: true,
-                        addHeader: ['referer:youtube.com', 'user-agent:googlebot']
-                    }, { windowsHide: true });
-
-                    const entry = (info.entries && info.entries[0]) ? info.entries[0] : info;
-                    if (entry && entry.formats) {
-                        const audioFormats = entry.formats.filter(f => f.acodec !== 'none');
-                        const bestAudio = audioFormats.find(f => f.vcodec === 'none') || audioFormats[0];
-                        if (bestAudio && bestAudio.url) {
-                            ffmpegInput = bestAudio.url;
-                            inputStream = null;
-                            log.success(`[PreloadManager] Direct URL extracted successfully for: ${targetTrack.title}`);
-                        }
-                    } else if (entry && entry.url) {
-                        ffmpegInput = entry.url;
-                        inputStream = null;
-                    }
-                } catch (ytdlErr) {
-                    log.error(`[PreloadManager] youtube-dl-exec resolution warning for ${targetTrack.title}:`, ytdlErr.message);
-                }
-            }
-
-            if (!ffmpegInput && inputStream) {
-                ffmpegInput = 'pipe:0';
-            }
+            const resolved = await this.resolveAudioInput(targetTrack, targetUrl);
+            const ffmpegInput = resolved.ffmpegInput;
+            const inputStream = resolved.inputStream;
 
             if (isCancelled) return;
 
@@ -1311,7 +1538,20 @@ class PreloadManager {
             if (resumeInfo) {
                 ffmpegArgs.push('-ss', resumeInfo.seconds.toFixed(6));
             }
-            ffmpegArgs.push('-i', ffmpegInput || 'pipe:0', '-acodec', 'libmp3lame', '-ab', `${bitrate}k`);
+            ffmpegArgs.push('-i', ffmpegInput || 'pipe:0');
+            /*
+             * L'image seule est écartée, et il le faut.
+             *
+             * Un fichier téléversé porte souvent sa pochette en flux vidéo — du
+             * MJPEG à l'intérieur d'un WAV. Le muxer MP3 ne sait la ranger que
+             * dans une étiquette ID3v2, que l'on désactive juste après pour ne
+             * pas semer d'étiquette au milieu d'un encodage repris. ffmpeg
+             * s'arrêtait alors net sur « nothing was written into output file »,
+             * sans un octet, et le préchargement de ces fichiers échouait
+             * toujours. Seul le son nous intéresse ici.
+             */
+            ffmpegArgs.push('-vn');
+            ffmpegArgs.push('-acodec', 'libmp3lame', '-ab', `${bitrate}k`);
             // Sans ces deux options, chaque segment encodé s'ouvre sur une
             // étiquette ID3, qui se retrouverait en plein milieu du fichier au
             // moment du raccord.
@@ -1494,6 +1734,10 @@ class PreloadManager {
                 const retryIn = Math.round(this._retryDelayMs(attempts) / 1000);
                 log.error(`[PreloadManager] Preload failed for ${track.title} `
                     + `(attempt ${attempts}, retrying in ${retryIn} s):`, err.message);
+
+                // Lancé sans être attendu : le diagnostic ne doit pas retenir la
+                // boucle de préchargement, qui a d'autres cibles à servir.
+                this._checkYtdlpFreshness(track, attempts);
             }
             this.notifyProgress();
         }

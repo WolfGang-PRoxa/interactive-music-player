@@ -573,72 +573,135 @@ function createApiRouter(webServer) {
             return res.status(403).send('Chemin de fichier non autorisé');
         }
 
-        // Si c'est un flux distant (YouTube, etc.)
-        if (!track.extractor) {
-            for (const [_, ext] of player.extractors.store.entries()) {
-                try {
-                    if (await ext.validate(track.url, track.queryType)) {
-                        track.extractor = ext;
-                        log.info(`[WebServer Stream] Extractor resolved on the fly for ${track.title}: ${ext.constructor.name}`);
-                        break;
-                    }
-                } catch (e) {}
+        /*
+         * Flux distant : YouTube et consorts, transcodés à la volée.
+         *
+         * La piste est d'abord rendue jouable par le préchargeur, qui tient la
+         * recette : une piste venue d'une playlist enregistrée n'est qu'un objet
+         * nu relu du disque, et l'extracteur à qui on la remettait telle quelle
+         * rendait un flux qui ne produisait rien — sans erreur, sans un octet.
+         * Le tableau de bord recevait alors un `audio/mpeg` vide : la barre de
+         * progression avançait, et rien ne sortait. La même résolution sert au
+         * préchargement, ce qui explique qu'un morceau déjà mis en cache
+         * s'entendait quand le même morceau joué en direct restait muet.
+         *
+         * Le contexte d'extraction enveloppe la seule résolution : le flux qu'il
+         * rend continue d'être lu longtemps après, et le refermer plus tard ne
+         * lui apporterait rien.
+         */
+        try {
+            const crypto = require('crypto');
+
+            const resolveInput = async () => {
+                const playable = await preloadManager.resolvePlayableTrack(track);
+                const input = await preloadManager.resolveAudioInput(playable.track, playable.url);
+                return { ...input, title: playable.track.title || track.title };
+            };
+
+            const context = player && player.extractors && player.extractors.context;
+            const { ffmpegInput, inputStream, title } = context
+                ? await context.provide({
+                    id: crypto.randomUUID(),
+                    attemptedExtractors: new Set(),
+                    bridgeAttemptedExtractors: new Set(),
+                }, resolveInput)
+                : await resolveInput();
+
+            if (!ffmpegInput && !inputStream) {
+                log.error(`[WebServer Stream] No playable source for: ${title}`);
+                return res.status(502).send('Source audio introuvable pour ce morceau');
             }
-        }
 
-        if (track.extractor) {
-            try {
-                let stream = null;
-                if (typeof track.extractor.stream === 'function') {
-                    stream = await track.extractor.stream(track);
-                } else if (typeof track.extractor.bridge === 'function') {
-                    stream = await track.extractor.bridge(track);
-                } else if (typeof track.extractor.getStream === 'function') {
-                    stream = await track.extractor.getStream(track);
-                } else if (player && typeof player.extractors.stream === 'function') {
-                    stream = await player.extractors.stream(track);
-                }
-                if (stream) {
-                    const cp = require('child_process');
-                    const ffmpeg = require('ffmpeg-static');
+            const cp = require('child_process');
+            const ffmpeg = require('ffmpeg-static');
 
-                    const ffmpegProcess = cp.spawn(ffmpeg, [
-                        '-i', 'pipe:0',
-                        '-acodec', 'libmp3lame',
-                        '-ab', '128k',
-                        '-f', 'mp3',
-                        'pipe:1'
-                    ], {
-                        stdio: ['pipe', 'pipe', 'ignore'],
-                        windowsHide: true
-                    });
-
-                    res.writeHead(200, {
-                        'Content-Type': 'audio/mpeg',
-                        'Transfer-Encoding': 'chunked'
-                    });
-
-                    stream.pipe(ffmpegProcess.stdin);
-                    ffmpegProcess.stdout.pipe(res);
-
-                    req.on('close', () => {
-                        try {
-                            ffmpegProcess.kill();
-                        } catch (e) {}
-                        try {
-                            stream.destroy();
-                        } catch (e) {}
-                    });
-                    return;
-                }
-            } catch (err) {
-                log.error('[WebServer Stream] Remote stream extraction/transcoding error:', err.message);
-                res.status(500).send(err.message);
-                return;
+            const args = [];
+            // Une URL directe peut se rompre en cours de route : ffmpeg reprend
+            // la connexion plutôt que de rendre un fichier tronqué.
+            if (ffmpegInput && /^https?:\/\//i.test(ffmpegInput)) {
+                args.push('-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5');
             }
-        }
+            // `-vn` : la source peut porter une image — pochette d'un fichier
+            // téléversé, piste vidéo d'un flux distant. Le muxer MP3 n'en veut
+            // pas et s'arrête sans écrire un octet. Voir PreloadManager.
+            args.push('-i', ffmpegInput || 'pipe:0', '-vn',
+                '-acodec', 'libmp3lame', '-ab', '128k', '-f', 'mp3', 'pipe:1');
 
-        res.status(400).send('Format non supporté pour le stream personnel');
+            const ffmpegProcess = cp.spawn(ffmpeg, args, {
+                stdio: ['pipe', 'pipe', 'pipe'],
+                windowsHide: true,
+            });
+
+            // Dernières lignes de ffmpeg, gardées pour le seul cas où il ne
+            // produit rien : son diagnostic est alors la seule explication
+            // disponible, et il partait jusqu'ici dans le vide.
+            let stderrTail = '';
+            if (ffmpegProcess.stderr) {
+                ffmpegProcess.stderr.on('data', (chunk) => {
+                    stderrTail = (stderrTail + chunk.toString()).slice(-800);
+                });
+            }
+
+            if (inputStream) {
+                // Sans ces deux gardes, une source qui se coupe fait remonter un
+                // `error` sur un flux qui n'en écoute pas : Node abat alors le
+                // processus entier, bot compris.
+                inputStream.on('error', (err) => {
+                    log.error(`[WebServer Stream] Source stream error for ${title}:`, err.message);
+                    try { ffmpegProcess.kill(); } catch (e) {}
+                });
+                if (ffmpegProcess.stdin) {
+                    ffmpegProcess.stdin.on('error', (err) => {
+                        // EPIPE attendu : ffmpeg a fermé son entrée en premier.
+                        if (err.code !== 'EPIPE') {
+                            log.error(`[WebServer Stream] ffmpeg stdin error for ${title}:`, err.message);
+                        }
+                    });
+                }
+                inputStream.pipe(ffmpegProcess.stdin);
+            }
+
+            /*
+             * L'en-tête n'est écrite qu'au premier octet reçu.
+             *
+             * Annoncée d'avance, elle engageait la réponse avant de savoir s'il y
+             * aurait quelque chose à envoyer : un échec ne pouvait plus être
+             * signalé, et le navigateur recevait un `200 OK` parfaitement vide,
+             * qu'il traite comme un morceau sans son plutôt que comme une erreur.
+             */
+            let headerSent = false;
+            ffmpegProcess.stdout.once('data', (chunk) => {
+                headerSent = true;
+                res.writeHead(200, {
+                    'Content-Type': 'audio/mpeg',
+                    'Transfer-Encoding': 'chunked',
+                });
+                res.write(chunk);
+                ffmpegProcess.stdout.pipe(res);
+            });
+
+            ffmpegProcess.on('error', (err) => {
+                log.error(`[WebServer Stream] ffmpeg could not be started for ${title}:`, err.message);
+                if (!headerSent && !res.headersSent) res.status(500).send(err.message);
+            });
+
+            ffmpegProcess.on('close', (code) => {
+                if (headerSent) return;
+                log.error(`[WebServer Stream] ffmpeg produced nothing for ${title} `
+                    + `(code ${code}) — ${stderrTail.trim().split('\n').slice(-3).join(' | ') || 'no output'}`);
+                if (!res.headersSent) res.status(502).send('Transcodage impossible pour ce morceau');
+            });
+
+            req.on('close', () => {
+                try { ffmpegProcess.kill(); } catch (e) {}
+                try { if (inputStream) inputStream.destroy(); } catch (e) {}
+            });
+            return;
+        } catch (err) {
+            log.error('[WebServer Stream] Remote stream extraction/transcoding error:', err.message);
+            if (!res.headersSent) res.status(500).send(err.message);
+            return;
+        }
     });
 
     router.get('/download', async (req, res) => {
@@ -716,17 +779,20 @@ function createApiRouter(webServer) {
         let ffmpegAudioUrl = null;
         let inputStream = null;
 
-        if (cachedPath && fs.existsSync(cachedPath) && !(reqFormat || '').toLowerCase().startsWith('mp4')) {
+        // Fichier local : accepté uniquement s'il est sous une racine autorisée.
+        //
+        // Il passe **avant** le cache, à l'inverse du flux : ce que le cache
+        // contient est une copie compressée, faite pour être écoutée sur un
+        // téléphone. Un téléchargement, lui, doit repartir de l'original —
+        // sans quoi un export en WAV rendrait un WAV réencodé depuis un MP3.
+        const localPath = resolveMediaPath(track.url);
+        if (localPath) {
+            ffmpegInput = localPath;
+        } else if (track.queryType === 'file' || !/^https?:\/\//i.test(track.url || '')) {
+            log.warn(`[WebServer Download] Access denied, path outside the allowed roots: ${track.url}`);
+            return res.status(403).send('Chemin de fichier non autorisé');
+        } else if (cachedPath && fs.existsSync(cachedPath) && !(reqFormat || '').toLowerCase().startsWith('mp4')) {
             ffmpegInput = cachedPath;
-        } else {
-            // Fichier local : accepté uniquement s'il est sous une racine autorisée
-            const localPath = resolveMediaPath(track.url);
-            if (localPath) {
-                ffmpegInput = localPath;
-            } else if (track.queryType === 'file' || !/^https?:\/\//i.test(track.url || '')) {
-                log.warn(`[WebServer Download] Access denied, path outside the allowed roots: ${track.url}`);
-                return res.status(403).send('Chemin de fichier non autorisé');
-            }
         }
 
         // 2. Sinon, résolution de l'URL directe via youtube-dl-exec
@@ -854,7 +920,104 @@ function createApiRouter(webServer) {
         res.status(500).send('Échec du téléchargement du morceau');
     });
 
+    /*
+     * Résolutions vidéo déjà obtenues — et déjà refusées.
+     *
+     * Le tableau de bord redemande l'adresse du flux à chaque rafraîchissement
+     * d'état, soit une fois par seconde et par onglet ouvert. Tant que la
+     * résolution aboutit, le cache absorbe tout. Mais un échec n'y laissait
+     * aucune trace : une vidéo protégée par DRM, retirée, ou simplement
+     * introuvable, relançait donc un processus yt-dlp par seconde et par
+     * onglet, indéfiniment, pour rapporter chaque fois la même erreur.
+     *
+     * Six de ces processus tournaient de front sur la machine, chacun pesant
+     * son démarrage de Python : la boucle d'événements s'en ressentait, et les
+     * WebSocket des tableaux de bord se faisaient couper — d'où des clients qui
+     * n'en finissaient plus de se reconnecter, symptôme sans rapport apparent
+     * avec la vidéo.
+     *
+     * L'échec est donc retenu comme le succès, moins longtemps : une vidéo peut
+     * redevenir disponible, et rien ne presse de le découvrir.
+     */
     const videoCache = new Map();
+    const VIDEO_CACHE_TTL_MS = 3600000;
+    const VIDEO_FAILURE_TTL_MS = 300000;
+
+    /**
+     * Résolutions en cours, par clé de cache.
+     *
+     * Deux onglets ouverts sur le même morceau demandaient chacun le leur, et
+     * les deux processus faisaient le même travail. Le second attend désormais
+     * le premier.
+     */
+    const videoInFlight = new Map();
+
+    /**
+     * Résout le flux vidéo d'un morceau, sans rien mettre en cache.
+     *
+     * Rend toujours une issue, jamais une exception : un échec est une réponse
+     * comme une autre, et c'est ce qui permet de le retenir aussi longtemps
+     * qu'un succès.
+     *
+     * @param {string} query - URL du morceau, ou titre à rechercher.
+     * @param {number} height - Définition demandée.
+     * @param {{ title?: string, author?: string }} fallback - Métadonnées de
+     *   repli, quand la source n'en rapporte pas.
+     * @returns {Promise<{ data?: object, status?: number, error?: string }>}
+     */
+    async function resolveVideoStream(query, height, fallback = {}) {
+        try {
+            const youtubedl = require('youtube-dl-exec');
+            const isUrl = /^https?:\/\//i.test(query);
+            const queryArg = isUrl ? query : `ytsearch1:${query}`;
+
+            const output = await youtubedl(queryArg, {
+                dumpSingleJson: true,
+                noCheckCertificates: true,
+                noWarnings: true,
+                preferFreeFormats: true,
+                addHeader: ['referer:youtube.com', 'user-agent:googlebot']
+            }, { windowsHide: true });
+
+            const entry = (output.entries && output.entries[0]) ? output.entries[0] : output;
+            if (!entry || !entry.formats) {
+                return { status: 404, error: 'Aucun format vidéo disponible' };
+            }
+
+            const videoFormats = entry.formats.filter(f => f.vcodec !== 'none' && f.acodec === 'none' && (f.ext === 'mp4' || f.container === 'mp4'));
+            const fallbackVideoFormats = entry.formats.filter(f => f.vcodec !== 'none' && f.acodec === 'none');
+            const anyVideoFormats = entry.formats.filter(f => f.vcodec !== 'none');
+
+            const formats = videoFormats.length > 0 ? videoFormats : (fallbackVideoFormats.length > 0 ? fallbackVideoFormats : anyVideoFormats);
+            if (formats.length === 0) {
+                return { status: 404, error: 'Aucun flux vidéo trouvé' };
+            }
+
+            const optimal = pickVideoFormat(formats, height);
+
+            if (optimal.height && optimal.height !== height) {
+                log.info(`[WebServer Video-Info] ${height}p unavailable in a readable codec for `
+                    + `« ${entry.title || query} »: ${optimal.height}p (${optimal.vcodec || '?'}) served instead.`);
+            }
+
+            return {
+                data: {
+                    videoUrl: optimal.url,
+                    height: optimal.height,
+                    // Hauteur demandée : le client peut ainsi signaler l'écart sans
+                    // relire les réglages.
+                    requestedHeight: height,
+                    codec: optimal.vcodec || null,
+                    format: optimal.ext || 'mp4',
+                    title: entry.title || fallback.title || '',
+                    author: entry.uploader || entry.artist || fallback.author || ''
+                }
+            };
+        } catch (err) {
+            log.error('[WebServer Video-Info] Video extraction error:', err.message);
+            return { status: 500, error: err.message };
+        }
+    }
 
     router.get('/video-info', async (req, res) => {
         const { trackUrl, title, author, guildId } = req.query;
@@ -870,65 +1033,32 @@ function createApiRouter(webServer) {
         // La hauteur entre dans la clé : changer de qualité doit relancer une
         // résolution, pas resservir l'entrée mise en cache pour l'ancienne.
         const cacheKey = `${targetQuery.toLowerCase()}|${targetHeight}`;
-        if (videoCache.has(cacheKey)) {
-            const cached = videoCache.get(cacheKey);
-            if (Date.now() - cached.timestamp < 3600000) {
-                return res.json(cached.data);
+
+        const cached = videoCache.get(cacheKey);
+        if (cached) {
+            const ttl = cached.error ? VIDEO_FAILURE_TTL_MS : VIDEO_CACHE_TTL_MS;
+            if (Date.now() - cached.timestamp < ttl) {
+                return cached.error
+                    ? res.status(cached.status || 500).json({ error: cached.error })
+                    : res.json(cached.data);
             }
+            videoCache.delete(cacheKey);
         }
 
-        try {
-            const youtubedl = require('youtube-dl-exec');
-            const isUrl = /^https?:\/\//i.test(targetQuery);
-            const queryArg = isUrl ? targetQuery : `ytsearch1:${targetQuery}`;
-
-            const output = await youtubedl(queryArg, {
-                dumpSingleJson: true,
-                noCheckCertificates: true,
-                noWarnings: true,
-                preferFreeFormats: true,
-                addHeader: ['referer:youtube.com', 'user-agent:googlebot']
-            }, { windowsHide: true });
-
-            const entry = (output.entries && output.entries[0]) ? output.entries[0] : output;
-            if (!entry || !entry.formats) {
-                return res.status(404).json({ error: 'Aucun format vidéo disponible' });
-            }
-
-            const videoFormats = entry.formats.filter(f => f.vcodec !== 'none' && f.acodec === 'none' && (f.ext === 'mp4' || f.container === 'mp4'));
-            const fallbackVideoFormats = entry.formats.filter(f => f.vcodec !== 'none' && f.acodec === 'none');
-            const anyVideoFormats = entry.formats.filter(f => f.vcodec !== 'none');
-
-            const formats = videoFormats.length > 0 ? videoFormats : (fallbackVideoFormats.length > 0 ? fallbackVideoFormats : anyVideoFormats);
-            if (formats.length === 0) {
-                return res.status(404).json({ error: 'Aucun flux vidéo trouvé' });
-            }
-
-            const optimal = pickVideoFormat(formats, targetHeight);
-
-            if (optimal.height && optimal.height !== targetHeight) {
-                log.info(`[WebServer Video-Info] ${targetHeight}p unavailable in a readable codec for `
-                    + `« ${entry.title || targetQuery} »: ${optimal.height}p (${optimal.vcodec || '?'}) served instead.`);
-            }
-
-            const data = {
-                videoUrl: optimal.url,
-                height: optimal.height,
-                // Hauteur demandée : le client peut ainsi signaler l'écart sans
-                // relire les réglages.
-                requestedHeight: targetHeight,
-                codec: optimal.vcodec || null,
-                format: optimal.ext || 'mp4',
-                title: entry.title || title || '',
-                author: entry.uploader || entry.artist || author || ''
-            };
-
-            videoCache.set(cacheKey, { timestamp: Date.now(), data });
-            res.json(data);
-        } catch (err) {
-            log.error('[WebServer Video-Info] Video extraction error:', err.message);
-            res.status(500).json({ error: err.message });
+        let pending = videoInFlight.get(cacheKey);
+        if (!pending) {
+            pending = resolveVideoStream(targetQuery, targetHeight, { title, author })
+                .then((outcome) => {
+                    videoCache.set(cacheKey, { timestamp: Date.now(), ...outcome });
+                    return outcome;
+                })
+                .finally(() => videoInFlight.delete(cacheKey));
+            videoInFlight.set(cacheKey, pending);
         }
+
+        const outcome = await pending;
+        if (outcome.error) return res.status(outcome.status || 500).json({ error: outcome.error });
+        res.json(outcome.data);
     });
 
     router.post('/upload', async (req, res) => {
