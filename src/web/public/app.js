@@ -1005,6 +1005,75 @@
 
     // --- Interactive Control Event Listeners ---
 
+    /**
+     * Lance la lecture de la source choisie, le lecteur étant vide.
+     *
+     * Le bouton lecture ne savait rien faire de cet état : il annonçait
+     * « aucune musique en cours » et s'arrêtait là, alors que la file d'attente
+     * ou la playlist désignée comme source n'attendait qu'un départ. Le seul
+     * cas où il n'y a vraiment rien à jouer est celui d'une source vide — et
+     * c'est encore une occasion de proposer l'autre.
+     *
+     * D'où les quatre issues, dans l'ordre où on les rencontre :
+     *
+     *   - la source a de quoi jouer : on la lance, et c'est tout ;
+     *   - la file est vide : on propose la première playlist qui ne l'est pas ;
+     *   - la playlist choisie est vide : on propose la file, ou à défaut la
+     *     playlist suivante qui a du contenu ;
+     *   - rien nulle part : la notification seule, sans bouton, car il n'y
+     *     aurait rien derrière.
+     *
+     * L'état consulté ici est celui de la dernière diffusion du serveur : il
+     * décide de ce qu'on **propose**, jamais de ce qui se joue. Le serveur
+     * revérifie tout de son côté — voir handleStartPlaybackSource.
+     */
+    function startActiveSource() {
+        const source = state.activePlaybackSource || 'queue';
+        const queue = state.queue || [];
+        const playlists = state.playlists || [];
+        const filled = playlists.filter(p => (p.tracks || []).length > 0);
+
+        const start = (nextSource) => sendWS({
+            type: 'startPlaybackSource',
+            data: nextSource ? { source: nextSource } : {}
+        });
+
+        /** Bouton « jouer cette playlist », ou rien s'il n'y en a aucune. */
+        const playlistAction = (playlist) => (playlist ? {
+            label: t('toast_action_play_playlist').replace('{name}', playlist.name),
+            onClick: () => start(playlist.id)
+        } : null);
+
+        if (source === 'queue') {
+            if (queue.length > 0) {
+                start(null);
+                return;
+            }
+            showToast(t('toast_queue_empty'), playlistAction(filled[0] || null));
+            return;
+        }
+
+        const playlist = playlists.find(p => p.id === source) || null;
+        if (playlist && (playlist.tracks || []).length > 0) {
+            start(null);
+            return;
+        }
+
+        // La playlist a pu disparaître entre-temps : son nom vaut mieux que son
+        // identifiant, mais l'identifiant vaut mieux qu'un trou dans la phrase.
+        const name = playlist ? playlist.name : source;
+        const action = queue.length > 0
+            ? {
+                label: t('toast_action_play_queue'),
+                onClick: () => start('queue')
+            }
+            // Sinon la playlist suivante qui a du contenu — celle qu'on vient
+            // d'essayer n'en a pas, elle ne peut pas être de celles-là.
+            : playlistAction(filled.find(p => p.id !== source) || null);
+
+        showToast(t('toast_playlist_empty').replace('{name}', name), action);
+    }
+
     // Media Controls
     function togglePlayPause() {
         const now = Date.now();
@@ -1023,8 +1092,8 @@
         });
 
         if (!state.currentTrack) {
-            console.warn('[PlayPause Debug] Toggle ignored: no currentTrack in state.');
-            showToast(t('tooltip_no_track_playing') || 'Aucune musique en cours');
+            console.warn('[PlayPause Debug] No currentTrack: starting the chosen source.');
+            startActiveSource();
             return;
         }
 
@@ -1451,6 +1520,7 @@
 
         if (personalAudio && state.settings && state.settings.broadcastMode === 'personal') {
             personalAudio.currentTime = targetMs / 1000;
+            suspendPreload();
         }
         sendWS({
             type: 'seek',
@@ -1466,6 +1536,7 @@
 
         if (personalAudio && state.settings && state.settings.broadcastMode === 'personal') {
             personalAudio.currentTime = targetMs / 1000;
+            suspendPreload();
         }
         sendWS({
             type: 'seek',
@@ -1606,6 +1677,51 @@
     };
 
     function setupAudioListeners(audio) {
+        /*
+         * Un chargement qui échoue ne se voyait nulle part.
+         *
+         * L'élément reste alors muet, et le serveur — qui tient la progression
+         * du mode personnel de son côté — continue d'avancer : la barre défile
+         * sur du silence, sans un mot. C'est ainsi qu'un flux vide servi par
+         * `/api/stream` a pu passer des semaines pour une bizarrerie sans
+         * logique. L'erreur est désormais dite à l'utilisateur et remontée au
+         * journal du bot, seul endroit consultable depuis un téléphone.
+         */
+        audio.addEventListener('error', () => {
+            // Le fragment silencieux du déverrouillage, et la source vidée
+            // volontairement à la fin d'un fondu : ni l'un ni l'autre n'est un
+            // incident.
+            if (audio.unlockInProgress || !audio.getAttribute('src')) return;
+
+            const err = audio.error;
+            const title = (state.currentTrack && state.currentTrack.title) || '—';
+            const detail = `code ${err ? err.code : '?'}`
+                + `${err && err.message ? ` : ${err.message}` : ''}`
+                + ` | readyState ${audio.readyState} | networkState ${audio.networkState}`;
+
+            sendWS({
+                type: 'clientLog',
+                data: {
+                    source: 'Audio',
+                    message: `ECHEC CHARGEMENT | « ${title} » `
+                        + `| element ${audio === primaryAudio ? 'primaire' : 'secondaire'} `
+                        + `| actif ${audio === activeAudio ? 'oui' : 'non'} | ${detail}`
+                }
+            });
+
+            // Une reprise d'abord : la plupart de ces échecs tiennent au
+            // transport, et un rechargement à la position atteinte les efface
+            // sans que l'utilisateur ait rien à faire.
+            if (reloadPersonalAudio(audio, detail)) return;
+
+            // Seul l'élément qui a la charge du son mérite d'interrompre
+            // l'utilisateur : l'autre prépare un enchaînement dont l'échec se
+            // verra bien assez tôt.
+            if (audio === activeAudio && state.settings.broadcastMode === 'personal') {
+                showToast(t('toast_track_load_failed').replace('{title}', title));
+            }
+        });
+
         audio.addEventListener('progress', () => {
             if (audio === activeAudio) window.MusicPlayer.updateBufferUI();
         });
@@ -1625,6 +1741,22 @@
             } else {
                 return;
             }
+
+            /*
+             * Le préchargement est aussi décidé ici, et pas seulement à la
+             * réception de l'état.
+             *
+             * Un téléphone verrouillé, ou dont on a quitté le navigateur, ne
+             * garde la page vivante que parce qu'un son y joue : les minuteries
+             * y sont bridées et les messages du serveur peuvent s'espacer. Cet
+             * événement-ci, en revanche, est émis par la lecture elle-même,
+             * plusieurs fois par seconde tant qu'elle dure. C'est le battement
+             * le plus fiable dont on dispose dans cet état.
+             *
+             * L'appel est sans effet tant qu'il n'y a rien à faire : il se
+             * contente de comparer ce que la réserve tient à ce qui vient.
+             */
+            preloadNextTrack();
 
             // Le serveur prend cette valeur pour argent comptant. Tant que la
             // position restaurée n'a pas été appliquée à l'élément, la remonter
@@ -1710,10 +1842,14 @@
                 // ou playlist. Voir MusicPlayer.pisteSuivante.
                 const nextTrack = window.MusicPlayer.nextTrackOf(state);
                 if (nextTrack) {
-                    const nextUrl = `${window.location.protocol === 'https:' ? 'https:' : 'http:'}//${window.location.host}/api/stream?guildId=${state.guildId}&trackUrl=${encodeURIComponent(nextTrack.url)}`;
-                    nextAudio.currentTrackUrl = nextTrack.url;
-                    nextAudio.src = nextUrl;
-                    nextAudio.load();
+                    // Le préchargement l'a peut-être déjà mis là : recharger la
+                    // même source repartirait de zéro, et le fondu s'ouvrirait
+                    // sur un tampon vide.
+                    if (nextAudio.currentTrackUrl !== nextTrack.url) {
+                        nextAudio.currentTrackUrl = nextTrack.url;
+                        nextAudio.src = streamUrlFor(nextTrack);
+                        nextAudio.load();
+                    }
                     nextAudio.volume = 0;
                     nextAudio.isMixFadingIn = true;
                     nextAudio.isMixFadingOut = false;
@@ -1890,55 +2026,129 @@
     if (secondaryAudio) setupAudioListeners(secondaryAudio);
 
     /**
-     * Autorise la lecture des deux éléments audio dès le premier geste.
+     * Autorise la lecture des deux éléments audio, à la faveur d'un geste.
      *
      * Les navigateurs mobiles refusent `play()` sur un élément qu'aucune action
-     * de l'utilisateur n'a jamais déclenché. Le second élément n'entre en jeu
-     * qu'au premier fondu enchaîné, longtemps après l'appui sur « lecture » :
-     * sa mise en route était alors rejetée — `NotAllowedError` — et
-     * l'enchaînement se déroulait sur du silence, l'erreur ne partant que dans
-     * la console du navigateur.
+     * de l'utilisateur n'a jamais déclenché — `NotAllowedError`. Or en
+     * diffusion personnelle, presque tous nos `play()` partent d'un message du
+     * serveur, jamais d'un appui : sans autorisation préalable, la piste se
+     * charge, la barre de progression avance, et il ne sort aucun son. C'est
+     * exactement le symptôme qu'on a mis des jours à cerner.
      *
-     * Un fragment silencieux, joué puis retiré à l'intérieur du geste, suffit à
-     * lever la restriction pour toute la session. L'élément déjà pourvu d'une
-     * source n'est pas touché : il joue, donc il est déjà autorisé.
+     * Trois choses ont été corrigées ici, et il fallait les trois :
+     *
+     *  1. **Le fragment silencieux était illisible.** Son en-tête annonçait un
+     *     bloc de données vide, ce que WebKit refuse de charger : la lecture du
+     *     fragment échouait, donc l'autorisation avec elle. Le remplaçant porte
+     *     vingt millisecondes de vrai silence — 204 octets, PCM 8 bits.
+     *
+     *  2. **Un échec était définitif.** Le drapeau passait à `vrai` avant même
+     *     de savoir si l'autorisation avait été obtenue, et l'écouteur était
+     *     posé en `once` : le premier geste consommait l'unique tentative. On
+     *     réessaie désormais à chaque geste jusqu'à obtenir gain de cause.
+     *
+     *  3. **L'élément déjà pourvu d'une source était sauté**, au motif qu'il
+     *     jouait donc était déjà autorisé. C'est faux : sur téléphone, l'état
+     *     du serveur arrive avant le premier appui et lui pose une source qu'il
+     *     n'a jamais eu le droit de jouer. Il est donc lancé pour de bon, puis
+     *     remis en pause aussitôt si le serveur ne le jouait pas.
      */
-    const SILENCE_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=';
+    const SILENCE_WAV = 'data:audio/wav;base64,'
+        + 'UklGRsQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YaAAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA';
+
+    const UNLOCK_GESTURES = ['pointerdown', 'touchstart', 'keydown'];
     let audioUnlocked = false;
+
+    /**
+     * Obtient de ce navigateur le droit de faire jouer un élément.
+     *
+     * @param {HTMLAudioElement} el
+     * @returns {Promise<boolean>} L'autorisation a-t-elle été accordée.
+     */
+    function grantPlayback(el) {
+        if (el.playbackGranted) return Promise.resolve(true);
+
+        const settle = (granted) => {
+            if (granted) el.playbackGranted = true;
+            return granted;
+        };
+
+        if (el.getAttribute('src')) {
+            // Ce que le serveur veut de cet élément : s'il ne doit pas jouer, la
+            // lecture est aussitôt refermée. Le geste, lui, aura été dépensé —
+            // c'est tout ce qu'on lui demandait.
+            const wanted = state.isPlaying && !state.isPaused && el === activeAudio;
+            const promise = el.play();
+            if (!promise || typeof promise.then !== 'function') return Promise.resolve(settle(true));
+            return promise.then(() => {
+                if (!wanted) el.pause();
+                return settle(true);
+            }).catch(() => settle(false));
+        }
+
+        el.unlockInProgress = true;
+        el.muted = true;
+        el.src = SILENCE_WAV;
+
+        const cleanup = () => {
+            try { el.pause(); } catch (e) {}
+            el.removeAttribute('src');
+            el.load();
+            el.muted = false;
+            el.unlockInProgress = false;
+        };
+
+        const promise = el.play();
+        if (!promise || typeof promise.then !== 'function') {
+            cleanup();
+            return Promise.resolve(settle(true));
+        }
+        return promise
+            .then(() => { cleanup(); return settle(true); })
+            .catch(() => { cleanup(); return settle(false); });
+    }
 
     function unlockAudio() {
         if (audioUnlocked) return;
-        audioUnlocked = true;
 
-        [primaryAudio, secondaryAudio].forEach((el) => {
-            if (!el || el.src) return;
-            el.unlockInProgress = true;
-            el.muted = true;
-            el.src = SILENCE_WAV;
-            const promise = el.play();
-            const cleanup = () => {
-                try { el.pause(); } catch (e) {}
-                el.removeAttribute('src');
-                el.load();
-                el.muted = false;
-                el.unlockInProgress = false;
-            };
-            if (promise && typeof promise.then === 'function') {
-                promise.then(cleanup).catch(() => {
-                    cleanup();
-                    sendWS({
-                        type: 'clientLog',
-                        data: { source: 'Mix', message: 'DEVERROUILLAGE refuse pour un element audio' }
-                    });
+        const targets = [primaryAudio, secondaryAudio].filter((el) => el && !el.playbackGranted);
+        if (targets.length === 0) {
+            audioUnlocked = true;
+            return;
+        }
+
+        Promise.all(targets.map(grantPlayback)).then((results) => {
+            if (results.every(Boolean)) {
+                audioUnlocked = true;
+                UNLOCK_GESTURES.forEach((evt) => {
+                    document.removeEventListener(evt, unlockAudio, true);
                 });
-            } else {
-                cleanup();
+                return;
             }
+
+            // Une seule fois par élément : le geste suivant réessaiera, et le
+            // journal n'a pas besoin d'en tenir le compte.
+            targets.forEach((el) => {
+                if (el.playbackGranted || el.unlockRefusalReported) return;
+                el.unlockRefusalReported = true;
+                sendWS({
+                    type: 'clientLog',
+                    data: {
+                        source: 'Audio',
+                        message: 'DEVERROUILLAGE refuse pour l\'element '
+                            + (el === primaryAudio ? 'primaire' : 'secondaire')
+                            + ' — un nouveau geste sera retente'
+                    }
+                });
+            });
         });
     }
 
-    ['pointerdown', 'touchstart', 'keydown'].forEach((evt) => {
-        document.addEventListener(evt, unlockAudio, { once: true, capture: true });
+    // Sans `once` : tant que l'autorisation n'est pas acquise, chaque geste est
+    // une occasion de la demander. Les écouteurs se retirent d'eux-mêmes une
+    // fois les deux éléments autorisés.
+    UNLOCK_GESTURES.forEach((evt) => {
+        document.addEventListener(evt, unlockAudio, { capture: true });
     });
 
     /**
@@ -2063,6 +2273,309 @@
         }
     }
 
+    /**
+     * Adresse du flux d'une piste, telle que la sert le bot.
+     *
+     * @param {object} track
+     * @param {number} [attempt=0] - Numéro de reprise. Non nul, il s'ajoute à
+     *   l'adresse : le navigateur tient une réponse tronquée pour valide et la
+     *   resservirait de son cache, indéfiniment identique à elle-même.
+     * @returns {string}
+     */
+    function streamUrlFor(track, attempt = 0) {
+        const scheme = window.location.protocol === 'https:' ? 'https:' : 'http:';
+        const base = `${scheme}//${window.location.host}/api/stream`
+            + `?guildId=${state.guildId}&trackUrl=${encodeURIComponent(track.url)}`;
+        return attempt > 0 ? `${base}&retry=${attempt}` : base;
+    }
+
+    /** Nombre de rechargements tentés avant de renoncer et de le dire. */
+    const MAX_AUDIO_RELOADS = 2;
+
+    /** Délai avant une reprise : voir le commentaire dans reloadPersonalAudio. */
+    const RELOAD_DELAY_MS = 400;
+
+    /**
+     * Recharge la piste en cours après un échec, à la position déjà atteinte.
+     *
+     * Un morceau qui ne se charge pas laissait le lecteur muet pour de bon : le
+     * serveur, qui tient seul la progression en diffusion personnelle, continue
+     * d'avancer, si bien que la barre défile sur du silence jusqu'à la piste
+     * suivante. Une reprise coûte une seconde et sauve la plupart des cas —
+     * coupure de flux, réponse tronquée, décodage refusé sur des octets
+     * incomplets.
+     *
+     * Le compteur est porté par l'élément et remis à zéro à chaque piste
+     * chargée : deux échecs de suite sur le même morceau signent autre chose
+     * qu'un incident de transport, et il vaut mieux le dire que de s'acharner.
+     *
+     * @param {HTMLAudioElement} audio
+     * @param {string} reason - Ce qui a motivé la reprise, pour le journal.
+     * @returns {boolean} false si la reprise n'a pas lieu.
+     */
+    function reloadPersonalAudio(audio, reason) {
+        if (!state.currentTrack || state.settings.broadcastMode !== 'personal') return false;
+        if (audio !== activeAudio) return false;
+
+        // Une reprise déjà engagée : la remise à zéro de l'élément fait
+        // elle-même remonter des erreurs, et chacune relancerait une reprise.
+        if (audio.reloadPending) return true;
+
+        const attempt = (audio.reloadAttempts || 0) + 1;
+        if (attempt > MAX_AUDIO_RELOADS) return false;
+        audio.reloadAttempts = attempt;
+        audio.reloadPending = true;
+
+        // La position du serveur fait foi : celle de l'élément est retombée à
+        // zéro avec l'échec du chargement.
+        const positionSecs = ((state.progress && state.progress.currentMs) || 0) / 1000;
+
+        sendWS({
+            type: 'clientLog',
+            data: {
+                source: 'Audio',
+                message: `REPRISE ${attempt}/${MAX_AUDIO_RELOADS} | « ${state.currentTrack.title || '—'} » `
+                    + `| à ${positionSecs.toFixed(1)} s | ${reason}`
+            }
+        });
+
+        const url = streamUrlFor(state.currentTrack, attempt);
+
+        /*
+         * La reprise est différée, et l'élément remis à zéro avant.
+         *
+         * Réécrire la source depuis l'écouteur d'erreur, dans l'instant, laissait
+         * le lecteur dans un état dont il ne se relevait pas : il répondait
+         * aussitôt `code 4 | networkState 3`, soit « aucune source exploitable »,
+         * alors que la même adresse servie à la main rend le fichier entier. La
+         * sélection de ressource du navigateur est encore en cours pendant cet
+         * événement ; on la laisse se terminer, on vide l'élément, puis on lui
+         * donne la nouvelle adresse.
+         *
+         * Le délai sert aussi à autre chose : ces échecs viennent d'une coupure
+         * de transport, et redemander dans la milliseconde qui suit revient à
+         * frapper à une porte qu'on vient de voir se fermer.
+         */
+        setTimeout(() => {
+            audio.reloadPending = false;
+            if (!state.currentTrack || audio.currentTrackUrl !== state.currentTrack.url) return;
+
+            audio.removeAttribute('src');
+            audio.load();
+
+            audio.src = url;
+            audio.load();
+            applyInitialPosition(audio, positionSecs, () => {
+                if (state.isPlaying && !state.isPaused) {
+                    audio.play().catch(() => {});
+                }
+            });
+        }, RELOAD_DELAY_MS);
+
+        return true;
+    }
+
+    /* ── Préchargement du morceau suivant, dans le navigateur ──────────── */
+
+    /**
+     * Avance de tampon à partir de laquelle le morceau suivant peut commencer à
+     * se charger, en secondes de lecture.
+     *
+     * Deux téléchargements de front se partagent la bande passante : tant que
+     * le morceau en cours n'a pas de quoi tenir, elle lui revient tout entière.
+     */
+    const PRELOAD_AHEAD_SECS = 25;
+
+    /**
+     * Temps restant à partir duquel le morceau suivant se charge, quoi qu'il en
+     * soit du tampon.
+     *
+     * Le critère de tampon ci-dessus ne suffit pas : WebKit met en mémoire avec
+     * parcimonie, plus encore sur un réseau mobile, et l'avance de vingt-cinq
+     * secondes peut n'être jamais atteinte. Le préchargement n'aurait alors
+     * jamais lieu — précisément sur l'appareil qui en a le plus besoin.
+     *
+     * Cette seconde condition ne dépend d'aucune politique de navigateur : à une
+     * minute de la fin, on charge la suite, un point c'est tout. Le morceau en
+     * cours est de toute façon presque entièrement descendu à ce moment-là, la
+     * bande passante ne lui manquera pas.
+     */
+    const PRELOAD_LEAD_SECS = 60;
+
+    /**
+     * Secondes de lecture déjà en mémoire tampon devant la tête de lecture.
+     *
+     * @param {HTMLAudioElement} audio
+     * @returns {number} Infini quand le fichier est entièrement chargé.
+     */
+    function bufferedAheadSecs(audio) {
+        if (!audio || audio.readyState >= 4) return Infinity;
+        if (!audio.buffered || audio.buffered.length === 0) return 0;
+        try {
+            const end = audio.buffered.end(audio.buffered.length - 1);
+            return Math.max(0, end - audio.currentTime);
+        } catch (e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Le morceau en cours peut-il céder de la bande passante au suivant ?
+     *
+     * @param {HTMLAudioElement} audio
+     * @returns {boolean}
+     */
+    function readyToPreload(audio) {
+        if (!audio) return false;
+        if (bufferedAheadSecs(audio) >= PRELOAD_AHEAD_SECS) return true;
+
+        const duration = audio.duration;
+        if (!duration || isNaN(duration) || duration <= 0) return false;
+        return (duration - audio.currentTime) <= PRELOAD_LEAD_SECS;
+    }
+
+    /** L'élément qui ne porte pas la lecture, et peut donc servir de tampon. */
+    function spareAudioElement() {
+        return activeAudio === primaryAudio ? secondaryAudio : primaryAudio;
+    }
+
+    /** Rend l'élément de réserve à son état vide. */
+    function releaseSpare(spare) {
+        if (!spare || !spare.getAttribute('src')) return;
+        try { spare.pause(); } catch (e) {}
+        spare.removeAttribute('src');
+        spare.load();
+        spare.currentTrackUrl = null;
+        spare.reloadAttempts = 0;
+    }
+
+    /**
+     * Interrompt le préchargement en cours, la bande passante étant réclamée
+     * ailleurs.
+     *
+     * Un déplacement dans la piste vide le tampon et oblige le navigateur à
+     * redemander le fichier à la nouvelle position. Si le morceau suivant est en
+     * train de descendre en même temps, les deux se partagent la ligne et le
+     * saut met plusieurs secondes à se voir — sur un téléphone, c'est la
+     * différence entre « instantané » et « il ne se passe rien ».
+     *
+     * Un fichier déjà entièrement chargé est conservé : il ne coûte plus rien.
+     */
+    function suspendPreload() {
+        const spare = spareAudioElement();
+        if (!spare || !spare.getAttribute('src')) return;
+        if (spare.readyState >= 4) return;
+        releaseSpare(spare);
+    }
+
+    /**
+     * Charge le morceau suivant dans l'élément de réserve, pendant que l'autre
+     * joue.
+     *
+     * Le bot précharge déjà de son côté, mais ce qu'il prépare reste sur son
+     * disque : en diffusion personnelle, le son sort du navigateur, et c'est
+     * donc le navigateur qui a besoin d'avoir la suite sous la main. Sans cela,
+     * chaque changement de piste ouvre un téléchargement depuis zéro — une
+     * trentaine de mégaoctets pour un fichier WAV — pendant que la position,
+     * elle, avance déjà côté serveur. D'où des débuts de morceau muets, et des
+     * coupures en cours de route sur une connexion mobile.
+     *
+     * L'élément de réserve est celui-là même que l'enchaînement mix emploie :
+     * la lecture bascule de l'un à l'autre plutôt que de recharger toujours le
+     * même, et le morceau qui commence est déjà en mémoire.
+     */
+    function preloadNextTrack() {
+        if (!personalAudio || !state.settings || state.settings.broadcastMode !== 'personal') return;
+
+        const spare = spareAudioElement();
+        if (!spare) return;
+
+        if (!state.currentTrack) {
+            releaseSpare(spare);
+            return;
+        }
+
+        // Pendant un enchaînement, l'élément de réserve joue déjà : il ne faut
+        // pas lui retirer sa source sous les doigts.
+        if (fadeAudio !== null || activeAudio.isMixFadingIn || mixAwaitingConfirmation !== null) return;
+
+        const next = window.MusicPlayer.nextTrackOf(state);
+        if (!next || !next.url) {
+            releaseSpare(spare);
+            return;
+        }
+
+        // Déjà en tampon : rien à faire, surtout pas relancer le téléchargement.
+        if (spare.currentTrackUrl === next.url) return;
+
+        // La file a changé : ce que la réserve tenait n'est plus le suivant.
+        if (spare.currentTrackUrl) releaseSpare(spare);
+
+        if (!readyToPreload(activeAudio)) return;
+
+        spare.currentTrackUrl = next.url;
+        spare.reloadAttempts = 0;
+        spare.preload = 'auto';
+        spare.muted = false;
+        spare.src = streamUrlFor(next);
+        spare.load();
+    }
+
+    /**
+     * Fait passer la lecture sur l'élément de réserve, qui tient déjà le
+     * morceau demandé.
+     *
+     * Rien n'est téléchargé : c'est tout l'intérêt. L'élément qui vient d'être
+     * quitté est vidé et deviendra la réserve du morceau d'après.
+     *
+     * @param {number} resumePositionSecs - Position annoncée par le serveur.
+     * @param {number} fadeDuration - Durée du fondu d'ouverture, 0 s'il n'a pas
+     *   lieu d'être.
+     * @returns {boolean} false si la réserve n'avait pas ce morceau.
+     */
+    function adoptPreloadedTrack(resumePositionSecs, fadeDuration) {
+        const spare = spareAudioElement();
+        if (!spare || !state.currentTrack) return false;
+        if (spare.currentTrackUrl !== state.currentTrack.url) return false;
+        // `HAVE_CURRENT_DATA` : de quoi commencer. En deçà, le chargement n'a
+        // rien donné et le chemin ordinaire fera mieux.
+        if (spare.readyState < 2) return false;
+
+        const previous = activeAudio;
+
+        spare.volume = previous.volume;
+        spare.playbackRate = previous.playbackRate;
+        spare.isMixFadingIn = false;
+        spare.isMixFadingOut = false;
+
+        activeAudio = spare;
+        personalAudio = spare;
+        window.MusicPlayer.activeAudio = spare;
+
+        if (previous && previous !== spare) {
+            previous.currentTrackUrl = null;
+            releaseSpare(previous);
+        }
+
+        clientPositionWins = false;
+
+        if (fadeDuration > 0) prepareFadeIn(spare);
+        applyInitialPosition(spare, resumePositionSecs, () => {
+            if (fadeDuration > 0) armFadeIn(spare, fadeDuration);
+        });
+
+        sendWS({
+            type: 'clientLog',
+            data: {
+                source: 'Audio',
+                message: `TAMPON | « ${state.currentTrack.title || '—'} » joué depuis la réserve, `
+                    + 'sans téléchargement'
+            }
+        });
+
+        return true;
+    }
+
     function syncPersonalAudio() {
         if (!personalAudio) return;
         const isPersonal = state.settings.broadcastMode === 'personal';
@@ -2086,7 +2599,7 @@
             return;
         }
 
-        const expectedSrc = `${window.location.protocol === 'https:' ? 'https:' : 'http:'}//${window.location.host}/api/stream?guildId=${state.guildId}&trackUrl=${encodeURIComponent(state.currentTrack.url)}`;
+        const expectedSrc = streamUrlFor(state.currentTrack);
 
         // Le serveur a-t-il rattrapé la piste que le navigateur joue déjà ?
         // L'attente est bornée : une confirmation qui ne viendrait jamais
@@ -2119,10 +2632,22 @@
             ? (parseFloat(state.startupFadein.durationMs) || 0) / 1000
             : 0;
 
-        if (!isMixTransitioning && isNewTrack) {
+        // Le morceau suivant déjà en réserve : la lecture bascule dessus sans
+        // rien redemander au serveur. C'est ce que le préchargement prépare.
+        if (!isMixTransitioning && isNewTrack
+            && adoptPreloadedTrack(resumePositionSecs, startupFadein > 0 ? startupFadein : mixFade)) {
+            mixTransitionNextTrack = null;
+            mixTransition = null;
+            if (startupFadein > 0) {
+                startupFadeinPlayed = true;
+                sendWS({ type: 'startupFadeinConsumed' });
+            }
+        } else if (!isMixTransitioning && isNewTrack) {
             mixTransitionNextTrack = null;
             mixTransition = null;
             personalAudio.currentTrackUrl = state.currentTrack.url;
+            // Les reprises comptent par piste : celle-ci n'a pas encore échoué.
+            personalAudio.reloadAttempts = 0;
             personalAudio.src = expectedSrc;
             personalAudio.load();
 
@@ -2171,6 +2696,9 @@
             armFadeIn(personalAudio, startupFadein);
         }
 
+        // Le morceau suivant se charge pendant que celui-ci joue.
+        preloadNextTrack();
+
         // Volume (Ducking automatique inclus)
         clientDucking.update(state);
 
@@ -2191,6 +2719,24 @@
                 } else if (shouldPlay && audio.paused && audio === activeAudio) {
                     audio.play().catch(err => {
                         console.warn('[Audio] Playback blocked or impossible to start:', err);
+                        // `AbortError` ne signale pas un échec : la lecture
+                        // demandée a été supplantée par le chargement de la
+                        // piste suivante, ce qui arrive à chaque passage un peu
+                        // vif d'un morceau à l'autre. Le journal du bot n'a rien
+                        // à y gagner.
+                        if (err && err.name === 'AbortError') return;
+                        // Le reste est remonté au serveur : cet avertissement ne
+                        // partait que dans la console du navigateur, hors de
+                        // portée depuis un téléphone — et c'est le seul indice
+                        // qu'un morceau n'a pas démarré.
+                        sendWS({
+                            type: 'clientLog',
+                            data: {
+                                source: 'Audio',
+                                message: `ECHEC LECTURE | « ${(state.currentTrack && state.currentTrack.title) || '—'} » `
+                                    + `| ${(err && err.name) || '?'} : ${(err && err.message) || ''}`
+                            }
+                        });
                     });
                 }
             }
@@ -2216,6 +2762,9 @@
                     });
                 } else {
                     personalAudio.currentTime = serverSecs;
+                    // Le saut vient d'un autre appareil : la ligne revient au
+                    // morceau en cours, le suivant attendra.
+                    suspendPreload();
                 }
             } else {
                 // Les deux horloges concordent : le serveur redevient la référence.
