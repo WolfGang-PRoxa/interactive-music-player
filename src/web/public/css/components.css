@@ -1059,3 +1059,39 @@ html[data-style="neon-cyberpunk"] .speed-pad-container::before {
         gap: 7px;
     }
 }
+
+/*
+ * Le « i » du titre d'une carte.
+ *
+ * Même sobriété que le cadenas voisin — un bouton de titre ne doit pas peser
+ * plus que le titre —, mais poussé au bout de la rangée : le titre est un
+ * conteneur flex, et « margin-left: auto » lui donne tout l'espace restant.
+ * C'est ce qui le place à droite sans qu'on ait à connaître la largeur du
+ * texte, qui change avec la langue.
+ */
+.card-info-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    padding: 2px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.45;
+    transition: opacity 0.2s ease, color 0.2s ease, background 0.2s ease;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.card-info-btn svg {
+    width: 15px;
+    height: 15px;
+}
+
+.card-info-btn:hover {
+    opacity: 1;
+    color: var(--c-primary);
+    background: rgba(255, 255, 255, 0.08);
+}

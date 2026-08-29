@@ -2194,3 +2194,112 @@ html.light-theme .version-target,
 html[data-theme="light"] .version-target {
     background: rgba(0, 0, 0, 0.04);
 }
+
+/* ═══════════════ Sources et formats de la boîte d'import ═══════════════ */
+
+/*
+ * Une fenêtre de lecture, pas de réglage : plus étroite que les paramètres,
+ * puisqu'elle ne porte que du texte et que des lignes trop longues se lisent
+ * mal. Le plafond en « vw » la garde entière sur un téléphone.
+ */
+.import-info-box {
+    max-width: min(560px, calc(100vw - 2rem));
+}
+
+.import-info-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+/*
+ * Le nom à gauche, la description à droite, et la description qui se replie
+ * seule quand la place manque.
+ *
+ * `flex-basis` sur le nom plutôt qu'une largeur fixe : les libellés traduits
+ * n'ont pas la même longueur d'une langue à l'autre — « Recherche libre » et
+ * « Freie Suche » ne tiennent pas dans la même colonne —, et une largeur figée
+ * aurait tronqué l'allemand ou creusé l'anglais.
+ */
+.import-info-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.2rem 0.6rem;
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+
+.import-info-list strong {
+    flex: 0 0 auto;
+    min-width: 9.5rem;
+    color: var(--text-main);
+    font-weight: 600;
+}
+
+.import-info-list span {
+    flex: 1 1 12rem;
+    color: var(--text-muted);
+}
+
+/*
+ * Les nuances qui font qu'une source « marche » sans marcher tout à fait :
+ * l'audio retrouvé ailleurs pour Spotify, le dossier hors périmètre qui ne
+ * sort que dans le salon vocal. Retirées du flux de la liste par leur filet
+ * latéral — ce sont des réserves, pas des entrées de plus.
+ */
+.import-info-note {
+    margin: 0.9rem 0 0;
+    padding-left: 0.7rem;
+    border-left: 2px solid var(--border-card);
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--text-muted);
+}
+
+.import-info-formats {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4rem 0.7rem;
+    margin-bottom: 0.7rem;
+}
+
+.import-info-format-label {
+    flex: 0 0 auto;
+    min-width: 3.5rem;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.import-info-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    flex: 1 1 auto;
+}
+
+/*
+ * Une extension par pastille : la liste se lit d'un coup d'œil, là où une
+ * énumération séparée par des virgules oblige à la parcourir. Elles passent à
+ * la ligne d'elles-mêmes plutôt que de déborder.
+ */
+.import-info-chips span {
+    padding: 1px 7px;
+    border-radius: 5px;
+    border: 1px solid var(--border-card);
+    background: rgba(255, 255, 255, 0.05);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+html[data-theme="light"] .import-info-chips span {
+    background: rgba(0, 0, 0, 0.04);
+}

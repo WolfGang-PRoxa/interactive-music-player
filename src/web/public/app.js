@@ -1281,6 +1281,23 @@
                 });
             }
             searchInput.value = '';
+        } else {
+            /*
+             * Rien à envoyer : le curseur revient dans le champ.
+             *
+             * C'est ce qui remplace la bulle de validation du navigateur, que
+             * « novalidate » a fait taire — voir le commentaire du formulaire
+             * dans index.html. Sans elle, un clic sur « Ajouter » à vide ne
+             * produisait plus rien du tout, et l'absence de réponse se lit
+             * comme une panne.
+             *
+             * Le focus dit la même chose qu'elle, en moins bavard : voilà où
+             * l'on attend quelque chose. Il sert aussi le cas où le champ
+             * contient des espaces — invisibles, mais que « required » tient
+             * pour une valeur, si bien que le navigateur, lui, n'aurait rien
+             * signalé du tout.
+             */
+            searchInput.focus();
         }
     });
 
@@ -3000,6 +3017,41 @@
 
     // Initialisation du système de tooltips personnalisés
     TooltipSystem.init();
+
+    /*
+     * Sources et formats de la boîte d'import.
+     *
+     * Fenêtre purement documentaire : son contenu est écrit dans index.html et
+     * ne bouge pas, il n'y a donc rien à peindre à l'ouverture. Ne restent que
+     * les trois façons d'en sortir — la croix, le voile, la touche Échap, cette
+     * dernière étant prise en charge plus bas avec les autres fenêtres.
+     */
+    const importInfoModal = document.getElementById('import-info-modal');
+    const btnImportInfo = document.getElementById('btn-import-info');
+    const btnCloseImportInfo = document.getElementById('btn-close-import-info');
+
+    if (btnImportInfo && importInfoModal) {
+        btnImportInfo.addEventListener('click', (e) => {
+            // Le titre de la carte porte le glisser-déposer : on arrête
+            // l'événement avant qu'il n'y remonte, plutôt que de compter sur le
+            // garde de layoutPersistence.js, qui n'écarte que « mousedown ».
+            e.preventDefault();
+            e.stopPropagation();
+            importInfoModal.classList.remove('hidden');
+        });
+    }
+
+    if (btnCloseImportInfo && importInfoModal) {
+        btnCloseImportInfo.addEventListener('click', () => {
+            importInfoModal.classList.add('hidden');
+        });
+    }
+
+    if (importInfoModal) {
+        importInfoModal.addEventListener('click', (e) => {
+            if (e.target === importInfoModal) importInfoModal.classList.add('hidden');
+        });
+    }
 
     // Restart / Shutdown Bot Button Listener (Simple click)
     if (btnRestartBot) {

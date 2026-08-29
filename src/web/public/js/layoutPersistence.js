@@ -152,7 +152,7 @@ function getCardCleanTitle(card) {
     const titleEl = card.querySelector('.card-title');
     if (!titleEl) return "Boîte";
     const clone = titleEl.cloneNode(true);
-    clone.querySelectorAll('.icon-drag-handle, .card-lock-btn').forEach(el => el.remove());
+    clone.querySelectorAll('.icon-drag-handle, .card-lock-btn, .card-info-btn').forEach(el => el.remove());
     return clone.textContent.trim();
 }
 

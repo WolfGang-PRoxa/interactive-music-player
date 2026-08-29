@@ -445,9 +445,42 @@
                         <svg class="icon-locked hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                     </button>
                     <span data-i18n="card_add_track">Ajouter un fichier</span>
+                    <!--
+                         Le « i » de la boîte. « margin-left: auto » le pousse
+                         au bout de la rangée, le titre étant un conteneur flex.
+
+                         Un bouton, et c'est ce qui le dispense de tout garde :
+                         le glisser-déposer des cartes est branché sur le titre
+                         et écarte déjà « e.target.closest('button') », si bien
+                         qu'un clic ici ne déplace pas la carte.
+                    -->
+                    <button type="button" id="btn-import-info" class="card-info-btn" data-tooltip="Sources et formats pris en charge" data-i18n-tooltip="tooltip_import_info">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                        </svg>
+                    </button>
                 </h2>
-                <form id="search-form" class="search-box">
-                    <input type="text" id="search-input" placeholder="Lien YouTube/YouTube Music/SoundCloud/Spotify ou recherche..." data-i18n-placeholder="search_placeholder" required>
+                <!--
+                     « novalidate » : le navigateur garde ses remarques pour lui.
+
+                     Le champ étant « required », une soumission à vide
+                     déclenchait la bulle de validation native — « Veuillez
+                     renseigner ce champ. » —, ancrée au champ et qui y demeure :
+                     elle recouvrait l'infobulle du dessous et passait pour elle.
+                     Deux messages pour un même champ, dont un qu'on ne pouvait
+                     ni traduire ni styler, le navigateur les rendant dans sa
+                     propre langue et sa propre apparence.
+
+                     L'attribut n'ôte que l'interface du navigateur, pas la
+                     contrainte : « required » reste sur le champ, et les
+                     lecteurs d'écran continuent de l'annoncer comme obligatoire.
+                     Le formulaire, lui, écartait déjà les envois vides — voir
+                     le « if (query) » de son écouteur dans app.js.
+                -->
+                <form id="search-form" class="search-box" novalidate>
+                    <input type="text" id="search-input" placeholder="Lien YouTube/YouTube Music/SoundCloud/Spotify ou recherche..." data-i18n-placeholder="search_placeholder" data-tooltip="Collez un lien, tapez une recherche, ou indiquez le chemin d'un fichier présent sur la machine du bot." data-i18n-tooltip="tooltip_search_input" required>
                     <input type="file" id="file-input" accept="audio/*,video/*,.mp4,.webm,.mkv,.avi,.mov,.flv,.m4v,.3gp,.ogv,.wmv" style="display: none;">
                     <button type="button" id="btn-file-select" class="file-btn" data-tooltip="Sélectionner un fichier audio local" data-i18n-tooltip="tooltip_file_select">
                         <svg class="icon-clip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1062,6 +1095,129 @@
                 <button id="btn-create-playlist-cancel" class="maint-btn secondary" style="width: 100%;">
                     <span data-i18n="btn_cancel">Annuler</span>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!--
+         Sources et formats de la boîte d'import.
+         Ouverte par le « i » du titre de la carte « Ajouter un fichier ».
+         Purement documentaire : rien à valider, rien à enregistrer, d'où
+         l'absence de bouton d'action — on la referme et c'est tout.
+    -->
+    <div id="import-info-modal" class="maintenance-overlay hidden">
+        <div class="maintenance-box settings-modal-box import-info-box">
+            <div class="settings-modal-header">
+                <h2 class="settings-modal-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                    <span data-i18n="import_info_title">Sources et formats</span>
+                </h2>
+                <button id="btn-close-import-info" class="settings-close-btn" data-tooltip="Fermer" data-i18n-tooltip="tooltip_close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="settings-modal-body">
+                <!-- Section 1 : d'où la musique peut venir -->
+                <div class="settings-section">
+                    <h3 class="settings-section-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <span data-i18n="import_info_sources_title">Sources prises en charge</span>
+                    </h3>
+
+                    <!--
+                         Les noms de plateformes ne portent pas de « data-i18n » :
+                         une marque ne se traduit pas. Seule la description de ce
+                         qu'on peut en tirer change de langue.
+                    -->
+                    <ul class="import-info-list">
+                        <li>
+                            <strong>YouTube · YouTube Music</strong>
+                            <span data-i18n="import_info_desc_youtube">Lien d'une vidéo, d'une playlist ou d'un album.</span>
+                        </li>
+                        <li>
+                            <strong>SoundCloud</strong>
+                            <span data-i18n="import_info_desc_soundcloud">Lien d'un morceau ou d'un set.</span>
+                        </li>
+                        <li>
+                            <strong>Spotify</strong>
+                            <span data-i18n="import_info_desc_spotify">Lien d'un titre, d'un album ou d'une playlist.</span>
+                        </li>
+                        <li>
+                            <strong>Apple Music</strong>
+                            <span data-i18n="import_info_desc_apple">Lien d'un titre ou d'un album.</span>
+                        </li>
+                        <li>
+                            <strong data-i18n="import_info_name_search">Recherche libre</strong>
+                            <span data-i18n="import_info_desc_search">Un titre, un artiste : le meilleur résultat est retenu.</span>
+                        </li>
+                        <li>
+                            <strong data-i18n="import_info_name_path">Chemin local</strong>
+                            <span data-i18n="import_info_desc_path">Un fichier présent sur la machine qui héberge le bot.</span>
+                        </li>
+                        <li>
+                            <strong data-i18n="import_info_name_upload">Import depuis cet appareil</strong>
+                            <span data-i18n="import_info_desc_upload">Le trombone, qui envoie un fichier de votre appareil vers le bot.</span>
+                        </li>
+                    </ul>
+
+                    <p class="import-info-note" data-i18n="import_info_bridge_note">
+                        Spotify et Apple Music ne diffusent pas leur audio. Le bot
+                        en lit les informations, puis retrouve le morceau sur une
+                        source qui l'autorise : la version jouée peut différer
+                        légèrement de l'originale.
+                    </p>
+                </div>
+
+                <!-- Section 2 : ce que le bot sait lire -->
+                <div class="settings-section">
+                    <h3 class="settings-section-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                        <span data-i18n="import_info_formats_title">Formats acceptés</span>
+                    </h3>
+
+                    <div class="import-info-formats">
+                        <span class="import-info-format-label" data-i18n="import_info_formats_audio">Audio</span>
+                        <div class="import-info-chips">
+                            <span>MP3</span><span>FLAC</span><span>WAV</span><span>OGG</span>
+                            <span>M4A</span><span>OPUS</span><span>AAC</span><span>WMA</span>
+                        </div>
+                    </div>
+
+                    <div class="import-info-formats">
+                        <span class="import-info-format-label" data-i18n="import_info_formats_video">Vidéo</span>
+                        <div class="import-info-chips">
+                            <span>MP4</span><span>WEBM</span><span>MKV</span><span>AVI</span><span>MOV</span>
+                            <span>FLV</span><span>M4V</span><span>3GP</span><span>OGV</span><span>WMV</span>
+                        </div>
+                    </div>
+
+                    <!--
+                         Texte nu, sans <code> : les traductions sont posées par
+                         « textContent » (js/state.js), qui balaie tout balisage
+                         dès qu'une langue s'applique. Le repli du fichier doit
+                         donc dire exactement ce que l'utilisateur verra.
+                    -->
+                    <p class="import-info-note" data-i18n="import_info_formats_note">
+                        Un fichier joué depuis un dossier de la machine du bot ne
+                        s'entend dans le navigateur que si ce dossier figure dans
+                        MEDIA_ROOTS. Sinon, il ne sort que dans le salon vocal.
+                    </p>
+                </div>
             </div>
         </div>
     </div>
