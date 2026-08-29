@@ -602,10 +602,32 @@
                     <!-- Mix Type Segmented Control -->
                     <div class="setting-row">
                         <div class="setting-label">
-                            <svg class="icon-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                                <polygon points="2 17 12 22 22 17"></polygon>
-                                <polygon points="2 12 12 17 22 12"></polygon>
+                            <!--
+                                 Remplie, là où les 115 autres icônes de la page
+                                 sont tracées au trait. Ce n'est pas une
+                                 inattention : celle-ci est une silhouette — un
+                                 contour fermé dont l'épaisseur est dans la
+                                 géométrie —, quand les icônes Feather sont des
+                                 lignes que « stroke-width » épaissit.
+
+                                 Elle portait les attributs des autres, copiés
+                                 tels quels. Le résultat ne se lisait pas comme
+                                 une erreur mais comme une nuance : « fill:none »
+                                 la vidait, et un trait de 2 unités sur un
+                                 viewBox de 800 rendu en 17,6 px donne 0,04 px —
+                                 un filet sous-pixel que l'antialiasing délave.
+                                 D'où une icône qui paraissait d'une autre
+                                 couleur que ses voisines, alors qu'elle avait la
+                                 bonne : il n'en restait qu'un pour cent.
+
+                                 Remplie, elle retrouve le poids des autres sans
+                                 qu'on ait rien à régler : ses barres font 66
+                                 unités sur 800, soit 1,45 px à l'écran, quand un
+                                 trait de 2 sur un viewBox de 24 en donne 1,47.
+                                 Le dessin avait été fait pour cette rangée.
+                            -->
+                            <svg class="icon-transition" viewBox="0 0 800 800" fill="currentColor">
+                                <path d="M786 316 532 116q-16-8-36-8-28 0-30 27v65h-99v66h165v-65l147 115-140 111q-7 5-7-12v-48H334v-61q-2-20-27-30-21-9-43 9L13 483l254 200q16 12 36 8 28-6 30-27v-65h99v-66H267v65L120 483l140-111q7-5 7 13v47h198v61q2 21 27 30 21 9 43-9Z"/>
                             </svg>
                             <span data-i18n="transition_type">Type de transition</span>
                         </div>
