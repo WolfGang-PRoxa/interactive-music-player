@@ -52,12 +52,51 @@ function startToastCountdown(delayMs) {
     toastCycle.hideTimer = setTimeout(hideToast, delayMs);
 }
 
+/**
+ * Suspend le compte à rebours et retient ce qu'il en restait.
+ *
+ * Deux gestes le demandent : la souris posée sur la notification, et le doigt
+ * qui la saisit pour la balayer. Sans compte à rebours en cours — le survol
+ * intervient pendant la disparition —, le reliquat est remis à zéro pour que la
+ * reprise reparte d'un délai plein.
+ */
+function holdToastCountdown() {
+    if (toastCycle.hideTimer) {
+        const elapsed = Date.now() - toastCycle.countdownStartedAt;
+        toastCycle.remainingMs = Math.max(0, toastCycle.remainingMs - elapsed);
+    } else {
+        toastCycle.remainingMs = 0;
+    }
+    clearToastTimers();
+    toastCycle.paused = true;
+}
+
+/** Reprend le compte à rebours là où `holdToastCountdown` l'a laissé. */
+function releaseToastCountdown() {
+    if (!toastCycle.paused) return;
+    toastCycle.paused = false;
+
+    const { holdDuration } = getToastDurations();
+    // Un reliquat quasi nul ferait clignoter la notification : elle disparaîtrait
+    // dans l'instant où on la relâche. On lui redonne alors un délai complet.
+    const remaining = toastCycle.remainingMs > 150
+        ? toastCycle.remainingMs
+        : Math.max(1, holdDuration * 1000);
+    startToastCountdown(remaining);
+}
+
 function hideToast() {
     const toast = document.getElementById('error-toast');
     if (!toast) return;
 
     const { outDuration } = getToastDurations();
-    toast.classList.remove('toast-in', 'toast-paused');
+    // `toast-settling` est retiré ici et non au relâchement du doigt : il coupe
+    // les animations le temps du retour en place, et une notification qu'on
+    // aurait touchée sans la chasser s'en irait ensuite d'un coup, sans son
+    // fondu de sortie.
+    toast.classList.remove('toast-in', 'toast-paused', 'toast-settling');
+    toast.style.transform = '';
+    toast.style.opacity = '';
     // Redémarrage forcé de l'animation de sortie (reflow).
     toast.classList.remove('toast-out');
     void toast.offsetWidth;
@@ -70,10 +109,47 @@ function hideToast() {
     }, Math.max(1, outDuration * 1000));
 }
 
-window.MusicPlayer.showToast = function(message) {
+/**
+ * Affiche une notification, éventuellement accompagnée d'une action.
+ *
+ * L'action est un bouton posé dans la notification elle-même : c'est le seul
+ * endroit où l'on puisse répondre à ce qu'elle annonce sans avoir à retrouver
+ * la commande ailleurs dans la page. Elle est facultative, et la grande
+ * majorité des appels n'en passe pas.
+ *
+ * Le bouton est unique et resservi d'une notification à l'autre : son écouteur
+ * précédent porte l'action de la précédente, et doit partir avec elle — sans
+ * quoi un clic déclencherait toutes celles qui l'ont précédé.
+ *
+ * @param {string} message
+ * @param {{ label: string, onClick: function }} [action] - Bouton d'action.
+ */
+window.MusicPlayer.showToast = function(message, action) {
     const toast = document.getElementById('error-toast');
     const toastMessage = document.getElementById('error-toast-message');
     if (!toast || !toastMessage) return;
+
+    const actionBtn = document.getElementById('btn-toast-action');
+    if (actionBtn) {
+        if (actionBtn._toastHandler) {
+            actionBtn.removeEventListener('click', actionBtn._toastHandler);
+            actionBtn._toastHandler = null;
+        }
+
+        const usable = action && action.label && typeof action.onClick === 'function';
+        actionBtn.classList.toggle('hidden', !usable);
+        actionBtn.textContent = usable ? action.label : '';
+
+        if (usable) {
+            actionBtn._toastHandler = () => {
+                // La notification se retire d'elle-même : son message ne vaut
+                // plus rien une fois qu'on a répondu à ce qu'il proposait.
+                hideToast();
+                action.onClick();
+            };
+            actionBtn.addEventListener('click', actionBtn._toastHandler);
+        }
+    }
 
     const { inDuration, outDuration, holdDuration } = getToastDurations();
     toast.style.setProperty('--toast-in-duration', `${inDuration}s`);
@@ -87,8 +163,15 @@ window.MusicPlayer.showToast = function(message) {
 
     clearToastTimers();
 
+    // Un balayage laisse la notification déplacée et transparente ; le message
+    // suivant s'afficherait à sa place et dans son état. Le geste en cours est
+    // abandonné du même coup : il visait le message qu'on vient de remplacer.
+    toastSwipe = null;
+    toast.style.transform = '';
+    toast.style.opacity = '';
+
     // Rejoue l'animation d'entrée même si un toast est déjà affiché.
-    toast.classList.remove('hidden', 'toast-out', 'toast-paused', 'toast-in');
+    toast.classList.remove('hidden', 'toast-out', 'toast-paused', 'toast-in', 'toast-swiping', 'toast-settling');
     void toast.offsetWidth;
     toast.classList.add('toast-in');
 
@@ -135,6 +218,168 @@ function watchFullscreen() {
     }
 }
 
+/* ── Balayage : la notification se chasse du doigt ────────────── */
+
+/**
+ * En deçà, le doigt n'a pas encore dit ce qu'il voulait : c'est peut-être un
+ * appui sur le bouton d'action, ou un défilement de la page.
+ */
+const SWIPE_DEADZONE_PX = 10;
+
+/** Course au-delà de laquelle le relâchement chasse la notification. */
+const SWIPE_DISMISS_PX = 64;
+
+/** Course à laquelle la notification est devenue tout à fait transparente. */
+const SWIPE_FADE_PX = 180;
+
+/** Geste en cours, ou null. */
+let toastSwipe = null;
+
+const isTouchMode = () => {
+    const dm = window.MusicPlayer.deviceMode;
+    return dm ? dm.isTouch() : false;
+};
+
+/**
+ * Chasse la notification dans la direction du balayage.
+ *
+ * Elle ne reprend pas l'animation de sortie : celle-ci retombe vers le bas
+ * droit quelle que soit la manière dont on l'a congédiée, et le mouvement
+ * partirait à contresens du doigt qui vient de la pousser. Elle prolonge donc
+ * la course entamée, puis se retire.
+ *
+ * @param {HTMLElement} toast
+ * @param {number} dx Course horizontale atteinte, en pixels.
+ * @param {number} dy Course verticale atteinte.
+ */
+function flingToast(toast, dx, dy) {
+    clearToastTimers();
+    toastCycle.paused = false;
+
+    const { outDuration } = getToastDurations();
+    const ms = Math.max(120, Math.round(outDuration * 1000));
+
+    toast.classList.remove('toast-in', 'toast-out', 'toast-paused', 'toast-swiping');
+    toast.classList.add('toast-settling');
+    toast.style.setProperty('--toast-settle-duration', `${ms}ms`);
+
+    // Recalcul forcé : sans lui, la suppression de `toast-swiping` — qui coupe
+    // toute transition — et le déplacement qui suit tomberaient dans la même
+    // passe de style, et la notification sauterait à sa position finale.
+    void toast.offsetWidth;
+
+    // Assez loin pour sortir de l'écran par le bord qu'elle longe déjà.
+    toast.style.transform = `translate(${dx > 0 ? '120vw' : '0px'}, ${dy > 0 ? '120vh' : '0px'})`;
+    toast.style.opacity = '0';
+
+    toastCycle.removeTimer = setTimeout(() => {
+        toast.classList.add('hidden');
+        toast.classList.remove('toast-settling');
+        toast.style.transform = '';
+        toast.style.opacity = '';
+    }, ms);
+}
+
+/** Ramène la notification à sa place, le balayage n'ayant pas abouti. */
+function settleToast(toast) {
+    toast.classList.remove('toast-swiping');
+    toast.classList.add('toast-settling');
+    // La durée posée par une sortie précédente resterait sur l'élément : le
+    // retour en place reprend la sienne, plus vive, celle de la feuille.
+    toast.style.removeProperty('--toast-settle-duration');
+    void toast.offsetWidth;
+    toast.style.transform = '';
+    toast.style.opacity = '';
+}
+
+/**
+ * Balayage vers la droite ou vers le bas pour chasser la notification.
+ *
+ * Ces deux directions ne sont pas un choix arbitraire : la notification est
+ * posée en bas à droite, ce sont les deux bords qu'elle longe et les seuls par
+ * lesquels elle sorte sans traverser la page. Vers la gauche ou vers le haut,
+ * le geste n'accroche rien — elle ne bouge pas, et le défilement de la page
+ * reste disponible.
+ *
+ * Le doigt suspend le compte à rebours dès qu'il se pose, exactement comme la
+ * souris qui survole : on ne chasse pas une notification qui vient de
+ * disparaître d'elle-même sous le doigt.
+ *
+ * Les écouteurs sont posés dans tous les cas, et c'est le mode de support qui
+ * décide à la volée : un appareil peut passer du tactile au bureau sans
+ * recharger la page — voir js/deviceMode.js.
+ *
+ * @param {HTMLElement} toast
+ */
+function setupToastSwipe(toast) {
+    toast.addEventListener('touchstart', (e) => {
+        if (!isTouchMode() || toast.classList.contains('hidden')) return;
+        // À deux doigts, c'est un pincement : il ne s'adresse pas à nous.
+        if (e.touches.length !== 1) return;
+
+        const touch = e.touches[0];
+        toastSwipe = { startX: touch.clientX, startY: touch.clientY, dx: 0, dy: 0, axis: null };
+
+        holdToastCountdown();
+        toast.classList.remove('toast-in', 'toast-out', 'toast-paused', 'toast-settling');
+        toast.classList.add('toast-swiping');
+    }, { passive: true });
+
+    toast.addEventListener('touchmove', (e) => {
+        if (!toastSwipe) return;
+        const touch = e.touches[0];
+        if (!touch) return;
+
+        const dx = touch.clientX - toastSwipe.startX;
+        const dy = touch.clientY - toastSwipe.startY;
+
+        // L'axe se fixe à la sortie de la zone morte et ne change plus : un
+        // geste diagonal doit choisir, faute de quoi la notification louvoierait
+        // entre les deux directions pendant toute la course.
+        if (!toastSwipe.axis) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_DEADZONE_PX) return;
+            toastSwipe.axis = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
+        }
+
+        toastSwipe.dx = toastSwipe.axis === 'x' ? Math.max(0, dx) : 0;
+        toastSwipe.dy = toastSwipe.axis === 'y' ? Math.max(0, dy) : 0;
+
+        const travel = Math.max(toastSwipe.dx, toastSwipe.dy);
+        if (travel <= 0) return;
+
+        // Le défilement de la page ne cède la place qu'une fois la notification
+        // réellement en mouvement : un balayage vers la gauche ou vers le haut
+        // ne la concerne pas et doit rester au doigt de l'utilisateur.
+        e.preventDefault();
+
+        toast.style.transform = `translate(${toastSwipe.dx}px, ${toastSwipe.dy}px)`;
+        toast.style.opacity = String(Math.max(0, 1 - travel / SWIPE_FADE_PX));
+    }, { passive: false });
+
+    /**
+     * @param {boolean} dismissible - Faux quand le geste a été interrompu.
+     */
+    const endSwipe = (dismissible) => {
+        if (!toastSwipe) return;
+        const { dx, dy } = toastSwipe;
+        toastSwipe = null;
+
+        if (dismissible && Math.max(dx, dy) >= SWIPE_DISMISS_PX) {
+            flingToast(toast, dx, dy);
+            return;
+        }
+
+        settleToast(toast);
+        releaseToastCountdown();
+    };
+
+    toast.addEventListener('touchend', () => endSwipe(true), { passive: true });
+    // Appel entrant, geste repris par le système : la notification revient à sa
+    // place, quelle que soit la course parcourue. La course dit ce que le doigt
+    // a fait, pas ce que l'utilisateur voulait — et personne n'a relâché ici.
+    toast.addEventListener('touchcancel', () => endSwipe(false), { passive: true });
+}
+
 window.MusicPlayer.setupToastInteractions = function() {
     const toast = document.getElementById('error-toast');
     if (!toast || toast.dataset.interactionsInit === 'true') return;
@@ -147,18 +392,7 @@ window.MusicPlayer.setupToastInteractions = function() {
 
     toast.addEventListener('mouseenter', () => {
         if (toast.classList.contains('hidden')) return;
-        toastCycle.paused = true;
-
-        // Décompte du temps déjà écoulé pour le reprendre à la sortie du survol.
-        // Sans compte à rebours actif, le survol intervient pendant la
-        // disparition : le reliquat est remis à zéro pour repartir d'un délai plein.
-        if (toastCycle.hideTimer) {
-            const elapsed = Date.now() - toastCycle.countdownStartedAt;
-            toastCycle.remainingMs = Math.max(0, toastCycle.remainingMs - elapsed);
-        } else {
-            toastCycle.remainingMs = 0;
-        }
-        clearToastTimers();
+        holdToastCountdown();
 
         // Une sortie déjà entamée est annulée : le toast redevient pleinement
         // visible tant que la souris reste dessus.
@@ -168,17 +402,11 @@ window.MusicPlayer.setupToastInteractions = function() {
 
     toast.addEventListener('mouseleave', () => {
         if (!toastCycle.paused) return;
-        toastCycle.paused = false;
         toast.classList.remove('toast-paused');
-
-        const { holdDuration } = getToastDurations();
-        // Si le survol a commencé pendant la disparition, on redonne un délai
-        // complet plutôt qu'un reliquat nul qui ferait clignoter la notification.
-        const remaining = toastCycle.remainingMs > 150
-            ? toastCycle.remainingMs
-            : Math.max(1, holdDuration * 1000);
-        startToastCountdown(remaining);
+        releaseToastCountdown();
     });
+
+    setupToastSwipe(toast);
 
     const copyBtn = document.getElementById('btn-copy-toast');
     if (copyBtn) {

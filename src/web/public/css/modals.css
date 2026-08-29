@@ -17,6 +17,18 @@
     z-index: 2147483647;
     max-width: min(420px, calc(100vw - 4rem));
 
+    /*
+     * Le geste appartient à la notification, pas à la page.
+     *
+     * Le balayage qui la chasse (js/settingsModal.js) n'annule le défilement
+     * qu'une fois sa direction établie, une dizaine de pixels plus loin. Sans
+     * cette ligne, le navigateur a déjà pris le geste pour lui à cet instant :
+     * l'événement n'est plus annulable, la page défile et la notification reste
+     * sur place. Elle est trop petite et trop brève pour qu'on lui reproche de
+     * retenir le doigt qui se pose dessus.
+     */
+    touch-action: none;
+
     /* Durées pilotées depuis les paramètres du dashboard (settingsModal.js) */
     --toast-in-duration: 0.35s;
     --toast-out-duration: 0.35s;
@@ -39,6 +51,32 @@
     opacity: 1;
     transform: none;
     transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+/*
+ * Balayage du doigt (js/settingsModal.js).
+ *
+ * Pendant le geste, la notification suit le doigt au pixel : toute animation et
+ * toute transition sont coupées, sans quoi elle traînerait derrière lui. Les
+ * animations passent d'ailleurs devant le style en ligne dans la cascade — les
+ * couper est la seule façon pour le déplacement d'exister.
+ *
+ * Au relâchement, `toast-settling` mène le retour à la place ou la sortie
+ * d'écran. Sa durée est celle réglée pour la disparition, posée en variable par
+ * le script : une notification chassée du doigt ne doit pas s'en aller plus
+ * lentement que les autres.
+ */
+.toast.toast-swiping {
+    animation: none;
+    transition: none;
+    cursor: grabbing;
+}
+
+.toast.toast-settling {
+    animation: none;
+    transition:
+        transform var(--toast-settle-duration, 0.2s) cubic-bezier(0.4, 0, 0.9, 0.4),
+        opacity var(--toast-settle-duration, 0.2s) ease;
 }
 
 .toast.hidden {
@@ -82,6 +120,42 @@
     flex: 1;
     min-width: 0;
     overflow-wrap: anywhere;
+}
+
+/*
+ * Bouton d'action de la notification.
+ *
+ * Il porte du texte, là où la copie porte une icône : c'est une proposition —
+ * « jouer la playlist X » — et aucun pictogramme ne dirait laquelle. Il se
+ * distingue donc du fond clair de la notification par un aplat plein, seul
+ * moyen de rester lisible à cette taille sans crier plus fort que le message
+ * lui-même.
+ *
+ * `flex-shrink: 0` sur le bouton et `min-width: 0` sur le message plus haut se
+ * répondent : c'est le texte de la notification qui se replie, jamais l'action,
+ * qu'un libellé coupé rendrait indéchiffrable.
+ */
+.toast-action-btn {
+    flex-shrink: 0;
+    padding: 0.3rem 0.7rem;
+    border: none;
+    border-radius: 7px;
+    background: var(--c-accent);
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: filter 0.2s ease, transform 0.15s ease;
+}
+
+.toast-action-btn:hover {
+    filter: brightness(1.12);
+}
+
+.toast-action-btn:active {
+    transform: scale(0.95);
 }
 
 .toast-copy-btn {
