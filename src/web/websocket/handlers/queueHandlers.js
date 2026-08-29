@@ -174,7 +174,18 @@ async function handleMoveOrInsertTrack(ctx) {
         } else if ((source === 'history' || source === 'nowplaying' || source === 'playlist_track') && url) {
             try {
                 const searchResult = await searchLocalAwareTrack(player, url);
-                if (searchResult && searchResult.tracks && searchResult.tracks.length > 0) {
+                if (!searchResult || !searchResult.tracks || searchResult.tracks.length === 0) {
+                    // Le glissement n'aboutit pas, et rien ne le disait : la
+                    // piste ne réapparaissait simplement pas dans la file. Une
+                    // source distante devenue injoignable — YouTube qui refuse
+                    // la connexion, vidéo retirée — passait ainsi pour un
+                    // glisser-déposer cassé.
+                    log.warn(`[WebServer] Insertion abandoned, track unresolvable: ${url}`);
+                    webServer._sendError('Ce morceau est introuvable pour le moment : sa source ne répond pas.');
+                    return;
+                }
+
+                {
                     const track = searchResult.tracks[0];
                     const trackData = {
                         title: track.title,
@@ -267,24 +278,46 @@ function handleClearHistory(ctx) {
         }
 }
 
+/**
+ * Vide la file d'attente — celle que le tableau de bord montre.
+ *
+ * Ce n'est pas toujours la même liste. Une playlist qui occupe le lecteur met
+ * la file de côté le temps de sa lecture, et c'est cette file-là que le panneau
+ * affiche. Le bouton, lui, vidait la liste du lecteur — celle de la playlist,
+ * invisible à ce moment-là : rien ne bougeait à l'écran, et il passait pour
+ * cassé. Ses deux voisins, le retrait d'un titre et le déplacement, savaient
+ * déjà faire la différence ; celui-ci l'ignorait.
+ *
+ * Le test de la file mise de côté vient donc en premier, et il ne dépend
+ * d'aucun lecteur : elle vit dans les réglages, et se vide même quand plus rien
+ * ne joue.
+ */
 function handleClearQueue(ctx) {
     const { webServer, player, currentGuildId } = ctx;
-    let queue = ctx.queue;
+    const queue = ctx.queue;
 
-        if (queue) {
-            try {
-                const settings = database.getSettings(currentGuildId);
-                if (settings.broadcastMode === 'personal') {
-                    queue.virtualTracks = [];
-                } else if (queue.tracks) {
-                    queue.tracks.clear();
-                }
-                webServer.broadcastState(currentGuildId);
-                playbackStateManager.saveState(player);
-            } catch (err) {
-                log.error('[WebServer] clearQueue error:', err.message);
+    try {
+        const settings = database.getSettings(currentGuildId);
+        const isPlaylistPlaying = settings.activePlaybackSource
+            && settings.activePlaybackSource !== 'queue';
+
+        if (isPlaylistPlaying) {
+            writeSetAsideQueue(currentGuildId, [], settings);
+        } else if (queue) {
+            if (settings.broadcastMode === 'personal') {
+                queue.virtualTracks = [];
+            } else if (queue.tracks) {
+                queue.tracks.clear();
             }
+        } else {
+            return;
         }
+
+        webServer.broadcastState(currentGuildId);
+        playbackStateManager.saveState(player);
+    } catch (err) {
+        log.error('[WebServer] clearQueue error:', err.message);
+    }
 }
 
 module.exports = {

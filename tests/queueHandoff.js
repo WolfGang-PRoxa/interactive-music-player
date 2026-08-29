@@ -185,10 +185,67 @@ setTimeout(() => {
     check('nothing is sent to the physical player', queue.played === null);
 
     testNextTrackOf();
+    testClearQueue();
 
     console.log(`\n=== ${passed} passed, ${failed} failed ===`);
     process.exit(failed === 0 ? 0 : 1);
 }, 0);
+
+/**
+ * Le bouton « vider la file » agit sur la liste que le panneau montre.
+ *
+ * Une playlist qui occupe le lecteur met la file d'attente de côté, et c'est
+ * elle que le tableau de bord affiche pendant ce temps. Le bouton vidait la
+ * liste du lecteur — celle de la playlist, invisible alors : rien ne bougeait à
+ * l'écran, et il passait pour cassé. Le retrait d'un titre et le déplacement,
+ * ses deux voisins, faisaient déjà la différence.
+ */
+function testClearQueue() {
+    console.log('\nclearQueue — the list emptied is the one on screen\n');
+
+    const queueHandlers = require('../src/web/websocket/handlers/queueHandlers');
+    const call = (queue) => queueHandlers.handleClearQueue({
+        webServer, player: null, currentGuildId: 'g1', queue,
+    });
+    const setAside = (field) => ((settings[field] && (settings[field].tracks
+        || settings[field].virtualTracks)) || []).length;
+
+    // Playlist en cours : la file mise de côté est la seule visible.
+    let queue = prepare({ queueBackupEveryone: { tracks: [A, B] } });
+    call(queue);
+    check('a playlist playing, the set-aside queue is the one emptied',
+        setAside('queueBackupEveryone') === 0,
+        `${setAside('queueBackupEveryone')} track(s) left`);
+    check('  … and the playlist keeps its own list',
+        queue.emptied === false, 'emptying it would have cut the playlist short');
+
+    // La file mise de côté ne dépend pas du mode de diffusion.
+    queue = prepare({ broadcastMode: 'personal', queueBackupPersonal: { virtualTracks: [A, B] } });
+    queue.virtualTracks = [];
+    call(queue);
+    check('personal broadcast, the set-aside queue too',
+        setAside('queueBackupPersonal') === 0,
+        `${setAside('queueBackupPersonal')} track(s) left`);
+
+    // Source « file d'attente » : c'est bien la liste du lecteur qu'on vide.
+    queue = prepare({ activePlaybackSource: 'queue', queueBackupEveryone: { tracks: [A] } });
+    call(queue);
+    check('on the queue source, the player list is the one emptied', queue.emptied === true);
+
+    queue = prepare({ activePlaybackSource: 'queue', broadcastMode: 'personal' });
+    queue.virtualTracks = [A, B];
+    call(queue);
+    check('  … and its virtual counterpart in personal broadcast',
+        queue.virtualTracks.length === 0, `${queue.virtualTracks.length} track(s) left`);
+
+    // Aucun lecteur monté : la file mise de côté vit dans les réglages, elle se
+    // vide tout de même.
+    prepare({ queueBackupEveryone: { tracks: [A, B] } });
+    call(null);
+    check('with no player at all, the set-aside queue still empties',
+        setAside('queueBackupEveryone') === 0,
+        `${setAside('queueBackupEveryone')} track(s) left`);
+}
 
 // ────────────────────────── Côté navigateur ──────────────────────────
 
