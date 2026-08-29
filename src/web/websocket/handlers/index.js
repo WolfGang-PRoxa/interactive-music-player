@@ -52,6 +52,7 @@ module.exports = {
     shutdownBot: systemHandlers.handleShutdownBot,
     skip: playbackHandlers.handleSkip,
     startupFadeinConsumed: systemHandlers.handleStartupFadeinConsumed,
+    startPlaybackSource: playbackHandlers.handleStartPlaybackSource,
     stop: playbackHandlers.handleStop,
     syncProgress: playbackHandlers.handleSyncProgress,
     toggleVoiceDetection: guildHandlers.handleToggleVoiceDetection,

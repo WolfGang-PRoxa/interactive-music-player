@@ -549,8 +549,121 @@ function handleSyncProgress(ctx) {
         }
 }
 
+/**
+ * Lance la lecture de la source active, lecteur vide.
+ *
+ * Le bouton lecture du tableau de bord ne savait rien faire d'un lecteur vide :
+ * il annonçait « aucune musique en cours » et s'arrêtait là, alors que la file
+ * ou la playlist désignée comme source n'attendait qu'un départ. Ce handler est
+ * ce départ. Le tableau de bord vérifie de son côté que la source a de quoi
+ * jouer — c'est lui qui sait quoi proposer sinon —, mais rien ici ne s'y fie :
+ * son état date de la dernière diffusion, et deux navigateurs peuvent piloter
+ * le même bot.
+ *
+ * `data.source` bascule la source avant de démarrer. C'est ce qu'envoie le
+ * bouton de la notification, qui propose l'autre source quand celle qui est
+ * choisie n'a rien à jouer. La bascule passe par `setActivePlaybackSource`
+ * plutôt que d'être refaite ici : elle range la file de côté, restaure celle
+ * qui l'était, et démarre déjà la playlist qu'on lui désigne. Il ne reste alors
+ * qu'à ne rien faire — c'est le rôle de la garde ci-dessous.
+ *
+ * @param {object} ctx Contexte assemblé par wsHandler.
+ */
+async function handleStartPlaybackSource(ctx) {
+    const { ws, data, webServer, player, currentGuildId, dispatch } = ctx;
+
+    if (data && data.source) {
+        const before = database.getSettings(currentGuildId).activePlaybackSource || 'queue';
+        if (data.source !== before) {
+            await dispatch({
+                type: 'setActivePlaybackSource',
+                guildId: currentGuildId,
+                data: { source: data.source, index: 0 },
+            });
+        }
+    }
+
+    const settings = database.getSettings(currentGuildId);
+    const isPersonal = settings.broadcastMode === 'personal';
+    const source = settings.activePlaybackSource || 'queue';
+    const queue = player.queues.get(currentGuildId) || ctx.queue;
+
+    // Une piste occupe déjà le lecteur : il n'y a rien à démarrer. C'est le cas
+    // après une bascule vers une playlist, qui a lancé la lecture elle-même.
+    const busy = isPersonal ? !!queue?.virtualCurrentTrack : !!queue?.currentTrack;
+    if (busy) {
+        webServer.broadcastState(currentGuildId);
+        return;
+    }
+
+    if (source !== 'queue') {
+        // Depuis son premier titre, et non depuis `playlistCurrentIndex` : cet
+        // index est resté sur la piste où la lecture s'est arrêtée, et repartir
+        // de là ne jouerait que la fin de la playlist. « Lancer la playlist »,
+        // lecteur vide, veut dire la reprendre au début.
+        await webServer._syncPlaylistToPlayer(currentGuildId, source, 0, true);
+        webServer.broadcastState(currentGuildId);
+        playbackStateManager.saveState(player);
+        return;
+    }
+
+    if (isPersonal) {
+        // Le premier titre de la file quitte l'attente pour le lecteur, comme
+        // le fait la fin d'une piste — voir WebServer.handleVirtualSkip.
+        const next = (queue?.virtualTracks || [])[0];
+        if (!next) return;
+
+        queue.virtualTracks.shift();
+        queue.virtualCurrentTrack = next;
+        queue.virtualProgressMs = 0;
+        queue.virtualIsPlaying = true;
+        queue.virtualIsPaused = false;
+        queue.virtualLastUpdated = Date.now();
+
+        webServer.broadcastState(currentGuildId);
+        playbackStateManager.saveState(player);
+        return;
+    }
+
+    if (!queue || queue.tracks.size === 0) return;
+
+    const guild = webServer.client.guilds.cache.get(currentGuildId);
+    if (!guild) return;
+
+    let voiceChannel = ws && ws.selectedVoiceChannelId
+        ? guild.channels.cache.get(ws.selectedVoiceChannelId)
+        : null;
+    if (!voiceChannel) voiceChannel = webServer._findActiveVoiceChannel(guild);
+    if (!voiceChannel) {
+        webServer._sendError('Vous devez rejoindre un salon vocal pour lancer de la musique.');
+        return;
+    }
+
+    // Salon désert : le bot n'y entre pas, et la file démarrera d'elle-même à
+    // l'arrivée d'un auditeur. Même arbitrage que pour l'ajout d'une piste.
+    if (!await presenceManager.connectIfInhabited(queue, voiceChannel)) {
+        webServer.broadcastState(currentGuildId);
+        return;
+    }
+
+    try {
+        // Sans argument, le lecteur dépile le premier titre de la file : il
+        // quitte l'attente au lieu d'y rester en double, ce qui arriverait à
+        // rejouer la même piste en boucle.
+        await queue.node.play();
+    } catch (err) {
+        log.error('[WebServer] Queue start error:', err.message);
+        webServer._sendError(`Impossible de lancer la file d'attente : ${err.message}`);
+        return;
+    }
+
+    webServer.broadcastState(currentGuildId);
+    playbackStateManager.saveState(player);
+}
+
 module.exports = {
     handlePlay,
+    handleStartPlaybackSource,
     handlePause,
     handleResume,
     handleSkip,

@@ -206,7 +206,7 @@
 
             <div class="status-indicator">
                 <span class="status-dot green"></span>
-                <span class="status-text" data-i18n="status_connected">Client Discord Connecté</span>
+                <span class="status-text" data-i18n="status_connected">Connecté au bot</span>
             </div>
         </header>
 
@@ -1983,6 +1983,13 @@
                 <line x1="12" y1="16" x2="12.01" y2="16"></line>
             </svg>
             <span id="error-toast-message">Une erreur s'est produite.</span>
+            <!--
+                 Bouton d'action, révélé au cas par cas : la notification qui
+                 annonce une source de lecture vide y propose l'autre source.
+                 Son libellé et son geste sont posés par showToast, d'où
+                 l'absence de `data-i18n` — il n'a pas de texte à lui.
+            -->
+            <button id="btn-toast-action" class="toast-action-btn hidden" type="button"></button>
             <button id="btn-copy-toast" class="toast-copy-btn" data-tooltip="Copier le message" data-i18n-tooltip="tooltip_copy_toast">
                 <svg class="toast-copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>

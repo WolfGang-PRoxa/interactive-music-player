@@ -78,6 +78,9 @@ const ACTION_GROUPS = {
     // Choisir entre la file et une playlist, c'est décider de ce qui joue —
     // pas modifier une collection. D'où `playback` plutôt que `playlists`.
     setActivePlaybackSource: 'playback',
+    // Le bouton lecture, lecteur vide : il démarre la source choisie, il n'y
+    // ajoute rien. Même groupe que `resume`, dont il prend la suite.
+    startPlaybackSource: 'playback',
 
     // File d'attente et historique.
     // `play` porte mal son nom : c'est l'ajout d'un résultat de recherche à la
