@@ -970,6 +970,31 @@ window.MusicPlayer.initPlaylists = function() {
         }
     }
 
+    /*
+     * Exposée, parce que le champ de saisie doit être vidé quel que soit le
+     * chemin de fermeture.
+     *
+     * L'écouteur d'Échap global d'app.js refermait cette fenêtre en lui posant
+     * simplement sa classe, sans passer par ici : un nom commencé puis
+     * abandonné se retrouvait à la réouverture. Le cas ne se voyait pas
+     * souvent, le champ ayant le focus à l'ouverture — c'est alors son propre
+     * écouteur, plus bas, qui prend la touche et vide bien le champ. Mais un
+     * clic ailleurs dans la boîte suffisait à passer par l'autre chemin.
+     */
+    window.MusicPlayer.closePlaylistCreateModal = closePlaylistCreateModal;
+
+    /*
+     * Le clic à côté referme, comme pour les réglages et le partage. La cible
+     * doit être le voile lui-même : l'événement remonte depuis la boîte, et
+     * l'écouter sans ce test refermerait la fenêtre dès qu'on clique dans le
+     * champ de saisie.
+     */
+    if (playlistCreateModal) {
+        playlistCreateModal.addEventListener('click', (e) => {
+            if (e.target === playlistCreateModal) closePlaylistCreateModal();
+        });
+    }
+
     if (btnAddPlaylist) {
         btnAddPlaylist.addEventListener('click', () => {
             if (playlistCreateModal) {

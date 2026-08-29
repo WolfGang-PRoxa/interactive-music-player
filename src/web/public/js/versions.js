@@ -522,6 +522,32 @@ window.MusicPlayer = window.MusicPlayer || {};
             cancelUninstall.addEventListener('click', closeUninstallPopup);
         }
 
+        /*
+         * Le clic à côté referme, comme partout ailleurs — mais en passant par
+         * `closeVersionModal`, et non en posant la classe soi-même.
+         *
+         * Ces deux fenêtres-ci ne sont pas de simples voiles. Elles refusent de
+         * disparaître pendant une bascule ou une désinstallation engagée :
+         * masquer la fenêtre n'annulerait rien, cela ne ferait que dérober à
+         * l'utilisateur l'avancement de ce qu'il a lancé. Et la fermeture
+         * ordinaire remet le menu déroulant sur la version réellement exécutée,
+         * sans quoi il resterait sur celle qu'on a renoncé à installer.
+         *
+         * Toute cette logique vit déjà dans `closeVersionModal`, appelée par la
+         * touche Échap. Le clic emprunte le même chemin plutôt que d'en ouvrir
+         * un second, qui aurait divergé au premier changement de règle.
+         *
+         * La cible doit être le voile lui-même : l'événement remonte depuis la
+         * boîte, et l'écouter sans ce test annulerait la bascule au moment même
+         * où l'on clique « Confirmer ».
+         */
+        [el('version-modal'), el('version-uninstall-modal')].forEach((overlay) => {
+            if (!overlay) return;
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) window.MusicPlayer.closeVersionModal();
+            });
+        });
+
         paintCurrentVersion();
     };
 

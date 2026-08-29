@@ -3020,6 +3020,25 @@
             });
         }
 
+        /*
+         * Le clic à côté referme, comme pour les réglages et le partage.
+         *
+         * La cible doit être le voile lui-même : l'événement remonte depuis la
+         * boîte, et se contenter de l'écouter refermerait la fenêtre au moindre
+         * clic sur « Éteindre ». C'est la seule chose que ce test distingue —
+         * ce qui a été cliqué, et non ce qui a reçu l'événement au bout de sa
+         * course.
+         *
+         * Refermer ainsi une fenêtre qui propose deux gestes destructeurs n'a
+         * rien d'imprudent : sortir sans rien choisir est précisément ce qu'on
+         * veut rendre facile.
+         */
+        if (maintModal) {
+            maintModal.addEventListener('click', (e) => {
+                if (e.target === maintModal) maintModal.classList.add('hidden');
+            });
+        }
+
         /** Rampe d'extinction en cours, s'il y en a une. */
         let fadeOutTimer = null;
 
@@ -3196,21 +3215,51 @@
                 if (window.MusicPlayer.closeVersionModal()) return;
             }
 
+            /*
+             * De la plus haute à la plus basse, et on s'arrête à la première
+             * refermée.
+             *
+             * La boucle les fermait toutes d'un coup. Le cas se rencontre : la
+             * confirmation de retrait d'un serveur se superpose aux paramètres,
+             * et Échap emportait les deux — on renonçait à retirer un serveur
+             * et on perdait au passage le panneau qu'on n'avait pas demandé à
+             * quitter. Le lecteur de documentation et les fenêtres de version,
+             * traités juste au-dessus, appliquent déjà cette règle ; celles-ci
+             * y échappaient.
+             *
+             * D'où l'ordre : les paramètres en dernier, puisque c'est la seule
+             * qui puisse en porter une autre.
+             *
+             * Le partage du contrôle, lui, manquait simplement à la liste. Il
+             * se refermait au clic à côté comme ses voisines, mais restait
+             * sourd à la touche.
+             */
             const modalsToClose = [
-                'settings-modal',
+                'server-confirm-delete-modal',
                 'maintenance-modal',
                 'playlist-create-modal',
-                'server-confirm-delete-modal'
+                'import-info-modal',
+                'share-modal',
+                'settings-modal'
             ];
-            modalsToClose.forEach(id => {
+            for (const id of modalsToClose) {
                 const modal = document.getElementById(id);
-                if (modal && !modal.classList.contains('hidden')) {
+                if (!modal || modal.classList.contains('hidden')) continue;
+
+                // La création de playlist a sa propre fermeture, qui vide aussi
+                // le champ de saisie. La masquer d'ici laisserait le nom
+                // abandonné réapparaître à la réouverture.
+                if (id === 'playlist-create-modal'
+                    && typeof window.MusicPlayer.closePlaylistCreateModal === 'function') {
+                    window.MusicPlayer.closePlaylistCreateModal();
+                } else {
                     modal.classList.add('hidden');
                     if (id === 'settings-modal') {
                         localStorage.setItem('music_player_settings_open', 'false');
                     }
                 }
-            });
+                break;
+            }
         }
     });
 

@@ -666,6 +666,28 @@ window.MusicPlayer.initSettingsModal = function() {
         });
     }
 
+    /*
+     * Le clic à côté referme la confirmation de retrait d'un serveur.
+     *
+     * Branché ici, et non dans `openServerDeleteConfirmModal` : cette
+     * fonction-là est rappelée à chaque ouverture — elle repeint les libellés
+     * et repose ses gestes par affectation de `onclick`, qui écrase le
+     * précédent. Un `addEventListener` posé dans ce chemin empilerait au
+     * contraire un écouteur par ouverture, et la fenêtre finirait par se
+     * refermer plusieurs fois pour un seul clic. L'initialisation ne passe
+     * qu'une fois, c'est sa place.
+     *
+     * Elle se superpose aux paramètres, mais les deux voiles sont frères dans
+     * le document : l'événement remonte vers le corps de la page, jamais à
+     * travers la fenêtre du dessous, qui reste donc ouverte.
+     */
+    const serverDeleteModal = document.getElementById('server-confirm-delete-modal');
+    if (serverDeleteModal) {
+        serverDeleteModal.addEventListener('click', (e) => {
+            if (e.target === serverDeleteModal) serverDeleteModal.classList.add('hidden');
+        });
+    }
+
     if (localStorage.getItem('music_player_settings_open') === 'true' && settingsModal) {
         try {
             window.MusicPlayer.renderConnectedGuildsList();
