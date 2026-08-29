@@ -655,6 +655,31 @@
     box-shadow: 0 0 12px rgba(237, 66, 69, 0.35) !important;
 }
 
+/*
+ * Le courant qui parcourt le glyphe d'alimentation.
+ *
+ * Deux copies des tracés du symbole, posées par-dessus lui et allumées au
+ * survol : le courant remonte la barre, puis fait le tour de l'anneau par ses
+ * deux bouts jusqu'à refermer la boucle. Le dessin ne bouge pas — il se met
+ * sous tension.
+ *
+ * Ce bouton éteint le bot. Les trois autres animations de l'en-tête sont des
+ * invitations, et une invitation serait ici une faute : elle donnerait envie de
+ * cliquer sur la seule commande qu'on ne veut pas voir cliquée distraitement.
+ * Le vocabulaire est donc celui de l'électricité et non celui du jeu.
+ *
+ * L'opacité nulle est le repos, et le script ne pose la sienne qu'en style en
+ * ligne — les attributs de présentation passent *sous* la feuille de style dans
+ * la cascade, si bien qu'un « opacity » posé en attribut ne rallumerait jamais
+ * rien.
+ */
+.danger-power-btn .power-charge {
+    stroke: #fff1f1;
+    opacity: 0;
+    pointer-events: none;
+    filter: drop-shadow(0 0 2px rgba(255, 92, 92, 0.9));
+}
+
 /* Buy Me a Coffee Donation Button in Header (Icon-only & Separated) */
 .btn-coffee-donate {
     background: rgba(245, 158, 11, 0.12);
@@ -693,11 +718,6 @@
     overflow: visible !important;
     position: relative;
     z-index: 5;
-}
-
-/* Animation de la vapeur de café */
-.btn-coffee-donate .steam-path {
-    transition: d 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.7s ease-out;
 }
 
 /* Animation de la roue des paramètres */

@@ -162,14 +162,55 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
                         <line x1="12" y1="2" x2="12" y2="12"></line>
+                        <!--
+                             Les deux mêmes tracés, en clair, par-dessus : c'est
+                             le courant qui les parcourt au survol — voir
+                             js/headerButtonAnimations.js.
+
+                             Ce sont des copies au caractère près, et il le faut :
+                             la lueur suit le glyphe, elle ne dessine pas une
+                             seconde forme. Le moindre écart la ferait passer à
+                             côté du trait qu'elle est censée allumer.
+
+                             Invisibles tant que le script ne s'exécute pas — la
+                             feuille de style les laisse à opacité nulle, et lui
+                             seul les rallume.
+                        -->
+                        <path class="power-charge power-charge-ring" d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                        <line class="power-charge power-charge-bar" x1="12" y1="2" x2="12" y2="12"></line>
                     </svg>
                 </button>
             </div>
             <div class="theme-controls-wrapper">
                 <!-- GitHub Button -->
-                <a href="https://github.com/WolfGang-PRoxa/interactive_music_player" target="_blank" rel="noopener noreferrer" class="theme-toggle-btn" data-tooltip="Voir sur GitHub" data-i18n-tooltip="tooltip_view_github" style="margin-right: 8px; text-decoration: none;">
+                <a id="btn-github" href="https://github.com/WolfGang-PRoxa/interactive_music_player" target="_blank" rel="noopener noreferrer" class="theme-toggle-btn" data-tooltip="Voir sur GitHub" data-i18n-tooltip="tooltip_view_github" style="margin-right: 8px; text-decoration: none;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+                        <!--
+                             Le logo tenait en un seul tracé : la queue, puis le
+                             contour du chat rejoint par un « m » relatif. Le
+                             voici en trois morceaux, parce que trois choses
+                             bougent séparément — voir js/headerButtonAnimations.js.
+
+                             Les points de coupe ne sont pas choisis : ce sont
+                             les sommets que le tracé d'origine traversait déjà.
+
+                               · la queue, de 9,19 à 2,16 ;
+                               · les pattes et les épaules, qui restent plantées.
+                                 Elles commencent à 16,22 — où le « m 14 6 »
+                                 relatif tombait depuis la fin de la queue — et
+                                 leur second morceau redescend de 9.94,15.55 ;
+                               · la tête, d'une épaule à l'autre, soit de
+                                 15.06,15.52 à 9.94,15.55. Elle seule porte la
+                                 rotation, autour de la nuque à mi-chemin des
+                                 deux.
+
+                             Le rendu au repos est inchangé, au point près : les
+                             extrémités coïncident et les bouts arrondis
+                             referment la jointure.
+                        -->
+                        <path class="gh-tail" d="M9 19c-5 1.5-5-2.5-7-3"></path>
+                        <path class="gh-legs" d="M16 22v-3.87a3.37 3.37 0 0 0-.94-2.61M9.94 15.55A3.37 3.37 0 0 0 9 18.13V22"></path>
+                        <path class="gh-head" d="M15.06 15.52c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7"></path>
                     </svg>
                 </a>
 
@@ -178,9 +219,13 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-coffee">
                         <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
                         <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
-                        <path d="M5.5 7.2 C3.2 5.2, 7.8 3.2, 5.5 1.2 C3.5 -0.8, 7.5 -2.5, 5.5 -4" class="steam-path steam-1"></path>
-                        <path d="M10.5 7.2 C8.2 5.2, 12.8 3.2, 10.5 1.2 C8.5 -0.8, 12.5 -2.5, 10.5 -4" class="steam-path steam-2"></path>
-                        <path d="M15.5 7.2 C13.2 5.2, 17.8 3.2, 15.5 1.2 C13.5 -0.8, 17.5 -2.5, 15.5 -4" class="steam-path steam-3"></path>
+                        <!--
+                             La tasse seule : le bol et son anse. La vapeur
+                             n'est plus dessinée ici — trois courbes ne savent
+                             pas tourbillonner. Elle est simulée sur un canevas
+                             posé au-dessus du bouton, voir
+                             js/headerButtonAnimations.js.
+                        -->
                     </svg>
                 </a>
             </div>

@@ -21,9 +21,12 @@
     "test:shared-control": "node tests/sharedControl.js",
     "test:toast-swipe": "node tests/toastSwipe.js",
     "test:stream-resolution": "node tests/streamResolution.js",
+    "test:coffee-steam": "node tests/coffeeSteam.js",
+    "test:github-tail": "node tests/githubTail.js",
+    "test:power-charge": "node tests/powerCharge.js",
     "test:docs-languages": "node tests/docsLanguages.js",
     "test:docs-integrity": "node tests/docsIntegrity.js",
-    "test": "node tests/deviceMode.js && node tests/dragPreview.js && node tests/speedPadPointer.js && node tests/queueHandoff.js && node tests/favoriteChannel.js && node tests/sharedControl.js && node tests/toastSwipe.js && node tests/streamResolution.js && node tests/docsLanguages.js && node tests/docsIntegrity.js && node tests/smoke.js"
+    "test": "node tests/deviceMode.js && node tests/dragPreview.js && node tests/speedPadPointer.js && node tests/queueHandoff.js && node tests/favoriteChannel.js && node tests/sharedControl.js && node tests/toastSwipe.js && node tests/streamResolution.js && node tests/coffeeSteam.js && node tests/githubTail.js && node tests/powerCharge.js && node tests/docsLanguages.js && node tests/docsIntegrity.js && node tests/smoke.js"
   },
   "keywords": [
     "discord",
