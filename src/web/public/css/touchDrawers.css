@@ -134,6 +134,16 @@ body.touch-drawer-is-open .drawer-edge-tab {
 /* ── Les languettes, une par tiroir ─────────────────────────── */
 
 /*
+ * La largeur des languettes est déclarée sur la racine, et non sur la languette
+ * elle-même : l'en-tête en a besoin à son tour, pour s'arrêter avant elles — voir
+ * plus bas.
+ */
+[data-touch-mode="true"] {
+    /* Une languette de 6 px se vise à la souris, pas au doigt. */
+    --edge-tab-width: 10px;
+}
+
+/*
  * Le tiroir d'activité s'ouvre en effleurant le bord droit ; les deux nouveaux
  * n'avaient que leur interrupteur, l'un dans la carte « En cours de lecture »,
  * l'autre au fond des paramètres. Ils reçoivent donc la même languette, rangée
@@ -150,8 +160,7 @@ body.touch-drawer-is-open .drawer-edge-tab {
     --edge-tab-pitch: calc(var(--edge-tab-height) + var(--edge-tab-gap));
 
     height: var(--edge-tab-height);
-    /* Une languette de 6 px se vise à la souris, pas au doigt. */
-    width: 10px;
+    width: var(--edge-tab-width);
 }
 
 [data-touch-mode="true"] #drawer-edge-tab {
@@ -164,6 +173,84 @@ body.touch-drawer-is-open .drawer-edge-tab {
 
 [data-touch-mode="true"] #logs-drawer-edge-tab {
     top: calc(var(--edge-tab-top) + 2 * var(--edge-tab-pitch));
+}
+
+/*
+ * Couché, la pile des trois languettes se centre sur la hauteur de l'écran.
+ *
+ * Les 70 px du haut sont une ancre de portrait : sur les huit cents pixels d'un
+ * téléphone debout, la pile posée là tombe naturellement dans le tiers
+ * supérieur, à portée du pouce. Couché, il ne reste que la moitié de cette
+ * hauteur et la même ancre laisse un dégagement deux fois plus grand au-dessus
+ * qu'en dessous : la pile paraît tomber vers le bas.
+ *
+ * Elle se centre donc, et sur l'écran — pas sur la page. La nuance est tout le
+ * sujet : le bandeau du navigateur se replie au défilement, la page grandit
+ * d'autant, et un centrage rapporté à elle ferait glisser les trois languettes
+ * chaque fois que le bandeau va et vient. Deux points fixes le permettent :
+ *
+ *   - l'ancrage part du bas. Le bandeau est en haut ; c'est donc le bord haut
+ *     de la page qui monte et descend avec lui, jamais le bord bas, qui reste
+ *     collé à celui de l'écran.
+ *   - l'unité choisie mesure la page bandeau replié, soit la hauteur de l'écran
+ *     entier. C'est le travers bien connu de `100vh`, qui déborde toujours d'un
+ *     téléphone, et c'est ici exactement ce qu'on demande — mais `vh` ne le
+ *     garantit pas : la spécification laisse chaque moteur le rapporter au
+ *     grand viewport ou au petit. Chrome et Safari prennent le grand, Firefox
+ *     le petit, et les languettes y descendaient de la moitié du bandeau.
+ *     `lvh` nomme le grand sans ambiguïté ; `vh` reste en repli pour les
+ *     moteurs qui ne le connaissent pas encore, où l'on ne fait ni mieux ni
+ *     moins bien qu'avant.
+ *
+ * La demi-hauteur de la pile se déduit de ses propres mesures : trois
+ * languettes et deux écarts, dont la moitié fait une languette et demie plus un
+ * écart. Retoucher `--edge-tab-height` ou `--edge-tab-gap` garde le centrage
+ * juste, sans qu'on ait à repasser ici.
+ *
+ * L'ordre s'inverse avec le sens de l'ancrage : c'est la languette des
+ * journaux, dernière de la pile, qui porte désormais la mesure, et celle de
+ * l'activité qui s'en écarte de deux crans.
+ *
+ * Le téléphone seul : c'est le seul appareil dont la hauteur couchée soit assez
+ * courte pour que l'ancre du haut se voie. Une tablette couchée en garde huit
+ * cents et plus, où la pile reste où elle a toujours été.
+ */
+@media (orientation: landscape) {
+    [data-device-mode="phone"] .drawer-edge-tab {
+        --edge-tab-bottom: calc(
+            50vh - 1.5 * var(--edge-tab-height) - var(--edge-tab-gap)
+        );
+    }
+
+    /*
+     * Le repli passe par `@supports`, et non par deux déclarations superposées :
+     * une variable avale n'importe quelle suite de mots sans broncher, et une
+     * unité inconnue ne s'y verrait qu'au moment de la substitution — trop tard
+     * pour retomber sur la déclaration précédente, `bottom` reviendrait à
+     * `auto` et les trois languettes s'empileraient au même endroit.
+     */
+    @supports (height: 100lvh) {
+        [data-device-mode="phone"] .drawer-edge-tab {
+            --edge-tab-bottom: calc(
+                50lvh - 1.5 * var(--edge-tab-height) - var(--edge-tab-gap)
+            );
+        }
+    }
+
+    [data-device-mode="phone"] #logs-drawer-edge-tab {
+        top: auto;
+        bottom: var(--edge-tab-bottom);
+    }
+
+    [data-device-mode="phone"] #video-drawer-edge-tab {
+        top: auto;
+        bottom: calc(var(--edge-tab-bottom) + var(--edge-tab-pitch));
+    }
+
+    [data-device-mode="phone"] #drawer-edge-tab {
+        top: auto;
+        bottom: calc(var(--edge-tab-bottom) + 2 * var(--edge-tab-pitch));
+    }
 }
 
 /*
@@ -188,6 +275,29 @@ body.touch-drawer-is-open .drawer-edge-tab {
 
 [data-touch-mode="true"] #logs-drawer-edge-tab:hover {
     box-shadow: -5px 0 20px var(--c-success), 0 0 10px rgba(255, 255, 255, 0.8);
+}
+
+/*
+ * L'en-tête s'arrête avant la colonne des languettes.
+ *
+ * Les trois languettes descendent de 70 px à 298 px du haut de la fenêtre, soit
+ * exactement la hauteur de l'en-tête sur un écran étroit. Or les commandes y
+ * prennent alors la largeur entière : le menu du salon et celui du style
+ * finissaient à quatorze pixels d'elles, assez près pour qu'on lise les deux
+ * comme un seul bloc, et assez près pour qu'un pouce visant le menu attrape la
+ * languette.
+ *
+ * La réserve est prise en marge intérieure, non sur la largeur des menus : la
+ * bordure du bas, elle, continue de traverser toute la page — c'est le trait qui
+ * sépare l'en-tête du tableau de bord, il n'a aucune raison de s'interrompre.
+ *
+ * Le téléphone seul : c'est le seul mode où les menus prennent la largeur
+ * entière et vont donc au contact. Sur tablette ils gardent leurs 240 px, à
+ * gauche ; y prendre la même réserve décalerait pour rien le témoin de
+ * connexion par rapport au bord des cartes, juste dessous.
+ */
+[data-device-mode="phone"] .main-header {
+    padding-right: calc(var(--edge-tab-width) + 0.5rem);
 }
 
 /* Au bureau, les deux fenêtres flottent : il n'y a pas de tiroir à tirer. */
@@ -244,32 +354,25 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
 [data-touch-mode="true"] .video-window-header,
 [data-touch-mode="true"] .logs-window-header {
     padding-top: max(0.6rem, env(safe-area-inset-top));
-    padding-left: max(0.9rem, env(safe-area-inset-left));
-    padding-right: max(0.9rem, env(safe-area-inset-right));
+    padding-left: max(0.9rem, var(--drawer-inset-left));
+    padding-right: max(0.9rem, var(--drawer-inset-right));
     flex-shrink: 0;
 }
 
 /*
- * L'en-tête des journaux alignait quatre groupes sur une rangée : le titre, six
+ * L'en-tête des journaux aligne quatre groupes sur une rangée : le titre, six
  * filtres, la transparence et trois boutons. La transparence est partie
- * ci-dessus ; les filtres restent trop larges pour un téléphone. On laisse donc
- * la rangée se replier — titre et boutons sur la première ligne, filtres sur la
- * seconde.
+ * ci-dessus ; restent les filtres, seuls à ne pas tenir sur toutes les largeurs.
+ *
+ * Ils gardent leur place dans la rangée et se contentent d'y défiler du doigt
+ * quand elle se resserre : `min-width: 0` défait la largeur plancher que le
+ * flex accorde à tout élément, sans quoi le groupe pousserait les boutons hors
+ * du cadre au lieu de se laisser rogner. Le repli sur une seconde ligne est
+ * réservé aux largeurs où il n'y a vraiment plus rien à rogner — voir la
+ * requête média plus bas.
  */
-[data-touch-mode="true"] .logs-window-header {
-    flex-wrap: wrap;
-    row-gap: 8px;
-}
-
 [data-touch-mode="true"] .logs-header-filters {
-    order: 3;
-    /* Une base de 100 % force le passage à la ligne : les filtres ont la
-       seconde pour eux seuls. */
-    flex-basis: 100%;
-    margin: 0;
-    /* Six filtres ne tiennent pas toujours sur la largeur d'un téléphone
-       debout : ils défilent alors du doigt plutôt que de se replier à leur
-       tour, ce qui coûterait une troisième ligne d'en-tête. */
+    min-width: 0;
     overflow-x: auto;
     scrollbar-width: none;
 }
@@ -286,7 +389,61 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
     margin-left: auto;
 }
 
+/*
+ * En deçà de quarante fois la police par défaut — 640 px sur un navigateur
+ * réglé d'usine —, les filtres prennent la seconde ligne pour eux seuls, et le
+ * titre et les boutons gardent la première.
+ *
+ * C'est le cas du téléphone debout : le titre et les trois commandes laissent
+ * moins de deux cents pixels aux six filtres, qui deviendraient un bouton et
+ * demi visible au milieu d'un défilement. Couché, ou sur une tablette, la
+ * rangée les loge en entier et les renvoyer à la ligne ne ferait que voler une
+ * ligne au terminal.
+ *
+ * Le seuil est en `em` et non en pixels : dans une requête média, l'unité vaut
+ * la taille de police par défaut du navigateur, celle-là même qui dimensionne
+ * les filtres. Un lecteur qui a grossi la police du sien déplace donc le seuil
+ * d'autant, ce qu'un seuil en pixels ignorerait — il replierait trop tard,
+ * quand les filtres ne tiennent déjà plus.
+ */
+@media (max-width: 39.99em) {
+    [data-touch-mode="true"] .logs-window-header {
+        flex-wrap: wrap;
+        row-gap: 8px;
+    }
+
+    [data-touch-mode="true"] .logs-header-filters {
+        order: 3;
+        /* Une base de 100 % force le passage à la ligne. */
+        flex-basis: 100%;
+        margin: 0;
+    }
+}
+
 /* ── Le corps ───────────────────────────────────────────────── */
+
+/*
+ * La taille du terminal suit l'écran, et non plus la police du navigateur.
+ *
+ * `0,78 rem` suit la police par défaut du navigateur, sans rien savoir de
+ * l'écran sur lequel elle atterrit : la même valeur donne une soixantaine de
+ * caractères par ligne sur un écran de bureau et une trentaine sur un
+ * téléphone, où l'horodatage et l'étiquette mangent en plus le tiers de la
+ * ligne avant le premier mot. C'est là que la coupure des messages en deux se
+ * voit.
+ *
+ * `3 vw` rattache la taille à la largeur réellement disponible — le tiroir
+ * occupe l'écran entier, les deux se confondent. Les deux bornes gardent le
+ * résultat dans le raisonnable : jamais plus grand qu'au bureau, jamais plus
+ * petit que 0,62 rem, un plancher qui suit la police du lecteur plutôt que de
+ * la contredire.
+ *
+ * L'horodatage et l'étiquette sont écrits en `em` (voir css/logs.css) : ils
+ * rétrécissent du même rapport, la ligne garde ses proportions.
+ */
+[data-device-mode="phone"] .logs-window-body {
+    font-size: clamp(0.62rem, 3vw, 0.78rem);
+}
 
 /*
  * `.video-window-body` retranchait de la fenêtre les 40 px annoncés de son
@@ -300,10 +457,34 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
     min-height: 0;
 }
 
-/* Le terminal longe le bord bas, rogné sur les téléphones sans bouton
-   d'accueil. */
+/*
+ * Le terminal longe trois bords : les deux côtés et le bas, rogné sur les
+ * téléphones sans bouton d'accueil.
+ *
+ * Les trois valeurs reprennent le remplissage de css/logs.css comme plancher.
+ * Le bas ne l'avait pas : il posait la réserve du système seule, et la faisait
+ * donc tomber à zéro sur tout appareil qui n'en déclare pas — la dernière ligne
+ * de journal se retrouvait collée au bord.
+ */
 [data-touch-mode="true"] .logs-terminal-container {
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: max(12px, var(--drawer-inset-left));
+    padding-right: max(12px, var(--drawer-inset-right));
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+}
+
+/*
+ * Les deux étiquettes flottantes du terminal — « défiler vers le bas » et la
+ * barre de sélection — sont ancrées au bord bas du panneau, à huit et seize
+ * pixels. La barre d'accueil en fait vingt et un : elles passaient dessous, là
+ * où l'appui glisse la page au lieu de presser le bouton. Elles sont centrées
+ * horizontalement, l'encoche ne les concerne pas.
+ */
+[data-touch-mode="true"] .logs-scroll-bottom-btn {
+    bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+[data-touch-mode="true"] .logs-selection-bar {
+    bottom: max(8px, env(safe-area-inset-bottom));
 }
 
 /*
@@ -429,8 +610,8 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
  * zones de sécurité prennent le relais sur les trois bords que la barre longe.
  */
 [data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen) .video-custom-controls {
-    padding-left: max(12px, env(safe-area-inset-left));
-    padding-right: max(12px, env(safe-area-inset-right));
+    padding-left: max(12px, var(--drawer-inset-left));
+    padding-right: max(12px, var(--drawer-inset-right));
     padding-bottom: max(8px, env(safe-area-inset-bottom));
 }
 
@@ -447,8 +628,8 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
  */
 [data-touch-mode="true"] #video-floating-window.is-fullscreen .video-custom-controls,
 [data-touch-mode="true"] body.video-fullscreen-active #video-floating-window .video-custom-controls {
-    padding-left: max(20px, env(safe-area-inset-left)) !important;
-    padding-right: max(20px, env(safe-area-inset-right)) !important;
+    padding-left: max(20px, var(--drawer-inset-left)) !important;
+    padding-right: max(20px, var(--drawer-inset-right)) !important;
     padding-bottom: max(14px, env(safe-area-inset-bottom)) !important;
 }
 
@@ -456,6 +637,6 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
 [data-touch-mode="true"] #video-floating-window.is-fullscreen .video-top-overlay,
 [data-touch-mode="true"] body.video-fullscreen-active #video-floating-window .video-top-overlay {
     padding-top: max(10px, env(safe-area-inset-top));
-    padding-left: max(14px, env(safe-area-inset-left));
-    padding-right: max(14px, env(safe-area-inset-right));
+    padding-left: max(14px, var(--drawer-inset-left));
+    padding-right: max(14px, var(--drawer-inset-right));
 }

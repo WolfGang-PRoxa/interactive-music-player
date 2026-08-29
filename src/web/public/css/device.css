@@ -512,6 +512,37 @@ body.touch-dragging * {
     flex-wrap: wrap;
 }
 
+/*
+ * Le partage du contrôle rejoint la rangée des boutons, au lieu de fuir à
+ * droite.
+ *
+ * Il forme sa propre section — voir index.html —, et l'en-tête écarte ses
+ * sections par `justify-content: space-between`. Sur téléphone, où les sections
+ * passent à la ligne, cela plaquait le bouton contre le bord droit, à un demi-
+ * écran de GitHub et du don avec qui il partage pourtant sa ligne. Rien ne le
+ * rattachait plus aux cinq boutons du dessus : isolé dans son coin, il avait
+ * l'air d'appartenir aux languettes des tiroirs, qui passent juste à côté.
+ *
+ * `margin-right: auto` lui fait absorber tout l'espace libre de la ligne : les
+ * trois boutons se rangent à gauche, dans le prolongement de ceux du dessus.
+ *
+ * Reste à ce que l'écart entre le don et le partage soit celui de deux boutons
+ * voisins, et non celui de deux sections : à l'intérieur d'un groupe, deux
+ * boutons sont séparés du `gap` de 1,2 rem plus les 8 px de marge que chacun
+ * porte, quand l'en-tête n'écarte ses sections que de 1,5 rem — trois pixels de
+ * moins, assez pour que la colonne du troisième bouton ne tombe pas sur celle
+ * du dessus. L'écartement horizontal de l'en-tête adopte donc celui des
+ * boutons ; sur téléphone, il ne sépare qu'eux, chaque autre section occupant sa
+ * ligne entière.
+ */
+[data-device-mode="phone"] .main-header {
+    column-gap: calc(1.2rem + 8px);
+}
+
+[data-device-mode="phone"] #share-controls-wrapper {
+    margin-right: auto;
+}
+
 /* Le titre est ce qui se comprime en premier faute de place ; réduit, il tient
    sur une ligne et rend la sienne aux commandes. */
 [data-device-mode="phone"] .main-header h1 {
@@ -962,4 +993,105 @@ body.touch-dragging * {
 [data-device-mode="phone"] .drawer-panel {
     width: 100% !important;
     max-width: 100% !important;
+}
+
+/* ═══════════════════ Les couloirs des trois tiroirs ═══════════════════ */
+
+/*
+ * Même travail que pour la fenêtre de documentation, plus haut, appliqué cette
+ * fois aux trois tiroirs : l'activité, la vidéo et les journaux. Tous trois
+ * occupent l'écran entier au doigt — voir css/touchDrawers.css pour les deux
+ * derniers —, donc tous trois longent les quatre bords du matériel et non plus
+ * ceux d'un cadre posé au milieu de la page.
+ *
+ * La documentation répète ses valeurs de repli dans un second bloc, faute
+ * d'avoir eu de quoi les nommer. Ici, deux variables portent la réserve
+ * latérale : les règles écrivent partout `max(couloir, réserve)`, et le repli
+ * du côté libre se fait en un seul endroit, sur la variable. Une règle ajoutée
+ * demain en hérite sans qu'on ait à penser à l'encoche.
+ */
+[data-touch-mode="true"] {
+    /*
+     * Par défaut, la réserve du système telle qu'il la déclare, des deux côtés.
+     * C'est la valeur sûre : elle ne suppose rien du matériel.
+     */
+    --drawer-inset-left: env(safe-area-inset-left);
+    --drawer-inset-right: env(safe-area-inset-right);
+}
+
+/*
+ * Couché, un seul des deux bords porte l'encoche ; l'autre n'a qu'un coin
+ * arrondi à dégager, et le système lui accorde pourtant la même réserve. C'est
+ * ce couloir vide qu'on rend à la page.
+ *
+ * `deviceMode.js` déduit le côté et le pose en attribut. La déduction n'est
+ * qu'une hypothèse : si l'attribut manque — appareil ancien, orientation
+ * indéterminable, tablette née en paysage —, rien ne s'applique et la réserve
+ * du système reste en vigueur.
+ *
+ * Le `min()` est ce qui rend l'hypothèse inoffensive : le côté réputé libre
+ * reçoit la plus petite des deux valeurs, jamais davantage que ce que le
+ * système a déclaré. Sur un appareil sans découpe, où la réserve vaut zéro, on
+ * ne pose donc rien ; et si le sens de rotation était deviné à l'envers, il
+ * resterait 0,9 rem sous l'encoche — pas de quoi la dégager, assez pour que le
+ * texte ne colle pas au verre le temps qu'on échange les deux constantes de
+ * `deviceMode.js`.
+ *
+ * Le portrait n'est pas traité : l'encoche y est en haut ou en bas, les bords
+ * latéraux ne portent alors aucune réserve et il n'y a rien à rendre.
+ */
+@media (orientation: landscape) {
+    [data-touch-mode="true"][data-notch="left"] {
+        --drawer-inset-right: min(0.9rem, env(safe-area-inset-right));
+    }
+
+    [data-touch-mode="true"][data-notch="right"] {
+        --drawer-inset-left: min(0.9rem, env(safe-area-inset-left));
+    }
+}
+
+/*
+ * Le couloir de base du tiroir d'activité, celui qu'aucune contrainte physique
+ * ne dicte : il vaut ce que valait le remplissage écrit dans css/drawer.css,
+ * réduit sur téléphone comme l'en-tête l'était déjà plus haut. Les quatre
+ * rangées du tiroir le partagent, faute de quoi elles se désaligneraient dès
+ * que la réserve du système dépasse l'une et pas l'autre.
+ */
+[data-device-mode="tablet"] {
+    --drawer-gutter: 1.4rem;
+    --drawer-gutter-top: 1.2rem;
+}
+
+[data-device-mode="phone"] {
+    --drawer-gutter: 0.9rem;
+    --drawer-gutter-top: 0.85rem;
+}
+
+/*
+ * Le tiroir d'activité n'avait aucun retrait de sécurité : il est né panneau
+ * flottant sur un écran d'ordinateur, et le passage au plein écran tactile ne
+ * lui en a jamais donné. Couché, son contenu passait donc sous la découpe, et
+ * debout — une fois le tableau de bord ajouté à l'écran d'accueil, où plus
+ * aucune barre de navigateur ne s'interpose — le titre passait sous l'heure.
+ *
+ * Seul le remplissage horizontal et les deux bords extrêmes sont réécrits : le
+ * reste du remplissage vertical, propre à chaque rangée, garde ce que
+ * css/drawer.css lui donne.
+ */
+[data-touch-mode="true"] .drawer-header {
+    padding-top: max(var(--drawer-gutter-top), env(safe-area-inset-top));
+}
+
+[data-touch-mode="true"] .drawer-header,
+[data-touch-mode="true"] .drawer-settings,
+[data-touch-mode="true"] .drawer-body,
+[data-touch-mode="true"] .drawer-footer {
+    padding-left: max(var(--drawer-gutter), var(--drawer-inset-left));
+    padding-right: max(var(--drawer-gutter), var(--drawer-inset-right));
+}
+
+/* Le pied est la dernière rangée : c'est lui qui longe le bord bas, et la barre
+   d'accueil des téléphones sans bouton. */
+[data-touch-mode="true"] .drawer-footer {
+    padding-bottom: max(0.85rem, env(safe-area-inset-bottom));
 }
