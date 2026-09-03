@@ -308,6 +308,28 @@ Warteschlange wartet weiter, bis sie an der Reihe ist.
 - **Entfernen und Leeren** — nehmen Sie einen bestimmten Eintrag heraus oder
   leeren Sie Warteschlange oder Verlauf vollständig.
 
+### Verlauf des Eingabefelds
+
+Das Eingabefeld merkt sich abgeschickte Eingaben — die letzten fünfundzwanzig,
+wobei ein bereits bekannter Eintrag nach oben rückt, statt ein zweites Mal
+aufgeführt zu werden. Das Feld öffnet die Liste beim Fokussieren und filtert sie
+beim Tippen; gesucht wird im gesamten Eintrag und nicht nur an seinem Anfang, so
+dass ein Link über den Namen des Titels wiedergefunden wird, den er trägt.
+
+- **Pfeiltasten hoch und runter** — durchlaufen die Liste und tragen den Eintrag
+  ins Feld. Über den ersten hinaus nach oben zu gehen stellt die begonnene
+  Eingabe wieder her, die beim ersten Schritt beiseitegelegt wurde: eine von
+  einer Pfeiltaste unterbrochene Eingabe geht nie verloren.
+- **Klick** — wählt einen Eintrag unmittelbar aus.
+- **Kreuz** — entfernt einen Eintrag aus dem Verlauf.
+- **Escape** — schließt die Liste und gibt dem Feld zurück, was darin stand.
+
+Dieser Verlauf **lebt im Browser**, nicht auf dem Bot: er gehört zu dem Gerät
+und dem Browser, von denen aus Sie schauen, und zwei Geräte am selben Bot teilen
+sich keinen. Er ersetzt die Liste, die der Browser von sich aus anbot und die
+weder das Farbschema des Dashboards kannte noch eine Möglichkeit bot, einen
+Eintrag zu vergessen.
+
 ### Import von Dateien
 
 Legen Sie eine Audio- oder Videodatei auf der Oberfläche ab, um sie der

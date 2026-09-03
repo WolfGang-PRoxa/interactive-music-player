@@ -295,6 +295,28 @@ titre et la file continue d'attendre son tour.
 - **Suppression et nettoyage** — retirez un élément précis ou videz
   intégralement la file ou l'historique.
 
+### Historique du champ d'ajout
+
+Le champ d'ajout retient les saisies validées — les vingt-cinq dernières, une
+entrée déjà connue remontant en tête plutôt que de s'y inscrire une seconde
+fois. Le panneau s'ouvre à la prise de focus et se filtre à la frappe ; la
+recherche porte sur le contenu et non sur le début, de sorte qu'un lien se
+retrouve par le nom du morceau qu'il porte.
+
+- **Flèches haut et bas** — parcourent la liste et portent l'entrée dans le
+  champ. Remonter au-dessus de la première restitue la saisie en cours, mise de
+  côté au premier déplacement : une frappe interrompue par une flèche n'est
+  jamais perdue.
+- **Clic** — choisit directement une entrée.
+- **Croix** — retire une entrée de l'historique.
+- **Échap** — referme le panneau et rend au champ ce qui y était tapé.
+
+Cet historique **vit dans le navigateur**, et non sur le bot : il est propre à
+l'appareil et au navigateur depuis lesquels vous consultez, et deux appareils
+pilotant le même bot n'ont pas le même. Il remplace la liste que le navigateur
+proposait de lui-même, laquelle ignorait le thème du tableau de bord et
+n'offrait aucun moyen d'oublier une entrée.
+
 ### Import de fichiers
 
 Déposez un fichier audio ou vidéo sur l'interface pour l'ajouter à la file, à

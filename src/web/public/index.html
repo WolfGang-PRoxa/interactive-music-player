@@ -480,7 +480,7 @@
                      le « if (query) » de son écouteur dans app.js.
                 -->
                 <form id="search-form" class="search-box" novalidate>
-                    <input type="text" id="search-input" placeholder="Lien YouTube/YouTube Music/SoundCloud/Spotify ou recherche..." data-i18n-placeholder="search_placeholder" data-tooltip="Collez un lien, tapez une recherche, ou indiquez le chemin d'un fichier présent sur la machine du bot." data-i18n-tooltip="tooltip_search_input" required>
+                    <input type="text" id="search-input" placeholder="Lien YouTube/YouTube Music/SoundCloud/Spotify ou recherche..." data-i18n-placeholder="search_placeholder" data-tooltip="Collez un lien, tapez une recherche, ou indiquez le chemin d'un fichier présent sur la machine du bot." data-i18n-tooltip="tooltip_search_input" autocomplete="off" required>
                     <input type="file" id="file-input" accept="audio/*,video/*,.mp4,.webm,.mkv,.avi,.mov,.flv,.m4v,.3gp,.ogv,.wmv" style="display: none;">
                     <button type="button" id="btn-file-select" class="file-btn" data-tooltip="Sélectionner un fichier audio local" data-i18n-tooltip="tooltip_file_select">
                         <svg class="icon-clip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2257,6 +2257,7 @@
          dragPreview vient en premier, touchDragDrop s'appuyant dessus. -->
     <script src="js/dragPreview.js"></script>
     <script src="js/touchDragDrop.js"></script>
+    <script src="js/searchHistory.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

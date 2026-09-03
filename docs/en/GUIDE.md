@@ -290,6 +290,26 @@ from its first title and the queue keeps waiting its turn.
 - **Removal and clearing** — take out a specific item or empty the queue or the
   history entirely.
 
+### Add-field history
+
+The add field remembers what you submit — the last twenty-five entries, an
+already known one moving back to the top rather than being written a second
+time. The panel opens when the field takes focus and narrows as you type; the
+search looks at the whole entry rather than its beginning, so a link is found
+again by the name of the track it carries.
+
+- **Up and down arrows** — walk the list and carry the entry into the field.
+  Going back above the first one restores what you were typing, set aside on the
+  first move: a keystroke interrupted by an arrow is never lost.
+- **Click** — picks an entry outright.
+- **Cross** — drops an entry from the history.
+- **Escape** — closes the panel and gives the field back what was typed in it.
+
+This history **lives in the browser**, not on the bot: it belongs to the device
+and the browser you are looking from, and two devices driving the same bot do
+not share one. It replaces the list the browser offered on its own, which
+ignored the dashboard theme and gave no way to forget an entry.
+
 ### File import
 
 Drop an audio or video file onto the interface to add it to the queue, to a

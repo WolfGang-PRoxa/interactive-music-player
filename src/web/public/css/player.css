@@ -459,3 +459,135 @@ input:checked + .switch-slider:before {
 /* Active speakers and User list */
 .speakers-list {
 }
+
+/* ═══════════════ Historique du champ d'ajout ═══════════════ */
+
+/*
+ * Le repère du panneau.
+ *
+ * `position: relative` sans autre effet : la rangée reste la même, mais le
+ * champ et le panneau se lisent désormais dans le même système de coordonnées,
+ * ce qui permet à js/searchHistory.js de poser le second sous le premier à
+ * partir des décalages du premier. Le repli sur téléphone change la largeur du
+ * champ, et cette mesure-là suit toute seule.
+ */
+.search-box {
+    position: relative;
+}
+
+/*
+ * Aucune règle ne nomme de thème ici, et c'est voulu.
+ *
+ * Les huit combinaisons d'habillage et de teinte définissent toutes
+ * `--bg-dropdown`, `--border-card`, `--text-main` et `--text-muted` : bâtir le
+ * panneau dessus le fait suivre le glassmorphisme, le néon, le minimalisme et
+ * la synthwave sans qu'aucune ne soit citée. C'est précisément ce que la liste
+ * du navigateur ne savait pas faire — rendue par le système, elle restait un
+ * rectangle blanc sous un tableau de bord sombre.
+ */
+.search-history-panel {
+    /*
+     * Cinq lignes visibles, la suite au défilement.
+     *
+     * Le plafond se calcule à partir de la hauteur d'une ligne plutôt que d'être
+     * une valeur ronde trouvée à l'œil : la ligne porte cette hauteur elle-même,
+     * si bien que le panneau s'arrête exactement au bas de la cinquième et non
+     * au milieu de la sixième — qui est la façon la plus sûre de faire croire
+     * qu'il n'y a rien de plus à voir.
+     */
+    --history-row-height: 2.15rem;
+
+    position: absolute;
+    z-index: 60;
+    max-height: calc(var(--history-row-height) * 5 + 0.6rem);
+    overflow-y: auto;
+    padding: 0.3rem;
+    border: 1px solid var(--border-card);
+    border-radius: 12px;
+    background: var(--bg-dropdown);
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(var(--blur-val));
+    -webkit-backdrop-filter: blur(var(--blur-val));
+}
+
+.search-history-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    /* Hauteur fixe, et non un remplissage : c'est ce qui rend le compte des
+       cinq lignes exact. Le centrage vertical vient du flex. */
+    height: var(--history-row-height);
+    padding: 0 0.6rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+/*
+ * Une seule apparence pour le survol et pour la mise en évidence des flèches.
+ *
+ * Les deux gestes désignent la même chose — l'entrée sur laquelle on est — et
+ * leur donner deux aspects distincts obligerait à lire deux vocabulaires sur
+ * une liste de six lignes. La souris et le clavier disent ici la même chose.
+ */
+.search-history-row:hover,
+.search-history-row.is-highlighted {
+    background: var(--bg-hover);
+}
+
+.search-history-row.is-highlighted {
+    box-shadow: inset 2px 0 0 var(--c-primary);
+}
+
+/*
+ * Une entrée tient sur une ligne, coupée par des points de suspension.
+ *
+ * `min-width: 0` défait la largeur plancher que le flex accorde à tout
+ * élément : sans elle, une URL longue pousserait la croix hors du panneau au
+ * lieu de se laisser tronquer.
+ */
+.search-history-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.85rem;
+    color: var(--text-main);
+}
+
+.search-history-remove {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 5px;
+    background: none;
+    color: var(--text-muted);
+    font-family: var(--font-primary);
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+/*
+ * La croix ne paraît qu'au survol de sa ligne, ou quand les flèches s'y
+ * arrêtent : six croix alignées feraient de l'historique une liste de choses à
+ * supprimer, quand il est d'abord une liste de choses à rejouer.
+ */
+.search-history-row:hover .search-history-remove,
+.search-history-row.is-highlighted .search-history-remove {
+    opacity: 0.6;
+}
+
+.search-history-remove:hover {
+    opacity: 1;
+    color: var(--c-error);
+    background: rgba(237, 66, 69, 0.12);
+}

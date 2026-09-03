@@ -297,6 +297,28 @@ primer título y la cola sigue esperando su turno.
 - **Eliminación y limpieza** — retire un elemento concreto o vacíe íntegramente
   la cola o el historial.
 
+### Historial del campo de adición
+
+El campo de adición conserva lo que usted valida — las últimas veinticinco
+entradas, y una ya conocida vuelve a la cabeza en lugar de inscribirse una
+segunda vez. El panel se abre al recibir el foco y se filtra a medida que
+escribe; la búsqueda examina el contenido y no el principio, de modo que un
+enlace se reencuentra por el nombre de la pista que lleva.
+
+- **Flechas arriba y abajo** — recorren la lista y llevan la entrada al campo.
+  Subir por encima de la primera restituye lo que estaba escribiendo, apartado
+  en el primer desplazamiento: una escritura interrumpida por una flecha nunca
+  se pierde.
+- **Clic** — elige directamente una entrada.
+- **Cruz** — retira una entrada del historial.
+- **Escape** — cierra el panel y devuelve al campo lo que allí se había escrito.
+
+Este historial **vive en el navegador**, no en el bot: es propio del dispositivo
+y del navegador desde los que usted consulta, y dos dispositivos que pilotan el
+mismo bot no comparten el mismo. Sustituye a la lista que el navegador ofrecía
+por su cuenta, la cual ignoraba el tema del panel y no ofrecía ningún modo de
+olvidar una entrada.
+
 ### Importación de archivos
 
 Suelte un archivo de audio o de vídeo sobre la interfaz para añadirlo a la cola,
