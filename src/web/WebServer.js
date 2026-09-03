@@ -12,6 +12,7 @@ const broadcastManager = require('../broadcast/BroadcastManager');
 const playbackStateManager = require('../database/PlaybackStateManager');
 const preloadManager = require('../audio/PreloadManager');
 const { activeEngine } = require('../audio/mix');
+const { foldVirtualElapsed } = require('../audio/PlaybackSession');
 const auth = require('./auth');
 const { arePathsOrUrlsEqual } = require('../utils/paths');
 const { readSetAsideQueue } = require('../utils/setAsideQueue');
@@ -228,11 +229,10 @@ class WebServer {
                                 if (!this.hasConnectedClient(guildId)) {
                                     queue.virtualLastUpdated = Date.now();
                                 } else {
-                                    const speed = parseFloat(settings.playbackSpeed || '1.0');
-                                    const now = Date.now();
-                                    const elapsed = (now - (queue.virtualLastUpdated || now)) * speed;
-                                    queue.virtualProgressMs = (queue.virtualProgressMs || 0) + elapsed;
-                                    queue.virtualLastUpdated = now;
+                                    // Le même solde que celui d'une pause, et par la
+                                    // même fonction : deux calculs séparés finiraient
+                                    // par diverger, et la position n'a qu'un sens.
+                                    foldVirtualElapsed(queue, parseFloat(settings.playbackSpeed || '1.0'));
 
                                     const durationMs = queue.virtualCurrentTrack.durationMS || parseDurationToMs(queue.virtualCurrentTrack.duration);
                                     // Le délai de courtoisie laisse le navigateur annoncer

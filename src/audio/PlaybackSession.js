@@ -252,6 +252,46 @@ function getSession(queue) {
 }
 
 /**
+ * Verse dans `virtualProgressMs` le temps écoulé depuis le dernier relevé.
+ *
+ * En diffusion personnelle, le son sort du navigateur et le serveur ne compte
+ * pas d'échantillons : il tient la position à l'horloge murale, par un tour de
+ * boucle chaque seconde. Entre deux tours, la position que porte la session est
+ * donc en retard de ce qui s'est écoulé depuis le dernier — jusqu'à une seconde
+ * entière.
+ *
+ * Cela ne se voyait pas tant que ce retard était rattrapé au tour suivant. Mais
+ * une pause fige l'horloge : l'intervalle en cours n'était alors jamais compté,
+ * et la lecture repartait en deçà du point où elle s'était arrêtée. D'où cette
+ * fonction, appelée aussi bien par la boucle que par tout ce qui arrête le
+ * compteur — le retard est soldé avant qu'on l'immobilise.
+ *
+ * Ne compte rien si la lecture est déjà arrêtée ou en pause : le repère est
+ * alors simplement repoussé, faute de quoi une seconde pause sur une lecture
+ * déjà en pause avancerait le morceau de tout le temps passé à l'arrêt.
+ *
+ * @param {import('discord-player').GuildQueue} queue
+ * @param {number} [speed] Vitesse de lecture : une seconde d'horloge ne vaut
+ *   plus une seconde de morceau dès qu'elle s'écarte de 1.
+ * @returns {number} Millisecondes ajoutées.
+ */
+function foldVirtualElapsed(queue, speed = 1) {
+    if (!queue) return 0;
+
+    const now = Date.now();
+    const since = queue.virtualLastUpdated || now;
+    queue.virtualLastUpdated = now;
+
+    if (!queue.virtualIsPlaying || queue.virtualIsPaused) return 0;
+
+    // Une horloge qui recule — reprise de veille, ajustement NTP — ne doit pas
+    // faire reculer le morceau.
+    const elapsed = Math.max(0, (now - since) * (speed > 0 ? speed : 1));
+    queue.virtualProgressMs = (queue.virtualProgressMs || 0) + elapsed;
+    return elapsed;
+}
+
+/**
  * Installe les accesseurs sur le prototype de GuildQueue.
  *
  * Passer par le prototype couvre toutes les queues, quel que soit le chemin
@@ -290,6 +330,7 @@ installAccessors();
 module.exports = {
     PlaybackSession,
     getSession,
+    foldVirtualElapsed,
     SCHEMA,
     FIELDS,
 };

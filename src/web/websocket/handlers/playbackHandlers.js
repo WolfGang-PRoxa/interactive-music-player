@@ -7,6 +7,7 @@
 const database = require('../../../database/Database');
 const playbackStateManager = require('../../../database/PlaybackStateManager');
 const presenceManager = require('../../../audio/PresenceManager');
+const { foldVirtualElapsed } = require('../../../audio/PlaybackSession');
 const { searchLocalAwareTrack, playlistIsSource, addToSetAsideQueue } = require('../handlerUtils');
 const { getCleanFilename } = require('../../../utils/paths');
 const log = require('../../../utils/logger');
@@ -230,9 +231,15 @@ function handlePause(ctx) {
         log.debug(`[Player Debug] WS 'pause' received for guild ${currentGuildId} (broadcastMode: ${settings.broadcastMode})`);
         if (settings.broadcastMode === 'personal') {
             if (queue && queue.virtualCurrentTrack) {
+                // Avant de figer l'horloge, solder ce qu'elle doit.
+                //
+                // La position n'avance que par tours d'une seconde, et une pause
+                // tombe presque toujours entre deux : sans ce solde, la fraction
+                // en cours était perdue, et la lecture reprenait jusqu'à une
+                // seconde en deçà du point où l'utilisateur l'avait arrêtée.
+                foldVirtualElapsed(queue, parseFloat(settings.playbackSpeed || '1.0'));
                 queue.virtualIsPlaying = false;
                 queue.virtualIsPaused = true;
-                queue.virtualLastUpdated = Date.now();
                 webServer.broadcastState(currentGuildId);
                 playbackStateManager.saveState(player);
             }
