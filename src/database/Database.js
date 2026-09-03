@@ -413,6 +413,41 @@ class GuildDatabase {
         this._save();
     }
 
+    // --- Dossier de telechargement (commun a tous les salons) ---
+
+    /**
+     * Dossier ou ecrire les fichiers telecharges, ou null si l'utilisateur n'en
+     * a jamais choisi.
+     *
+     * Global et non par serveur : c'est une propriete de la machine qui heberge
+     * le bot, pas du salon depuis lequel on demande le morceau. Le meme disque
+     * sert les deux, et devoir rechoisir son dossier a chaque serveur n'aurait
+     * aucun sens.
+     *
+     * Le nul est rendu tel quel plutot que remplace ici par le dossier par
+     * defaut : cette classe ne connait pas le systeme de fichiers, et c'est
+     * utils/downloadDir.js qui sait ou tombe le defaut.
+     *
+     * @returns {string|null}
+     */
+    getDownloadDir() {
+        return this.globalData.downloadDir || null;
+    }
+
+    /**
+     * Retient le dossier choisi. `null` remet le defaut.
+     *
+     * Aucune validation ici : le chemin arrive deja verifie de la route qui
+     * l'accepte, et cette classe n'a pas a decider si un dossier existe — elle
+     * ne saurait de toute facon pas quoi faire du refus.
+     *
+     * @param {string|null} dir
+     */
+    setDownloadDir(dir) {
+        this.globalData.downloadDir = dir || null;
+        this._save();
+    }
+
     // --- Methodes globales pour les playlists (communes a tous les salons) ---
 
     /**

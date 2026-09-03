@@ -591,3 +591,180 @@ input:checked + .switch-slider:before {
     color: var(--c-error);
     background: rgba(237, 66, 69, 0.12);
 }
+
+/* ═══════════════ Sélecteur de dossier de téléchargement ═══════════════ */
+
+.download-dir-box {
+    max-width: min(560px, calc(100vw - 2rem));
+}
+
+.dir-browser-head {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.7rem;
+}
+
+.dir-up-btn {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid var(--border-card);
+    border-radius: 8px;
+    background: var(--bg-select);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+}
+
+.dir-up-btn svg {
+    width: 15px;
+    height: 15px;
+}
+
+.dir-up-btn:hover:not(:disabled) {
+    color: var(--c-primary);
+    background: var(--bg-hover);
+}
+
+/*
+ * À la racine d'un disque il n'y a plus de parent : le bouton reste en place
+ * mais s'éteint. Le retirer ferait sauter la ligne d'un cran à chaque fois
+ * qu'on atteint le sommet.
+ */
+.dir-up-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+/*
+ * Le chemin courant, en une ligne tronquée par la gauche.
+ *
+ * `direction: rtl` inverse le sens de troncature : d'un chemin trop long, c'est
+ * la fin qui importe — le dossier où l'on est —, pas la racine, qui est la même
+ * pour tout le monde. Le `bdi` du texte évite que l'inversion ne réordonne les
+ * séparateurs eux-mêmes.
+ */
+.dir-browser-path {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    direction: rtl;
+    text-align: left;
+    unicode-bidi: plaintext;
+    font-family: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.dir-browser-list {
+    /* Six lignes, la suite au défilement : assez pour se repérer dans un
+       dossier ordinaire, assez peu pour que la fenêtre tienne sur un écran. */
+    --dir-row-height: 2.1rem;
+    max-height: calc(var(--dir-row-height) * 6);
+    overflow-y: auto;
+    border: 1px solid var(--border-card);
+    border-radius: 10px;
+    padding: 0.25rem;
+    margin-bottom: 0.8rem;
+}
+
+.dir-browser-row {
+    display: block;
+    width: 100%;
+    height: var(--dir-row-height);
+    padding: 0 0.6rem;
+    border: none;
+    border-radius: 7px;
+    background: none;
+    color: var(--text-main);
+    font-family: inherit;
+    font-size: 0.85rem;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.dir-browser-row:hover {
+    background: var(--bg-hover);
+}
+
+.dir-browser-empty {
+    margin: 0;
+    padding: 0.5rem 0.6rem;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.dir-browser-warning {
+    margin: 0 0 0.8rem;
+    padding-left: 0.7rem;
+    border-left: 2px solid var(--c-error);
+    font-size: 0.82rem;
+    color: var(--c-error);
+}
+
+.dir-manual-label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.dir-browser-actions {
+    margin-top: 1rem;
+}
+
+/*
+ * Les racines de l'arborescence, en pastilles.
+ *
+ * Elles passent à la ligne d'elles-mêmes : une machine à huit disques ne doit
+ * pas faire déborder la fenêtre, et il n'y a rien à faire défiler
+ * horizontalement dans une liste de six caractères.
+ */
+.dir-browser-roots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-bottom: 0.7rem;
+}
+
+.dir-browser-roots:empty {
+    display: none;
+}
+
+.dir-root-chip {
+    padding: 0.2rem 0.6rem;
+    border: 1px solid var(--border-card);
+    border-radius: 6px;
+    background: var(--bg-select);
+    color: var(--text-muted);
+    font-family: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.dir-root-chip:hover {
+    color: var(--text-main);
+    background: var(--bg-hover);
+    border-color: var(--border-card-hover);
+}
+
+/* Le disque où l'on se trouve : sur une machine à quatre disques, le savoir
+   vaut mieux que de le déduire du chemin affiché en dessous. */
+.dir-root-chip.is-current {
+    color: var(--c-primary);
+    border-color: var(--c-primary);
+}

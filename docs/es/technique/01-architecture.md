@@ -43,6 +43,7 @@ src/
 │   ├── logger.js             Registro de la aplicación
 │   ├── atomicJson.js         Lectura/escritura JSON resistentes a los fallos
 │   ├── mediaPaths.js         Salvaguarda de las rutas servidas al cliente
+│   ├── downloadDir.js        Carpeta donde se escriben los archivos descargados
 │   ├── paths.js              Comparación y limpieza de rutas
 │   ├── duration.js           Formateo y análisis de las duraciones
 │   ├── embeds.js             Recuadros de Discord
@@ -69,6 +70,7 @@ data/
 ├── dashboard-token         Testigo de acceso generado en el primer arranque
 ├── uploads/                Archivos importados, nombrados por huella
 ├── cache/                  Pistas remotas precargadas en MP3
+├── downloads/              Archivos descargados, si no se elige otra carpeta
 └── logs/                   Un registro por arranque + latest.log
 ```
 

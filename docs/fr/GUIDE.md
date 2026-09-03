@@ -341,6 +341,38 @@ Chaque piste peut être téléchargée dans une trentaine de formats et qualité
 MP3, M4A, FLAC, WAV, OGG, OPUS, WEBM, ainsi que MP4 pour la vidéo. La conversion
 est effectuée à la volée.
 
+**Vers le disque du bot** — le menu de destination, à droite du champ d'ajout,
+compte une quatrième entrée : « Vers `data/downloads/` ». Elle n'envoie rien au
+lecteur — elle écrit le fichier sur la machine qui héberge le bot. Son libellé
+porte le dossier de destination, ce qui évite d'avoir à l'ouvrir pour savoir où
+les fichiers tombent.
+
+Le bouton en forme de dossier, à droite de cette ligne du menu, ouvre un
+explorateur de la machine hôte — et non un champ où taper un chemin, cette
+machine n'étant pas forcément celle d'où vous regardez. Sous Windows, les
+disques sont proposés en haut de la fenêtre : sans eux, remonter depuis un
+dossier de `C:` mène à `C:\` et jamais à `D:`. Le champ « Ou saisir un chemin »
+reste là pour les cas que l'explorateur ne couvre pas, et « Dossier par défaut »
+ramène à `data/downloads/`.
+
+Le dossier est retenu **par le bot**, et non par le navigateur : il est commun à
+tous vos serveurs et à tous vos appareils. Un chemin qui n'existe pas, qui n'est
+pas un dossier, ou qui refuse l'écriture est écarté au moment du choix et la
+raison en est affichée — plutôt que de faire échouer le téléchargement plus
+tard, loin de la décision qui l'a causé.
+
+Une source distante est transcodée en MP3, au débit du menu **qualité d'import
+audio**. Un fichier déjà présent sur le disque du bot est copié tel quel, sans
+réencodage : vous avez demandé à l'avoir dans votre dossier, pas à en perdre la
+qualité au passage. Deux garanties, enfin : retélécharger un morceau ne remplace
+pas le précédent — le nouveau fichier est numéroté —, et un téléchargement
+interrompu ne laisse pas de fichier tronqué dans le dossier, l'écriture se
+faisant sous un nom provisoire renommé une fois seulement le transcodage réussi.
+
+L'opération se déroule en arrière-plan et se signale par des notifications : le
+morceau doit d'abord être résolu, puis transcodé, ce qui prend le temps que cela
+prend.
+
 ### Vidéo
 
 Lorsqu'une piste possède une vidéo associée, le tableau de bord peut l'afficher

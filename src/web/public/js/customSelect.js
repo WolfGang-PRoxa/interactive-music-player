@@ -95,7 +95,7 @@ class CustomSelect {
                             defFlag = `:def:${checkDefault(parts[0], parts[1])}`;
                         }
                     }
-                    signature += `O:${option.value}:${option.textContent}:${option.selected}:${option.disabled}${defFlag}:rm:${option.dataset.removable || ''}|`;
+                    signature += `O:${option.value}:${option.textContent}:${option.selected}:${option.disabled}${defFlag}:rm:${option.dataset.removable || ''}:ac:${option.dataset.action || ''}|`;
                 });
             } else if (child.tagName === 'OPTION') {
                 let defFlag = '';
@@ -105,7 +105,7 @@ class CustomSelect {
                         defFlag = `:def:${checkDefault(parts[0], parts[1])}`;
                     }
                 }
-                signature += `O:${child.value}:${child.textContent}:${child.selected}:${child.disabled}${defFlag}:rm:${child.dataset.removable || ''}|`;
+                signature += `O:${child.value}:${child.textContent}:${child.selected}:${child.disabled}${defFlag}:rm:${child.dataset.removable || ''}:ac:${child.dataset.action || ''}|`;
             }
         });
 
@@ -317,6 +317,56 @@ class CustomSelect {
             });
 
             optDiv.appendChild(removeBtn);
+        }
+
+        /*
+         * Bouton d'action d'une option, à droite de sa ligne.
+         *
+         * Même principe que le retrait juste au-dessus, et pour une raison
+         * voisine : certaines options portent un réglage qui leur appartient en
+         * propre — la destination « vers un dossier » a le sien, les trois
+         * autres n'en ont pas. Le poser à côté du menu obligerait à le montrer
+         * en permanence, y compris quand l'option qu'il sert n'est pas choisie,
+         * et à expliquer par un libellé ce que sa place dirait toute seule.
+         *
+         * Le composant ignore ce que l'action veut dire : il émet
+         * `option-action` sur le <select> natif avec la valeur de l'option, et
+         * l'appelant fait le reste. C'est ce qui permet d'en poser une seconde
+         * ailleurs sans revenir ici.
+         */
+        if (option.dataset.action) {
+            const actionBtn = document.createElement('button');
+            actionBtn.className = 'option-action-btn';
+            actionBtn.type = 'button';
+            if (option.dataset.actionTooltip) actionBtn.dataset.tooltip = option.dataset.actionTooltip;
+
+            const ICONS = {
+                folder: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>',
+            };
+            actionBtn.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    ${ICONS[option.dataset.action] || ICONS.folder}
+                </svg>
+            `;
+
+            actionBtn.addEventListener('click', (e) => {
+                // Sans quoi le clic vaudrait aussi choix de l'option : on veut
+                // régler la destination, pas forcément la sélectionner.
+                e.stopPropagation();
+                e.preventDefault();
+
+                // Ce que l'action ouvre se pose par-dessus ; garder le menu
+                // déployé derrière n'apporterait rien.
+                this.container.classList.remove('open');
+
+                this.nativeSelect.dispatchEvent(
+                    new CustomEvent('option-action', {
+                        detail: { value: option.value, action: option.dataset.action },
+                    })
+                );
+            });
+
+            optDiv.appendChild(actionBtn);
         }
 
         optDiv.addEventListener('click', (e) => {

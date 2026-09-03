@@ -43,6 +43,7 @@ src/
 │   ├── logger.js             Journalisation applicative
 │   ├── atomicJson.js         Lecture/écriture JSON résistantes aux crashs
 │   ├── mediaPaths.js         Garde-fou des chemins servis au client
+│   ├── downloadDir.js        Dossier où sont écrits les fichiers téléchargés
 │   ├── paths.js              Comparaison et nettoyage de chemins
 │   ├── duration.js           Formatage et analyse des durées
 │   ├── embeds.js             Encadrés Discord
@@ -69,6 +70,7 @@ data/
 ├── dashboard-token         Jeton d'accès généré au premier démarrage
 ├── uploads/                Fichiers importés, nommés par empreinte
 ├── cache/                  Pistes distantes préchargées en MP3
+├── downloads/              Fichiers téléchargés, si aucun autre dossier n'est choisi
 └── logs/                   Un journal par démarrage + latest.log
 ```
 

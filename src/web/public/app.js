@@ -1273,6 +1273,15 @@
                     type: 'playNow',
                     data: { query }
                 });
+            } else if (target === 'download') {
+                // La seule destination qui ne mène pas au lecteur : le bot
+                // écrit un fichier dans son dossier de téléchargement et s'en
+                // tient là. Le retour se fait en notifications, la résolution
+                // puis le transcodage prenant le temps qu'ils prennent.
+                sendWS({
+                    type: 'downloadTrack',
+                    data: { query }
+                });
             } else {
                 // Default: 'queue' (Vers la file d'attente)
                 sendWS({
@@ -3291,6 +3300,7 @@
                 'maintenance-modal',
                 'playlist-create-modal',
                 'import-info-modal',
+                'download-dir-modal',
                 'share-modal',
                 'settings-modal'
             ];

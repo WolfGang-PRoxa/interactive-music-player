@@ -130,6 +130,32 @@ track, then before the actual reading of the file — including for a track comi
 from the queue. A track whose path is outside the perimeter produces a `403`,
 never a read.
 
+### Writing, by contrast, is not confined
+
+[`utils/downloadDir.js`](../../../src/utils/downloadDir.js) keeps the folder the
+fourth destination of the add box writes its files to, and it has no allowed
+roots. The asymmetry is deliberate, and worth stating rather than being put up
+with:
+
+- **`mediaPaths` protects reading.** The risk there is serving the client a file
+  it has no business seeing — hence a closed perimeter, and `.env` out of reach.
+- **The download folder is a target.** The risk is no longer disclosing but
+  writing somewhere it should not. And confining it under an allowed root would
+  amount to removing the feature: someone who keeps their music in `D:\Music`
+  wants to download it there.
+
+What carries the safety is therefore elsewhere. The chosen path is validated
+before being kept — it exists, it is a directory, it accepts writing, it holds
+no null byte — the file name is derived from the track title rather than
+supplied by the client, and the writing goes through a provisional name renamed
+only on success. `GET /api/browse-dirs` also lets the tree of the host machine
+be walked, which is a new capability.
+
+All of it holds within the threat model above: the bot runs on its owner's
+machine, these routes are mounted after `auth.middleware`, and that same
+dashboard can already shut the process down. A stolen token therefore opens
+nothing it did not already open.
+
 ---
 
 ## Ceilings

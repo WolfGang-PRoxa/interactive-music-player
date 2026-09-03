@@ -514,6 +514,24 @@
                         <option value="queue" data-i18n="add_target_queue" selected>Vers la file d'attente</option>
                         <option value="playlist" data-i18n="add_target_playlist">Vers la playlist active</option>
                         <option value="play" data-i18n="add_target_play">Vers la lecture</option>
+                        <!--
+                             La quatrième destination porte son propre bouton, à
+                             droite de sa ligne dans le menu déroulant : le
+                             dossier appartient à cette option-là, et à aucune
+                             autre. `data-action` est le mécanisme générique de
+                             js/customSelect.js — le même qui pose la corbeille
+                             des versions —, qui émet `option-action` sur le
+                             <select> et laisse l'appelant décider de la suite.
+
+                             Le libellé est réécrit par js/downloadTarget.js dès
+                             que le dossier est connu : « Vers data/downloads/ »
+                             tant qu'aucun n'a été choisi, « Vers <chemin> »
+                             ensuite. Le texte ci-dessous n'est qu'un repli, le
+                             temps que la réponse du bot arrive.
+                        -->
+                        <option value="download"
+                                data-action="folder"
+                                data-action-tooltip="Choisir le dossier de téléchargement">Vers data/downloads/</option>
                     </select>
                 </div>
 
@@ -1217,6 +1235,72 @@
                         s'entend dans le navigateur que si ce dossier figure dans
                         MEDIA_ROOTS. Sinon, il ne sort que dans le salon vocal.
                     </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!--
+         Sélecteur du dossier de téléchargement.
+
+         Un explorateur du disque du bot, et non un champ où taper un chemin :
+         la machine hôte n'est pas forcément celle d'où l'on regarde, et de
+         mémoire on écrit rarement un chemin juste du premier coup. Le champ
+         reste là malgré tout, sous la liste — c'est par lui qu'on change de
+         disque sous Windows, une racine n'ayant pas de parent où remonter.
+    -->
+    <div id="download-dir-modal" class="maintenance-overlay hidden">
+        <div class="maintenance-box settings-modal-box download-dir-box">
+            <div class="settings-modal-header">
+                <h2 class="settings-modal-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span data-i18n="download_dir_title">Dossier de téléchargement</span>
+                </h2>
+                <button id="btn-close-download-dir" class="settings-close-btn" data-tooltip="Fermer" data-i18n-tooltip="tooltip_close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="settings-modal-body">
+                <!--
+                     Les racines : les disques sous Windows, « / » ailleurs.
+
+                     Sans elles, l'explorateur est prisonnier de son point de
+                     départ. Remonter depuis un dossier de C: mène à la racine
+                     de C:, dont le parent est elle-même — et D: reste hors
+                     d'atteinte, quel que soit le nombre de fois qu'on remonte.
+
+                     Remplies par js/downloadTarget.js, et masquées quand il n'y
+                     a qu'une racine : sur un système de fichiers unique, les
+                     montrer n'apprendrait rien.
+                -->
+                <div id="dir-browser-roots" class="dir-browser-roots"></div>
+
+                <div class="dir-browser-head">
+                    <button type="button" id="btn-dir-up" class="dir-up-btn" data-tooltip="Dossier parent" data-i18n-tooltip="tooltip_dir_parent">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="19" x2="12" y2="5"></line>
+                            <polyline points="5 12 12 5 19 12"></polyline>
+                        </svg>
+                    </button>
+                    <code id="dir-browser-path" class="dir-browser-path"></code>
+                </div>
+
+                <div id="dir-browser-list" class="dir-browser-list"></div>
+
+                <p id="dir-browser-warning" class="dir-browser-warning hidden"></p>
+
+                <label class="dir-manual-label" for="input-download-dir" data-i18n="download_dir_manual">Ou saisir un chemin :</label>
+                <input type="text" id="input-download-dir" class="modal-input" placeholder="D:\Musique" autocomplete="off">
+
+                <div class="maintenance-actions dir-browser-actions">
+                    <button id="btn-download-dir-reset" class="maint-btn secondary" data-i18n="download_dir_reset">Dossier par défaut</button>
+                    <button id="btn-download-dir-save" class="maint-btn primary" data-i18n="download_dir_save">Choisir ce dossier</button>
                 </div>
             </div>
         </div>
@@ -2258,6 +2342,7 @@
     <script src="js/dragPreview.js"></script>
     <script src="js/touchDragDrop.js"></script>
     <script src="js/searchHistory.js"></script>
+    <script src="js/downloadTarget.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

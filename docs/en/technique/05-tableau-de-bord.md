@@ -46,6 +46,9 @@ All are protected by the token ([07 — Security](07-securite.md)).
 | `POST /api/upload` | File import, raw stream with an `X-File-Name` header |
 | `GET /api/docs` | Contents of the embedded documentation, in the requested language |
 | `GET /api/docs/contenu` | Markdown source of a document, designated by its identifier and its language |
+| `GET /api/download-dir` | Current download folder, and the default it compares against |
+| `POST /api/download-dir` | Choice of folder, validated before being kept; empty body returns to the default |
+| `GET /api/browse-dirs` | Sub-folders of a path on the host machine, for the picker |
 
 `/api/docs` inventories `docs/` on every call, from the **version currently
 running** and not from the shared root: the documentation displayed is therefore
@@ -110,7 +113,7 @@ for preloading to feed the cache.
 
 ### Client → server messages
 
-36 types, declared in the routing table
+37 types, declared in the routing table
 [`handlers/index.js`](../../../src/web/websocket/handlers/index.js):
 
 | Domain | Messages |
@@ -119,7 +122,7 @@ for preloading to feed the cache.
 | Queue | `removeTrack`, `playNow`, `moveOrInsertTrack`, `clearQueue`, `removeFromHistory`, `clearHistory` |
 | Playlists | `createPlaylist`, `renamePlaylist`, `deletePlaylist`, `reorderPlaylists`, `addPlaylistTrack`, `addTrackToPlaylist`, `removeTrackFromPlaylist`, `movePlaylistTrack`, `setActivePlaybackSource` |
 | Discord server | `selectChannel`, `setDefaultChannel`, `updateSettings`, `toggleVoiceDetection`, `leaveGuild` |
-| Track | `setTrackQuality` |
+| Track | `setTrackQuality`, `downloadTrack` |
 | System | `requestState`, `clientLog`, `memoryStream`, `startupFadeinConsumed`, `restartBot`, `shutdownBot` |
 
 `leaveGuild` makes the bot leave a Discord server — the wastebasket in the

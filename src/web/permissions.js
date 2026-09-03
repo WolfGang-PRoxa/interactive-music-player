@@ -81,6 +81,10 @@ const ACTION_GROUPS = {
     // Le bouton lecture, lecteur vide : il démarre la source choisie, il n'y
     // ajoute rien. Même groupe que `resume`, dont il prend la suite.
     startPlaybackSource: 'playback',
+    // Ecrire un fichier sur le disque du bot n'est pas piloter la
+    // lecture : c'est ajouter, comme les trois autres destinations de
+    // la meme boite. D'ou `queue`, le groupe de l'ajout.
+    downloadTrack: 'queue',
 
     // File d'attente et historique.
     // `play` porte mal son nom : c'est l'ajout d'un résultat de recherche à la

@@ -43,6 +43,7 @@ src/
 │   ├── logger.js             Application logging
 │   ├── atomicJson.js         Crash-resistant JSON reading/writing
 │   ├── mediaPaths.js         Guard rail for paths served to the client
+│   ├── downloadDir.js        Folder the downloaded files are written to
 │   ├── paths.js              Path comparison and cleanup
 │   ├── duration.js           Duration formatting and parsing
 │   ├── embeds.js             Discord embeds
@@ -69,6 +70,7 @@ data/
 ├── dashboard-token         Access token generated on first startup
 ├── uploads/                Imported files, named by fingerprint
 ├── cache/                  Preloaded remote tracks in MP3
+├── downloads/              Downloaded files, if no other folder is chosen
 └── logs/                   One log per startup + latest.log
 ```
 

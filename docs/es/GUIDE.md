@@ -344,6 +344,39 @@ Cada pista puede descargarse en una treintena de formatos y calidades: MP3, M4A,
 FLAC, WAV, OGG, OPUS, WEBM, así como MP4 para el vídeo. La conversión se efectúa
 sobre la marcha.
 
+**Hacia el disco del bot** — el menú de destino, a la derecha del campo de
+adición, cuenta con una cuarta entrada: «Hacia `data/downloads/`». No envía nada
+al reproductor: escribe el archivo en la máquina que aloja el bot. Su etiqueta
+lleva la carpeta de destino, lo que evita tener que abrirla para saber dónde
+caen los archivos.
+
+El botón con forma de carpeta, a la derecha de esa línea del menú, abre un
+explorador de la máquina anfitriona — y no un campo donde teclear una ruta, ya
+que esa máquina no es necesariamente aquella desde la que usted mira. En Windows
+las unidades se ofrecen en la parte alta de la ventana: sin ellas, subir desde
+una carpeta de `C:` lleva a `C:\` y nunca a `D:`. El campo «O introducir una
+ruta» permanece para los casos que el explorador no cubre, y «Carpeta por
+defecto» devuelve a `data/downloads/`.
+
+La carpeta la retiene **el bot**, y no el navegador: es común a todos sus
+servidores y a todos sus dispositivos. Una ruta que no existe, que no es una
+carpeta o que rechaza la escritura se descarta en el momento de la elección y se
+muestra el motivo — en lugar de hacer fracasar la descarga más tarde, lejos de
+la decisión que la causó.
+
+Una fuente remota se transcodifica a MP3, al caudal del menú **calidad de
+importación de audio**. Un archivo ya presente en el disco del bot se copia tal
+cual, sin recodificación: usted pidió tenerlo en su carpeta, no perder calidad
+por el camino. Dos garantías, por último: volver a descargar una pista no
+sustituye a la anterior — el nuevo archivo se numera — y una descarga
+interrumpida no deja ningún archivo truncado en la carpeta, pues la escritura se
+hace bajo un nombre provisional que solo se renombra una vez lograda la
+transcodificación.
+
+La operación transcurre en segundo plano y se anuncia mediante notificaciones:
+la pista debe resolverse primero y transcodificarse después, lo que lleva el
+tiempo que lleva.
+
 ### Vídeo
 
 Cuando una pista posee un vídeo asociado, el panel de control puede mostrarlo de

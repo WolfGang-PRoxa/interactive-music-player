@@ -334,6 +334,36 @@ Every track can be downloaded in some thirty formats and qualities: MP3, M4A,
 FLAC, WAV, OGG, OPUS, WEBM, as well as MP4 for video. The conversion is
 performed on the fly.
 
+**To the bot's disk** — the destination menu, to the right of the add field,
+holds a fourth entry: "To `data/downloads/`". It sends nothing to the player —
+it writes the file to the machine hosting the bot. Its label carries the
+destination folder, which saves opening it to find out where the files land.
+
+The folder button, at the right of that row of the menu, opens a browser of the
+host machine — rather than a field to type a path into, that machine not
+necessarily being the one you are looking from. On Windows the drives are
+offered at the top of the window: without them, going up from a folder of `C:`
+leads to `C:\` and never to `D:`. The "Or enter a path" field stays there for
+the cases the browser does not cover, and "Default folder" returns to
+`data/downloads/`.
+
+The folder is remembered **by the bot**, not by the browser: it is shared by all
+your servers and all your devices. A path that does not exist, that is not a
+folder, or that refuses to be written to is turned down at the moment of the
+choice and the reason is shown — rather than failing the download later, far
+from the decision that caused it.
+
+A remote source is transcoded to MP3, at the bitrate of the **import audio
+quality** menu. A file already on the bot's disk is copied as is, without
+re-encoding: you asked to have it in your folder, not to lose quality on the
+way. Two guarantees, finally: downloading a track again does not replace the
+previous one — the new file is numbered — and an interrupted download leaves no
+truncated file in the folder, the writing being done under a provisional name
+renamed only once the transcoding has succeeded.
+
+The operation runs in the background and reports through notifications: the
+track has to be resolved first, then transcoded, which takes the time it takes.
+
 ### Video
 
 When a track has an associated video, the dashboard can display it in the

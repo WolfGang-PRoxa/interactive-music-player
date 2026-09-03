@@ -48,6 +48,9 @@ Alle sind durch das Token geschützt ([07 — Sicherheit](07-securite.md)).
 | `POST /api/upload` | Dateiimport, roher Strom mit Kopfzeile `X-File-Name` |
 | `GET /api/docs` | Inhaltsverzeichnis der eingebetteten Dokumentation, in der angefragten Sprache |
 | `GET /api/docs/contenu` | Markdown-Quelle eines Dokuments, bezeichnet durch Kennung und Sprache |
+| `GET /api/download-dir` | Aktueller Download-Ordner und der Standard, mit dem er verglichen wird |
+| `POST /api/download-dir` | Wahl des Ordners, vor dem Merken geprüft; leerer Rumpf kehrt zum Standard zurück |
+| `GET /api/browse-dirs` | Unterordner eines Pfades der Host-Maschine, für die Auswahl |
 
 `/api/docs` erfasst `docs/` bei jedem Aufruf, und zwar aus der **gerade
 laufenden Fassung** und nicht aus dem gemeinsamen Stammverzeichnis: die
@@ -118,7 +121,7 @@ weshalb das Vorladen den Cache füttern soll.
 
 ### Nachrichten Client → Server
 
-36 Typen, deklariert in der Routing-Tabelle
+37 Typen, deklariert in der Routing-Tabelle
 [`handlers/index.js`](../../../src/web/websocket/handlers/index.js):
 
 | Bereich | Nachrichten |
@@ -127,7 +130,7 @@ weshalb das Vorladen den Cache füttern soll.
 | Warteschlange | `removeTrack`, `playNow`, `moveOrInsertTrack`, `clearQueue`, `removeFromHistory`, `clearHistory` |
 | Wiedergabelisten | `createPlaylist`, `renamePlaylist`, `deletePlaylist`, `reorderPlaylists`, `addPlaylistTrack`, `addTrackToPlaylist`, `removeTrackFromPlaylist`, `movePlaylistTrack`, `setActivePlaybackSource` |
 | Discord-Server | `selectChannel`, `setDefaultChannel`, `updateSettings`, `toggleVoiceDetection`, `leaveGuild` |
-| Titel | `setTrackQuality` |
+| Titel | `setTrackQuality`, `downloadTrack` |
 | System | `requestState`, `clientLog`, `memoryStream`, `startupFadeinConsumed`, `restartBot`, `shutdownBot` |
 
 `leaveGuild` lässt den Bot einen Discord-Server verlassen — der Papierkorb in den

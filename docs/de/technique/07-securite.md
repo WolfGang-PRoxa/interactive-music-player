@@ -131,6 +131,35 @@ angefragten Titels und dann vor dem tatsächlichen Lesen der Datei — auch bei
 einem Titel aus der Warteschlange. Ein Titel, dessen Pfad außerhalb des Bereichs
 liegt, ergibt ein `403`, niemals einen Lesevorgang.
 
+### Das Schreiben dagegen ist nicht eingeschlossen
+
+[`utils/downloadDir.js`](../../../src/utils/downloadDir.js) verwahrt den Ordner,
+in den das vierte Ziel des Eingabekastens seine Dateien schreibt, und er kennt
+keine erlaubten Stammverzeichnisse. Die Asymmetrie ist gewollt und verdient es,
+ausgesprochen statt hingenommen zu werden:
+
+- **`mediaPaths` schützt das Lesen.** Das Risiko liegt dort darin, dem Client
+  eine Datei auszuliefern, die ihn nichts angeht — daher ein geschlossener
+  Bereich und `.env` außer Reichweite.
+- **Der Download-Ordner ist ein Ziel.** Das Risiko ist nicht mehr, etwas
+  preiszugeben, sondern dorthin zu schreiben, wohin man nicht soll. Ihn unter
+  ein erlaubtes Stammverzeichnis zu sperren, käme jedoch dem Entfernen der
+  Funktion gleich: wer seine Musik in `D:\Musik` ablegt, will sie auch dorthin
+  herunterladen.
+
+Was die Sicherheit trägt, liegt also woanders. Der gewählte Pfad wird geprüft,
+bevor er gemerkt wird — er existiert, er ist ein Ordner, er lässt sich
+beschreiben, er enthält kein Nullbyte —, der Dateiname wird aus dem Titel des
+Stücks abgeleitet und nicht vom Client geliefert, und geschrieben wird unter
+einem vorläufigen Namen, der nur bei Erfolg umbenannt wird. `GET
+/api/browse-dirs` lässt zudem den Baum der Host-Maschine durchlaufen, was eine
+neue Fähigkeit ist.
+
+Das alles bleibt innerhalb des obigen Bedrohungsmodells: der Bot läuft auf der
+Maschine seines Besitzers, diese Routen werden nach `auth.middleware`
+eingehängt, und dasselbe Dashboard kann den Prozess ohnehin schon beenden. Ein
+gestohlenes Token öffnet somit nichts, was es nicht schon geöffnet hätte.
+
 ---
 
 ## Obergrenzen

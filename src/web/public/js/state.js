@@ -144,7 +144,8 @@ window.MusicPlayer.applyLanguage = async function(lang) {
     // et tooltips dont la clé dépend de l'état (verrouillé/déverrouillé,
     // détection activée/désactivée…).
     ['updatePlaylistsUI', 'updateQueueUI', 'updateHistoryUI', 'updateSpeakersUI',
-     'refreshDrawerLabels', 'refreshMemoryBreakdown'].forEach(nameOf => {
+     'refreshDrawerLabels', 'refreshMemoryBreakdown',
+     'refreshDownloadTarget'].forEach(nameOf => {
         if (typeof window.MusicPlayer[nameOf] === 'function') {
             try { window.MusicPlayer[nameOf](); } catch (e) {}
         }

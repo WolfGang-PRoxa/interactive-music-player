@@ -6,6 +6,7 @@ const database = require('../../database/Database');
 const preloadManager = require('../../audio/PreloadManager');
 const { resolveMediaPath, isAllowedMediaFilename } = require('../../utils/mediaPaths');
 const { arePathsOrUrlsEqual } = require('../../utils/paths');
+const downloadDir = require('../../utils/downloadDir');
 const log = require('../../utils/logger');
 
 /** Taille maximale d'un fichier uploadé (Mo). */
@@ -1104,6 +1105,145 @@ function createApiRouter(webServer) {
                 res.status(500).json({ error: err.message });
             }
         }
+    });
+
+    /* ═════════════ Dossier de téléchargement ═════════════
+     *
+     * Ces trois routes servent la quatrième destination de la boîte d'ajout :
+     * celle qui n'envoie rien au lecteur et écrit sur le disque du bot.
+     *
+     * Elles laissent le tableau de bord parcourir l'arborescence de la machine
+     * hôte, ce qui est une capacité nouvelle et mérite d'être dit. Elle reste
+     * dans le modèle de menace du projet — le bot tourne chez son propriétaire,
+     * l'authentification couvre déjà toute route montée après elle, et ce même
+     * tableau de bord peut éteindre le processus. Mais l'enfermer dans les
+     * racines de `mediaPaths` reviendrait à retirer la fonction : quelqu'un qui
+     * range sa musique dans « D:\Musique » veut l'y télécharger.
+     */
+
+    router.get('/download-dir', (req, res) => {
+        const chosen = database.getDownloadDir();
+        res.json({
+            dir: chosen || downloadDir.DEFAULT_DIR,
+            defaultDir: downloadDir.DEFAULT_DIR,
+            isDefault: !chosen,
+        });
+    });
+
+    router.post('/download-dir', (req, res) => {
+        const wanted = req.body && typeof req.body.dir === 'string' ? req.body.dir : null;
+
+        // Chaîne vide ou absente : retour au dossier par défaut. C'est ce que
+        // fait le bouton « réinitialiser » du sélecteur.
+        if (!wanted || !wanted.trim()) {
+            database.setDownloadDir(null);
+            return res.json({ dir: downloadDir.DEFAULT_DIR, isDefault: true });
+        }
+
+        const verdict = downloadDir.validate(wanted);
+        if (!verdict.ok) {
+            log.warn(`[WebServer DownloadDir] Refused: ${wanted} (${verdict.reason})`);
+            return res.status(400).json({ error: verdict.reason });
+        }
+
+        database.setDownloadDir(verdict.resolved);
+        log.info(`[WebServer DownloadDir] Downloads will now be written to ${verdict.resolved}`);
+        res.json({ dir: verdict.resolved, isDefault: false });
+    });
+
+    /**
+     * Sous-dossiers d'un chemin, pour le sélecteur.
+     *
+     * Seuls les dossiers sont rendus : le but est de désigner une destination,
+     * et faire défiler dix mille fichiers pour choisir leur dossier parent ne
+     * sert personne.
+     */
+    router.get('/browse-dirs', (req, res) => {
+        const asked = typeof req.query.path === 'string' && req.query.path.trim()
+            ? req.query.path.trim()
+            : null;
+
+        if (asked && asked.includes('\0')) return res.status(400).json({ error: 'invalid' });
+
+        let wanted;
+        try {
+            if (asked) {
+                wanted = path.resolve(asked);
+            } else {
+                /*
+                 * Premier affichage : le dossier courant.
+                 *
+                 * Le dossier par défaut est créé au passage s'il manque. Il
+                 * naît normalement au premier téléchargement, si bien qu'avant
+                 * celui-ci l'explorateur s'ouvrait sur un dossier inexistant —
+                 * et n'affichait rien du tout. Le créer ici ne fait
+                 * qu'avancer d'un instant ce qui allait arriver, et rend le
+                 * point de départ conforme à ce que le menu annonce.
+                 */
+                const chosen = database.getDownloadDir();
+                wanted = chosen || downloadDir.ensure(downloadDir.DEFAULT_DIR);
+            }
+        } catch (e) {
+            return res.status(400).json({ error: 'invalid' });
+        }
+
+        const roots = downloadDir.listRoots();
+
+        // Un dossier peut avoir disparu depuis qu'il a été choisi. Plutôt que
+        // de répondre « illisible » et de laisser l'explorateur vide — sans
+        // contenu ni moyen d'aller ailleurs —, on remonte au premier ancêtre
+        // qui se laisse lire.
+        const target = downloadDir.nearestReadable(wanted);
+        if (!target) {
+            return res.json({
+                path: null, parent: null, requested: wanted, roots, dirs: [], writable: false,
+            });
+        }
+
+        let entries;
+        try {
+            entries = fs.readdirSync(target, { withFileTypes: true });
+        } catch (e) {
+            return res.json({
+                path: null, parent: null, requested: wanted, roots, dirs: [], writable: false,
+            });
+        }
+
+        const dirs = [];
+        for (const entry of entries) {
+            // `isDirectory` est faux sur un lien symbolique, même s'il pointe
+            // vers un dossier : `statSync` suit le lien, et un dossier de
+            // musique atteint par un lien doit pouvoir être parcouru.
+            let isDir = entry.isDirectory();
+            if (!isDir && entry.isSymbolicLink()) {
+                try {
+                    isDir = fs.statSync(path.join(target, entry.name)).isDirectory();
+                } catch (e) {
+                    isDir = false;
+                }
+            }
+            if (!isDir) continue;
+
+            // Les dossiers cachés sont écartés : sous Unix ils portent les
+            // réglages des applications, et personne n'y range sa musique.
+            if (entry.name.startsWith('.')) continue;
+            dirs.push({ name: entry.name, path: path.join(target, entry.name) });
+        }
+        dirs.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
+        const parent = path.dirname(target);
+        res.json({
+            path: target,
+            // À la racine, `dirname` rend le chemin lui-même : il n'y a alors
+            // plus de parent où remonter, et le sélecteur éteint le bouton.
+            parent: parent === target ? null : parent,
+            // Ce qui avait été demandé, quand ce n'est pas ce qu'on a ouvert :
+            // le client peut alors dire que le dossier n'est plus là.
+            requested: target === wanted ? null : wanted,
+            roots,
+            writable: downloadDir.validate(target).ok,
+            dirs,
+        });
     });
 
     return router;

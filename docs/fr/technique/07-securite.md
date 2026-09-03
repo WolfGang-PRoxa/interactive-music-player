@@ -131,6 +131,33 @@ puis avant la lecture effective du fichier — y compris pour une piste provenan
 de la file d'attente. Une piste dont le chemin est hors périmètre produit un
 `403`, jamais une lecture.
 
+### L'écriture, elle, n'est pas enfermée
+
+[`utils/downloadDir.js`](../../../src/utils/downloadDir.js) garde le dossier où
+la quatrième destination de la boîte d'ajout écrit ses fichiers, et il n'a pas
+de racines autorisées. L'asymétrie est voulue, et vaut d'être énoncée plutôt que
+subie :
+
+- **`mediaPaths` protège la lecture.** Le risque y est de servir au client un
+  fichier qu'il n'a pas à voir — d'où un périmètre fermé, et `.env` hors
+  d'atteinte.
+- **Le dossier de téléchargement est une cible.** Le risque n'est plus de
+  divulguer mais d'écrire ailleurs qu'il ne faut. Or l'enfermer sous une racine
+  autorisée reviendrait à retirer la fonction : quelqu'un qui range sa musique
+  dans `D:\Musique` veut l'y télécharger.
+
+Ce qui porte la sûreté est donc ailleurs. Le chemin choisi est validé avant
+d'être retenu — il existe, c'est un dossier, il accepte l'écriture, il ne
+contient pas d'octet nul —, le nom du fichier est dérivé du titre de la piste et
+non fourni par le client, et l'écriture passe par un nom provisoire renommé au
+seul succès. `GET /api/browse-dirs` laisse par ailleurs parcourir l'arborescence
+de la machine hôte, ce qui est une capacité nouvelle.
+
+Le tout se tient dans le modèle de menace ci-dessus : le bot tourne sur la
+machine de son propriétaire, ces routes sont montées après `auth.middleware`, et
+ce même tableau de bord peut déjà éteindre le processus. Un jeton dérobé n'ouvre
+donc rien qu'il n'ouvrait déjà.
+
 ---
 
 ## Plafonds

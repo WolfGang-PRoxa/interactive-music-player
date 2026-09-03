@@ -131,6 +131,34 @@ luego antes de la lectura efectiva del archivo — incluso para una pista
 procedente de la cola de espera. Una pista cuya ruta está fuera del perímetro
 produce un `403`, nunca una lectura.
 
+### La escritura, en cambio, no está encerrada
+
+[`utils/downloadDir.js`](../../../src/utils/downloadDir.js) guarda la carpeta
+donde el cuarto destino de la caja de adición escribe sus archivos, y no tiene
+raíces autorizadas. La asimetría es deliberada, y merece enunciarse en lugar de
+padecerse:
+
+- **`mediaPaths` protege la lectura.** El riesgo allí es servir al cliente un
+  archivo que no tiene por qué ver — de ahí un perímetro cerrado, y `.env` fuera
+  de alcance.
+- **La carpeta de descarga es un destino.** El riesgo ya no es divulgar, sino
+  escribir donde no se debe. Ahora bien, encerrarla bajo una raíz autorizada
+  equivaldría a retirar la función: quien guarda su música en `D:\Musica` quiere
+  descargarla allí.
+
+Lo que sostiene la seguridad está, pues, en otra parte. La ruta elegida se
+valida antes de retenerse — existe, es una carpeta, acepta la escritura, no
+contiene ningún octeto nulo —, el nombre del archivo se deriva del título de la
+pista y no lo proporciona el cliente, y la escritura pasa por un nombre
+provisional que solo se renombra en caso de éxito. `GET /api/browse-dirs`
+permite además recorrer el árbol de la máquina anfitriona, lo que es una
+capacidad nueva.
+
+Todo ello se sostiene dentro del modelo de amenaza anterior: el bot funciona en
+la máquina de su propietario, estas rutas se montan después de
+`auth.middleware`, y ese mismo panel ya puede apagar el proceso. Un testigo
+robado no abre, por tanto, nada que no abriera ya.
+
 ---
 
 ## Topes

@@ -5,6 +5,7 @@
  * routeur lui-même.
  */
 
+const downloadHandlers = require('./downloadHandlers');
 const guildHandlers = require('./guildHandlers');
 const playbackHandlers = require('./playbackHandlers');
 const queueHandlers = require('./queueHandlers');
@@ -49,6 +50,7 @@ module.exports = {
     setPlayMode: playbackHandlers.handleSetPlayMode,
     setTrackQuality: qualityHandlers.handleSetTrackQuality,
     shareControl: shareHandlers.handleShareControl,
+    downloadTrack: downloadHandlers.handleDownloadTrack,
     shutdownBot: systemHandlers.handleShutdownBot,
     skip: playbackHandlers.handleSkip,
     startupFadeinConsumed: systemHandlers.handleStartupFadeinConsumed,

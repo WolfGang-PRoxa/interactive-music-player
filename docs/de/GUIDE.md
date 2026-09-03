@@ -355,6 +355,39 @@ Jeder Titel lässt sich in rund dreißig Formaten und Qualitäten herunterladen:
 MP3, M4A, FLAC, WAV, OGG, OPUS, WEBM sowie MP4 für Video. Die Umwandlung erfolgt
 im laufenden Betrieb.
 
+**Auf die Festplatte des Bots** — das Zielmenü rechts vom Eingabefeld hat einen
+vierten Eintrag: „Nach `data/downloads/`". Er schickt nichts an den Player,
+sondern schreibt die Datei auf die Maschine, die den Bot beherbergt. Seine
+Beschriftung trägt den Zielordner, so dass man ihn nicht öffnen muss, um zu
+wissen, wo die Dateien landen.
+
+Die Ordner-Schaltfläche rechts in dieser Menüzeile öffnet einen Explorer der
+Host-Maschine — und kein Feld zum Eintippen eines Pfades, denn diese Maschine
+ist nicht zwangsläufig die, von der aus Sie schauen. Unter Windows werden die
+Laufwerke oben im Fenster angeboten: ohne sie führt der Weg nach oben aus einem
+Ordner von `C:` nach `C:\` und niemals nach `D:`. Das Feld „Oder einen Pfad
+eingeben" bleibt für die Fälle, die der Explorer nicht abdeckt, und
+„Standardordner" führt zurück nach `data/downloads/`.
+
+Den Ordner merkt sich **der Bot**, nicht der Browser: er gilt für alle Ihre
+Server und alle Ihre Geräte. Ein Pfad, der nicht existiert, der kein Ordner ist
+oder der das Schreiben verweigert, wird schon bei der Wahl abgewiesen und der
+Grund genannt — statt den Download später scheitern zu lassen, fern von der
+Entscheidung, die ihn verursacht hat.
+
+Eine entfernte Quelle wird nach MP3 umgewandelt, mit der Bitrate aus dem Menü
+**Audioqualität des Imports**. Eine Datei, die bereits auf der Festplatte des
+Bots liegt, wird unverändert kopiert, ohne Neukodierung: Sie wollten sie in
+Ihrem Ordner haben, nicht unterwegs an Qualität verlieren. Zwei Zusicherungen
+schließlich: ein erneut heruntergeladener Titel ersetzt den vorherigen nicht —
+die neue Datei wird nummeriert —, und ein abgebrochener Download hinterlässt
+keine abgeschnittene Datei im Ordner, denn geschrieben wird unter einem
+vorläufigen Namen, der erst nach erfolgreicher Umwandlung umbenannt wird.
+
+Der Vorgang läuft im Hintergrund und meldet sich über Benachrichtigungen: der
+Titel muss erst aufgelöst und dann umgewandelt werden, was die Zeit braucht, die
+es braucht.
+
 ### Video
 
 Wenn zu einem Titel ein Video gehört, kann das Dashboard es im Hintergrund

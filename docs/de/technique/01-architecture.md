@@ -43,6 +43,7 @@ src/
 │   ├── logger.js             Protokollierung der Anwendung
 │   ├── atomicJson.js         Absturzsicheres Lesen/Schreiben von JSON
 │   ├── mediaPaths.js         Schutzgeländer für die dem Client gelieferten Pfade
+│   ├── downloadDir.js        Ordner, in den heruntergeladene Dateien geschrieben werden
 │   ├── paths.js              Vergleich und Bereinigung von Pfaden
 │   ├── duration.js           Formatierung und Auswertung von Dauern
 │   ├── embeds.js             Discord-Einbettungen
@@ -69,6 +70,7 @@ data/
 ├── dashboard-token         Beim ersten Start erzeugtes Zugangstoken
 ├── uploads/                Importierte Dateien, nach Prüfsumme benannt
 ├── cache/                  Vorgeladene entfernte Titel als MP3
+├── downloads/              Heruntergeladene Dateien, wenn kein anderer Ordner gewählt ist
 └── logs/                   Ein Protokoll je Start + latest.log
 ```
 

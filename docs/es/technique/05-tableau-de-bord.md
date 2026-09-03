@@ -47,6 +47,9 @@ Todas están protegidas por el testigo ([07 — Seguridad](07-securite.md)).
 | `POST /api/upload` | Importación de archivo, flujo en bruto con cabecera `X-File-Name` |
 | `GET /api/docs` | Índice de la documentación embebida, en el idioma pedido |
 | `GET /api/docs/contenu` | Fuente Markdown de un documento, designado por su identificador y su idioma |
+| `GET /api/download-dir` | Carpeta de descarga actual, y el valor por defecto con el que se compara |
+| `POST /api/download-dir` | Elección de la carpeta, validada antes de retenerse; cuerpo vacío para volver al valor por defecto |
+| `GET /api/browse-dirs` | Subcarpetas de una ruta de la máquina anfitriona, para el selector |
 
 `/api/docs` inventaría `docs/` en cada llamada, desde la **versión en curso de
 ejecución** y no desde la raíz compartida: la documentación mostrada es, pues, la
@@ -112,7 +115,7 @@ que la precarga alimente la caché.
 
 ### Mensajes cliente → servidor
 
-36 tipos, declarados en la tabla de enrutamiento
+37 tipos, declarados en la tabla de enrutamiento
 [`handlers/index.js`](../../../src/web/websocket/handlers/index.js):
 
 | Dominio | Mensajes |
@@ -121,7 +124,7 @@ que la precarga alimente la caché.
 | Cola de espera | `removeTrack`, `playNow`, `moveOrInsertTrack`, `clearQueue`, `removeFromHistory`, `clearHistory` |
 | Listas de reproducción | `createPlaylist`, `renamePlaylist`, `deletePlaylist`, `reorderPlaylists`, `addPlaylistTrack`, `addTrackToPlaylist`, `removeTrackFromPlaylist`, `movePlaylistTrack`, `setActivePlaybackSource` |
 | Servidor de Discord | `selectChannel`, `setDefaultChannel`, `updateSettings`, `toggleVoiceDetection`, `leaveGuild` |
-| Pista | `setTrackQuality` |
+| Pista | `setTrackQuality`, `downloadTrack` |
 | Sistema | `requestState`, `clientLog`, `memoryStream`, `startupFadeinConsumed`, `restartBot`, `shutdownBot` |
 
 `leaveGuild` hace que el bot abandone un servidor de Discord — la papelera de los
