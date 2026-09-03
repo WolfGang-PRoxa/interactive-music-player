@@ -38,6 +38,11 @@ const check = (label, ok, detail = '') => {
     else { failed++; console.log(`  FAIL ${label}${detail ? ` — ${detail}` : ''}`); }
 };
 
+/** Le premier enfant portant cette classe, ou un objet vide à défaut. */
+function childByClass(parent, className) {
+    return parent.children.find(c => c.classList.contains(className)) || { textContent: '' };
+}
+
 /** Élément factice : assez de DOM pour ce que le module touche. */
 function makeElement(tag = 'div') {
     const listeners = {};
@@ -116,6 +121,10 @@ function mount({ stored = null, clearsFieldFirst = false } = {}) {
                 return null;
             },
             createElement: (tag) => { const el = makeElement(tag); created.push(el); return el; },
+            // Les icônes sont dessinées en SVG, qui vit dans son propre espace
+            // de noms : sans cette fabrique, le module tombe en construisant la
+            // note de musique d'une entrée sans image.
+            createElementNS: (ns, tag) => { const el = makeElement(tag); created.push(el); return el; },
             // La capture est distinguée de la remontée : c'est elle que le
             // module emploie pour lire le champ avant qu'un autre écouteur ne
             // le vide, et un stub qui les confondrait ne prouverait rien.
@@ -152,8 +161,16 @@ function mount({ stored = null, clearsFieldFirst = false } = {}) {
 
     return {
         input, form, box, panel, store, sandbox,
-        /** Le texte des lignes actuellement peintes. */
-        rows: () => panel.children.map(r => r.children[0].textContent),
+        /*
+         * Le texte des lignes actuellement peintes.
+         *
+         * Cherché par sa classe et non par sa place : une ligne porte
+         * maintenant une vignette avant son nom, et un index en dur se
+         * tromperait de fils au prochain ornement ajouté.
+         */
+        rows: () => panel.children.map(r => childByClass(r, 'search-history-label').textContent),
+        /** La croix d'une ligne, cherchée de la même façon. */
+        removeButtonOf: (row) => childByClass(row, 'search-history-remove'),
         highlightedIndex: () => panel.children.findIndex(r => r.classList.contains('is-highlighted')),
         isOpen: () => !panel.classList.contains('hidden'),
         type(value) { input.value = value; input._fire('input', {}); },
@@ -172,7 +189,15 @@ function mount({ stored = null, clearsFieldFirst = false } = {}) {
             (docBubble.submit || []).forEach(fn => fn(event));
         },
         focus() { input._fire('focus', {}); },
-        saved: () => JSON.parse(store.get('searchInputHistory') || '[]'),
+        /*
+         * Les saisies retenues, réduites à leur texte.
+         *
+         * Une entrée est désormais un objet — la saisie, plus le nom et
+         * l'image appris ensuite. Les vérifications de stockage ne portent que
+         * sur le texte ; celles de l'enrichissement lisent `stored()`.
+         */
+        saved: () => JSON.parse(store.get('searchInputHistory') || '[]').map(e => e.q),
+        stored: () => JSON.parse(store.get('searchInputHistory') || '[]'),
     };
 }
 
@@ -362,7 +387,7 @@ console.log('\nLa sortie du panneau\n');
     const s = mount({ stored: ['alpha', 'bravo'] });
     s.focus();
     const row = s.panel.children[1];
-    const removeBtn = row.children[1];
+    const removeBtn = s.removeButtonOf(row);
     row._fire('mousedown', { target: removeBtn, preventDefault() {} });
 
     check('la croix d’une ligne retire son entrée',
@@ -374,6 +399,128 @@ console.log('\nLa sortie du panneau\n');
     check('un clic sur la ligne la porte dans le champ',
         s.input.value === 'alpha', `« ${s.input.value} »`);
     check('  … et referme le panneau', !s.isOpen());
+}
+
+
+// ─────────────────────── Vignette, nom et infobulle ───────────────────────
+
+/*
+ * Une ligne ne montre plus la saisie brute.
+ *
+ * Une adresse ne dit rien de ce qu'elle porte : la ligne affiche donc le nom du
+ * morceau quand il est connu, le nom du fichier pour un chemin, et garde
+ * l'adresse complète pour le survol. L'image de la piste tient lieu de repère,
+ * et une note de musique la remplace quand il n'y en a pas.
+ */
+console.log('\nCe que montre une ligne\n');
+
+/** La vignette d'une ligne : son image, ou l'icône par défaut. */
+function thumbOf(row) {
+    const holder = childByClass(row, 'search-history-thumb');
+    const child = (holder.children || [])[0] || {};
+    return { tag: child.tagName || null, src: child.src || null };
+}
+
+{
+    const s = mount({
+        stored: [
+            { q: 'https://youtu.be/aaa', title: 'Around the World', thumb: 'https://img/aaa.jpg' },
+            { q: 'C:\\Musique\\Daft Punk\\Da Funk.mp3', title: null, thumb: null },
+            { q: 'daft punk', title: null, thumb: null },
+        ],
+    });
+    s.focus();
+
+    check('un titre connu remplace l’adresse',
+        s.rows()[0] === 'Around the World', s.rows()[0]);
+    check('  … et son image est posée sur la ligne',
+        thumbOf(s.panel.children[0]).tag === 'IMG'
+            && thumbOf(s.panel.children[0]).src === 'https://img/aaa.jpg',
+        JSON.stringify(thumbOf(s.panel.children[0])));
+    check('  … l’adresse complète restant au survol',
+        s.panel.children[0].title === 'https://youtu.be/aaa',
+        String(s.panel.children[0].title));
+
+    check('un chemin est réduit au nom du fichier',
+        s.rows()[1] === 'Da Funk.mp3', s.rows()[1]);
+    check('  … avec le chemin entier au survol',
+        s.panel.children[1].title === 'C:\\Musique\\Daft Punk\\Da Funk.mp3',
+        String(s.panel.children[1].title));
+    check('  … et la note de musique faute d’image',
+        thumbOf(s.panel.children[1]).tag === 'SVG', String(thumbOf(s.panel.children[1]).tag));
+
+    check('une recherche en toutes lettres s’affiche telle quelle',
+        s.rows()[2] === 'daft punk', s.rows()[2]);
+    check('  … et ne s’encombre pas d’une infobulle qui la répéterait',
+        !s.panel.children[2].title, String(s.panel.children[2].title));
+}
+
+{
+    // Le format d'avant : de simples chaînes. Elles doivent se relire sans
+    // migration à la main, et paraître comme des saisies pas encore reconnues.
+    const s = mount({ stored: ['https://youtu.be/zzz', 'un titre'] });
+    s.focus();
+    check('les entrées d’avant se relisent sans rien perdre',
+        s.rows().length === 2 && s.rows()[0] === 'https://youtu.be/zzz', s.rows().join(' | '));
+
+    // La conversion n'est pas écrite à la lecture : relire n'a pas à toucher au
+    // stockage. Elle l'est à la première sauvegarde, celle-ci par exemple.
+    s.submit('https://youtu.be/nouveau');
+    check('  … et se rangent au nouveau format dès la première écriture',
+        s.stored().every(e => typeof e.q === 'string')
+            && s.stored().some(e => e.q === 'https://youtu.be/zzz' && e.title === null),
+        JSON.stringify(s.stored()));
+}
+
+// ─────────────────────── L'enrichissement par l'état ───────────────────────
+
+console.log('\nCe que l’état vient compléter\n');
+
+{
+    const s = mount({ stored: ['https://youtu.be/aaa', 'daft punk', 'introuvable'] });
+
+    s.sandbox.window.MusicPlayer.enrichSearchHistory([
+        { url: 'https://youtu.be/aaa', title: 'Around the World', thumbnail: 'https://img/a.jpg' },
+        { url: 'https://autre/bbb', title: 'daft punk', thumbnail: 'https://img/b.jpg' },
+    ]);
+
+    check('une entrée est reconnue par son adresse',
+        s.stored()[0].title === 'Around the World' && s.stored()[0].thumb === 'https://img/a.jpg',
+        JSON.stringify(s.stored()[0]));
+    check('une recherche est reconnue par le titre revenu',
+        s.stored()[1].title === 'daft punk' && s.stored()[1].thumb === 'https://img/b.jpg',
+        JSON.stringify(s.stored()[1]));
+    check('ce qu’aucune piste ne retrouve garde son texte',
+        s.stored()[2].title === null && s.stored()[2].thumb === null,
+        JSON.stringify(s.stored()[2]));
+
+    s.focus();
+    check('  … et la ligne montre alors le nom appris',
+        s.rows()[0] === 'Around the World', s.rows()[0]);
+}
+
+{
+    // La casse ne doit pas empêcher le rapprochement : une adresse recopiée à
+    // la main, un chemin Windows saisi en minuscules.
+    const s = mount({ stored: ['C:\\Musique\\Air.mp3'] });
+    s.sandbox.window.MusicPlayer.enrichSearchHistory([
+        { url: 'c:\\musique\\air.mp3', title: 'La Femme d’Argent', thumbnail: null },
+    ]);
+    check('le rapprochement ignore la casse',
+        s.stored()[0].title === 'La Femme d’Argent', JSON.stringify(s.stored()[0]));
+}
+
+{
+    // Le cas le plus fréquent : rien de nouveau à apprendre. La fonction est
+    // appelée à chaque état, soit une fois par seconde.
+    const s = mount({ stored: [{ q: 'a', title: 'A', thumb: 'i' }] });
+    const before = s.store.get('searchInputHistory');
+    s.sandbox.window.MusicPlayer.enrichSearchHistory([{ url: 'a', title: 'Autre', thumbnail: 'j' }]);
+    check('une entrée déjà complète n’est pas retouchée',
+        s.store.get('searchInputHistory') === before, s.store.get('searchInputHistory'));
+
+    s.sandbox.window.MusicPlayer.enrichSearchHistory([]);
+    check('une liste de pistes vide ne fait rien tomber', true);
 }
 
 console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);

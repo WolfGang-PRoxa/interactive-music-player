@@ -540,6 +540,41 @@ input:checked + .switch-slider:before {
 }
 
 /*
+ * La vignette d'une entrée : l'image de la piste, ou une note de musique.
+ *
+ * Le cadre garde sa taille dans les deux cas — c'est ce qui aligne les noms les
+ * uns sous les autres, quelles que soient les images trouvées. Il porte son
+ * propre fond : une pochette sombre sur un panneau sombre n'aurait pas de bord,
+ * et la note seule flotterait sans rien pour la poser.
+ */
+.search-history-thumb {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    overflow: hidden;
+    background: var(--bg-select);
+    color: var(--text-muted);
+}
+
+/* `cover` : les pochettes ne sont pas toutes carrées — celles de YouTube sont
+   en 16/9 — et une image déformée se remarque plus qu'une image recadrée. */
+.search-history-thumb img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.search-history-note {
+    width: 13px;
+    height: 13px;
+}
+
+/*
  * Une entrée tient sur une ligne, coupée par des points de suspension.
  *
  * `min-width: 0` défait la largeur plancher que le flex accorde à tout

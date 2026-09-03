@@ -326,6 +326,16 @@ again by the name of the track it carries.
 - **Cross** — drops an entry from the history.
 - **Escape** — closes the panel and gives the field back what was typed in it.
 
+Each row carries the track's image and its name rather than the address that was
+typed: a link says nothing of what it holds. A local file's name replaces its
+path, and the full address or path comes back on hover. Where there is no image
+— a track not yet recognised, a source that provides none — a music note takes
+the place, so that the names stay aligned.
+
+Those images and names come from what the bot has resolved: an address just
+pasted shows as itself, and fills in as soon as the track appears in the queue,
+the history or a playlist.
+
 This history **lives in the browser**, not on the bot: it belongs to the device
 and the browser you are looking from, and two devices driving the same bot do
 not share one. It replaces the list the browser offered on its own, which

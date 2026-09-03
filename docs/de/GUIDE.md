@@ -349,6 +349,17 @@ dass ein Link über den Namen des Titels wiedergefunden wird, den er trägt.
 - **Kreuz** — entfernt einen Eintrag aus dem Verlauf.
 - **Escape** — schließt die Liste und gibt dem Feld zurück, was darin stand.
 
+Jede Zeile trägt das Bild des Titels und seinen Namen statt der eingetippten
+Adresse: ein Link sagt nichts über das, was er enthält. Der Name einer lokalen
+Datei ersetzt ihren Pfad, und die vollständige Adresse oder der Pfad erscheint
+beim Überfahren wieder. Fehlt ein Bild — ein noch nicht erkannter Titel, eine
+Quelle, die keines liefert —, nimmt eine Musiknote den Platz ein, so dass die
+Namen ausgerichtet bleiben.
+
+Diese Bilder und Namen stammen aus dem, was der Bot aufgelöst hat: eine eben
+eingefügte Adresse zeigt sich als sie selbst und wird ergänzt, sobald der Titel
+in der Warteschlange, im Verlauf oder in einer Wiedergabeliste auftaucht.
+
 Dieser Verlauf **lebt im Browser**, nicht auf dem Bot: er gehört zu dem Gerät
 und dem Browser, von denen aus Sie schauen, und zwei Geräte am selben Bot teilen
 sich keinen. Er ersetzt die Liste, die der Browser von sich aus anbot und die

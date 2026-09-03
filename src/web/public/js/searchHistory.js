@@ -40,7 +40,14 @@ window.MusicPlayer = window.MusicPlayer || {};
      */
     const MAX_LENGTH = 400;
 
-    /** Entrées, de la plus récente à la plus ancienne. */
+    /**
+     * Entrées, de la plus récente à la plus ancienne.
+     *
+     * Chacune vaut `{ q, title, thumb }` : la saisie telle qu'elle a été
+     * validée, et ce que le tableau de bord a fini par en apprendre. `title` et
+     * `thumb` restent nuls tant que la piste n'a pas été reconnue — une adresse
+     * collée à l'instant ne dit encore rien de ce qu'elle porte.
+     */
     let entries = [];
 
     /** Entrées effectivement affichées, filtrées par la saisie. */
@@ -66,7 +73,10 @@ window.MusicPlayer = window.MusicPlayer || {};
             const raw = localStorage.getItem(STORAGE_KEY);
             const parsed = raw ? JSON.parse(raw) : [];
             entries = Array.isArray(parsed)
-                ? parsed.filter((e) => typeof e === 'string' && e).slice(0, MAX_ENTRIES)
+                // Les entrées d'avant étaient de simples chaînes : elles sont
+                // relues comme des saisies sans métadonnées, que la première
+                // reconnaissance viendra compléter. Rien à migrer à la main.
+                ? parsed.map(normalise).filter(Boolean).slice(0, MAX_ENTRIES)
                 : [];
         } catch (e) {
             // Stockage illisible ou refusé (navigation privée stricte) :
@@ -85,10 +95,30 @@ window.MusicPlayer = window.MusicPlayer || {};
     }
 
     /**
+     * Ramène ce qui sort du stockage à la forme attendue.
+     *
+     * Rend `null` sur ce qui n'a pas de saisie exploitable : une entrée sans
+     * `q` ne pourrait ni être rejouée, ni même s'afficher.
+     */
+    function normalise(raw) {
+        if (typeof raw === 'string') {
+            return raw ? { q: raw, title: null, thumb: null } : null;
+        }
+        if (!raw || typeof raw.q !== 'string' || !raw.q) return null;
+        return {
+            q: raw.q,
+            title: typeof raw.title === 'string' ? raw.title : null,
+            thumb: typeof raw.thumb === 'string' ? raw.thumb : null,
+        };
+    }
+
+    /**
      * Retient une saisie validée.
      *
      * Une entrée déjà connue remonte en tête au lieu d'être ajoutée deux fois :
-     * un historique où le même lien figure douze fois n'aide personne.
+     * un historique où le même lien figure douze fois n'aide personne. Ce
+     * qu'on sait déjà d'elle la suit — la reconnaissance a pu avoir lieu au
+     * premier passage, et la refaire ne servirait à rien.
      *
      * @param {string} value
      */
@@ -96,16 +126,16 @@ window.MusicPlayer = window.MusicPlayer || {};
         const clean = (value || '').trim();
         if (!clean || clean.length > MAX_LENGTH) return;
 
-        const existing = entries.findIndex((e) => e === clean);
-        if (existing !== -1) entries.splice(existing, 1);
+        const existing = entries.findIndex((e) => e.q === clean);
+        const known = existing !== -1 ? entries.splice(existing, 1)[0] : null;
 
-        entries.unshift(clean);
+        entries.unshift(known || { q: clean, title: null, thumb: null });
         if (entries.length > MAX_ENTRIES) entries.length = MAX_ENTRIES;
         save();
     }
 
-    function forget(value) {
-        const at = entries.indexOf(value);
+    function forget(query) {
+        const at = entries.findIndex((e) => e.q === query);
         if (at === -1) return;
         entries.splice(at, 1);
         save();
@@ -119,11 +149,18 @@ window.MusicPlayer = window.MusicPlayer || {};
      * La recherche porte sur le contenu et non sur le début : on retrouve un
      * lien par le nom du morceau qu'il porte, ce qu'un filtre par préfixe
      * interdirait sur une URL, qui commence toujours pareil.
+     *
+     * Elle porte aussi sur le titre reconnu, et pas seulement sur ce qui a été
+     * tapé : c'est ce que la ligne affiche, et chercher autre chose que ce
+     * qu'on lit serait déroutant. Une adresse qui ne porte pas le nom du
+     * morceau — un identifiant opaque, comme en produisent la plupart des
+     * plateformes — n'était sinon retrouvable par ce nom d'aucune façon.
      */
     function matching(value) {
         const needle = (value || '').trim().toLowerCase();
         if (!needle) return entries.slice();
-        return entries.filter((e) => e.toLowerCase().includes(needle));
+        return entries.filter((e) => e.q.toLowerCase().includes(needle)
+            || (e.title || '').toLowerCase().includes(needle));
     }
 
     /**
@@ -147,21 +184,118 @@ window.MusicPlayer = window.MusicPlayer || {};
         return !panel.classList.contains('hidden');
     }
 
+    /** Une adresse distante, par opposition à un chemin ou à une recherche. */
+    function isLink(text) {
+        return /^https?:\/\//i.test(text || '');
+    }
+
+    /**
+     * Un chemin de fichier sur la machine du bot.
+     *
+     * Les deux formes que le champ accepte : une lettre de disque de Windows,
+     * ou un chemin absolu POSIX. Reconnaître un chemin relatif reviendrait à
+     * prendre toute recherche pour un fichier.
+     */
+    function isPath(text) {
+        return /^[a-zA-Z]:[\\/]/.test(text || '') || /^\//.test(text || '');
+    }
+
+    /**
+     * Le nom à afficher sur la ligne.
+     *
+     * Le titre reconnu s'il est connu ; sinon le nom du fichier pour un chemin,
+     * qui vaut mieux que quatre dossiers suivis de ce nom ; sinon la saisie
+     * telle quelle — pour une recherche en toutes lettres, c'est déjà le nom.
+     */
+    function displayName(entry) {
+        if (entry.title) return entry.title;
+        if (isPath(entry.q)) {
+            const parts = entry.q.split(/[\\/]/);
+            return parts[parts.length - 1] || entry.q;
+        }
+        return entry.q;
+    }
+
+    /** La note de musique, quand aucune image n'est disponible. */
+    function noteIcon() {
+        const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        icon.setAttribute('viewBox', '0 0 24 24');
+        icon.setAttribute('fill', 'none');
+        icon.setAttribute('stroke', 'currentColor');
+        icon.setAttribute('stroke-width', '2');
+        icon.setAttribute('stroke-linecap', 'round');
+        icon.setAttribute('stroke-linejoin', 'round');
+        icon.setAttribute('class', 'search-history-note');
+
+        const stem = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        stem.setAttribute('d', 'M9 18V5l12-2v13');
+        const left = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        left.setAttribute('cx', '6'); left.setAttribute('cy', '18'); left.setAttribute('r', '3');
+        const right = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        right.setAttribute('cx', '18'); right.setAttribute('cy', '16'); right.setAttribute('r', '3');
+
+        icon.appendChild(stem);
+        icon.appendChild(left);
+        icon.appendChild(right);
+        return icon;
+    }
+
+    /**
+     * La vignette d'une entrée, ou la note de musique à défaut.
+     *
+     * L'image est posée par `src`, jamais par du balisage assemblé : elle vient
+     * d'une plateforme distante, et rien de ce qui vient de dehors ne doit
+     * pouvoir se faire interpréter. Une adresse qui ne répond pas — vignette
+     * expirée, réseau coupé — laisse la place à la note plutôt qu'au cadre vide
+     * des images cassées.
+     */
+    function thumbnail(entry) {
+        const holder = document.createElement('span');
+        holder.className = 'search-history-thumb';
+
+        if (!entry.thumb) {
+            holder.appendChild(noteIcon());
+            return holder;
+        }
+
+        const img = document.createElement('img');
+        img.alt = '';
+        img.loading = 'lazy';
+        img.addEventListener('error', () => {
+            holder.textContent = '';
+            holder.appendChild(noteIcon());
+        });
+        img.src = entry.thumb;
+        holder.appendChild(img);
+        return holder;
+    }
+
     function render() {
         panel.textContent = '';
 
-        shown.forEach((value, index) => {
+        shown.forEach((entry, index) => {
             const row = document.createElement('div');
             row.className = 'search-history-row';
             if (index === highlighted) row.classList.add('is-highlighted');
+
+            row.appendChild(thumbnail(entry));
 
             const label = document.createElement('span');
             label.className = 'search-history-label';
             // `textContent`, jamais `innerHTML` : ces chaînes viennent de
             // l'utilisateur, et une recherche contenant des chevrons ne doit
             // pas se retrouver interprétée comme du balisage.
-            label.textContent = value;
+            label.textContent = displayName(entry);
             row.appendChild(label);
+
+            // L'adresse complète au survol, puisque la ligne ne la montre plus.
+            // Sur un chemin aussi : le nom du fichier seul ne dit pas d'où il
+            // vient. L'infobulle native, et non celle du tableau de bord : le
+            // panneau se referme à la perte du focus, et une infobulle qui lui
+            // survivrait resterait seule à l'écran.
+            if (entry.title || isLink(entry.q) || isPath(entry.q)) {
+                row.title = entry.q;
+            }
 
             const remove = document.createElement('button');
             remove.type = 'button';
@@ -176,12 +310,12 @@ window.MusicPlayer = window.MusicPlayer || {};
             row.addEventListener('mousedown', (e) => {
                 e.preventDefault();
                 if (e.target === remove) {
-                    forget(value);
+                    forget(entry.q);
                     refresh(input.value);
                     if (shown.length === 0) close();
                     return;
                 }
-                apply(value);
+                apply(entry.q);
                 close();
                 input.focus();
             });
@@ -228,7 +362,9 @@ window.MusicPlayer = window.MusicPlayer || {};
      */
     function moveTo(next) {
         highlighted = Math.max(-1, Math.min(shown.length - 1, next));
-        apply(highlighted === -1 ? draft : shown[highlighted]);
+        // La saisie, et non le nom affiché : c'est elle qui sera renvoyée, et
+        // le titre d'un morceau ne rejouerait pas le lien dont il vient.
+        apply(highlighted === -1 ? draft : shown[highlighted].q);
         render();
 
         const row = panel.children[highlighted];
@@ -342,6 +478,62 @@ window.MusicPlayer = window.MusicPlayer || {};
     } else {
         init();
     }
+
+    /**
+     * Complète les entrées avec ce que le tableau de bord sait des pistes.
+     *
+     * L'historique ne retient que ce qui a été tapé : une adresse ne dit ni le
+     * nom du morceau ni son image. Ceux-ci n'existent qu'une fois la piste
+     * résolue par le bot, et c'est l'état qui les rapporte — file d'attente,
+     * historique, playlists, lecture en cours. On y puise plutôt que d'ajouter
+     * un aller-retour dont le serveur n'a pas besoin.
+     *
+     * Deux rapprochements, du plus sûr au plus large :
+     *
+     *  - **l'adresse**, pour un lien ou un chemin : la saisie est alors très
+     *    exactement l'`url` de la piste ;
+     *  - **le titre**, pour une recherche en toutes lettres : on a tapé un nom,
+     *    et c'est ce nom qui est revenu.
+     *
+     * Une saisie qu'aucun des deux ne retrouve — une adresse que le bot a
+     * réécrite en la résolvant, une recherche approximative — garde son texte
+     * et la note de musique. C'est le repli, pas une panne.
+     *
+     * @param {object[]} tracks Pistes connues, dans n'importe quel ordre.
+     */
+    window.MusicPlayer.enrichSearchHistory = function (tracks) {
+        if (!Array.isArray(tracks) || tracks.length === 0) return;
+
+        // L'état arrive chaque seconde : on ne parcourt les pistes que s'il
+        // reste quelque chose à apprendre.
+        const pending = entries.filter((e) => !e.title && !e.thumb);
+        if (pending.length === 0) return;
+
+        const byUrl = new Map();
+        const byTitle = new Map();
+        tracks.forEach((track) => {
+            if (!track) return;
+            if (track.url) byUrl.set(String(track.url).toLowerCase(), track);
+            if (track.title) byTitle.set(String(track.title).toLowerCase(), track);
+        });
+
+        let changed = false;
+        pending.forEach((entry) => {
+            const key = entry.q.toLowerCase();
+            const found = byUrl.get(key) || byTitle.get(key);
+            if (!found) return;
+            entry.title = found.title || null;
+            entry.thumb = found.thumbnail || null;
+            // Une piste sans titre ni image n'apprend rien : ne pas le compter
+            // comme un changement évite d'écrire le stockage pour rien.
+            if (entry.title || entry.thumb) changed = true;
+        });
+
+        if (!changed) return;
+        save();
+        // Le panneau ouvert montre l'ancienne ligne : il la refait.
+        if (panel && isOpen()) refresh(input.value);
+    };
 
     /** Exposé pour les tests, et pour un éventuel bouton d'effacement. */
     window.MusicPlayer.clearSearchHistory = function () {

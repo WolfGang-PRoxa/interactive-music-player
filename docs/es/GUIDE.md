@@ -335,6 +335,17 @@ enlace se reencuentra por el nombre de la pista que lleva.
 - **Cruz** — retira una entrada del historial.
 - **Escape** — cierra el panel y devuelve al campo lo que allí se había escrito.
 
+Cada línea lleva la imagen de la pista y su nombre, en lugar de la dirección
+escrita: un enlace no dice nada de lo que contiene. El nombre de un archivo local
+sustituye a su ruta, y la dirección o la ruta completa reaparece al pasar por
+encima. A falta de imagen — pista aún no reconocida, fuente que no la
+proporciona —, una nota musical ocupa el lugar, de modo que los nombres quedan
+alineados.
+
+Esas imágenes y esos nombres vienen de lo que el bot ha resuelto: una dirección
+recién pegada se muestra tal cual, y se completa en cuanto la pista aparece en la
+cola, el historial o una lista de reproducción.
+
 Este historial **vive en el navegador**, no en el bot: es propio del dispositivo
 y del navegador desde los que usted consulta, y dos dispositivos que pilotan el
 mismo bot no comparten el mismo. Sustituye a la lista que el navegador ofrecía

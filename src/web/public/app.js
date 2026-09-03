@@ -853,6 +853,24 @@
             startProgressLoop();
         }
 
+        /*
+         * L'historique du champ d'ajout apprend d'ici ce qu'il ne peut pas
+         * savoir seul : le nom et l'image des pistes.
+         *
+         * Il ne retient que ce qui a été tapé — une adresse ne dit rien de ce
+         * qu'elle porte. Tout ce que le bot a résolu passe en revanche par
+         * l'état, et c'est la seule source à disposition du navigateur. La
+         * fonction s'arrête d'elle-même dès qu'il n'y a plus rien à compléter :
+         * l'état arrive chaque seconde, et la liste des pistes n'a pas à être
+         * parcourue pour rien.
+         */
+        if (typeof window.MusicPlayer.enrichSearchHistory === 'function') {
+            const known = [state.currentTrack]
+                .concat(state.queue || [], state.history || []);
+            (state.playlists || []).forEach(p => known.push(...(p.tracks || [])));
+            window.MusicPlayer.enrichSearchHistory(known);
+        }
+
         // La barre de préchargement se rafraîchit à chaque diffusion d'état. Elle
         // ne l'était jusqu'ici que sur les événements de l'élément audio, lesquels
         // n'existent qu'en diffusion personnelle : en mode « tout le monde » elle

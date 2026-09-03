@@ -333,6 +333,16 @@ retrouve par le nom du morceau qu'il porte.
 - **Croix** — retire une entrée de l'historique.
 - **Échap** — referme le panneau et rend au champ ce qui y était tapé.
 
+Chaque ligne porte l'image du morceau et son nom, plutôt que l'adresse tapée :
+un lien ne dit rien de ce qu'il contient. Le nom d'un fichier local remplace son
+chemin, et l'adresse ou le chemin complet reparaît au survol. Faute d'image —
+piste pas encore reconnue, source qui n'en fournit pas —, une note de musique
+tient la place, de sorte que les noms restent alignés.
+
+Ces images et ces noms viennent de ce que le bot a résolu : une adresse collée à
+l'instant s'affiche telle quelle, et se complète dès que la piste apparaît dans
+la file, l'historique ou une playlist.
+
 Cet historique **vit dans le navigateur**, et non sur le bot : il est propre à
 l'appareil et au navigateur depuis lesquels vous consultez, et deux appareils
 pilotant le même bot n'ont pas le même. Il remplace la liste que le navigateur
