@@ -35,9 +35,31 @@ rien n'apparaît dans la barre des tâches. Une petite fenêtre vous montre où 
 est le lancement, coche les étapes au fur et à mesure, puis disparaît toute
 seule dès que le bot est prêt — le tableau de bord s'ouvre juste après dans
 votre navigateur. Si quelque chose bloque, elle reste affichée et vous dit quoi
-faire : installer Node.js, renseigner votre jeton Discord dans `.env`, ou
-consulter les journaux. Le premier lancement est plus long que les suivants :
+faire : installer Node.js, reprendre la configuration, ou consulter
+les journaux. Le premier lancement est plus long que les suivants :
 il installe les dépendances.
+
+**Au tout premier lancement**, cette fenêtre ne démarre rien : elle vous
+accompagne. Le bot a besoin de sa propre application Discord, et personne ne
+peut la créer à votre place — un jeton désigne une application, il ne se partage
+pas. Tout le reste est pris en charge :
+
+- un bouton ouvre le portail développeur de Discord, où vous créez
+  l'application (*New Application*), puis, dans l'onglet *Bot*, cliquez sur
+  *Reset Token* puis *Copy* ;
+- il n'y a rien à coller : dès que le jeton est dans votre presse-papiers, la
+  fenêtre le reconnaît, le soumet à Discord et affiche en retour le nom de
+  l'application. Le champ reste là pour les cas où cette détection n'aboutit
+  pas ;
+- l'identifiant de l'application n'est **pas** demandé — il se déduit du jeton.
+  Le fichier `.env` est écrit pour vous, sans que vous ayez à l'ouvrir ;
+- un dernier bouton invite le bot sur votre serveur, permissions déjà cochées.
+  Le bot démarre pendant ce temps, sans attendre que vous ayez fini.
+
+Un jeton que Discord refuse est signalé sur-le-champ, avec son motif — plutôt
+qu'au démarrage suivant, sous la forme d'un bot qui s'arrête sans rien dire. Et
+si le jeton enregistré cesse d'être accepté, parce qu'il a été régénéré depuis
+sur le portail, la fenêtre propose de refaire cette configuration.
 
 **Pour arrêter le bot**, utilisez le bouton d'extinction du tableau de bord :
 c'est lui qui remplace la fermeture de la console. Le bouton de redémarrage y

@@ -69,6 +69,29 @@ const webServer = require('./web/WebServer');
 const versioning = require('./versioning');
 const log = require('./utils/logger');
 
+/*
+ * Ce qui échappe à tous les try/catch aboutit ici.
+ *
+ * Le bot tourne sans console : ce que Node écrit de lui-même sur stderr avant
+ * de mourir ne se voit nulle part, et le journal — seule trace qui reste —
+ * n'en garde rien. Un jeton refusé au login, par exemple, sortait ainsi sans
+ * un mot dans data/logs/, et la fenêtre de lancement ne pouvait qu'annoncer un
+ * arrêt sans motif.
+ *
+ * Les deux gestionnaires ne rattrapent rien : ils écrivent, puis laissent le
+ * processus finir. Poursuivre après une erreur dont personne n'a prévu la
+ * forme laisserait tourner un bot dans un état inconnu, ce qui est pire que
+ * l'arrêt.
+ */
+function dieLoudly(kind, error) {
+    const detail = error instanceof Error ? (error.stack || error.message) : String(error);
+    log.error(`[FATAL] ${kind}: ${detail}`);
+    process.exit(1);
+}
+
+process.on('uncaughtException', (err) => dieLoudly('Uncaught exception', err));
+process.on('unhandledRejection', (reason) => dieLoudly('Unhandled rejection', reason));
+
 // --- Validate env ---
 if (!process.env.DISCORD_TOKEN) {
     log.error('[FATAL] DISCORD_TOKEN missing from the .env file');

@@ -36,9 +36,31 @@ nada aparece en la barra de tareas. Una pequeña ventana le muestra por dónde v
 el lanzamiento, marca las etapas a medida que avanzan, y luego desaparece sola
 en cuanto el bot está listo — el panel de control se abre justo después en su
 navegador. Si algo se atasca, la ventana permanece visible y le dice qué hacer:
-instalar Node.js, indicar su testigo de Discord en `.env`, o consultar los
+instalar Node.js, rehacer la configuración, o consultar los
 registros. El primer lanzamiento es más largo que los siguientes: instala las
 dependencias.
+
+**En el primer lanzamiento**, esa ventana no arranca nada: le acompaña. El bot
+necesita su propia aplicación de Discord, y nadie puede crearla en su lugar — un
+testigo designa una aplicación, y no se comparte. De todo lo demás se encarga
+ella:
+
+- un botón abre el portal de desarrolladores de Discord, donde usted crea la
+  aplicación (*New Application*) y luego, en la pestaña *Bot*, pulsa *Reset
+  Token* y *Copy*;
+- no hay nada que pegar: en cuanto el testigo está en su portapapeles, la
+  ventana lo reconoce, lo somete a Discord y le devuelve el nombre de la
+  aplicación. El campo sigue ahí para los casos en que esa detección no llega a
+  buen puerto;
+- el identificador de la aplicación **no** se pide — se deduce del testigo. El
+  archivo `.env` se escribe por usted, sin que tenga que abrirlo;
+- un último botón invita al bot a su servidor, con los permisos ya marcados. El
+  bot arranca mientras tanto, sin esperar a que usted termine.
+
+Un testigo que Discord rechaza se señala en el acto, con su motivo — en lugar de
+en el arranque siguiente, en forma de un bot que se detiene sin decir nada. Y si
+el testigo registrado deja de ser aceptado, porque se ha regenerado desde
+entonces en el portal, la ventana propone rehacer esta configuración.
 
 **Para detener el bot**, use el botón de apagado del panel de control: es él
 quien sustituye al cierre de la consola. El botón de reinicio también está

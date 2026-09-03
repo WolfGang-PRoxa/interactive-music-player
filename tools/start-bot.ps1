@@ -242,6 +242,169 @@ function PortAnswers {
 }
 
 # ============================================================================
+#  Première configuration
+# ============================================================================
+
+<#
+    Ce que le bot réclame et que personne ne peut lui donner à sa place : sa
+    propre application Discord. L'étape est incompressible — un jeton désigne
+    une application, il ne se partage pas et ne se devine pas — mais tout ce
+    qui l'entoure peut disparaître, et c'est l'objet de cette section.
+
+    Ce qui reste à faire à la main : créer l'application sur le portail, et
+    copier le jeton. Rien d'autre. L'identifiant de l'application n'est pas
+    demandé, il se déduit du jeton ; le fichier .env n'est pas ouvert, il est
+    écrit ; l'URL d'invitation n'est pas assemblée dans le portail, elle est
+    construite ici avec les bonnes portées et les bonnes permissions.
+#>
+
+# Le portail développeur. Ouvert tel quel, sans viser l'onglet « Bot » : à ce
+# moment-là l'application n'existe pas encore, il n'y a pas d'identifiant par
+# lequel l'atteindre.
+$DiscordPortal = 'https://discord.com/developers/applications'
+
+# Discord demande un agent utilisateur de cette forme sur les appels à son API,
+# et sa protection de façade écarte ce qui n'en porte pas.
+$ApiUserAgent = 'DiscordBot (https://github.com/WolfGang-PRoxa/interactive_music_player, 1.0)'
+
+<#
+    Permissions demandées à l'invitation, dans l'ordre du README.
+
+    Écrites en décalages plutôt qu'en somme toute faite : « 19923984 » ne se
+    relit pas, et la moindre correction future se ferait à l'aveugle.
+#>
+$InvitePermissions =
+    (1 -shl 10) +   # View Channels
+    (1 -shl 20) +   # Connect
+    (1 -shl 21) +   # Speak
+    (1 -shl  4) +   # Manage Channels
+    (1 -shl 24)     # Move Members
+
+function InviteUrl {
+    # Les deux portées sont celles du README : `bot` pose le bot dans le salon,
+    # `applications.commands` autorise ses commandes slash.
+    param([string]$ClientId)
+    return "https://discord.com/oauth2/authorize?client_id=$ClientId" +
+           "&permissions=$InvitePermissions&scope=bot+applications.commands"
+}
+
+function LooksLikeBotToken {
+    <#
+        Trois segments base64url séparés par des points : la forme d'un jeton de
+        bot. Le test reste large à dessein — il ne décide pas si le jeton est
+        bon, seulement s'il vaut la peine d'aller le demander à Discord, qui
+        seul tranche.
+    #>
+    param([string]$Text)
+    if (-not $Text) { return $false }
+    return ($Text.Trim() -match '^[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{20,}$')
+}
+
+function ValidateBotToken {
+    <#
+        Demande à Discord ce que vaut ce jeton, et de quelle application il
+        relève.
+
+        `/oauth2/applications/@me` rend l'application elle-même. Son identifiant
+        est exactement ce qu'attend DISCORD_CLIENT_ID : l'utilisateur n'a donc
+        pas à le relever à la main sur le portail, ce qui retire une valeur à
+        recopier sur les deux — et avec elle l'erreur de confondre l'identifiant
+        de l'application avec celui du bot.
+
+        La réponse porte aussi le nom de l'application, qui sert de preuve
+        lisible : voir « Interactive Music Player reconnu » vaut mieux qu'une
+        coche verte sur une suite de caractères que personne ne peut relire.
+
+        L'appel est synchrone et fige donc brièvement la fenêtre, comme
+        DashboardClients plus haut. C'est une requête, et l'interface n'a rien
+        d'autre à faire en l'attendant.
+    #>
+    param([string]$Token)
+
+    # Windows PowerShell 5.1 n'active pas TLS 1.2 partout selon l'âge de la
+    # machine, et Discord ne descend pas en deçà : sans cette ligne l'appel
+    # échoue sur une connexion fermée, qu'on prendrait pour une panne de réseau.
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    } catch { }
+
+    try {
+        $app = Invoke-RestMethod -Uri 'https://discord.com/api/v10/oauth2/applications/@me' `
+            -Headers @{ Authorization = "Bot $($Token.Trim())" } `
+            -UserAgent $ApiUserAgent -TimeoutSec 12 -ErrorAction Stop
+
+        if (-not $app.id) { return @{ Ok = $false; Reason = 'rejected' } }
+        return @{ Ok = $true; Id = [string]$app.id; Name = [string]$app.name }
+    } catch {
+        # 401 comme 403 disent la même chose à l'utilisateur : ce jeton-là n'est
+        # pas le bon. Tout le reste — DNS, proxy, câble — est une panne de
+        # liaison, et lui reprocher son jeton l'enverrait corriger ce qui va
+        # bien.
+        $status = 0
+        if ($_.Exception.Response) {
+            try { $status = [int]$_.Exception.Response.StatusCode } catch { }
+        }
+        if ($status -eq 401 -or $status -eq 403) { return @{ Ok = $false; Reason = 'rejected' } }
+        return @{ Ok = $false; Reason = 'offline'; Message = $_.Exception.Message }
+    }
+}
+
+function SetEnvValues {
+    <#
+        Inscrit des valeurs dans .env sans toucher au reste du fichier.
+
+        Les commentaires de .env.example expliquent chaque variable, une par
+        une ; réécrire le fichier en un minimum de deux lignes priverait
+        l'utilisateur de tout ce qu'il pourrait vouloir régler ensuite — le
+        port, l'exposition réseau, ses dossiers de musique.
+
+        Écrit par .NET en UTF-8 **sans BOM**, et non par Set-Content : celui-ci
+        pose un BOM que dotenv rattacherait au nom de la première variable, qui
+        deviendrait invisible pour le bot.
+    #>
+    param([hashtable]$Values)
+
+    $lines = @()
+    if (Test-Path -LiteralPath $EnvFile) {
+        $lines = @(Get-Content -LiteralPath $EnvFile -ErrorAction Stop)
+    }
+
+    $remaining = @{}
+    foreach ($key in $Values.Keys) { $remaining[$key] = $Values[$key] }
+
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=') {
+            $key = $matches[1]
+            if ($remaining.ContainsKey($key)) {
+                $lines[$i] = "$key=$($remaining[$key])"
+                $remaining.Remove($key)
+            }
+        }
+    }
+
+    # Une variable absente du fichier — .env écrit à la main, exemple modifié —
+    # est ajoutée en fin plutôt que perdue en silence.
+    foreach ($key in @($remaining.Keys)) { $lines += "$key=$($remaining[$key])" }
+
+    [System.IO.File]::WriteAllLines($EnvFile, [string[]]$lines,
+        (New-Object System.Text.UTF8Encoding($false)))
+}
+
+function ClipboardText {
+    <#
+        Le presse-papiers peut être verrouillé par l'application qui vient d'y
+        écrire. L'accès lève alors, et une exception par battement d'horloge n'a
+        pas sa place dans une fenêtre dont c'est le métier d'attendre un collage.
+    #>
+    try {
+        if ([System.Windows.Clipboard]::ContainsText()) {
+            return [System.Windows.Clipboard]::GetText()
+        }
+    } catch { }
+    return ''
+}
+
+# ============================================================================
 #  Fenêtre de lancement
 # ============================================================================
 
@@ -351,6 +514,37 @@ $LaunchXaml = @'
           <Setter Property="BorderBrush" Value="#36FFFFFF"/>
         </Trigger>
       </Style.Triggers>
+    </Style>
+
+    <!-- Champ de collage du jeton. Un TextBox ne s'arrondit pas par une
+         propriété : il faut lui refaire un gabarit, dont le ScrollViewer doit
+         garder le nom PART_ContentHost — c'est par ce nom que le contrôle
+         retrouve où écrire. -->
+    <Style x:Key="PasteBox" TargetType="TextBox">
+      <Setter Property="Foreground" Value="#F5F4F8"/>
+      <Setter Property="CaretBrush" Value="#7A85FF"/>
+      <Setter Property="SelectionBrush" Value="#5865F2"/>
+      <Setter Property="FontSize" Value="11.5"/>
+      <Setter Property="FontFamily" Value="Cascadia Mono, Consolas"/>
+      <Setter Property="Height" Value="36"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="TextBox">
+            <Border x:Name="Fill" CornerRadius="10" Padding="12,0"
+                    Background="#0DFFFFFF" BorderBrush="#24FFFFFF" BorderThickness="1">
+              <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsFocused" Value="True">
+                <Setter TargetName="Fill" Property="BorderBrush" Value="#5865F2"/>
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Fill" Property="BorderBrush" Value="#3DFFFFFF"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
 
     <Style x:Key="CloseButtonStyle" TargetType="Button">
@@ -497,6 +691,110 @@ $LaunchXaml = @'
         <!-- Cartes d'action : seulement quand le bot tourne déjà -->
         <StackPanel x:Name="CardList" Margin="0,14,0,0"/>
 
+        <!--
+             Première configuration.
+
+             N'apparaît qu'au premier lancement, ou lorsque Discord refuse le
+             jeton enregistré. Prend la place de la liste des étapes plutôt que
+             de s'ajouter dessous : la croix rouge d'une vérification ratée ne
+             ferait qu'inquiéter sur un poste où rien n'est encore cassé.
+
+             Deux temps. Le premier mène au portail et attend le jeton ; le
+             second, une fois l'application reconnue, mène à l'invitation.
+        -->
+        <StackPanel x:Name="SetupPanel" Visibility="Collapsed" Margin="0,16,0,0">
+
+          <StackPanel x:Name="SetupStage1">
+
+            <TextBlock Foreground="#8C899D" FontSize="12.5" TextWrapping="Wrap"
+                       Text="Votre bot a besoin de sa propre application Discord. C'est gratuit, et à faire une seule fois."/>
+
+            <Grid Margin="0,15,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="19"/>
+                <ColumnDefinition Width="*"/>
+              </Grid.ColumnDefinitions>
+              <TextBlock Grid.Column="0" Text="1" Foreground="#7A85FF" FontSize="12.5" FontWeight="SemiBold"/>
+              <TextBlock Grid.Column="1" Foreground="#B9B6C6" FontSize="12.5" TextWrapping="Wrap"
+                         Text="Sur le portail : New Application, puis un nom."/>
+            </Grid>
+            <Grid Margin="0,7,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="19"/>
+                <ColumnDefinition Width="*"/>
+              </Grid.ColumnDefinitions>
+              <TextBlock Grid.Column="0" Text="2" Foreground="#7A85FF" FontSize="12.5" FontWeight="SemiBold"/>
+              <TextBlock Grid.Column="1" Foreground="#B9B6C6" FontSize="12.5" TextWrapping="Wrap"
+                         Text="Onglet Bot, à gauche → Reset Token → Copy."/>
+            </Grid>
+            <Grid Margin="0,7,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="19"/>
+                <ColumnDefinition Width="*"/>
+              </Grid.ColumnDefinitions>
+              <TextBlock Grid.Column="0" Text="3" Foreground="#7A85FF" FontSize="12.5" FontWeight="SemiBold"/>
+              <TextBlock Grid.Column="1" Foreground="#B9B6C6" FontSize="12.5" TextWrapping="Wrap"
+                         Text="Revenez ici : le jeton copié est reconnu tout seul."/>
+            </Grid>
+
+            <Button x:Name="PortalButton" Style="{StaticResource PrimaryButton}"
+                    Margin="0,17,0,0" HorizontalAlignment="Stretch"
+                    Content="Ouvrir le portail Discord"/>
+
+            <!-- Le champ et son indication. WPF n'a pas de texte de repli
+                 natif : c'est un libellé posé derrière, que la saisie fait
+                 disparaître. IsHitTestVisible le rend transparent au clic,
+                 sans quoi cliquer dessus ne donnerait pas le focus au champ. -->
+            <Grid Margin="0,10,0,0">
+              <TextBox x:Name="TokenBox" Style="{StaticResource PasteBox}"/>
+              <TextBlock x:Name="TokenHint" IsHitTestVisible="False"
+                         Foreground="#56536A" FontSize="11.5" Margin="13,0,0,0"
+                         VerticalAlignment="Center"
+                         Text="Le jeton copié apparaîtra ici"/>
+            </Grid>
+
+            <TextBlock x:Name="SetupStatus" Foreground="#6F6C80" FontSize="11.5"
+                       Margin="2,8,0,0" TextWrapping="Wrap"
+                       Text="En attente du jeton. Vous pouvez aussi le coller ci-dessus."/>
+          </StackPanel>
+
+          <StackPanel x:Name="SetupStage2" Visibility="Collapsed">
+
+            <Border CornerRadius="12" Padding="15,13" Background="#1457F287" BorderThickness="1"
+                    BorderBrush="#3357F287">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Path Grid.Column="0" Width="13" Height="11" Stretch="Uniform"
+                      Data="M0,4.5 L4,8.5 L11,0.5" Stroke="#57F287" StrokeThickness="2.2"
+                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                      VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                  <TextBlock x:Name="SetupBotName" Foreground="#F5F4F8" FontSize="13.5"
+                             FontWeight="SemiBold" TextWrapping="Wrap"/>
+                  <TextBlock Foreground="#8C899D" FontSize="11.5" Margin="0,2,0,0"
+                             TextWrapping="Wrap"
+                             Text="Jeton vérifié auprès de Discord et enregistré dans .env."/>
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <TextBlock Foreground="#8C899D" FontSize="12.5" Margin="2,15,0,0" TextWrapping="Wrap"
+                       Text="Reste à l'inviter sur votre serveur. Les permissions dont il a besoin sont déjà cochées ; le bot démarre pendant ce temps."/>
+
+            <Button x:Name="InviteButton" Style="{StaticResource PrimaryButton}"
+                    Margin="0,15,0,0" HorizontalAlignment="Stretch"
+                    Content="Inviter le bot sur mon serveur"/>
+
+            <Button x:Name="SkipInviteButton" Style="{StaticResource SecondaryButton}"
+                    Margin="0,8,0,0" HorizontalAlignment="Stretch"
+                    Content="Plus tard"/>
+          </StackPanel>
+
+        </StackPanel>
+
         <!-- Pied : n'apparaît qu'en cas d'échec, d'attente anormale, ou quand
              le bot tourne déjà -->
         <StackPanel x:Name="Footer" Visibility="Collapsed">
@@ -633,6 +931,17 @@ $detailText   = Element 'Detail'
 $actionButton = Element 'ActionButton'
 $dismissButton = Element 'DismissButton'
 $closeButton  = Element 'CloseButton'
+
+$setupPanel      = Element 'SetupPanel'
+$setupStage1     = Element 'SetupStage1'
+$setupStage2     = Element 'SetupStage2'
+$portalButton    = Element 'PortalButton'
+$tokenBox        = Element 'TokenBox'
+$tokenHint       = Element 'TokenHint'
+$setupStatus     = Element 'SetupStatus'
+$setupBotName    = Element 'SetupBotName'
+$inviteButton    = Element 'InviteButton'
+$skipInviteButton = Element 'SkipInviteButton'
 
 # L'icône de la fenêtre reste celle du fichier quand il existe : elle sert au
 # basculement Alt+Tab, que le logo vectoriel de l'en-tête ne couvre pas.
@@ -793,6 +1102,7 @@ $script:ExitCode    = 0
 $script:FooterAction  = $null
 $script:DismissAction = $null
 $script:CardActions   = @{}
+$script:SetupClientId = ''   # identifiant rendu par Discord, pour l'invitation
 
 # Ce que dit et fait la fin d'une séquence. Le lancement s'efface tout seul ;
 # une extinction, elle, n'a rien à ouvrir derrière elle et doit rester lisible.
@@ -842,6 +1152,13 @@ function StepConfiguration {
             if (-not $token -or $token -eq 'your_bot_token_here') { return 'failed' }
             return 'done'
         }
+        <#
+            L'absence de configuration n'est pas une panne : au premier
+            lancement, c'est l'état normal. Elle ouvre donc l'assistant plutôt
+            qu'une carte d'échec, et personne n'a à ouvrir un fichier .env ni à
+            savoir ce qu'est une variable d'environnement.
+        #>
+        OnFail  = { StartSetup }
         Fail    = @{
             Headline    = "Configuration à compléter."
             Detail      = "Renseignez DISCORD_TOKEN et DISCORD_CLIENT_ID dans le fichier .env, à la racine du projet, puis relancez."
@@ -899,6 +1216,29 @@ function StepLaunch {
             # relais et couvre la suite du démarrage.
             if (([DateTime]::UtcNow - $script:StepStarted).TotalMilliseconds -ge 2500) { return 'done' }
             return 'running'
+        }
+        <#
+            Un jeton refusé est le seul échec de démarrage qui ait une
+            réparation évidente, et c'est aussi le plus probable sur une
+            première installation — un jeton régénéré depuis, ou copié à
+            moitié. Le proposer en bouton principal vaut mieux que de renvoyer
+            vers un dossier de journaux où « TokenInvalid » ne dit rien à qui
+            n'a jamais vu ce mot.
+
+            Le motif se lit dans le journal parce que src/index.js y écrit
+            désormais ce qui le tue, y compris ce qu'aucun try/catch n'attendait.
+        #>
+        OnFail  = {
+            $tail = TailOf $LatestLog 20
+            if ($tail -match 'TokenInvalid|An invalid token was provided') {
+                ShowFooter -Message "Discord a refusé le jeton du bot." `
+                    -Details "Le jeton enregistré dans .env n'est plus accepté. Il a pu être régénéré depuis sur le portail, ou n'avoir été copié qu'en partie." `
+                    -ActionLabel 'Ouvrir les journaux' `
+                    -Action { Start-Process explorer.exe -ArgumentList "`"$LogFolder`"" } `
+                    -DismissLabel 'Reconfigurer' -DismissAction { StartSetup }
+                return
+            }
+            FailWith (CurrentStep).Fail
         }
         Fail    = @{
             Headline    = "Le bot s'est arrêté aussitôt après son démarrage."
@@ -1063,7 +1403,11 @@ function FinishStep {
     if ($State -eq 'failed') {
         $script:Outcome = 'stopped'
         $script:ExitCode = 1
-        FailWith $step.Fail
+        # Une étape peut préférer conduire quelque part plutôt que d'afficher un
+        # motif : c'est le cas de la configuration, dont l'échec au premier
+        # lancement n'est pas un échec mais un début. Le code de sortie qu'on
+        # vient de poser sera remis à zéro par StartSequence si la suite reprend.
+        if ($step.OnFail) { & $step.OnFail } else { FailWith $step.Fail }
         return $false
     }
 
@@ -1361,6 +1705,186 @@ function ShowRunningChoices {
 }
 
 # ============================================================================
+#  Assistant de première configuration
+# ============================================================================
+
+<#
+    Le jeton en cours d'examen, et celui déjà examiné.
+
+    La vérification n'est pas faite dans le gestionnaire de saisie mais un
+    battement plus tard, par l'horloge : l'appel à Discord fige le fil de
+    l'interface, et lancé sur-le-champ il empêcherait « Vérification… » de
+    s'afficher — la fenêtre resterait figée sur l'état précédent, sans rien dire
+    de ce qu'elle attend.
+#>
+$script:PendingToken = ''
+$script:CheckedToken = ''
+$script:LastClipboard = ''
+
+function SetupStatus {
+    param([string]$Text, [string]$Color = '#6F6C80')
+    $setupStatus.Text = $Text
+    $setupStatus.Foreground = NewBrush $Color
+}
+
+function StartSetup {
+    <#
+        Ouvre l'assistant, à la place de la liste des étapes.
+
+        Le moteur d'étapes est arrêté : ce qui suit ne dépend plus d'une horloge
+        mais de ce que l'utilisateur rapporte du portail. Il repartira de zéro
+        par LaunchAfterSetup, sur une liste reconstruite — le fichier .env aura
+        changé entre-temps, et avec lui ce que BuildSteps décide.
+    #>
+    $timer.Stop()
+    HideFooter
+    $cardList.Children.Clear()
+    $stepList.Visibility = 'Collapsed'
+    $barSlide.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $null)
+    $trackBar.Visibility = 'Collapsed'
+    $script:Outcome = 'stopped'
+
+    $headline.Text = 'Première configuration'
+    $setupPanel.Visibility = 'Visible'
+    $setupStage1.Visibility = 'Visible'
+    $setupStage2.Visibility = 'Collapsed'
+    $tokenBox.Text = ''
+    $script:CheckedToken = ''
+    $script:PendingToken = ''
+
+    # Le presse-papiers n'est pas vidé de ce qu'il porte déjà : quelqu'un qui a
+    # copié son jeton avant de lancer le bot le verra reconnu à l'ouverture,
+    # sans avoir rien à refaire.
+    $script:LastClipboard = ''
+    $script:SetupTimer.Start()
+}
+
+function CheckToken {
+    <# Soumet un jeton à Discord et rend compte du verdict dans la fenêtre. #>
+    param([string]$Token)
+
+    $verdict = ValidateBotToken $Token
+    if ($verdict.Ok) {
+        AcceptApplication -Token $Token -Id $verdict.Id -Name $verdict.Name
+        return
+    }
+
+    if ($verdict.Reason -eq 'offline') {
+        # Le jeton n'est pas mis en cause : on n'a pas pu poser la question.
+        SetupStatus "Discord est injoignable pour l'instant. Vérifiez votre connexion : la vérification se refera toute seule." '#FAA61A'
+        $script:CheckedToken = ''
+        return
+    }
+
+    SetupStatus "Discord refuse ce jeton. Reprenez-le dans l'onglet Bot, par Reset Token puis Copy — un jeton n'est visible qu'une fois, juste après avoir été régénéré." '#ED4245'
+}
+
+function AcceptApplication {
+    <#
+        L'application est reconnue : on écrit .env et on passe à l'invitation.
+
+        L'identifiant vient de Discord et non de l'utilisateur. C'est tout
+        l'intérêt de passer par l'API plutôt que de demander deux valeurs : il
+        n'y a rien à recopier, donc rien à confondre — et l'erreur classique,
+        prendre l'identifiant du bot pour celui de l'application, ne peut plus
+        se produire.
+    #>
+    param([string]$Token, [string]$Id, [string]$Name)
+
+    $script:SetupTimer.Stop()
+
+    try {
+        SetEnvValues @{ DISCORD_TOKEN = $Token.Trim(); DISCORD_CLIENT_ID = $Id }
+    } catch {
+        SetupStatus "Le fichier .env n'a pas pu être écrit : $($_.Exception.Message)" '#ED4245'
+        $script:SetupTimer.Start()
+        return
+    }
+
+    $script:SetupClientId = $Id
+    $setupBotName.Text = if ($Name) { "« $Name » est reconnu." } else { 'Application reconnue.' }
+    # Apostrophe droite, et non typographique : PowerShell 5.1 voit dans « ’ »
+    # un délimiteur de chaîne, et la ligne ne se lirait plus.
+    $headline.Text = "Plus qu'une étape."
+    $setupStage1.Visibility = 'Collapsed'
+    $setupStage2.Visibility = 'Visible'
+}
+
+function LaunchAfterSetup {
+    <#
+        Referme l'assistant et enchaîne sur le démarrage ordinaire.
+
+        Le bot est lancé sans attendre que l'invitation soit acceptée : il
+        démarre très bien sans aucun serveur, et le tableau de bord sait le
+        dire — c'est même la raison d'être de sa route /api/invite. Attendre
+        ferait perdre à l'utilisateur le temps de l'installation des
+        dépendances, précisément pendant qu'il a autre chose à faire.
+    #>
+    $script:SetupTimer.Stop()
+    $setupPanel.Visibility = 'Collapsed'
+    $stepList.Visibility = 'Visible'
+
+    StartSequence -Steps (BuildSteps) `
+        -Message 'Démarrage en cours…' `
+        -SuccessMessage "Le bot est prêt. Le tableau de bord va s'ouvrir." -AutoClose $true
+}
+
+$script:SetupTimer = New-Object System.Windows.Threading.DispatcherTimer
+$script:SetupTimer.Interval = [TimeSpan]::FromMilliseconds(250)
+$script:SetupTimer.Add_Tick({
+    try {
+        # Un jeton attend d'être vérifié : la fenêtre a eu le temps d'afficher
+        # qu'elle s'y met, l'appel peut la figer le temps qu'il faut.
+        if ($script:PendingToken) {
+            $token = $script:PendingToken
+            $script:PendingToken = ''
+            CheckToken $token
+            return
+        }
+
+        <#
+            Surveillance du presse-papiers.
+
+            C'est ce qui retire le dernier geste inutile : le jeton vient d'être
+            copié dans le navigateur, il n'y a aucune raison de demander en plus
+            de cliquer dans un champ et de coller. Seul ce qui a la forme d'un
+            jeton est retenu, le reste est ignoré sans être lu davantage — et
+            rien n'est conservé nulle part.
+        #>
+        $text = ClipboardText
+        if ($text -eq $script:LastClipboard) { return }
+        $script:LastClipboard = $text
+        if (LooksLikeBotToken $text) { $tokenBox.Text = $text.Trim() }
+    } catch { }
+})
+
+$tokenBox.Add_TextChanged({
+    $value = $tokenBox.Text.Trim()
+    # L'indication s'efface dès qu'il y a quelque chose à lire — avant tout
+    # jugement sur la forme, sinon elle resterait par-dessus une saisie en cours.
+    $tokenHint.Visibility = if ($tokenBox.Text) { 'Collapsed' } else { 'Visible' }
+    if (-not (LooksLikeBotToken $value)) { return }
+    # Sans cette garde, revenir sur le champ après un refus relancerait l'appel
+    # à chaque frappe, sur un jeton dont on sait déjà ce que Discord en pense.
+    if ($value -eq $script:CheckedToken) { return }
+    $script:CheckedToken = $value
+    $script:PendingToken = $value
+    SetupStatus 'Vérification auprès de Discord…' '#8C899D'
+})
+
+$portalButton.Add_Click({
+    Start-Process $DiscordPortal
+    SetupStatus "Le portail est ouvert. Copiez le jeton : il sera reconnu ici tout seul." '#8C899D'
+})
+
+$inviteButton.Add_Click({
+    Start-Process (InviteUrl $script:SetupClientId)
+    LaunchAfterSetup
+})
+
+$skipInviteButton.Add_Click({ LaunchAfterSetup })
+
+# ============================================================================
 #  Mise en place puis affichage
 # ============================================================================
 
@@ -1414,10 +1938,132 @@ $window.Add_Loaded({
 })
 
 if ($SelfTest) {
-    # Auto-test : tout est construit et câblé, on s'arrête avant l'affichage et
-    # avant qu'aucun processus n'ait été démarré.
+    <#
+        Auto-test : tout est construit et câblé, on s'arrête avant l'affichage
+        et avant qu'aucun processus n'ait été démarré.
+
+        Les vérifications qui suivent ne remplacent pas un essai à l'écran, mais
+        elles couvrent ce qui se casse en silence : un nom disparu du XAML rend
+        $null par FindName et ne se verrait qu'au moment d'ouvrir l'assistant,
+        et une permission mal décalée donnerait une invitation acceptée dont le
+        bot ne pourrait ni entrer dans un salon ni y parler.
+    #>
     Write-Output "Interface construite sans erreur. Étapes : $($script:Steps.Count)"
     foreach ($step in $script:Steps) { Write-Output "  - $($step.Caption)" }
+
+    $missing = @()
+    $wanted = @('SetupPanel', 'SetupStage1', 'SetupStage2', 'PortalButton',
+                'TokenBox', 'TokenHint', 'SetupStatus', 'SetupBotName',
+                'InviteButton', 'SkipInviteButton')
+    foreach ($name in $wanted) {
+        if ($null -eq (Element $name)) { $missing += $name }
+    }
+    if ($missing.Count -gt 0) {
+        Write-Output "ÉCHEC — éléments introuvables dans le XAML : $($missing -join ', ')"
+        exit 1
+    }
+    Write-Output "Assistant : les $($wanted.Count) éléments de la fenêtre répondent."
+
+    # 19923984 = View Channels + Connect + Speak + Manage Channels + Move Members.
+    if ($InvitePermissions -ne 19923984) {
+        Write-Output "ÉCHEC — permissions attendues 19923984, obtenu $InvitePermissions"
+        exit 1
+    }
+    Write-Output "Invitation : $(InviteUrl '000000000000000000')"
+
+    # La forme d'un jeton, sur des exemples inventés : trois segments pour un
+    # jeton, et le refus de ce qui n'en est pas un — dont la valeur de
+    # démonstration de .env.example, qu'un collage distrait pourrait amener.
+    $shapes = @(
+        @{ Text = 'MTk4NjIyNDgzNDcxOTI1MjQ4.Cl2FMQ.ZnCjm1XVW7vRze4b7Cq4se7kKWs'; Expect = $true },
+        @{ Text = 'your_bot_token_here';                                          Expect = $false },
+        @{ Text = 'https://discord.com/developers/applications';                   Expect = $false },
+        @{ Text = '';                                                             Expect = $false }
+    )
+    foreach ($shape in $shapes) {
+        if ((LooksLikeBotToken $shape.Text) -ne $shape.Expect) {
+            Write-Output "ÉCHEC — forme du jeton mal jugée : « $($shape.Text) »"
+            exit 1
+        }
+    }
+    Write-Output 'Jeton : les quatre formes sont correctement jugées.'
+
+    <#
+        Écriture du .env, sur un fichier jetable.
+
+        $EnvFile est détourné le temps de l'essai : la fonction le lit à
+        l'appel, et le vrai fichier de l'utilisateur n'a rien à faire dans un
+        auto-test.
+    #>
+    $realEnvFile = $EnvFile
+    $EnvFile = Join-Path ([System.IO.Path]::GetTempPath()) "imp-selftest-$PID.env"
+    try {
+        [System.IO.File]::WriteAllLines($EnvFile, [string[]]@(
+            '# Discord Bot Token',
+            'DISCORD_TOKEN=your_bot_token_here',
+            'DISCORD_CLIENT_ID=your_client_id_here',
+            '',
+            '# Port du tableau de bord',
+            'PORT=3000'
+        ), (New-Object System.Text.UTF8Encoding($false)))
+
+        SetEnvValues @{ DISCORD_TOKEN = 'JETON.DE.TEST'; DISCORD_CLIENT_ID = '123'; PUBLIC_URL = 'x' }
+
+        # Les fins de ligne sont celles de Windows : « $ » de .NET s'arrête
+        # avant le \n et bute sur le \r, d'où le \s* qui l'absorbe.
+        $written = [System.IO.File]::ReadAllText($EnvFile)
+        $bytes   = [System.IO.File]::ReadAllBytes($EnvFile)
+        $checks = @(
+            @{ Label = 'le jeton est remplacé';        Ok = $written -match '(?m)^DISCORD_TOKEN=JETON\.DE\.TEST\s*$' },
+            @{ Label = "l'identifiant est remplacé";   Ok = $written -match '(?m)^DISCORD_CLIENT_ID=123\s*$' },
+            @{ Label = 'la valeur d''exemple a disparu'; Ok = $written -notmatch 'your_bot_token_here' },
+            @{ Label = 'les commentaires survivent';   Ok = $written -match '# Port du tableau de bord' },
+            @{ Label = 'les autres variables aussi';   Ok = $written -match '(?m)^PORT=3000\s*$' },
+            @{ Label = 'une variable absente est ajoutée'; Ok = $written -match '(?m)^PUBLIC_URL=x\s*$' },
+            <#
+                Le BOM se cherche dans les octets, jamais dans le texte lu :
+                ReadAllText le retire à la lecture, et une comparaison de
+                chaînes ne pourrait donc rien voir. Elle mentirait même deux
+                fois — la comparaison par défaut de .NET est sensible à la
+                culture, et U+FEFF y pèse zéro : « abc ».StartsWith(BOM) rend
+                vrai sur un texte qui n'en porte aucun.
+            #>
+            @{ Label = 'aucun BOM en tête'
+               Ok = -not ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and
+                          $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) }
+        )
+        foreach ($check in $checks) {
+            if (-not $check.Ok) {
+                Write-Output "ÉCHEC — écriture du .env : $($check.Label)"
+                exit 1
+            }
+        }
+        Write-Output "Fichier .env : les $($checks.Count) garanties d'écriture tiennent."
+    } finally {
+        try { Remove-Item -LiteralPath $EnvFile -Force -ErrorAction Stop } catch { }
+        $EnvFile = $realEnvFile
+    }
+
+    <#
+        Le chemin complet vers Discord, avec un jeton volontairement faux : TLS,
+        agent utilisateur, et surtout le classement de la réponse. Un refus doit
+        se lire « rejected » et non « offline », faute de quoi l'assistant
+        accuserait le réseau d'un jeton erroné.
+
+        Hors ligne, l'essai ne conclut pas plutôt qu'il n'échoue : le réseau
+        n'est pas ce que cet auto-test a pour objet.
+    #>
+    $verdict = ValidateBotToken 'MTk4NjIyNDgzNDcxOTI1MjQ4.Cl2FMQ.ZnCjm1XVW7vRze4b7Cq4se7kKWs'
+    if ($verdict.Ok) {
+        Write-Output 'ÉCHEC — Discord a accepté un jeton inventé.'
+        exit 1
+    }
+    if ($verdict.Reason -eq 'offline') {
+        Write-Output 'Discord : injoignable, vérification non concluante (sans conséquence ici).'
+    } else {
+        Write-Output 'Discord : un jeton invalide est bien rapporté comme refusé.'
+    }
+
     exit 0
 }
 

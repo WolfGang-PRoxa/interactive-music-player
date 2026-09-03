@@ -38,9 +38,34 @@ der Taskleiste erscheint nichts. Ein kleines Fenster zeigt Ihnen, wie weit der
 Start gediehen ist, hakt die Schritte nach und nach ab und verschwindet dann von
 selbst, sobald der Bot bereit ist — das Dashboard öffnet sich gleich darauf in
 Ihrem Browser. Hakt etwas, bleibt das Fenster stehen und sagt Ihnen, was zu tun
-ist: Node.js installieren, Ihr Discord-Token in `.env` eintragen oder die
+ist: Node.js installieren, die Einrichtung erneut durchlaufen oder die
 Protokolle einsehen. Der erste Start dauert länger als die folgenden: er
 installiert die Abhängigkeiten.
+
+**Beim allerersten Start** startet dieses Fenster nichts, sondern begleitet Sie.
+Der Bot braucht seine eigene Discord-Anwendung, und niemand kann sie an Ihrer
+Stelle anlegen — ein Token bezeichnet eine Anwendung und wird nicht geteilt. Um
+alles Übrige kümmert sich das Fenster:
+
+- eine Schaltfläche öffnet Discords Entwicklerportal, wo Sie die Anwendung
+  anlegen (*New Application*) und dann im Reiter *Bot* auf *Reset Token* und
+  *Copy* klicken;
+- es gibt nichts einzufügen: sobald das Token in Ihrer Zwischenablage liegt,
+  erkennt das Fenster es, legt es Discord vor und zeigt Ihnen den Namen der
+  Anwendung zurück. Das Feld bleibt für die Fälle, in denen diese Erkennung
+  nicht durchkommt;
+- nach der Anwendungskennung wird **nicht** gefragt — sie ergibt sich aus dem
+  Token. Die Datei `.env` wird für Sie geschrieben, ohne dass Sie sie öffnen
+  müssten;
+- eine letzte Schaltfläche lädt den Bot auf Ihren Server ein, die Berechtigungen
+  bereits angehakt. Der Bot startet unterdessen, ohne zu warten, bis Sie fertig
+  sind.
+
+Ein Token, das Discord ablehnt, wird auf der Stelle gemeldet, mit dem Grund —
+statt beim nächsten Start, in Gestalt eines Bots, der wortlos stehen bleibt. Und
+wenn das gespeicherte Token nicht mehr angenommen wird, weil es seither im
+Portal neu erzeugt wurde, bietet das Fenster an, diese Einrichtung zu
+wiederholen.
 
 **Zum Anhalten des Bots** verwenden Sie die Ausschaltschaltfläche des
 Dashboards: sie ersetzt das Schließen der Konsole. Die Schaltfläche zum Neustart

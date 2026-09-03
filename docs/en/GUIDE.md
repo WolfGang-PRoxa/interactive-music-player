@@ -34,9 +34,30 @@ The bot starts **in the background**: no terminal window opens and nothing
 appears in the taskbar. A small window shows you how the launch is going, ticks
 off the steps as they complete, then disappears on its own as soon as the bot is
 ready — the dashboard opens right afterwards in your browser. If something gets
-stuck, the window stays up and tells you what to do: install Node.js, fill in
-your Discord token in `.env`, or check the logs. The first launch takes longer
+stuck, the window stays up and tells you what to do: install Node.js, go through the
+configuration again, or check the logs. The first launch takes longer
 than the following ones: it installs the dependencies.
+
+**On the very first launch**, that window starts nothing: it walks you through.
+The bot needs its own Discord application, and nobody can create it for you — a
+token designates one application, and does not get shared. Everything else is
+taken care of:
+
+- a button opens Discord's developer portal, where you create the application
+  (*New Application*), then, in the *Bot* tab, click *Reset Token* and *Copy*;
+- there is nothing to paste: as soon as the token is in your clipboard, the
+  window recognises it, submits it to Discord, and shows the application's name
+  back to you. The field stays there for the cases where that detection does
+  not come through;
+- the application id is **not** asked for — it is derived from the token. The
+  `.env` file is written for you, without your having to open it;
+- one last button invites the bot to your server, permissions already ticked.
+  The bot boots meanwhile, without waiting for you to be done.
+
+A token Discord turns down is reported there and then, with the reason — rather
+than at the next launch, in the shape of a bot that stops without a word. And if
+the stored token stops being accepted, because it was regenerated on the portal
+since, the window offers to go through this configuration again.
 
 **To stop the bot**, use the shutdown button on the dashboard: that is what
 replaces closing the console. The restart button is available there too.

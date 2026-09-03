@@ -56,8 +56,9 @@ la [chaîne audio](docs/fr/technique/02-lecture-audio.md), le
 ## Prérequis
 
 - **Node.js 18** ou supérieur
-- Une application Discord créée sur le
-  [portail développeur](https://discord.com/developers/applications)
+- Un compte Discord — l'application du bot se crée à l'installation, sur le
+  [portail développeur](https://discord.com/developers/applications), et le
+  premier démarrage vous y conduit
 
 FFmpeg et yt-dlp sont fournis par les dépendances npm : rien à installer sur le
 système.
@@ -71,10 +72,31 @@ système.
 ```bash
 git clone https://github.com/WolfGang-PRoxa/interactive_music_player
 cd interactive_music_player
-npm install
 ```
 
+Sous Windows, les dépendances sont installées au premier démarrage par la
+fenêtre de lancement ; il n'y a rien d'autre à faire ici.
+
 ### 2. Créer le bot Discord
+
+**Sous Windows, laissez-vous guider** : double-cliquez sur `Start bot.vbs`, à la
+racine du projet. Au premier lancement, la fenêtre qui s'ouvre ne démarre rien —
+elle vous accompagne, et se charge de tout ce qui suit.
+
+Il vous reste deux gestes : créer l'application sur le portail, que le bouton
+ouvre pour vous (**New Application**, puis onglet **Bot** → **Reset Token** →
+**Copy**), et cliquer sur *Inviter*. Le jeton copié est reconnu sans que vous
+ayez à le coller, l'identifiant de l'application en est déduit, `.env` est écrit,
+les dépendances installées, les commandes enregistrées, et l'URL d'invitation
+assemblée avec les bonnes portées et permissions.
+
+Cette même fenêtre sert ensuite à chaque démarrage, et propose de refaire cette
+configuration si Discord venait à refuser le jeton enregistré.
+
+<details>
+<summary>À la main, ou hors de Windows</summary>
+
+Commencez par `npm install`, puis :
 
 1. Sur le [portail développeur](https://discord.com/developers/applications),
    créez une application (**New Application**).
@@ -85,12 +107,7 @@ npm install
    et `applications.commands`, puis les permissions :
    *View Channels*, *Connect*, *Speak*, *Manage Channels*, *Move Members*.
 
-> **Aucune intention privilégiée n'est requise.** Le bot n'utilise que
-> `Guilds`, `GuildVoiceStates` et `GuildMessages`, toutes trois non
-> privilégiées. Il est inutile d'activer *Presence*, *Server Members* ou
-> *Message Content*.
-
-### 3. Configurer l'environnement
+Puis créez le fichier de configuration :
 
 ```bash
 cp .env.example .env      # copy .env.example .env sous Windows
@@ -103,35 +120,42 @@ DISCORD_TOKEN=votre_jeton
 DISCORD_CLIENT_ID=votre_application_id
 ```
 
-Voir la [référence complète des variables](docs/fr/technique/09-configuration.md#variables-denvironnement)
-pour le port, l'exposition réseau, les dossiers de musique locaux et la
-journalisation.
-
-### 4. Enregistrer les commandes et démarrer
+Et enfin :
 
 ```bash
 npm run deploy    # une fois, puis à chaque changement de commande
 npm start
 ```
 
+</details>
+
+> **Aucune intention privilégiée n'est requise.** Le bot n'utilise que
+> `Guilds`, `GuildVoiceStates` et `GuildMessages`, toutes trois non
+> privilégiées. Il est inutile d'activer *Presence*, *Server Members* ou
+> *Message Content*.
+
+### 3. Aller plus loin dans la configuration
+
+Tout le reste est facultatif et se règle dans `.env`. Voir la
+[référence complète des variables](docs/fr/technique/09-configuration.md#variables-denvironnement)
+pour le port, l'exposition réseau, les dossiers de musique locaux et la
+journalisation.
+
 Définir `GUILD_ID` dans `.env` rend les commandes disponibles immédiatement sur
 ce serveur ; sans cette variable, le déploiement est global et peut prendre
 jusqu'à une heure.
 
-### 5. Démarrer sans terminal *(Windows, facultatif)*
+### 4. Le raccourci *(Windows, facultatif)*
 
-Double-cliquez sur **`Start bot.vbs`**, à la racine du projet : le bot démarre
-directement, sans qu'aucune fenêtre ne s'ouvre.
-
-Pour l'avoir sous la main ailleurs que dans le dossier du projet, double-cliquez
+Pour avoir le bot sous la main ailleurs que dans le dossier du projet, double-cliquez
 plutôt sur **`Create shortcut.vbs`**, à la racine du projet. Un
 assistant s'ouvre : choisissez l'emplacement — bureau, menu Démarrer ou
 n'importe quel dossier de votre PC — et le raccourci y est posé. Une option
 permet aussi de lancer le bot à chaque ouverture de session Windows.
 
-Dans les deux cas le bot démarre **sans aucune fenêtre de terminal** : rien ne
-s'ouvre à l'écran, rien n'apparaît dans la barre des tâches. Une petite fenêtre
-suit le lancement étape par étape — Node.js, configuration, installation des
+Le bot démarre **sans aucune fenêtre de terminal** : rien ne s'ouvre à l'écran,
+rien n'apparaît dans la barre des tâches. Une petite fenêtre suit le lancement
+étape par étape — Node.js, configuration, installation des
 dépendances à la première utilisation, démarrage, tableau de bord — puis
 s'efface d'elle-même dès que le bot est prêt. Si une étape échoue, elle reste
 ouverte avec le motif, un extrait du journal et le bouton qui débloque.
@@ -140,7 +164,7 @@ Le bot tournant désormais sans console, on l'**arrête depuis le tableau de
 bord** (bouton d'extinction), et ses journaux se lisent dans l'onglet dédié ou
 dans `data/logs/`.
 
-### 6. Ouvrir le tableau de bord
+### 5. Ouvrir le tableau de bord
 
 Le navigateur s'ouvre automatiquement cinq secondes après le démarrage. Le
 tableau de bord est protégé par un **jeton d'accès**, enregistré dans
