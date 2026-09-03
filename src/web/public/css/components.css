@@ -57,44 +57,23 @@
     flex-shrink: 0;
 }
 
-.card-title:hover .icon-drag-handle {
+/*
+ * La poignée s'éclaire au survol du titre — le titre entier est la zone par
+ * laquelle on saisit la carte —, mais pas quand le pointeur est sur l'un des
+ * boutons que ce titre porte.
+ *
+ * Sans cette exception, survoler le cadenas allumait la poignée, et survoler la
+ * poignée allumait le cadenas en retour : chacun jouait l'animation de l'autre,
+ * pour la seule raison qu'ils partagent un parent. Le « i » avait le même
+ * défaut, moins remarqué.
+ *
+ * `:has()` est le seul moyen de remonter du bouton survolé jusqu'au titre : la
+ * poignée précède les boutons dans le balisage, et aucun sélecteur de frère ne
+ * va vers l'arrière. Ces feuilles s'en servent déjà ailleurs.
+ */
+.card-title:hover:not(:has(.card-lock-btn:hover, .card-info-btn:hover)) .icon-drag-handle {
     opacity: 0.8;
     color: var(--c-primary);
-}
-
-/* Card Lock Button */
-.card-lock-btn {
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    padding: 2px;
-    border-radius: 4px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0.5;
-    transition: opacity 0.2s ease, color 0.2s ease, background 0.2s ease;
-    margin-right: 4px;
-}
-
-.card-lock-btn:hover {
-    opacity: 1;
-    color: var(--c-primary);
-    background: rgba(255, 255, 255, 0.08);
-}
-
-.card.is-locked .icon-drag-handle {
-    cursor: not-allowed !important;
-    opacity: 0.2 !important;
-}
-
-.card.is-locked .card-resize-handle {
-    display: none !important;
-}
-
-.card.is-locked .card-title {
-    cursor: default !important;
 }
 
 /* Card Resize Handle */
@@ -753,29 +732,40 @@ html[data-style="neon-cyberpunk"] .speed-pad-container::before {
 }
 
 /* Card Locking CSS Styles */
+
+/*
+ * Le cadenas du titre : un bouton, et non une icône posée là.
+ *
+ * Même gabarit que le « i » de la même rangée — marge intérieure, coin arrondi,
+ * fond au survol : deux boutons d'un même titre n'ont pas à se répondre
+ * différemment. Il y gagne une surface cliquable qui dépasse le dessin du
+ * cadenas, ce que quatorze pixels de glyphe ne donnaient pas.
+ *
+ * Il ne réagit qu'à son propre survol. C'est `.card-title:hover .card-lock-btn`
+ * qui le faisait s'allumer quand on visait la poignée à côté.
+ */
 .card-lock-btn {
     background: none;
     border: none;
-    padding: 0;
-    margin: 0 0 0 6px;
-    cursor: pointer;
     color: var(--text-muted);
-    opacity: 0.4;
-    transition: opacity 0.2s ease, color 0.2s ease, transform 0.2s ease;
+    padding: 2px;
+    border-radius: 4px;
+    cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    opacity: 0.45;
+    transition: opacity 0.2s ease, color 0.2s ease,
+                background 0.2s ease, transform 0.2s ease;
+    margin: 0 0 0 6px;
     flex-shrink: 0;
 }
 
-.card-title:hover .card-lock-btn {
-    opacity: 0.8;
-}
-
 .card-lock-btn:hover {
+    opacity: 1;
     color: var(--c-accent);
-    transform: scale(1.15);
-    opacity: 1 !important;
+    background: rgba(255, 255, 255, 0.08);
+    transform: scale(1.1);
 }
 
 .card.card-locked .card-title {
@@ -797,13 +787,25 @@ html[data-style="neon-cyberpunk"] .speed-pad-container::before {
     color: var(--text-muted) !important;
 }
 
+/*
+ * Carte verrouillée : le cadenas reste allumé, il dit un état et non une
+ * possibilité.
+ *
+ * Les deux règles viennent après `.card-lock-btn:hover`, qu'elles égalent en
+ * spécificité et emporteraient donc en silence. C'est ce que le `!important`
+ * d'avant rattrapait ; la seconde règle rend au survol ce qui lui revient, sans
+ * qu'aucune n'ait à forcer la main.
+ */
 .card.card-locked .card-lock-btn {
     color: var(--c-accent);
-    opacity: 0.9 !important;
+    opacity: 0.9;
 }
 
 .card.card-locked .card-lock-btn:hover {
     color: var(--c-primary);
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.08);
+    transform: scale(1.1);
 }
 
 .card.card-locked .card-resize-handle {
