@@ -730,8 +730,13 @@ input:checked + .switch-slider:before {
  * d'un bord à l'autre pèserait plus lourd que ce qu'il fait — il confirme un
  * choix déjà pris au-dessus. Il reprend donc sa largeur propre, rangé à
  * droite, là où une fenêtre pose sa validation.
+ *
+ * Les deux classes sont nommées ensemble, et ce n'est pas décoratif :
+ * `modals.css` est importé **après** ce fichier (voir style.css), si bien qu'à
+ * spécificité égale c'est son `flex-direction: column` qui l'emportait. La
+ * règle ne dépend plus de l'ordre des feuilles.
  */
-.dir-browser-actions {
+.maintenance-actions.dir-browser-actions {
     margin-top: 1rem;
     flex-direction: row;
     justify-content: flex-end;

@@ -249,6 +249,50 @@ console.log('\nLe dossier de téléchargement du système\n');
     }
 }
 
+// ────────────────────── Le pied du sélecteur ──────────────────────
+
+/*
+ * « Choisir ce dossier » ne doit pas s'étaler sur toute la largeur.
+ *
+ * Il est seul depuis que le retour au dossier par défaut est passé en pastille,
+ * et `.maintenance-actions` — la classe que le pied partage avec les autres
+ * fenêtres — empile ses boutons d'un bord à l'autre. Il faut donc la contredire,
+ * et c'est là que le piège s'est refermé une première fois : à spécificité
+ * égale, c'est la feuille importée en dernier qui l'emporte, et `modals.css`
+ * vient après `player.css`.
+ *
+ * Le test n'exige pas une solution en particulier — une règle plus spécifique,
+ * ou un ordre d'import favorable — mais que l'une des deux tienne. Il tombe si
+ * l'on perd les deux, ce qui est exactement ce qui s'était produit.
+ */
+console.log('\nLe pied du sélecteur\n');
+
+{
+    const readCss = (file) => fs.readFileSync(
+        path.join(__dirname, '..', 'src', 'web', 'public', file), 'utf8');
+
+    const aggregate = readCss('style.css');
+    const modals = readCss(path.join('css', 'modals.css'));
+    const player = readCss(path.join('css', 'player.css'));
+
+    check('`.maintenance-actions` empile bien ses boutons',
+        /\.maintenance-actions\s*\{[^}]*flex-direction:\s*column/s.test(modals));
+
+    const rule = player.match(/([^\r\n{]*dir-browser-actions[^\r\n{]*)\{([^}]*)\}/);
+    check('le pied du sélecteur les remet en rangée',
+        !!rule && /flex-direction:\s*row/.test(rule[2]),
+        rule ? rule[1].trim() : 'règle introuvable');
+
+    const outranks = !!rule
+        && rule[1].includes('.maintenance-actions')
+        && rule[1].includes('.dir-browser-actions');
+    const playerImportedLast = aggregate.indexOf('player.css') > aggregate.indexOf('modals.css');
+
+    check('  … et l’emporte : soit par la spécificité, soit par l’ordre d’import',
+        outranks || playerImportedLast,
+        `spécificité : ${outranks} — player.css en dernier : ${playerImportedLast}`);
+}
+
 // ────────────────────── La route, de bout en bout ──────────────────────
 
 console.log('\nLa route /api/browse-dirs\n');
