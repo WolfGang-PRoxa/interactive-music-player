@@ -749,7 +749,7 @@ input:checked + .switch-slider:before {
 }
 
 .dir-browser-actions .maint-btn {
-    min-width: 220px;
+    min-width: 80%;
 }
 
 /*
