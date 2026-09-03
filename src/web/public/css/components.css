@@ -1031,6 +1031,43 @@ html[data-style="neon-cyberpunk"] .speed-pad-container::before {
     min-width: 0;
 }
 
+/*
+ * Le menu « Format », qui n'apparaît que pour la destination « Vers <dossier> ».
+ *
+ * Il se replie sur place plutôt que de disparaître d'un coup : les deux menus
+ * voisins reprennent la largeur libérée en glissant, et l'œil suit ce qui se
+ * passe au lieu de constater un changement de mise en page.
+ *
+ * `max-width` porte le repli, faute de mieux : une largeur `auto` ne
+ * s'anime pas, et la valeur ici n'a qu'à dépasser la largeur réelle du champ —
+ * `flex: 1 1 0` décide du reste. La marge négative annule l'écart de la
+ * rangée, qui resterait sinon comme un blanc de 10 px une fois le champ réduit
+ * à rien.
+ */
+.import-format-field {
+    overflow: hidden;
+    max-width: 320px;
+    transition: max-width 0.28s ease, opacity 0.2s ease,
+                transform 0.28s ease, margin-left 0.28s ease;
+}
+
+.import-format-field.is-collapsed {
+    max-width: 0;
+    margin-left: -10px;
+    opacity: 0;
+    transform: translateX(-8px);
+    /* Replié, il ne doit ni se cliquer ni s'atteindre au clavier. */
+    pointer-events: none;
+}
+
+/* Une préférence système pour le mouvement réduit vaut ici comme ailleurs :
+   le champ paraît et disparaît, sans glisser. */
+@media (prefers-reduced-motion: reduce) {
+    .import-format-field {
+        transition: none;
+    }
+}
+
 .import-quality-hint {
     margin: 0.35rem 0 0;
     font-size: 0.7rem;
@@ -1057,6 +1094,36 @@ html[data-style="neon-cyberpunk"] .speed-pad-container::before {
         flex-direction: column;
         align-items: stretch;
         gap: 7px;
+    }
+
+    /*
+     * La rangée est passée en colonne : le repli du champ « Format » doit
+     * suivre et se jouer sur la hauteur. Une largeur nulle lui laisserait la
+     * sienne — un blanc d'une trentaine de pixels au bas de la carte —, et la
+     * marge négative annule ici l'écart vertical de 7 px, non celui de 10 px
+     * d'une rangée.
+     */
+    .import-format-field {
+        max-width: none;
+        max-height: 80px;
+        /*
+         * `flex: 0 0 auto` et non la base nulle des champs voisins : ceux-ci
+         * retrouvent leur hauteur par le `min-height: auto` d'un élément flex,
+         * que l'`overflow: hidden` du repli annule ici. Avec une base nulle et
+         * plus rien pour la relever, le champ restait haut de zéro même
+         * déployé.
+         */
+        flex: 0 0 auto;
+        transition: max-height 0.28s ease, opacity 0.2s ease,
+                    transform 0.28s ease, margin-top 0.28s ease;
+    }
+
+    .import-format-field.is-collapsed {
+        max-width: none;
+        max-height: 0;
+        margin-left: 0;
+        margin-top: -7px;
+        transform: translateY(-6px);
     }
 }
 

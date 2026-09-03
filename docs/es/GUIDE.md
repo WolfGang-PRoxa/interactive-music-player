@@ -395,8 +395,12 @@ carpeta o que rechaza la escritura se descarta en el momento de la elección y s
 muestra el motivo — en lugar de hacer fracasar la descarga más tarde, lejos de
 la decisión que la causó.
 
-Una fuente remota se transcodifica a MP3, al caudal del menú **calidad de
-importación de audio**. Un archivo ya presente en el disco del bot se copia tal
+Una fuente remota se transcodifica al formato del menú **Formato**, al caudal
+del menú **Audio** — MP3, M4A, OGG, OPUS o WEBM; FLAC y WAV son sin pérdida e
+ignoran ese caudal. Este tercer menú solo aparece, deslizándose junto a los
+otros dos, para este destino: los otros tres no escriben archivo alguno, y una
+extensión no designaría nada allí. Solo ofrece formatos de audio, pues el vídeo
+tiene su propia vía — el botón de descarga de una pista. Un archivo ya presente en el disco del bot se copia tal
 cual, sin recodificación: usted pidió tenerlo en su carpeta, no perder calidad
 por el camino. Dos garantías, por último: volver a descargar una pista no
 sustituye a la anterior — el nuevo archivo se numera — y una descarga

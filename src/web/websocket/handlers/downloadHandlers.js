@@ -24,6 +24,7 @@ const database = require('../../../database/Database');
 const preloadManager = require('../../../audio/PreloadManager');
 const { searchLocalAwareTrack } = require('../handlerUtils');
 const downloadDir = require('../../../utils/downloadDir');
+const downloadFormats = require('../../../utils/downloadFormats');
 const log = require('../../../utils/logger');
 
 /** Débits acceptés, repris des réglages d'import de la boîte. */
@@ -34,6 +35,18 @@ const DEFAULT_BITRATE = '320';
 function targetDir() {
     const chosen = database.getDownloadDir();
     return downloadDir.ensure(chosen || downloadDir.DEFAULT_DIR);
+}
+
+/** Conteneur choisi dans le menu « Format », ou le repli du module. */
+function containerFor(guildId) {
+    try {
+        const choice = String(database.getSettings(guildId).importFormat || '');
+        return downloadFormats.EXTENSIONS.includes(choice)
+            ? choice
+            : downloadFormats.DEFAULT_CONTAINER;
+    } catch (e) {
+        return downloadFormats.DEFAULT_CONTAINER;
+    }
 }
 
 function bitrateFor(guildId) {
@@ -74,8 +87,9 @@ function copyLocal(source, dir) {
  *
  * @returns {Promise<string>} Chemin écrit.
  */
-function transcodeRemote(input, dir, title, bitrate) {
-    const finalPath = downloadDir.uniquePath(dir, downloadDir.safeFilename(title, '.mp3'));
+function transcodeRemote(input, dir, title, bitrate, container) {
+    const { ext, args: encoding } = downloadFormats.encodeArgs(container, bitrate);
+    const finalPath = downloadDir.uniquePath(dir, downloadDir.safeFilename(title, ext));
     const partial = `${finalPath}.incomplete`;
 
     return new Promise((resolve, reject) => {
@@ -89,11 +103,11 @@ function transcodeRemote(input, dir, title, bitrate) {
         }
 
         args.push('-i', input.ffmpegInput || 'pipe:0');
-        // `-vn` : la source porte souvent une pochette en flux vidéo, que le
-        // muxer MP3 ne sait ranger que dans une étiquette. Sans cela ffmpeg
+        // `-vn` : la source porte souvent une pochette en flux vidéo, que les
+        // muxers audio ne savent ranger que dans une étiquette. Sans cela ffmpeg
         // s'arrête sur « nothing was written into output file ». Voir
         // PreloadManager, où le même écueil a été rencontré.
-        args.push('-vn', '-acodec', 'libmp3lame', '-ab', `${bitrate}k`, '-y', partial);
+        args.push('-vn', ...encoding, '-y', partial);
 
         const child = cp.spawn(ffmpeg, args, {
             stdio: ['pipe', 'ignore', 'pipe'],
@@ -195,7 +209,7 @@ async function handleDownloadTrack(ctx) {
                 return;
             }
             written = await transcodeRemote(input, dir, playable.track.title || title,
-                bitrateFor(currentGuildId));
+                bitrateFor(currentGuildId), containerFor(currentGuildId));
         }
 
         log.success(`[Download] ${title} written to ${written}`);

@@ -382,8 +382,12 @@ folder, or that refuses to be written to is turned down at the moment of the
 choice and the reason is shown — rather than failing the download later, far
 from the decision that caused it.
 
-A remote source is transcoded to MP3, at the bitrate of the **import audio
-quality** menu. A file already on the bot's disk is copied as is, without
+A remote source is transcoded to the format of the **Format** menu, at the
+bitrate of the **Audio** one — MP3, M4A, OGG, OPUS or WEBM; FLAC and WAV are
+lossless and ignore that bitrate. This third menu only appears, sliding in
+beside the other two, for this destination: the other three write no file at
+all, and an extension would name nothing there. It offers audio formats only,
+video having its own route — a track's download button. A file already on the bot's disk is copied as is, without
 re-encoding: you asked to have it in your folder, not to lose quality on the
 way. Two guarantees, finally: downloading a track again does not replace the
 previous one — the new file is numbered — and an interrupted download leaves no

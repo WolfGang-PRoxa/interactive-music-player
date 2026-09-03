@@ -964,6 +964,12 @@
          * construction ne trouverait rien à synchroniser. Le `<select>` natif,
          * lui, porte déjà la bonne valeur quand elle a lieu.
          */
+        if (state.settings.importFormat !== undefined && importFormatSelect
+            && importFormatSelect.value !== String(state.settings.importFormat)) {
+            importFormatSelect.value = String(state.settings.importFormat);
+            if (importFormatSelect._customSelect) importFormatSelect._customSelect.sync();
+        }
+
         const addTargetSelect = document.getElementById('add-target-select');
         if (state.settings.addTarget !== undefined && addTargetSelect
             && addTargetSelect.value !== String(state.settings.addTarget)) {
@@ -979,6 +985,9 @@
                 && typeof window.MusicPlayer.ParticlePath.setTarget === 'function') {
                 window.MusicPlayer.ParticlePath.setTarget(addTargetSelect.value);
             }
+
+            // Le menu « Format » suit la destination : elle vient de changer.
+            updateFormatFieldVisibility();
         }
 
         // Delegate Speakers, Queue, and History UI rendering to js/queue.js module
@@ -1404,6 +1413,8 @@
     const importVideoQualitySelect = document.getElementById('import-video-quality-select');
     const importQualityRow = document.getElementById('import-quality-row');
     const importQualityHint = document.getElementById('import-quality-hint');
+    const importFormatSelect = document.getElementById('import-format-select');
+    const importFormatField = document.getElementById('import-format-field');
 
     /**
      * Reconnaît une source locale : chemin Windows (C:\…), chemin POSIX (/…),
@@ -1430,8 +1441,32 @@
         }
     }
 
+    /**
+     * Montre le menu « Format » pour la seule destination qui écrit un fichier.
+     *
+     * Les trois autres n'en écrivent aucun : un menu d'extension y désignerait
+     * quelque chose qui n'existe pas. Il se replie donc, et le repli est animé
+     * par la feuille de style — ici on ne fait que poser la classe.
+     */
+    function updateFormatFieldVisibility() {
+        if (!importFormatField) return;
+        const select = document.getElementById('add-target-select');
+        const toDisk = !!select && select.value === 'download';
+        importFormatField.classList.toggle('is-collapsed', !toDisk);
+    }
+    window.MusicPlayer.updateFormatFieldVisibility = updateFormatFieldVisibility;
+
     if (searchInput) {
         searchInput.addEventListener('input', updateQualityApplicability);
+    }
+
+    if (importFormatSelect) {
+        importFormatSelect.addEventListener('change', (e) => {
+            window.MusicPlayer.sendWS({
+                type: 'updateSettings',
+                data: { importFormat: e.target.value }
+            });
+        });
     }
 
     if (importAudioQualitySelect) {
@@ -3077,8 +3112,18 @@
                 type: 'updateSettings',
                 data: { addTarget: e.target.value }
             });
+            updateFormatFieldVisibility();
         });
     }
+
+    if (importFormatSelect && !importFormatSelect.dataset.customSelectInit) {
+        importFormatSelect.dataset.customSelectInit = 'true';
+        new CustomSelect(importFormatSelect);
+    }
+
+    // Au chargement : le balisage part replié, et la destination restaurée peut
+    // demander l'inverse avant même le premier état du serveur.
+    updateFormatFieldVisibility();
     const downloadFormatSelect = document.getElementById('download-format-select');
     if (downloadFormatSelect && !downloadFormatSelect.dataset.customSelectInit) {
         downloadFormatSelect.dataset.customSelectInit = 'true';

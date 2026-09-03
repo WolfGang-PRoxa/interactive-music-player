@@ -11,6 +11,7 @@ const playbackStateManager = require('../../../database/PlaybackStateManager');
 const { restoreHistory } = require('../../../utils/historyOrder');
 const { ensureEngine } = require('../../../audio/mix');
 const { applySpeed, cancelMixEffects } = require('../../../audio/playbackSettings');
+const downloadFormats = require('../../../utils/downloadFormats');
 const log = require('../../../utils/logger');
 
 /**
@@ -592,6 +593,15 @@ async function handleUpdateSettings(ctx) {
             if (data.addTarget !== undefined && !ADD_TARGETS.includes(data.addTarget)) {
                 log.warn(`[WebServer Settings] Unknown add destination ignored: ${data.addTarget}`);
                 delete data.addTarget;
+            }
+
+            // Même raison pour le conteneur de téléchargement : une extension
+            // que personne ne sait écrire laisserait le menu vide au
+            // rechargement, et ffmpeg sans muxer au téléchargement suivant.
+            if (data.importFormat !== undefined
+                && !downloadFormats.EXTENSIONS.includes(data.importFormat)) {
+                log.warn(`[WebServer Settings] Unknown download format ignored: ${data.importFormat}`);
+                delete data.importFormat;
             }
 
             database.updateSettings(currentGuildId, data);

@@ -410,8 +410,13 @@ oder der das Schreiben verweigert, wird schon bei der Wahl abgewiesen und der
 Grund genannt — statt den Download später scheitern zu lassen, fern von der
 Entscheidung, die ihn verursacht hat.
 
-Eine entfernte Quelle wird nach MP3 umgewandelt, mit der Bitrate aus dem Menü
-**Audioqualität des Imports**. Eine Datei, die bereits auf der Festplatte des
+Eine entfernte Quelle wird in das Format des Menüs **Format** umgewandelt, mit
+der Bitrate aus dem Menü **Audio** — MP3, M4A, OGG, OPUS oder WEBM; FLAC und WAV
+sind verlustfrei und ignorieren diese Bitrate. Dieses dritte Menü erscheint nur
+für dieses Ziel, indem es neben die beiden anderen gleitet: die übrigen drei
+schreiben überhaupt keine Datei, und eine Endung benennt dort nichts. Es bietet
+allein Audioformate, denn Video hat seinen eigenen Weg — die
+Download-Schaltfläche eines Titels. Eine Datei, die bereits auf der Festplatte des
 Bots liegt, wird unverändert kopiert, ohne Neukodierung: Sie wollten sie in
 Ihrem Ordner haben, nicht unterwegs an Qualität verlieren. Zwei Zusicherungen
 schließlich: ein erneut heruntergeladener Titel ersetzt den vorherigen nicht —

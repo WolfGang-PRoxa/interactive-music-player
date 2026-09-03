@@ -299,6 +299,7 @@
     "logs_copy_failed": "Copie impossible dans ce navigateur.",
     "import_audio_quality_label": "Audio",
     "import_video_quality_label": "Vidéo",
+    "import_format_label": "Format",
     "import_quality_hint": "Sans effet sur les fichiers locaux, importés tels quels.",
     "import_quality_local_notice": "Fichier local détecté : la qualité ne s'applique pas, il est importé tel quel.",
     "quality_menu_preloaded": "Préchargé",

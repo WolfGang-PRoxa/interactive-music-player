@@ -1188,6 +1188,7 @@ class WebServer {
                 // Destination du champ d'ajout. Sa valeur par défaut vit dans
                 // `_defaults()` de la base, d'où elle arrive déjà fusionnée.
                 addTarget: settings.addTarget,
+                importFormat: settings.importFormat,
                 // Secondes. Zéro est un choix, pas une absence de valeur : le
                 // `??` est donc de rigueur ici.
                 presenceDepartureDelay: settings.presenceDepartureDelay ?? 30

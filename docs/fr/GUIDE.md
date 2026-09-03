@@ -393,8 +393,12 @@ pas un dossier, ou qui refuse l'écriture est écarté au moment du choix et la
 raison en est affichée — plutôt que de faire échouer le téléchargement plus
 tard, loin de la décision qui l'a causé.
 
-Une source distante est transcodée en MP3, au débit du menu **qualité d'import
-audio**. Un fichier déjà présent sur le disque du bot est copié tel quel, sans
+Une source distante est transcodée dans le format du menu **Format**, au débit
+du menu **Audio** — MP3, M4A, OGG, OPUS ou WEBM ; FLAC et WAV sont sans perte et
+ignorent ce débit. Ce troisième menu n'apparaît, en glissant à côté des deux
+autres, que pour cette destination : les trois autres n'écrivent aucun fichier,
+et une extension n'y désignerait rien. Il n'offre que des formats audio, la
+vidéo ayant son propre chemin — le bouton de téléchargement d'une piste. Un fichier déjà présent sur le disque du bot est copié tel quel, sans
 réencodage : vous avez demandé à l'avoir dans votre dossier, pas à en perdre la
 qualité au passage. Deux garanties, enfin : retélécharger un morceau ne remplace
 pas le précédent — le nouveau fichier est numéroté —, et un téléchargement

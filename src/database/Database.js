@@ -199,6 +199,18 @@ class GuildDatabase {
             addTarget: 'queue',
 
             /**
+             * Conteneur des fichiers écrits sur le disque du bot : mp3, m4a,
+             * flac, wav, ogg, opus ou webm.
+             *
+             * Ne concerne que la destination « Vers <dossier> » — les trois
+             * autres n'écrivent aucun fichier. Le débit, lui, reste celui du
+             * menu « Audio » : ce réglage-ci ne choisit que l'extension.
+             *
+             * MP3 par défaut : c'est le format qu'aucun lecteur ne refuse.
+             */
+            importFormat: 'mp3',
+
+            /**
              * Délai de grâce avant que le bot ne quitte un salon vidé de ses
              * humains, **en secondes** — l'unité du curseur du tableau de bord,
              * et celle des réglages voisins.

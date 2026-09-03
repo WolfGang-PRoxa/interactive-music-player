@@ -565,6 +565,34 @@
                             <option value="360">360p</option>
                         </select>
                     </div>
+
+                    <!--
+                         Le format du fichier écrit sur le disque du bot.
+                         N'a de sens que pour la destination « Vers <dossier> » :
+                         les trois autres n'écrivent aucun fichier. Il se replie
+                         donc avec elle — voir `is-collapsed` dans
+                         css/components.css, et app.js qui pose la classe.
+
+                         Le débit n'est pas ici : il reste celui du menu
+                         « Audio » à gauche. Ce menu-ci ne choisit qu'une
+                         extension, et les deux formats sans perte ignorent le
+                         débit de toute façon.
+                    -->
+                    <div class="import-quality-field import-format-field is-collapsed" id="import-format-field">
+                        <label class="import-quality-label" for="import-format-select">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            <span data-i18n="import_format_label">Format</span>
+                        </label>
+                        <select id="import-format-select" class="styled-select">
+                            <option value="mp3">MP3</option>
+                            <option value="m4a">M4A</option>
+                            <option value="flac">FLAC</option>
+                            <option value="wav">WAV</option>
+                            <option value="ogg">OGG</option>
+                            <option value="opus">OPUS</option>
+                            <option value="webm">WEBM</option>
+                        </select>
+                    </div>
                 </div>
                 <p class="import-quality-hint" id="import-quality-hint" data-i18n="import_quality_hint">
                     Sans effet sur les fichiers locaux, importés tels quels.
