@@ -969,6 +969,16 @@
             && addTargetSelect.value !== String(state.settings.addTarget)) {
             addTargetSelect.value = String(state.settings.addTarget);
             if (addTargetSelect._customSelect) addTargetSelect._customSelect.sync();
+
+            // La traînée de particules relie la carte d'ajout à sa destination.
+            // Elle suit le menu par son événement `change`, qu'une valeur posée
+            // en JavaScript n'émet pas : sans cet appel, elle resterait sur la
+            // destination lue à son démarrage — la file d'attente — pendant que
+            // le menu en affiche une autre.
+            if (window.MusicPlayer.ParticlePath
+                && typeof window.MusicPlayer.ParticlePath.setTarget === 'function') {
+                window.MusicPlayer.ParticlePath.setTarget(addTargetSelect.value);
+            }
         }
 
         // Delegate Speakers, Queue, and History UI rendering to js/queue.js module

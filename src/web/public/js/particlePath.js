@@ -6,6 +6,11 @@
  * d'attente, la playlist active ou la lecture. La traînée relie donc la carte
  * source à celle des trois cartes qui est visée.
  *
+ * La quatrième destination n'en vise aucune : « Vers <dossier> » écrit sur le
+ * disque de la machine, et rien n'arrive dans le tableau de bord. La traînée
+ * quitte alors la page par le bord le plus proche qui se laisse atteindre, et
+ * un repère de téléchargement marque l'endroit par où elle s'en va.
+ *
  * Le tracé n'est pas décoratif, il est calculé. Chaque carte du tableau de bord
  * est dilatée d'une demi-gouttière, puis on cherche le plus court chemin qui ne
  * traverse aucune de ces zones : graphe de visibilité (coins des cartes +
@@ -31,6 +36,37 @@ window.MusicPlayer = window.MusicPlayer || {};
         playlist: 'playlists-card',
         play: 'player-card'
     };
+
+    /**
+     * La quatrième destination, qui ne vise aucune carte.
+     *
+     * « Vers <dossier> » n'envoie rien au tableau de bord : le bot écrit un
+     * fichier sur son disque. Il n'y a donc pas de carte à relier, et pointer la
+     * file d'attente faute de mieux — ce que faisait le repli de `TARGET_CARDS`
+     * — annonçait exactement le contraire de ce qui allait se passer.
+     *
+     * La traînée sort donc du tableau de bord par le bas, vers une cible posée
+     * sous le canevas. Les particules s'effacent en approchant du bord, et un
+     * repère de téléchargement marque l'endroit par où elles s'en vont : ce qui
+     * part ne va pas dans une carte, il quitte la page.
+     */
+    const DISK_TARGET = 'download';
+    /** Distance au-delà du bord où se tient la cible hors page (px). */
+    const EXIT_DROP = 26;
+    /** Épaisseur de cette cible (px). */
+    const EXIT_BAND = 22;
+    /** Côté du repère de téléchargement, et son retrait depuis le bord (px). */
+    const EXIT_MARK_SIZE = 17;
+    const EXIT_MARK_INSET = 16;
+    /**
+     * Bords essayés pour sortir, dans l'ordre de ce qu'ils racontent.
+     *
+     * Le bas d'abord : descendre est le sens du téléchargement, et c'est ce
+     * qu'on lit le plus vite. Les autres suivent, car les cartes se déplacent —
+     * celle du bas peut barrer toute la largeur, et il n'existe alors aucune
+     * sortie par en dessous.
+     */
+    const EXIT_SIDES = ['bottom', 'right', 'left', 'top'];
 
     // --- Réglages du tracé ---------------------------------------------------
 
@@ -85,6 +121,8 @@ window.MusicPlayer = window.MusicPlayer || {};
     /** { points, longueurs, total } — polyligne dense et abscisse curviligne. */
     let trail = null;
     let particles = [];
+    /** Où la traînée quitte la page, quand elle va au disque. `null` sinon. */
+    let exitMark = null;
     let palette = null;
     let lineGradient = null;
 
@@ -295,8 +333,9 @@ window.MusicPlayer = window.MusicPlayer || {};
      * on confine le tracé, s'il reste dans le canevas : au-delà, la traînée
      * serait rognée par le bord.
      */
-    function isUsablePoint(pt, obstacles, confineTo) {
-        if (confineTo && (pt.x < 1 || pt.y < 1 || pt.x > cssWidth - 1 || pt.y > cssHeight - 1)) {
+    function isUsablePoint(pt, obstacles, confineTo, slack = 0) {
+        if (confineTo && (pt.x < 1 - slack || pt.y < 1 - slack
+            || pt.x > cssWidth - 1 + slack || pt.y > cssHeight - 1 + slack)) {
             return false;
         }
         for (let i = 0; i < obstacles.length; i++) {
@@ -418,7 +457,7 @@ window.MusicPlayer = window.MusicPlayer || {};
      * contournant des rectangles peut changer de direction. Chacun retient le
      * rayon de sa carte, qui servira à arrondir le virage au bon endroit.
      */
-    function corners(obstacles, confineTo) {
+    function corners(obstacles, confineTo, slack = 0) {
         const list = [];
         obstacles.forEach(o => {
             [
@@ -428,7 +467,7 @@ window.MusicPlayer = window.MusicPlayer || {};
                 { x: o.left, y: o.bottom }
             ].forEach(pt => {
                 pt.radius = o.radius;
-                if (isUsablePoint(pt, obstacles, confineTo)) list.push(pt);
+                if (isUsablePoint(pt, obstacles, confineTo, slack)) list.push(pt);
             });
         });
         return list;
@@ -619,14 +658,24 @@ window.MusicPlayer = window.MusicPlayer || {};
         if (!canvas || !ctx || !grid) return;
         if (cssWidth < 2 || cssHeight < 2) return;
 
-        const targetId = TARGET_CARDS[currentTarget] || TARGET_CARDS.queue;
+        const toDisk = currentTarget === DISK_TARGET;
+        const targetId = toDisk ? null : (TARGET_CARDS[currentTarget] || TARGET_CARDS.queue);
         const rects = cardRects();
         const source = rects.find(r => r.id === SOURCE_CARD_ID);
-        const target = rects.find(r => r.id === targetId);
 
-        if (!source || !target || source === target) {
+        if (!source) {
             trail = null;
             particles = [];
+            exitMark = null;
+            return;
+        }
+
+        const cardTarget = toDisk ? null : rects.find(r => r.id === targetId);
+
+        if (!toDisk && (!cardTarget || source === cardTarget)) {
+            trail = null;
+            particles = [];
+            exitMark = null;
             return;
         }
 
@@ -637,25 +686,65 @@ window.MusicPlayer = window.MusicPlayer || {};
 
         const obstacles = rects.map(r => expand(r, margin));
         const sourceD = obstacles.find(o => o.id === SOURCE_CARD_ID);
-        const targetD = obstacles.find(o => o.id === targetId);
 
-        const from = anchors(sourceD, source);
-        const goal = anchors(targetD, target);
-        addFacingAnchors(from, sourceD, source, goal, targetD, target);
-
-        // Premier essai en restant dans le canevas, pour que la traînée ne soit
-        // jamais coupée par son bord ; second essai sans cette contrainte, au cas
-        // où les cartes ne laisseraient aucun passage intérieur.
-        let vertices = null;
-        for (const confineTo of [true, false]) {
-            const usable = p => isUsablePoint(p, obstacles, confineTo);
-            vertices = shortestPath(
+        /**
+         * Cherche une route de la carte source vers une cible donnée.
+         *
+         * `confineGoal` se règle à part pour la sortie vers le disque : la
+         * cible y est hors de la page — c'est tout l'objet — mais le chemin
+         * pour l'atteindre, lui, doit rester dedans. Sans cette distinction, la
+         * route contournait une carte pleine largeur par l'extérieur du canevas
+         * et n'y rentrait plus : le tracé existait, invisible.
+         */
+        function routeTo(dest, destD, confineTo, confineGoal = confineTo, slack = 0) {
+            const from = anchors(sourceD, source);
+            const goal = anchors(destD, dest);
+            addFacingAnchors(from, sourceD, source, goal, destD, dest);
+            const usable = p => isUsablePoint(p, obstacles, confineTo, slack);
+            const goalUsable = p => isUsablePoint(p, obstacles, confineGoal);
+            return shortestPath(
                 from.filter(usable),
-                goal.filter(usable),
-                corners(obstacles, confineTo),
+                goal.filter(goalUsable),
+                corners(obstacles, confineTo, slack),
                 obstacles
             );
-            if (vertices) break;
+        }
+
+        let vertices = null;
+        // Vers le disque, le premier bord sert aussi de repli : si aucun ne se
+        // laisse atteindre, la droite de secours plus bas part au moins dans la
+        // bonne direction.
+        let target = toDisk ? offPageTarget(source, EXIT_SIDES[0]) : cardTarget;
+
+        if (toDisk) {
+            // Le premier bord qui se laisse atteindre l'emporte : mieux vaut
+            // sortir de côté que retomber sur une droite qui traverserait les
+            // cartes.
+            for (const side of EXIT_SIDES) {
+                const candidate = offPageTarget(source, side);
+                vertices = routeTo(candidate, expand(candidate, margin), true, false);
+                if (vertices) {
+                    target = candidate;
+                    break;
+                }
+            }
+        } else {
+            const targetD = obstacles.find(o => o.id === targetId);
+            // Premier essai en restant dans le canevas, pour que la traînée ne
+            // soit jamais coupée par son bord ; second essai sans cette
+            // contrainte, au cas où les cartes ne laisseraient aucun passage
+            // intérieur.
+            for (const confineTo of [true, false]) {
+                vertices = routeTo(cardTarget, targetD, confineTo);
+                if (vertices) break;
+            }
+        }
+
+        if (!target) {
+            trail = null;
+            particles = [];
+            exitMark = null;
+            return;
         }
 
         if (!vertices || vertices.length < 2) {
@@ -670,8 +759,73 @@ window.MusicPlayer = window.MusicPlayer || {};
         const previousTotal = trail ? trail.total : 0;
         trail = buildTrail(roundCorners(vertices));
 
+        // Le repère se pose au dernier point encore dans la page : c'est là que
+        // la traînée s'en va, et donc là qu'il faut dire où elle va.
+        exitMark = toDisk ? lastPointInside(trail) : null;
+
         adjustParticles(previousTotal);
         buildGradient();
+    }
+
+    /**
+     * La cible de la destination « disque » : une bande hors du canevas.
+     *
+     * Posée au-delà du bord demandé, sur toute sa longueur. Étant hors de la
+     * page, elle n'est jamais dans une carte, et la traînée s'en va au lieu
+     * d'aboutir quelque part dans le tableau de bord.
+     *
+     * Une bande et non un carré à l'aplomb de la source, parce qu'un carré ne
+     * propose qu'un endroit par où sortir : si une carte le masque, le chemin
+     * n'existe pas et la traînée retombe sur une droite qui traverse tout. La
+     * bande porte des amarres sur toute la longueur du bord, et Dijkstra prend
+     * celle qui se laisse atteindre — la sortie se fait donc là où il y a de la
+     * place, sans que ce module ait à la chercher lui-même.
+     */
+    function offPageTarget(source, side) {
+        const d = EXIT_DROP;
+        const b = EXIT_BAND;
+
+        const bands = {
+            bottom: { left: 0, right: cssWidth, top: cssHeight + d, bottom: cssHeight + d + b },
+            top: { left: 0, right: cssWidth, top: -d - b, bottom: -d },
+            right: { left: cssWidth + d, right: cssWidth + d + b, top: 0, bottom: cssHeight },
+            left: { left: -d - b, right: -d, top: 0, bottom: cssHeight }
+        };
+        const r = bands[side] || bands.bottom;
+
+        return {
+            id: null,
+            left: r.left,
+            right: r.right,
+            top: r.top,
+            bottom: r.bottom,
+            cx: (r.left + r.right) / 2,
+            cy: (r.top + r.bottom) / 2,
+            radius: 0
+        };
+    }
+
+    /**
+     * Dernier point du tracé assez à l'intérieur pour porter le repère entier.
+     *
+     * Parcouru depuis la fin : c'est le point par lequel la traînée s'en va,
+     * quel que soit le bord qu'elle a fini par emprunter.
+     */
+    function lastPointInside(builtTrail) {
+        if (!builtTrail || builtTrail.total < 4) return null;
+        const m = EXIT_MARK_INSET;
+
+        // Parcouru par abscisse curviligne et non par sommets : le tracé de
+        // secours n'a que deux points, l'un dedans et l'autre hors page, et
+        // chercher parmi eux ramènerait le départ — le repère se poserait alors
+        // contre la carte source, à l'opposé de la sortie qu'il désigne.
+        for (let d = builtTrail.total; d >= 0; d -= 4) {
+            const p = pointAt(d);
+            if (p.x >= m && p.x <= cssWidth - m && p.y >= m && p.y <= cssHeight - m) {
+                return { x: p.x, y: p.y };
+            }
+        }
+        return null;
     }
 
     // --- Particules ----------------------------------------------------------
@@ -782,6 +936,58 @@ window.MusicPlayer = window.MusicPlayer || {};
             ctx.fill();
             ctx.restore();
         });
+
+        drawExitMark();
+    }
+
+    /**
+     * Le repère de sortie : une flèche descendant sur un socle.
+     *
+     * Le même signe que la pastille du sélecteur de dossier, et que le bouton de
+     * téléchargement d'une piste. Une traînée qui s'en va par le bas dit déjà
+     * qu'elle ne mène à aucune carte ; ce repère dit ce qu'elle rejoint — le
+     * disque de la machine, hors de la page.
+     *
+     * Dessiné après les particules, pour qu'elles passent derrière lui plutôt
+     * que de l'effacer image après image.
+     */
+    function drawExitMark() {
+        if (!exitMark || !palette) return;
+
+        const half = EXIT_MARK_SIZE / 2;
+        const x = exitMark.x;
+        const y = exitMark.y;
+        const color = palette.colors[0];
+
+        ctx.save();
+        ctx.strokeStyle = rgba(color, palette.alpha);
+        ctx.lineWidth = palette.strokeWidth + 0.7;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        if (palette.glow > 0) {
+            ctx.shadowColor = rgba(color, palette.alpha);
+            ctx.shadowBlur = palette.glow;
+        }
+
+        // Le socle : deux montants et un fond, ouvert vers le haut par où la
+        // flèche entre.
+        ctx.beginPath();
+        ctx.moveTo(x - half, y + half * 0.25);
+        ctx.lineTo(x - half, y + half);
+        ctx.lineTo(x + half, y + half);
+        ctx.lineTo(x + half, y + half * 0.25);
+        ctx.stroke();
+
+        // La flèche, qui descend dedans.
+        ctx.beginPath();
+        ctx.moveTo(x, y - half);
+        ctx.lineTo(x, y + half * 0.3);
+        ctx.moveTo(x - half * 0.5, y - half * 0.2);
+        ctx.lineTo(x, y + half * 0.3);
+        ctx.lineTo(x + half * 0.5, y - half * 0.2);
+        ctx.stroke();
+
+        ctx.restore();
     }
 
     function loop(now) {
