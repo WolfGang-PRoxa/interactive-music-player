@@ -1188,6 +1188,9 @@ function createApiRouter(webServer) {
         }
 
         const roots = downloadDir.listRoots();
+        // Le dossier de téléchargement du système, quand il en a un : la
+        // pastille de saisie rapide du sélecteur n'a pas d'autre source.
+        const downloads = downloadDir.userDownloadsDir();
 
         // Un dossier peut avoir disparu depuis qu'il a été choisi. Plutôt que
         // de répondre « illisible » et de laisser l'explorateur vide — sans
@@ -1196,7 +1199,8 @@ function createApiRouter(webServer) {
         const target = downloadDir.nearestReadable(wanted);
         if (!target) {
             return res.json({
-                path: null, parent: null, requested: wanted, roots, dirs: [], writable: false,
+                path: null, parent: null, requested: wanted, roots, downloads,
+                dirs: [], writable: false,
             });
         }
 
@@ -1205,7 +1209,8 @@ function createApiRouter(webServer) {
             entries = fs.readdirSync(target, { withFileTypes: true });
         } catch (e) {
             return res.json({
-                path: null, parent: null, requested: wanted, roots, dirs: [], writable: false,
+                path: null, parent: null, requested: wanted, roots, downloads,
+                dirs: [], writable: false,
             });
         }
 
@@ -1241,6 +1246,7 @@ function createApiRouter(webServer) {
             // le client peut alors dire que le dossier n'est plus là.
             requested: target === wanted ? null : wanted,
             roots,
+            downloads,
             writable: downloadDir.validate(target).ok,
             dirs,
         });

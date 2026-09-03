@@ -157,6 +157,7 @@
     "tooltip_pick_download_dir": "Elegir la carpeta de descargas",
     "tooltip_dir_parent": "Carpeta superior",
     "download_dir_title": "Carpeta de descargas",
+    "download_dir_downloads": "Descargas",
     "download_dir_manual": "O escriba una ruta:",
     "download_dir_reset": "Carpeta predeterminada",
     "download_dir_save": "Elegir esta carpeta",

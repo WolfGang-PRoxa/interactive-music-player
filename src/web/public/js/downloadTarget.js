@@ -143,7 +143,10 @@ window.MusicPlayer = window.MusicPlayer || {};
     }
 
     /**
-     * Les racines, en pastilles au-dessus de la liste.
+     * La barre de raccourcis, au-dessus de la liste.
+     *
+     * Deux sortes de pastilles, dans l'ordre où l'on s'en sert : le dossier de
+     * téléchargement du système d'abord, les racines ensuite.
      *
      * Celle qui contient le dossier courant est mise en évidence : sur une
      * machine à quatre disques, savoir où l'on est vaut mieux que de le
@@ -155,12 +158,56 @@ window.MusicPlayer = window.MusicPlayer || {};
 
         bar.textContent = '';
         const roots = payload.roots || [];
+        const currentPath = (payload.path || '').toLowerCase();
+
+        /*
+         * Le dossier de téléchargement du système.
+         *
+         * C'est là que la plupart des gens rangent ce qu'ils récupèrent, et
+         * l'atteindre en parcourant l'arborescence demande quatre ou cinq pas
+         * depuis la racine. La pastille les remplace.
+         *
+         * Elle conduit l'explorateur là-bas plutôt que de valider sur-le-champ,
+         * comme les racines à côté d'elle : le chemin se pose dans le champ, on
+         * voit ce qu'il contient, et on peut encore descendre d'un cran — vers
+         * un sous-dossier « Musique », par exemple — avant de confirmer.
+         *
+         * Absente si le système n'en déclare pas, ou si le dossier a disparu :
+         * une pastille qui ne mène nulle part vaut moins que pas de pastille.
+         */
+        if (payload.downloads) {
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'dir-root-chip dir-downloads-chip';
+            if (currentPath === payload.downloads.toLowerCase()) chip.classList.add('is-current');
+            chip.title = payload.downloads;
+
+            // Flèche descendant sur un socle : l'icône du téléchargement, la
+            // même que partout ailleurs dans le tableau de bord.
+            const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            icon.setAttribute('viewBox', '0 0 24 24');
+            icon.setAttribute('fill', 'none');
+            icon.setAttribute('stroke', 'currentColor');
+            icon.setAttribute('stroke-width', '2');
+            icon.setAttribute('stroke-linecap', 'round');
+            icon.setAttribute('stroke-linejoin', 'round');
+            const glyph = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            glyph.setAttribute('d', 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3');
+            icon.appendChild(glyph);
+            chip.appendChild(icon);
+
+            const label = document.createElement('span');
+            label.textContent = t('download_dir_downloads', 'Téléchargements');
+            chip.appendChild(label);
+
+            chip.addEventListener('click', () => browse(payload.downloads));
+            bar.appendChild(chip);
+        }
 
         // Une seule racine — tout système autre que Windows — : la montrer
         // n'apprendrait rien, puisqu'il n'y a nulle part ailleurs où aller.
         if (roots.length < 2) return;
 
-        const currentPath = (payload.path || '').toLowerCase();
         roots.forEach((root) => {
             const chip = document.createElement('button');
             chip.type = 'button';

@@ -373,7 +373,12 @@ Le bouton en forme de dossier, à droite de cette ligne du menu, ouvre un
 explorateur de la machine hôte — et non un champ où taper un chemin, cette
 machine n'étant pas forcément celle d'où vous regardez. Sous Windows, les
 disques sont proposés en haut de la fenêtre : sans eux, remonter depuis un
-dossier de `C:` mène à `C:\` et jamais à `D:`. Le champ « Ou saisir un chemin »
+dossier de `C:` mène à `C:\` et jamais à `D:`. Une pastille
+**Téléchargements** y conduit d'un clic au dossier de téléchargement du
+système — celui du navigateur, souvent la bonne destination et quatre ou cinq
+pas plus loin dans l'arborescence ; elle mène l'explorateur là-bas plutôt que
+de valider, de sorte qu'on peut encore descendre d'un cran avant de
+confirmer. Le champ « Ou saisir un chemin »
 reste là pour les cas que l'explorateur ne couvre pas, et « Dossier par défaut »
 ramène à `data/downloads/`.
 

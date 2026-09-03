@@ -768,3 +768,22 @@ input:checked + .switch-slider:before {
     color: var(--c-primary);
     border-color: var(--c-primary);
 }
+
+/* La pastille du dossier de téléchargement du système.
+
+   Elle porte un mot, là où ses voisines portent une lettre de disque : la
+   police à chasse fixe, faite pour aligner « C:\ » sur « D:\ », n'a plus de
+   raison d'être ici et étirerait le libellé sans rien y gagner. */
+.dir-downloads-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-family: inherit;
+    font-size: 0.76rem;
+}
+
+.dir-downloads-chip svg {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+}

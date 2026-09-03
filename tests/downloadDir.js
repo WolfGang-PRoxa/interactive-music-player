@@ -211,6 +211,44 @@ console.log('\nLe repli sur un dossier lisible\n');
         downloadDir.nearestReadable(roots[0]) !== null, roots[0]);
 }
 
+// ────────────────────── Le dossier du système ──────────────────────
+
+/*
+ * Le raccourci « Téléchargements » du sélecteur.
+ *
+ * Ce que rend cette recherche dépend de la machine qui exécute le test : on ne
+ * vérifie donc pas un chemin, mais le contrat — un dossier qui existe pour de
+ * bon, ou rien du tout. Une pastille menant à un dossier absent vaudrait moins
+ * que pas de pastille.
+ */
+console.log('\nLe dossier de téléchargement du système\n');
+
+{
+    const found = downloadDir.userDownloadsDir();
+    check('la recherche répond un chemin, ou rien',
+        found === null || (typeof found === 'string' && found.length > 0), String(found));
+
+    if (found) {
+        check('  … un chemin absolu', path.isAbsolute(found), found);
+
+        let isDir = false;
+        try { isDir = fs.statSync(found).isDirectory(); } catch (e) {}
+        check('  … qui existe et qui est bien un dossier', isDir, found);
+
+        check('  … et qui ne change pas d’un appel à l’autre',
+            downloadDir.userDownloadsDir() === found);
+    }
+
+    // Le repli minimal. Sur une machine où `~/Downloads` existe, ne rien rendre
+    // signalerait une recherche cassée — le registre mal lu, par exemple.
+    const home = path.join(os.homedir(), 'Downloads');
+    let homeExists = false;
+    try { homeExists = fs.statSync(home).isDirectory(); } catch (e) {}
+    if (homeExists) {
+        check('un ~/Downloads existant n’est jamais laissé de côté', found !== null, home);
+    }
+}
+
 // ────────────────────── La route, de bout en bout ──────────────────────
 
 console.log('\nLa route /api/browse-dirs\n');
@@ -246,6 +284,14 @@ server.listen(0, '127.0.0.1', async () => {
     check('  … et rapporte les racines de la machine',
         !!(start.json && Array.isArray(start.json.roots) && start.json.roots.length >= 1),
         start.json ? (start.json.roots || []).join('  ') : '');
+
+    // La pastille de saisie rapide n'a pas d'autre source que cette clé : si
+    // elle disparaît de la réponse, le raccourci disparaît de la fenêtre sans
+    // que rien d'autre ne bronche.
+    check('  … ainsi que le dossier de téléchargement du système',
+        !!start.json && 'downloads' in start.json
+            && start.json.downloads === downloadDir.userDownloadsDir(),
+        String(start.json && start.json.downloads));
 
     // Le cas exact qui laissait la fenêtre vide.
     const gone = await get(`/api/browse-dirs?path=${encodeURIComponent(path.join(root, 'parti'))}`);

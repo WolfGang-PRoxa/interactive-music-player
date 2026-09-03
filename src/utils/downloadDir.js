@@ -24,7 +24,9 @@
  */
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const cp = require('child_process');
 
 /** Dossier par défaut, sous `data/` comme le cache et les imports. */
 const DEFAULT_DIR = path.join(process.cwd(), 'data', 'downloads');
@@ -195,6 +197,122 @@ function listRoots() {
 }
 
 /**
+ * Dossier de téléchargement du système, celui du navigateur et du reste.
+ *
+ * Une saisie rapide, rien de plus : c'est là que la plupart des gens rangent ce
+ * qu'ils récupèrent, et l'atteindre en parcourant l'arborescence demande trois
+ * ou quatre pas depuis la racine.
+ *
+ * `~/Downloads` serait faux dans deux cas qu'on rencontre pour de bon :
+ *
+ *  - **le dossier a été déplacé.** Windows le permet d'un clic droit, et
+ *    beaucoup le sortent de `C:` pour épargner un disque système à l'étroit.
+ *    Seul le registre sait alors où il est parti.
+ *  - **le système n'est pas en anglais.** Sous Windows, non : le dossier
+ *    s'appelle « Downloads » sur le disque quelle que soit la langue, seul son
+ *    nom d'affichage est traduit. Sous Linux si : la convention XDG le nomme
+ *    dans la langue de l'utilisateur, et `~/Téléchargements` existe bel et bien.
+ *
+ * @returns {string|null} null si le dossier reste introuvable.
+ */
+let downloadsLookup;   // undefined : pas encore cherché ; null : introuvable
+
+function userDownloadsDir() {
+    // La recherche est faite une fois — le dossier ne se déplace pas deux fois
+    // dans une vie de processus, et sous Windows elle lance un programme. Son
+    // existence, elle, est revérifiée à chaque appel : c'est le cas où le
+    // chemin trouvé ne vaut plus rien, et il ne coûte qu'un `stat`.
+    if (downloadsLookup === undefined) downloadsLookup = locateDownloads();
+    if (!downloadsLookup) return null;
+
+    try {
+        if (fs.statSync(downloadsLookup).isDirectory()) return downloadsLookup;
+    } catch (e) {
+        // Supprimé ou déconnecté depuis : autant ne rien proposer.
+    }
+    return null;
+}
+
+/** Où le système déclare son dossier de téléchargement. */
+function locateDownloads() {
+    const fallback = path.join(os.homedir(), 'Downloads');
+
+    if (process.platform === 'win32') {
+        return registryDownloads() || fallback;
+    }
+
+    // macOS ne traduit pas ses dossiers personnels sur le disque ; Linux, si.
+    if (process.platform === 'linux') {
+        return xdgDownloads() || fallback;
+    }
+
+    return fallback;
+}
+
+/**
+ * Le dossier déclaré dans le registre de Windows.
+ *
+ * `User Shell Folders` est la clé qui fait autorité : c'est celle que Windows
+ * écrit quand on déplace le dossier. Elle garde le chemin sous sa forme non
+ * développée — « %USERPROFILE%\Downloads » —, d'où la substitution ensuite.
+ *
+ * Le nom de la valeur est l'identifiant du dossier connu « Downloads ». Il ne
+ * se traduit pas, lui.
+ */
+function registryDownloads() {
+    const KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders';
+    const VALUE = '{374DE290-123F-4565-9164-39C4925E467B}';
+
+    let output;
+    try {
+        output = cp.execFileSync('reg', ['query', KEY, '/v', VALUE], {
+            encoding: 'utf8',
+            windowsHide: true,
+            timeout: 4000,
+            stdio: ['ignore', 'pipe', 'ignore'],
+        });
+    } catch (e) {
+        // Valeur absente, `reg` introuvable, poste verrouillé : on retombera
+        // sur le chemin par défaut, qui est juste dans l'immense majorité des cas.
+        return null;
+    }
+
+    // « <nom>    REG_EXPAND_SZ    <chemin> », le chemin pouvant contenir des
+    // espaces : on coupe sur le type, pas sur les blancs.
+    const match = output.match(/REG_(?:EXPAND_)?SZ\s+(.+)/);
+    if (!match) return null;
+
+    const raw = match[1].trim();
+    if (!raw) return null;
+
+    // %USERPROFILE%, %HOMEDRIVE%… : les variables que Windows y laisse.
+    const expanded = raw.replace(/%([^%]+)%/g, (whole, name) => {
+        const value = process.env[name] || process.env[name.toUpperCase()];
+        return value === undefined ? whole : value;
+    });
+
+    return expanded.includes('%') ? null : expanded;
+}
+
+/**
+ * Le dossier déclaré par la convention XDG, sous Linux.
+ *
+ * `~/.config/user-dirs.dirs` est écrit par l'environnement de bureau et porte
+ * le nom traduit : sur un système en français, `XDG_DOWNLOAD_DIR` vaut
+ * « $HOME/Téléchargements », et `~/Downloads` n'existe pas.
+ */
+function xdgDownloads() {
+    try {
+        const text = fs.readFileSync(path.join(os.homedir(), '.config', 'user-dirs.dirs'), 'utf8');
+        const match = text.match(/^\s*XDG_DOWNLOAD_DIR\s*=\s*"([^"]*)"/m);
+        if (!match || !match[1]) return null;
+        return match[1].replace(/^\$HOME\b/, os.homedir());
+    } catch (e) {
+        return null;
+    }
+}
+
+/**
  * Premier dossier lisible en remontant depuis un chemin.
  *
  * Un dossier peut avoir disparu depuis qu'il a été choisi, ou n'avoir jamais
@@ -230,4 +348,5 @@ module.exports = {
     uniquePath,
     listRoots,
     nearestReadable,
+    userDownloadsDir,
 };

@@ -390,7 +390,11 @@ Die Ordner-Schaltfläche rechts in dieser Menüzeile öffnet einen Explorer der
 Host-Maschine — und kein Feld zum Eintippen eines Pfades, denn diese Maschine
 ist nicht zwangsläufig die, von der aus Sie schauen. Unter Windows werden die
 Laufwerke oben im Fenster angeboten: ohne sie führt der Weg nach oben aus einem
-Ordner von `C:` nach `C:\` und niemals nach `D:`. Das Feld „Oder einen Pfad
+Ordner von `C:` nach `C:\` und niemals nach `D:`. Eine Schaltfläche
+**Downloads** führt mit einem Klick zum Download-Ordner des Systems — dem des
+Browsers, meist das richtige Ziel und vier oder fünf Schritte tiefer im Baum;
+sie bringt den Explorer dorthin, statt zu bestätigen, so dass man noch eine
+Ebene tiefer gehen kann. Das Feld „Oder einen Pfad
 eingeben" bleibt für die Fälle, die der Explorer nicht abdeckt, und
 „Standardordner" führt zurück nach `data/downloads/`.
 

@@ -364,7 +364,10 @@ The folder button, at the right of that row of the menu, opens a browser of the
 host machine — rather than a field to type a path into, that machine not
 necessarily being the one you are looking from. On Windows the drives are
 offered at the top of the window: without them, going up from a folder of `C:`
-leads to `C:\` and never to `D:`. The "Or enter a path" field stays there for
+leads to `C:\` and never to `D:`. A **Downloads** chip goes straight to the
+system's download folder — the browser's own, usually the right destination and
+four or five steps further down the tree; it takes the browser there rather
+than confirming, so you can still go one level deeper first. The "Or enter a path" field stays there for
 the cases the browser does not cover, and "Default folder" returns to
 `data/downloads/`.
 

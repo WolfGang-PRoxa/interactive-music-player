@@ -157,6 +157,7 @@
     "tooltip_pick_download_dir": "Choose the download folder",
     "tooltip_dir_parent": "Parent folder",
     "download_dir_title": "Download folder",
+    "download_dir_downloads": "Downloads",
     "download_dir_manual": "Or type a path:",
     "download_dir_reset": "Default folder",
     "download_dir_save": "Choose this folder",
