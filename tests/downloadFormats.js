@@ -15,7 +15,11 @@
  *     commande sans muxer ;
  *   - le menu du balisage et la liste du module proposent les mêmes ;
  *   - le serveur écarte une extension qu'il ne sait pas écrire ;
- *   - le défaut est MP3.
+ *   - le défaut est MP3 ;
+ *   - un format qui échoue à l'encodage est réessayé en MP3, sur une entrée
+ *     fraîchement résolue, et l'utilisateur en est averti — la composition de la
+ *     source ne se découvre qu'au moment de l'encoder ;
+ *   - MP3 qui échoue n'est pas réessayé à l'identique.
  */
 const fs = require('fs');
 const path = require('path');
@@ -128,6 +132,137 @@ const context = (data) => ({
     webServer: { broadcastState() {}, client: null },
 });
 
+
+// ────────────────────── Le repli quand l'encodage échoue ──────────────────────
+
+/*
+ * On ne sait pas d'avance ce qu'on télécharge.
+ *
+ * Le débit de la source, son nombre de canaux, sa fréquence d'échantillonnage
+ * ne se découvrent qu'à l'encodage, et tel encodeur refuse ce que tel autre
+ * accepte. Le handler réessaie donc en MP3 — le format que rien ne refuse — au
+ * lieu de rendre un échec là où un fichier était possible.
+ *
+ * ffmpeg est remplacé par un double : le test décide quel conteneur échoue, et
+ * observe ce que le handler fait ensuite.
+ */
+const os = require('os');
+const { EventEmitter } = require('events');
+
+const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'imp-formats-'));
+
+/** Les conteneurs pour lesquels le faux ffmpeg refusera d'écrire. */
+let failFor = [];
+/** Les fichiers de sortie demandés, dans l'ordre des tentatives. */
+const attempts = [];
+
+stub('child_process', {
+    spawn: (bin, args) => {
+        const out = args[args.length - 1];
+        attempts.push(out);
+
+        const child = new EventEmitter();
+        child.stdin = new EventEmitter();
+        child.stdin.write = () => true;
+        child.stdin.end = () => {};
+        child.stderr = new EventEmitter();
+        child.kill = () => {};
+
+        const container = path.extname(out.replace(/\.incomplete$/, '')).slice(1);
+        setImmediate(() => {
+            if (failFor.includes(container)) {
+                child.stderr.emit('data', Buffer.from(`Encoder refuses ${container}`));
+                child.emit('close', 1);
+            } else {
+                // Un encodage qui aboutit laisse son fichier provisoire, que le
+                // handler renomme.
+                fs.writeFileSync(out, 'son');
+                child.emit('close', 0);
+            }
+        });
+        return child;
+    },
+});
+
+let resolveCalls = 0;
+stub('../src/audio/PreloadManager', {
+    resolvePlayableTrack: async (track) => ({ track, url: track.url }),
+    resolveAudioInput: async () => {
+        resolveCalls++;
+        return { ffmpegInput: 'https://exemple/piste.webm', inputStream: null };
+    },
+});
+stub('../src/web/websocket/handlerUtils', {
+    searchLocalAwareTrack: async () => ({
+        tracks: [{ title: 'Essai', url: 'https://exemple/piste' }],
+    }),
+});
+stub('../src/utils/downloadDir', {
+    DEFAULT_DIR: workDir,
+    ensure: (d) => { fs.mkdirSync(d, { recursive: true }); return d; },
+    safeFilename: (title, ext) => `${title}${ext}`,
+    uniquePath: (d, name) => path.join(d, name),
+});
+
+let chosenFormat = 'flac';
+require.cache[require.resolve('../src/database/Database')].exports = {
+    getSettings: () => ({ importFormat: chosenFormat, importAudioQuality: '192' }),
+    getDownloadDir: () => workDir,
+    updateSettings: () => {},
+};
+
+const downloadHandlers = require('../src/web/websocket/handlers/downloadHandlers');
+
+async function runFallback() {
+    console.log('\nLe repli sur MP3\n');
+
+    const notices = [];
+    const ctx = () => ({
+        data: { query: 'une chanson' },
+        webServer: { _sendError: (m) => notices.push(String(m)) },
+        player: null,
+        currentGuildId: 'g-essai',
+    });
+
+    // 1. Le format demandé passe : aucun repli.
+    failFor = [];
+    attempts.length = 0;
+    resolveCalls = 0;
+    await downloadHandlers.handleDownloadTrack(ctx());
+    check('un format qui aboutit est écrit tel quel',
+        attempts.length === 1 && attempts[0].includes('.flac'), attempts.join(', '));
+
+    // 2. Le format demandé échoue : on réessaie en MP3.
+    failFor = ['flac'];
+    attempts.length = 0;
+    resolveCalls = 0;
+    notices.length = 0;
+    await downloadHandlers.handleDownloadTrack(ctx());
+
+    check('un format qui échoue est réessayé en MP3',
+        attempts.length === 2 && attempts[1].includes('.mp3'), attempts.join(', '));
+    check('  … et l\'utilisateur en est averti',
+        notices.some((m) => m.includes('FLAC') && m.includes('MP3')), notices.join(' | '));
+
+    // L'entrée est redemandée à chaque essai : `resolveAudioInput` peut rendre
+    // un flux, qu'une première tentative a consommé. Le réutiliser écrirait un
+    // fichier vide.
+    check('  … sur une entrée fraîchement résolue', resolveCalls === 2, String(resolveCalls));
+
+    // 3. MP3 lui-même échoue : rien à réessayer.
+    chosenFormat = 'mp3';
+    failFor = ['mp3'];
+    attempts.length = 0;
+    notices.length = 0;
+    await downloadHandlers.handleDownloadTrack(ctx());
+    check('MP3 qui échoue n\'est pas réessayé à l\'identique',
+        attempts.length === 1, attempts.join(', '));
+    check('  … et l\'échec est rapporté',
+        notices.some((m) => m.toLowerCase().includes('impossible')), notices.join(' | '));
+
+    fs.rmSync(workDir, { recursive: true, force: true });
+}
+
 async function run() {
     written.length = 0;
     await guildHandlers.handleUpdateSettings(context({ importFormat: 'flac' }));
@@ -154,6 +289,8 @@ async function run() {
     const fresh = realDatabase.getSettings(`test-format-${Date.now()}`);
     check('un serveur inconnu part sur MP3',
         fresh.importFormat === formats.DEFAULT_CONTAINER, String(fresh.importFormat));
+
+    await runFallback();
 
     console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
     process.exit(failed === 0 ? 0 : 1);

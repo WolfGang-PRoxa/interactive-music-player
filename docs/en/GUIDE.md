@@ -387,7 +387,17 @@ bitrate of the **Audio** one — MP3, M4A, OGG, OPUS or WEBM; FLAC and WAV are
 lossless and ignore that bitrate. This third menu only appears, sliding in
 beside the other two, for this destination: the other three write no file at
 all, and an extension would name nothing there. It offers audio formats only,
-video having its own route — a track's download button. A file already on the bot's disk is copied as is, without
+video having its own route — a track's download button.
+
+The three menus do not bear on the same things, and whatever does not apply is
+greyed out: the video definition for this destination, which writes sound only,
+and the audio bitrate for FLAC and WAV, lossless, which keep everything they are
+given. A line under the row says why, each time.
+
+Lastly, what a source is made of is only discovered when encoding it. If the
+requested format does not come through, the file is written as MP3 — the one
+nothing refuses — and a notification says so, rather than returning a failure
+where a file was possible. A file already on the bot's disk is copied as is, without
 re-encoding: you asked to have it in your folder, not to lose quality on the
 way. Two guarantees, finally: downloading a track again does not replace the
 previous one — the new file is numbered — and an interrupted download leaves no

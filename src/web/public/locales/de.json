@@ -300,6 +300,8 @@
     "import_audio_quality_label": "Audio",
     "import_video_quality_label": "Video",
     "import_format_label": "Format",
+    "import_quality_download_notice": "Download in einen Ordner: die Videoauflösung ist gegenstandslos, geschrieben wird nur Audio.",
+    "import_quality_lossless_notice": "FLAC und WAV sind verlustfrei: sie behalten alles, und die Audio-Bitrate gilt für sie nicht.",
     "import_quality_hint": "Ohne Wirkung auf lokale Dateien, die unverändert importiert werden.",
     "import_quality_local_notice": "Lokale Datei erkannt: Die Qualität gilt nicht, sie wird unverändert importiert.",
     "quality_menu_preloaded": "Vorgeladen",

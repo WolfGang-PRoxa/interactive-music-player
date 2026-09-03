@@ -1060,6 +1060,36 @@ html[data-style="neon-cyberpunk"] .speed-pad-container::before {
     pointer-events: none;
 }
 
+/*
+ * Déployé et immobile, le champ cesse de rogner ce qui en dépasse.
+ *
+ * L'`overflow: hidden` porte le repli — sans lui le contenu déborderait sur ses
+ * voisins pendant que la largeur s'anime. Mais il rogne aussi le panneau du
+ * menu déroulant, qui est en position absolue et descend sous le champ : la
+ * liste se trouvait coupée à la hauteur d'une ligne, et seul le premier format
+ * était atteignable.
+ *
+ * La classe est posée par app.js à la fin de l'animation, et retirée avant le
+ * repli suivant : le rognage n'est levé qu'une fois qu'il n'a plus rien à
+ * faire.
+ */
+.import-format-field.is-open {
+    overflow: visible;
+}
+
+/*
+ * Un champ sans objet, plutôt que toute la rangée.
+ *
+ * Les trois menus ne s'appliquent pas aux mêmes cas : le débit audio ne veut
+ * rien dire pour un format sans perte, et la définition vidéo n'a rien à faire
+ * dans un téléchargement vers un dossier, qui n'écrit que de l'audio. Griser la
+ * rangée entière dirait que rien ne s'applique, ce qui serait faux.
+ */
+.import-quality-field.not-applicable {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
 /* Une préférence système pour le mouvement réduit vaut ici comme ailleurs :
    le champ paraît et disparaît, sans glisser. */
 @media (prefers-reduced-motion: reduce) {

@@ -1429,32 +1429,116 @@
     }
 
     /** Grise les sélecteurs quand la saisie désigne un fichier local. */
+    /**
+     * Grise ce qui ne s'applique pas, et dit pourquoi.
+     *
+     * Trois cas se superposent, du plus large au plus fin :
+     *
+     *  - **une source locale** est importée telle quelle : aucun des trois
+     *    menus n'y change quoi que ce soit, et c'est toute la rangée qui
+     *    s'éteint ;
+     *  - **le téléchargement vers un dossier** n'écrit que de l'audio — le menu
+     *    Format ne propose aucun conteneur vidéo —, donc la définition vidéo y
+     *    est sans objet ;
+     *  - **un format sans perte** ignore le débit : FLAC et WAV gardent tout ce
+     *    qu'on leur donne, et « 320 kbps » n'y voudrait rien dire.
+     *
+     * Griser la rangée entière dans les deux derniers cas dirait que rien ne
+     * s'applique, ce qui serait faux. C'est donc par champ.
+     */
     function updateQualityApplicability() {
         if (!importQualityRow) return;
+
         const local = isLocalSource(searchInput ? searchInput.value : '');
         importQualityRow.classList.toggle('not-applicable', local);
+
+        const targetSelect = document.getElementById('add-target-select');
+        const toDisk = !!targetSelect && targetSelect.value === 'download';
+        const lossless = !!importFormatSelect
+            && LOSSLESS_FORMATS.includes(importFormatSelect.value);
+
+        const audioField = importAudioQualitySelect
+            ? importAudioQualitySelect.closest('.import-quality-field') : null;
+        const videoField = importVideoQualitySelect
+            ? importVideoQualitySelect.closest('.import-quality-field') : null;
+
+        if (audioField) audioField.classList.toggle('not-applicable', !local && toDisk && lossless);
+        if (videoField) videoField.classList.toggle('not-applicable', !local && toDisk);
+
         if (importQualityHint) {
-            importQualityHint.classList.toggle('highlighted', local);
-            importQualityHint.textContent = local
-                ? t('import_quality_local_notice')
-                : t('import_quality_hint');
+            // Le message le plus précis l'emporte : une source locale rend tout
+            // le reste sans objet, et un format sans perte est plus surprenant
+            // qu'une vidéo écartée d'un téléchargement qui n'écrit que du son.
+            let notice = t('import_quality_hint');
+            if (local) notice = t('import_quality_local_notice');
+            else if (toDisk && lossless) notice = t('import_quality_lossless_notice');
+            else if (toDisk) notice = t('import_quality_download_notice');
+
+            importQualityHint.classList.toggle('highlighted', local || toDisk);
+            importQualityHint.textContent = notice;
         }
     }
 
+    /** Formats sans perte : le débit ne les concerne pas. */
+    const LOSSLESS_FORMATS = ['flac', 'wav'];
+
     /**
-     * Montre le menu « Format » pour la seule destination qui écrit un fichier.
+     * Montre le menu « Format » pour la seule destination qui écrit un fichier,
+     * et met à jour ce qui s'applique au choix courant.
      *
-     * Les trois autres n'en écrivent aucun : un menu d'extension y désignerait
-     * quelque chose qui n'existe pas. Il se replie donc, et le repli est animé
-     * par la feuille de style — ici on ne fait que poser la classe.
+     * Les trois autres destinations n'écrivent aucun fichier : un menu
+     * d'extension y désignerait quelque chose qui n'existe pas. Il se replie
+     * donc, et le repli est animé par la feuille de style.
+     *
+     * `is-open` n'est posée qu'une fois l'animation finie. L'`overflow: hidden`
+     * qui porte le repli rogne aussi le panneau du menu déroulant, lequel
+     * descend sous le champ : la liste des formats se trouvait coupée à la
+     * hauteur d'une ligne, et seul MP3 était atteignable.
      */
     function updateFormatFieldVisibility() {
         if (!importFormatField) return;
+
         const select = document.getElementById('add-target-select');
         const toDisk = !!select && select.value === 'download';
-        importFormatField.classList.toggle('is-collapsed', !toDisk);
+
+        if (toDisk) {
+            importFormatField.classList.remove('is-collapsed');
+            // Déjà à sa pleine largeur — premier affichage, ou appel répété :
+            // aucune transition ne viendra, et l'attendre clouerait le rognage
+            // en place.
+            if (!formatFieldOpening()) importFormatField.classList.add('is-open');
+        } else {
+            // Avant de replier : sans quoi le panneau resterait libre de
+            // déborder pendant que la largeur revient à zéro.
+            importFormatField.classList.remove('is-open');
+            importFormatField.classList.add('is-collapsed');
+        }
+
+        updateQualityApplicability();
     }
     window.MusicPlayer.updateFormatFieldVisibility = updateFormatFieldVisibility;
+
+    /**
+     * Le champ est-il encore en train de s'ouvrir ?
+     *
+     * Une largeur inférieure à ce que son contenu réclame signe une animation
+     * en cours ; c'est alors `transitionend` qui posera `is-open`.
+     */
+    function formatFieldOpening() {
+        if (!importFormatField) return false;
+        return importFormatField.getBoundingClientRect().width < importFormatField.scrollWidth;
+    }
+
+    if (importFormatField) {
+        importFormatField.addEventListener('transitionend', (e) => {
+            if (e.target !== importFormatField) return;
+            // La largeur en rangée, la hauteur en colonne : la propriété animée
+            // dépend du sens de la rangée, les deux sont acceptées.
+            if (e.propertyName !== 'max-width' && e.propertyName !== 'max-height') return;
+            if (importFormatField.classList.contains('is-collapsed')) return;
+            importFormatField.classList.add('is-open');
+        });
+    }
 
     if (searchInput) {
         searchInput.addEventListener('input', updateQualityApplicability);
@@ -1466,6 +1550,10 @@
                 type: 'updateSettings',
                 data: { importFormat: e.target.value }
             });
+            // Passer en FLAC ou en WAV éteint le débit audio, et en sortir le
+            // rallume : l'applicabilité suit le format, pas seulement la
+            // destination.
+            updateQualityApplicability();
         });
     }
 

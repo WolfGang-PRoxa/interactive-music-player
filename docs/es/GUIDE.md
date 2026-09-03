@@ -400,7 +400,17 @@ del menú **Audio** — MP3, M4A, OGG, OPUS o WEBM; FLAC y WAV son sin pérdida 
 ignoran ese caudal. Este tercer menú solo aparece, deslizándose junto a los
 otros dos, para este destino: los otros tres no escriben archivo alguno, y una
 extensión no designaría nada allí. Solo ofrece formatos de audio, pues el vídeo
-tiene su propia vía — el botón de descarga de una pista. Un archivo ya presente en el disco del bot se copia tal
+tiene su propia vía — el botón de descarga de una pista.
+
+Los tres menús no tratan de lo mismo, y lo que no viene al caso se atenúa: la
+definición de vídeo para este destino, que solo escribe sonido, y el caudal de
+audio para FLAC y WAV, sin pérdida, que conservan todo lo que se les da. Una
+frase bajo la fila dice cada vez por qué.
+
+Por último, de qué se compone una fuente solo se descubre al codificarla. Si el
+formato pedido no llega a buen puerto, el archivo se escribe en MP3 — el que
+nada rechaza — y una notificación lo indica, en lugar de devolver un fracaso
+donde un archivo era posible. Un archivo ya presente en el disco del bot se copia tal
 cual, sin recodificación: usted pidió tenerlo en su carpeta, no perder calidad
 por el camino. Dos garantías, por último: volver a descargar una pista no
 sustituye a la anterior — el nuevo archivo se numera — y una descarga

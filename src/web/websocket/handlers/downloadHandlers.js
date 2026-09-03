@@ -203,13 +203,54 @@ async function handleDownloadTrack(ctx) {
             written = await copyLocal(path.resolve(track.url), dir);
         } else {
             const playable = await preloadManager.resolvePlayableTrack(track);
-            const input = await preloadManager.resolveAudioInput(playable.track, playable.url);
-            if (!input.ffmpegInput && !input.inputStream) {
-                webServer._sendError(`Aucune source audio pour « ${title} ».`);
-                return;
+            const trackTitle = playable.track.title || title;
+            const bitrate = bitrateFor(currentGuildId);
+            const wanted = containerFor(currentGuildId);
+
+            /**
+             * Une tentative d'encodage, entrée fraîchement résolue.
+             *
+             * L'entrée est redemandée à chaque essai, et ce n'est pas un
+             * gaspillage : `resolveAudioInput` peut rendre un flux, qu'une
+             * première tentative a consommé. Le réutiliser tel quel écrirait
+             * un fichier vide.
+             */
+            const attempt = async (container) => {
+                const input = await preloadManager.resolveAudioInput(playable.track, playable.url);
+                if (!input.ffmpegInput && !input.inputStream) {
+                    throw new Error(`Aucune source audio pour « ${trackTitle} »`);
+                }
+                return transcodeRemote(input, dir, trackTitle, bitrate, container);
+            };
+
+            try {
+                written = await attempt(wanted);
+            } catch (err) {
+                /*
+                 * Le format choisi n'a pas abouti — repli sur MP3.
+                 *
+                 * On ne sait pas d'avance ce qu'on va télécharger : le débit,
+                 * le nombre de canaux, la fréquence d'échantillonnage de la
+                 * source ne se découvrent qu'à l'encodage, et tel encodeur
+                 * refuse ce que tel autre accepte. Plutôt que de rendre un
+                 * échec là où un fichier était possible, on réessaie dans le
+                 * format que rien ne refuse, et on le dit — un MP3 arrivé sans
+                 * prévenir à la place d'un FLAC serait une surprise désagréable.
+                 *
+                 * Une seule fois, et jamais si MP3 est déjà ce qui a échoué :
+                 * l'erreur est alors ailleurs que dans le format, et réessayer
+                 * à l'identique ne ferait que doubler l'attente.
+                 */
+                if (wanted === downloadFormats.DEFAULT_CONTAINER) throw err;
+
+                log.warn(`[Download] ${wanted} failed for ${trackTitle} (${err.message}); `
+                    + `falling back to ${downloadFormats.DEFAULT_CONTAINER}.`);
+                webServer._sendError(
+                    `Le format ${wanted.toUpperCase()} n'a pas abouti pour « ${trackTitle} » : `
+                    + `écriture en ${downloadFormats.DEFAULT_CONTAINER.toUpperCase()}.`);
+
+                written = await attempt(downloadFormats.DEFAULT_CONTAINER);
             }
-            written = await transcodeRemote(input, dir, playable.track.title || title,
-                bitrateFor(currentGuildId), containerFor(currentGuildId));
         }
 
         log.success(`[Download] ${title} written to ${written}`);

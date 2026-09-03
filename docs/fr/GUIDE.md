@@ -398,7 +398,17 @@ du menu **Audio** — MP3, M4A, OGG, OPUS ou WEBM ; FLAC et WAV sont sans perte 
 ignorent ce débit. Ce troisième menu n'apparaît, en glissant à côté des deux
 autres, que pour cette destination : les trois autres n'écrivent aucun fichier,
 et une extension n'y désignerait rien. Il n'offre que des formats audio, la
-vidéo ayant son propre chemin — le bouton de téléchargement d'une piste. Un fichier déjà présent sur le disque du bot est copié tel quel, sans
+vidéo ayant son propre chemin — le bouton de téléchargement d'une piste.
+
+Les trois menus ne portent pas sur les mêmes choses, et ce qui est sans objet se
+grise : la définition vidéo pour cette destination, qui n'écrit que du son, et le
+débit audio pour FLAC et WAV, sans perte, qui gardent tout ce qu'on leur donne.
+Une phrase sous la rangée dit à chaque fois pourquoi.
+
+Enfin, la composition d'une source ne se découvre qu'au moment de l'encoder. Si
+le format demandé n'aboutit pas, le fichier est écrit en MP3 — celui que rien ne
+refuse — et une notification le dit, plutôt que de rendre un échec là où un
+fichier était possible. Un fichier déjà présent sur le disque du bot est copié tel quel, sans
 réencodage : vous avez demandé à l'avoir dans votre dossier, pas à en perdre la
 qualité au passage. Deux garanties, enfin : retélécharger un morceau ne remplace
 pas le précédent — le nouveau fichier est numéroté —, et un téléchargement

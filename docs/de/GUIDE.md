@@ -416,7 +416,17 @@ sind verlustfrei und ignorieren diese Bitrate. Dieses dritte Menü erscheint nur
 für dieses Ziel, indem es neben die beiden anderen gleitet: die übrigen drei
 schreiben überhaupt keine Datei, und eine Endung benennt dort nichts. Es bietet
 allein Audioformate, denn Video hat seinen eigenen Weg — die
-Download-Schaltfläche eines Titels. Eine Datei, die bereits auf der Festplatte des
+Download-Schaltfläche eines Titels.
+
+Die drei Menüs betreffen nicht dieselben Dinge, und was gegenstandslos ist, wird
+abgeblendet: die Videoauflösung für dieses Ziel, das nur Ton schreibt, und die
+Audio-Bitrate für FLAC und WAV, verlustfrei, die alles behalten, was sie
+bekommen. Ein Satz unter der Reihe sagt jedes Mal, warum.
+
+Woraus eine Quelle besteht, zeigt sich schließlich erst beim Kodieren. Kommt das
+verlangte Format nicht durch, wird die Datei als MP3 geschrieben — jenes, das
+nichts ablehnt — und eine Benachrichtigung sagt es, statt einen Fehlschlag zu
+liefern, wo eine Datei möglich war. Eine Datei, die bereits auf der Festplatte des
 Bots liegt, wird unverändert kopiert, ohne Neukodierung: Sie wollten sie in
 Ihrem Ordner haben, nicht unterwegs an Qualität verlieren. Zwei Zusicherungen
 schließlich: ein erneut heruntergeladener Titel ersetzt den vorherigen nicht —
