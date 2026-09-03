@@ -16,6 +16,7 @@
     "test:device": "node tests/deviceMode.js",
     "test:drag": "node tests/dragPreview.js",
     "test:speed-pad": "node tests/speedPadPointer.js",
+    "test:speed-pad-scale": "node tests/speedPadScale.js",
     "test:queue-handoff": "node tests/queueHandoff.js",
     "test:favorite-channel": "node tests/favoriteChannel.js",
     "test:shared-control": "node tests/sharedControl.js",
@@ -32,7 +33,7 @@
     "test:download-formats": "node tests/downloadFormats.js",
     "test:docs-languages": "node tests/docsLanguages.js",
     "test:docs-integrity": "node tests/docsIntegrity.js",
-    "test": "node tests/deviceMode.js && node tests/dragPreview.js && node tests/speedPadPointer.js && node tests/queueHandoff.js && node tests/favoriteChannel.js && node tests/sharedControl.js && node tests/toastSwipe.js && node tests/streamResolution.js && node tests/coffeeSteam.js && node tests/githubTail.js && node tests/powerCharge.js && node tests/cardChrome.js && node tests/addTarget.js && node tests/pausePrecision.js && node tests/searchHistory.js && node tests/downloadDir.js && node tests/downloadFormats.js && node tests/docsLanguages.js && node tests/docsIntegrity.js && node tests/smoke.js"
+    "test": "node tests/deviceMode.js && node tests/dragPreview.js && node tests/speedPadPointer.js && node tests/speedPadScale.js && node tests/queueHandoff.js && node tests/favoriteChannel.js && node tests/sharedControl.js && node tests/toastSwipe.js && node tests/streamResolution.js && node tests/coffeeSteam.js && node tests/githubTail.js && node tests/powerCharge.js && node tests/cardChrome.js && node tests/addTarget.js && node tests/pausePrecision.js && node tests/searchHistory.js && node tests/downloadDir.js && node tests/downloadFormats.js && node tests/docsLanguages.js && node tests/docsIntegrity.js && node tests/smoke.js"
   },
   "keywords": [
     "discord",

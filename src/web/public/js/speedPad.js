@@ -261,7 +261,18 @@ function togglePrecisionMode(indicatorSource) {
     const currentSpeeds = getSpeeds();
     const targetSpeedFormatted = parseFloat(targetSpeed).toFixed(2);
 
-    if (!currentSpeeds.includes(targetSpeedFormatted)) {
+    /*
+     * La valeur choisie survit-elle au changement d'échelle ?
+     *
+     * Les trois échelles s'emboîtent — les pas de 0,05 contiennent les valeurs
+     * classiques, ceux de 0,01 contiennent les deux autres —, si bien que
+     * monter en précision ne perd jamais rien. C'est en redescendant que la
+     * valeur peut disparaître : 1,37 n'existe pas en classique, et le pad se
+     * rabat alors sur la plus proche.
+     */
+    const fellBack = !currentSpeeds.includes(targetSpeedFormatted);
+
+    if (fellBack) {
         let minDiff = Infinity;
         let closestSpeed = currentSpeeds[0];
         const targetVal = parseFloat(targetSpeed);
@@ -279,7 +290,18 @@ function togglePrecisionMode(indicatorSource) {
 
     const previousSpeed = window.MusicPlayer.currentSpeed;
     window.MusicPlayer.currentSpeed = targetSpeed;
-    window.MusicPlayer.rebuildSpeedPadTrack(true);
+
+    /*
+     * L'animation n'accompagne que ce repli, et non le changement d'échelle.
+     *
+     * Elle est là pour montrer d'où la valeur est partie et où elle a atterri :
+     * les graduations rebondissent depuis la nouvelle position, d'autant plus
+     * tard qu'elles en sont éloignées. Jouée alors que rien n'a bougé — le cas
+     * de trois bascules sur quatre, puisque monter en précision conserve
+     * toujours la valeur —, elle annonçait un déplacement qui n'avait pas eu
+     * lieu.
+     */
+    window.MusicPlayer.rebuildSpeedPadTrack(fellBack);
 
     if (targetSpeed !== previousSpeed) {
         window.MusicPlayer.sendSpeedUpdate(targetSpeed);
