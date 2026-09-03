@@ -185,6 +185,20 @@ class GuildDatabase {
             fadeoutDuration: 5,
 
             /**
+             * Destination du champ d'ajout : `queue`, `playlist`, `play` ou
+             * `download`.
+             *
+             * Par serveur, comme les deux menus de qualité d'import qui la
+             * voisinent dans la même boîte — et parce que trois de ses quatre
+             * valeurs désignent des choses propres au serveur : sa file, sa
+             * playlist active, sa lecture en cours.
+             *
+             * La file par défaut : c'est l'ajout qui n'engage à rien, le seul
+             * qui ne coupe pas ce qui joue et n'écrit rien sur le disque.
+             */
+            addTarget: 'queue',
+
+            /**
              * Délai de grâce avant que le bot ne quitte un salon vidé de ses
              * humains, **en secondes** — l'unité du curseur du tableau de bord,
              * et celle des réglages voisins.

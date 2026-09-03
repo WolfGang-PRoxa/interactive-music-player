@@ -355,6 +355,11 @@ sich keinen. Er ersetzt die Liste, die der Browser von sich aus anbot und die
 weder das Farbschema des Dashboards kannte noch eine Möglichkeit bot, einen
 Eintrag zu vergessen.
 
+Auch das Zielmenü neben dem Feld merkt sich etwas, aber anderswo: seine Stellung
+verwahrt **der Bot**, und zwar je Server, wie die beiden Menüs für die
+Importqualität. Sie übersteht damit ein Neuladen der Seite, einen Neustart des
+Bots, und folgt Ihnen auf ein anderes Gerät.
+
 ### Import von Dateien
 
 Legen Sie eine Audio- oder Videodatei auf der Oberfläche ab, um sie der

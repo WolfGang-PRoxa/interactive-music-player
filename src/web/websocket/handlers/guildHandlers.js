@@ -13,6 +13,14 @@ const { ensureEngine } = require('../../../audio/mix');
 const { applySpeed, cancelMixEffects } = require('../../../audio/playbackSettings');
 const log = require('../../../utils/logger');
 
+/**
+ * Destinations du champ d'ajout, dans l'ordre du menu déroulant.
+ *
+ * Doit rester identique aux valeurs des `<option>` de `#add-target-select`, dans
+ * index.html : c'est le même choix, écrit des deux côtés du fil.
+ */
+const ADD_TARGETS = ['queue', 'playlist', 'play', 'download'];
+
 async function handleSelectChannel(ctx) {
     const { ws, data, webServer, player } = ctx;
     let queue = ctx.queue;
@@ -569,6 +577,21 @@ async function handleUpdateSettings(ctx) {
                 } else {
                     delete data.presenceDepartureDelay;
                 }
+            }
+
+            /*
+             * Destination du champ d'ajout.
+             *
+             * `updateSettings` écrit ce qu'on lui donne : une valeur inconnue
+             * serait retenue telle quelle, et le menu déroulant se retrouverait
+             * au rechargement suivant sur une option qui n'existe pas — donc
+             * vide, sans que rien n'explique pourquoi. Elle est donc écartée
+             * plutôt que corrigée : imposer « file d'attente » ferait croire à
+             * un choix, là où il n'y a qu'une demande incompréhensible.
+             */
+            if (data.addTarget !== undefined && !ADD_TARGETS.includes(data.addTarget)) {
+                log.warn(`[WebServer Settings] Unknown add destination ignored: ${data.addTarget}`);
+                delete data.addTarget;
             }
 
             database.updateSettings(currentGuildId, data);

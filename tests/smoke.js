@@ -178,6 +178,13 @@ async function stageIntegration() {
                 check('every protocol field is present',
                     missing.length === 0,
                     missing.length ? `missing: ${missing.join(', ')}` : `${STATE_FIELDS.length} fields`);
+
+                // La destination du champ d'ajout traverse l'état : c'est par là
+                // qu'elle revient au tableau de bord après un rechargement, et
+                // le seul endroit où l'on constate qu'elle y arrive vraiment.
+                check('the add destination travels with the settings',
+                    !!data.settings && typeof data.settings.addTarget === 'string',
+                    String(data.settings && data.settings.addTarget));
             }
         }
 

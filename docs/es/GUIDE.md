@@ -341,6 +341,11 @@ mismo bot no comparten el mismo. Sustituye a la lista que el navegador ofrecía
 por su cuenta, la cual ignoraba el tema del panel y no ofrecía ningún modo de
 olvidar una entrada.
 
+El menú de destino, junto al campo, también recuerda, pero en otro sitio: su
+posición la retiene **el bot**, y por servidor, como los dos menús de calidad de
+importación. Sobrevive así a una recarga de la página, a un reinicio del bot, y
+le sigue a otro dispositivo.
+
 ### Importación de archivos
 
 Suelte un archivo de audio o de vídeo sobre la interfaz para añadirlo a la cola,

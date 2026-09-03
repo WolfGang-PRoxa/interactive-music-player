@@ -331,6 +331,10 @@ and the browser you are looking from, and two devices driving the same bot do
 not share one. It replaces the list the browser offered on its own, which
 ignored the dashboard theme and gave no way to forget an entry.
 
+The destination menu beside the field remembers too, but elsewhere: its position
+is kept **by the bot**, and per server, like the two import quality menus. So it
+survives a page reload, a restart of the bot, and follows you to another device.
+
 ### File import
 
 Drop an audio or video file onto the interface to add it to the queue, to a

@@ -339,6 +339,11 @@ pilotant le même bot n'ont pas le même. Il remplace la liste que le navigateur
 proposait de lui-même, laquelle ignorait le thème du tableau de bord et
 n'offrait aucun moyen d'oublier une entrée.
 
+Le menu de destination, à côté du champ, se souvient lui aussi — mais ailleurs :
+sa position est retenue **par le bot**, et par serveur, comme les deux menus de
+qualité d'import. Elle se retrouve donc au rechargement de la page, au
+redémarrage du bot, et depuis un autre appareil.
+
 ### Import de fichiers
 
 Déposez un fichier audio ou vidéo sur l'interface pour l'ajouter à la file, à

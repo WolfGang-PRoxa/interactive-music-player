@@ -950,6 +950,27 @@
             if (customImportVideoSelect) customImportVideoSelect.sync();
         }
 
+        /*
+         * Destination du champ d'ajout : le serveur fait autorité, comme pour
+         * les deux menus ci-dessus.
+         *
+         * Le menu retombait sur « file d'attente » à chaque rechargement, et
+         * après chaque redémarrage du bot : le choix ne vivait nulle part
+         * ailleurs que dans le `<select>` de la page ouverte.
+         *
+         * L'instance du menu déroulant est reprise sur l'élément — customSelect
+         * s'y dépose lui-même — plutôt que gardée dans une variable : ce menu
+         * est construit ailleurs, plus tard, et un état arrivé avant cette
+         * construction ne trouverait rien à synchroniser. Le `<select>` natif,
+         * lui, porte déjà la bonne valeur quand elle a lieu.
+         */
+        const addTargetSelect = document.getElementById('add-target-select');
+        if (state.settings.addTarget !== undefined && addTargetSelect
+            && addTargetSelect.value !== String(state.settings.addTarget)) {
+            addTargetSelect.value = String(state.settings.addTarget);
+            if (addTargetSelect._customSelect) addTargetSelect._customSelect.sync();
+        }
+
         // Delegate Speakers, Queue, and History UI rendering to js/queue.js module
         if (typeof window.MusicPlayer.updateSpeakersUI === 'function') {
             window.MusicPlayer.updateSpeakersUI();
@@ -3029,6 +3050,24 @@
     if (addTargetSelect && !addTargetSelect.dataset.customSelectInit) {
         addTargetSelect.dataset.customSelectInit = 'true';
         new CustomSelect(addTargetSelect);
+
+        /*
+         * La destination choisie est retenue par le bot, comme les qualités
+         * d'import qui la voisinent dans la même boîte : elle survit ainsi au
+         * rechargement de la page comme au redémarrage du serveur, et suit
+         * l'utilisateur d'un appareil à l'autre.
+         *
+         * L'écouteur est posé ici, et non avec les autres `change` du fichier,
+         * parce que c'est ici que ce menu existe : `addTargetSelect` y est
+         * déjà déclaré, et le sélecteur de mode d'appareil se branche de la
+         * même façon deux lignes plus haut.
+         */
+        addTargetSelect.addEventListener('change', (e) => {
+            window.MusicPlayer.sendWS({
+                type: 'updateSettings',
+                data: { addTarget: e.target.value }
+            });
+        });
     }
     const downloadFormatSelect = document.getElementById('download-format-select');
     if (downloadFormatSelect && !downloadFormatSelect.dataset.customSelectInit) {
