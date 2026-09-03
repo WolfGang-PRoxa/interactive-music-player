@@ -278,10 +278,17 @@ console.log('\nLe pied du sélecteur\n');
     check('`.maintenance-actions` empile bien ses boutons',
         /\.maintenance-actions\s*\{[^}]*flex-direction:\s*column/s.test(modals));
 
-    const rule = player.match(/([^\r\n{]*dir-browser-actions[^\r\n{]*)\{([^}]*)\}/);
+    const rule = player.match(/([^\r\n{]*dir-browser-actions\s*\{)([^}]*)\}/);
     check('le pied du sélecteur les remet en rangée',
         !!rule && /flex-direction:\s*row/.test(rule[2]),
-        rule ? rule[1].trim() : 'règle introuvable');
+        rule ? rule[1].replace('{', '').trim() : 'règle introuvable');
+    check('  … et centre son bouton, seule action de ce pied',
+        !!rule && /justify-content:\s*center/.test(rule[2]));
+
+    // Un plancher de largeur, sans valeur imposée : le libellé change de
+    // longueur d'une langue à l'autre, la valeur juste est affaire de goût.
+    check('le bouton a une largeur minimale',
+        /\.dir-browser-actions\s+\.maint-btn\s*\{[^}]*min-width:/s.test(player));
 
     const outranks = !!rule
         && rule[1].includes('.maintenance-actions')

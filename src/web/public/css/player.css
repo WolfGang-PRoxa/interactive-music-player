@@ -728,18 +728,28 @@ input:checked + .switch-slider:before {
  * `.maintenance-actions` empile ses boutons sur toute la largeur, ce qui a du
  * sens quand ils sont deux à se répondre. Seul, « Choisir ce dossier » étalé
  * d'un bord à l'autre pèserait plus lourd que ce qu'il fait — il confirme un
- * choix déjà pris au-dessus. Il reprend donc sa largeur propre, rangé à
- * droite, là où une fenêtre pose sa validation.
+ * choix déjà pris au-dessus.
+ *
+ * Il garde donc une largeur propre, mais centré : c'est la seule action de ce
+ * pied, et rien ne le tire d'un côté plutôt que de l'autre. Un plancher de
+ * largeur lui évite d'être aussi étroit que son texte, qui change de longueur
+ * d'une langue à l'autre — « Choose this folder » est plus court que
+ * « Carpeta predeterminada » n'est long.
  *
  * Les deux classes sont nommées ensemble, et ce n'est pas décoratif :
  * `modals.css` est importé **après** ce fichier (voir style.css), si bien qu'à
  * spécificité égale c'est son `flex-direction: column` qui l'emportait. La
- * règle ne dépend plus de l'ordre des feuilles.
+ * règle ne dépend plus de l'ordre des feuilles, et celle du bouton ci-dessous
+ * passe devant `.maint-btn` pour la même raison.
  */
 .maintenance-actions.dir-browser-actions {
     margin-top: 1rem;
     flex-direction: row;
-    justify-content: flex-end;
+    justify-content: center;
+}
+
+.dir-browser-actions .maint-btn {
+    min-width: 220px;
 }
 
 /*
