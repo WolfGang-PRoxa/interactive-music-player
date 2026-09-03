@@ -224,5 +224,140 @@ console.log('\n=== Précision de la pause — mode personnel ===\n');
 check('une file absente ne fait pas tomber le serveur',
     foldVirtualElapsed(null) === 0);
 
+// ═════════ Côté navigateur : l'affichage ne change pas de source ═════════
+
+/*
+ * La seconde moitié du même défaut, et celle qui se voyait vraiment.
+ *
+ * `renderSmoothProgress` lit deux horloges. En diffusion personnelle, tant que
+ * l'élément audio joue, elle lit l'élément — la position vraie, celle qui
+ * s'entend. Sinon elle lit l'estimation du serveur, avancée une fois par
+ * seconde et donc presque toujours en retard.
+ *
+ * L'ancienne condition n'admettait l'élément que « non en pause ». Appuyer sur
+ * pause faisait alors changer de source au moment précis du clic : la barre
+ * passait de la position réelle à une estimation plus ancienne, et reculait
+ * d'une fraction de seconde sans que rien n'ait bougé dans le morceau.
+ *
+ * La fonction est extraite de app.js et exécutée telle quelle : c'est celle qui
+ * tourne en production, et non une copie qui pourrait en diverger.
+ */
+const fs = require('fs');
+const vm = require('vm');
+
+/** Extrait une fonction de app.js, par équilibrage des accolades. */
+function extractFunction(source, name) {
+    const start = source.indexOf(`function ${name}()`);
+    if (start === -1) throw new Error(`${name} introuvable dans app.js`);
+
+    let depth = 0;
+    for (let end = source.indexOf('{', start); end < source.length; end++) {
+        if (source[end] === '{') depth++;
+        else if (source[end] === '}' && --depth === 0) return source.slice(start, end + 1);
+    }
+    throw new Error(`accolades non refermées pour ${name}`);
+}
+
+const appSource = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'web', 'public', 'app.js'), 'utf8'
+);
+
+const SERVER_RATIO = 99400 / 200000;
+
+/**
+ * Un banc minimal autour de la fonction de rendu.
+ *
+ * Les variables libres de `renderSmoothProgress` — l'état, l'élément audio, la
+ * barre — deviennent les globales du bac à sable : la fonction les lit sans
+ * savoir qu'elles ne viennent plus de sa fermeture.
+ */
+function mountRenderer({ personal = true, totalMs = 200000 } = {}) {
+    const context = {
+        isSeeking: false,
+        state: {
+            settings: { broadcastMode: personal ? 'personal' : 'everyone', playbackSpeed: '1.0' },
+            isPaused: false,
+            currentTrack: { title: 'Essai' },
+            progress: { currentMs: 99400, totalMs },
+        },
+        // L'élément est à 100 s ; le serveur, lui, en est encore à 99,4 s.
+        personalAudio: { duration: totalMs / 1000, currentTime: 100, paused: false },
+        progressBar: { style: {} },
+        timeCurrent: { textContent: '' },
+        timeTotal: { textContent: '' },
+        baseProgressMs: 99400,
+        baseTotalMs: totalMs,
+        lastProgressTimestamp: 1000,
+        isTrackPlaying: true,
+        window: { MusicPlayer: { currentSpeed: '1.0' } },
+        // Figée : l'extrapolation de la branche serveur doit être reproductible.
+        performance: { now: () => 1000 },
+        formatMs: (ms) => String(Math.round(ms)),
+        syncVideoProgress: () => {},
+    };
+    context.globalThis = context;
+    vm.createContext(context);
+    vm.runInContext(extractFunction(appSource, 'renderSmoothProgress'), context,
+        { filename: 'app.js:renderSmoothProgress' });
+
+    return {
+        context,
+        render() {
+            vm.runInContext('renderSmoothProgress()', context);
+            return context.window.MusicPlayer.currentProgressRatio;
+        },
+        /** Ce que devient l'affichage une fois la pause confirmée par le serveur. */
+        pause() {
+            context.state.isPaused = true;
+            context.personalAudio.paused = true;
+            context.isTrackPlaying = false;
+        },
+    };
+}
+
+console.log('=== Précision de la pause — affichage du navigateur ===\n');
+
+{
+    const bench = mountRenderer();
+    const playing = bench.render();
+    check('en lecture, la barre suit l’élément audio',
+        playing === 0.5, String(playing));
+
+    bench.pause();
+    const paused = bench.render();
+    check('la pause ne fait pas reculer la barre',
+        paused === playing, `${playing} puis ${paused}`);
+    check('  … elle ne retombe pas sur l’estimation du serveur',
+        paused !== SERVER_RATIO, `celle-ci vaut ${SERVER_RATIO}`);
+}
+
+{
+    // L'élément est arrêté sans que l'utilisateur l'ait demandé — chargement,
+    // bascule de piste. Il porte encore la position d'avant ; le serveur sait.
+    const bench = mountRenderer();
+    bench.context.personalAudio.paused = true;   // sans state.isPaused
+    check('un élément arrêté pour un chargement ne fait pas foi',
+        bench.render() === SERVER_RATIO, String(bench.render()));
+}
+
+{
+    // Rechargement de la page pendant une pause : l'élément repart de zéro, et
+    // c'est le serveur qui sait où l'on en était.
+    const bench = mountRenderer();
+    bench.pause();
+    bench.context.personalAudio.currentTime = 0;
+    check('une position nulle laisse la main au serveur',
+        bench.render() === SERVER_RATIO, String(bench.render()));
+}
+
+{
+    // En diffusion commune, le son ne sort pas du navigateur : son élément
+    // audio n'a rien à dire de la position.
+    const bench = mountRenderer({ personal: false });
+    bench.pause();
+    check('en diffusion commune, le serveur reste la référence',
+        bench.render() === SERVER_RATIO, String(bench.render()));
+}
+
 console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
 process.exit(failed === 0 ? 0 : 1);

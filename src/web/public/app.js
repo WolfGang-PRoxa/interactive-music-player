@@ -224,7 +224,38 @@
             const isPersonal = state.settings && state.settings.broadcastMode === 'personal';
             const speed = parseFloat((state.settings && state.settings.playbackSpeed) || window.MusicPlayer.currentSpeed || '1.0');
 
-            if (isPersonal && personalAudio && !isNaN(personalAudio.duration) && personalAudio.duration > 0 && !personalAudio.paused) {
+            /*
+             * Qui dit où en est la lecture.
+             *
+             * En diffusion personnelle, c'est l'élément audio : c'est lui qui
+             * joue, sa position est celle qu'on entend. Le serveur, lui, n'en
+             * tient qu'une estimation à l'horloge murale, avancée par un tour
+             * de boucle chaque seconde — donc en retard d'une fraction de
+             * seconde la plupart du temps.
+             *
+             * Il faut continuer de lire l'élément **pendant la pause**, et pas
+             * seulement pendant la lecture. La condition ne retenait ici que
+             * `!personalAudio.paused` : au moment précis où l'on appuyait,
+             * l'affichage changeait de source et passait de la position réelle
+             * à l'estimation, plus ancienne. La barre reculait alors d'une
+             * fraction de seconde alors que rien n'avait bougé dans le
+             * morceau — un recul qui ne venait pas de la lecture, mais de la
+             * question posée pour la mesurer.
+             *
+             * Deux réserves. L'élément ne fait foi que si l'arrêt vient de
+             * l'utilisateur (`state.isPaused`) : arrêté pour un chargement ou
+             * une bascule de piste, il porte encore la position du morceau
+             * précédent. Et une position nulle est écartée — au rechargement
+             * de la page pendant une pause, l'élément repart de zéro, et c'est
+             * le serveur qui sait où l'on en était, le temps que le recalage
+             * plus bas ait eu lieu.
+             */
+            const audioHoldsPosition = personalAudio
+                && !isNaN(personalAudio.duration) && personalAudio.duration > 0
+                && (!personalAudio.paused
+                    || (state.isPaused && personalAudio.currentTime > 0));
+
+            if (isPersonal && audioHoldsPosition) {
                 const currentSecs = personalAudio.currentTime;
                 const totalSecs = personalAudio.duration;
                 const ratio = Math.min(1, Math.max(0, currentSecs / totalSecs));
