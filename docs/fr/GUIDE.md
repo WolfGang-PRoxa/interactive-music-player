@@ -373,14 +373,14 @@ Le bouton en forme de dossier, à droite de cette ligne du menu, ouvre un
 explorateur de la machine hôte — et non un champ où taper un chemin, cette
 machine n'étant pas forcément celle d'où vous regardez. Sous Windows, les
 disques sont proposés en haut de la fenêtre : sans eux, remonter depuis un
-dossier de `C:` mène à `C:\` et jamais à `D:`. Une pastille
-**Téléchargements** y conduit d'un clic au dossier de téléchargement du
-système — celui du navigateur, souvent la bonne destination et quatre ou cinq
-pas plus loin dans l'arborescence ; elle mène l'explorateur là-bas plutôt que
-de valider, de sorte qu'on peut encore descendre d'un cran avant de
-confirmer. Le champ « Ou saisir un chemin »
-reste là pour les cas que l'explorateur ne couvre pas, et « Dossier par défaut »
-ramène à `data/downloads/`.
+dossier de `C:` mène à `C:\` et jamais à `D:`. Deux pastilles les
+précèdent : **Dossier par défaut**, qui ramène à `data/downloads/`, et
+**Téléchargements**, qui conduit au dossier de téléchargement du système — celui
+du navigateur, souvent la bonne destination et quatre ou cinq pas plus loin dans
+l'arborescence. L'une comme l'autre mènent l'explorateur là-bas plutôt que de
+valider : on voit ce que le dossier contient, et on peut encore descendre d'un
+cran avant de confirmer. Le champ « Ou saisir un chemin » reste là pour les cas
+que l'explorateur ne couvre pas.
 
 Le dossier est retenu **par le bot**, et non par le navigateur : il est commun à
 tous vos serveurs et à tous vos appareils. Un chemin qui n'existe pas, qui n'est

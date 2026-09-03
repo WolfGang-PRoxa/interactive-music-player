@@ -253,11 +253,35 @@ console.log('\nLe dossier de téléchargement du système\n');
 
 console.log('\nLa route /api/browse-dirs\n');
 
+/*
+ * La base est remplacée avant que la route ne la charge.
+ *
+ * Ces essais écrivent le dossier choisi : sur la vraie base, ils changeraient
+ * le réglage de la personne qui lance les tests, et un plantage à mi-course le
+ * lui laisserait modifié.
+ */
+let storedDir = null;
+{
+    const resolved = require.resolve('../src/database/Database');
+    require.cache[resolved] = {
+        id: resolved,
+        filename: resolved,
+        loaded: true,
+        exports: {
+            getDownloadDir: () => storedDir,
+            setDownloadDir: (value) => { storedDir = value || null; },
+        },
+    };
+}
+
 const express = require('express');
 const http = require('http');
 const createApiRouter = require('../src/web/routes/api.js');
 
 const app = express();
+// Le même analyseur de corps que WebServer monte devant ses routes : sans lui
+// `req.body` reste indéfini, et tout POST se lirait comme un corps vide.
+app.use(express.json({ limit: '1mb' }));
 app.use('/api', createApiRouter({ client: null, wss: null, inviteLink: () => null }));
 const server = http.createServer(app);
 
@@ -288,10 +312,16 @@ server.listen(0, '127.0.0.1', async () => {
     // La pastille de saisie rapide n'a pas d'autre source que cette clé : si
     // elle disparaît de la réponse, le raccourci disparaît de la fenêtre sans
     // que rien d'autre ne bronche.
+    // Les deux pastilles de raccourci n'ont pas d'autre source que ces clés :
+    // si l'une disparaît de la réponse, le raccourci disparaît de la fenêtre
+    // sans que rien d'autre ne bronche.
     check('  … ainsi que le dossier de téléchargement du système',
         !!start.json && 'downloads' in start.json
             && start.json.downloads === downloadDir.userDownloadsDir(),
         String(start.json && start.json.downloads));
+    check('  … et le dossier par défaut du bot',
+        !!start.json && start.json.defaultDir === downloadDir.DEFAULT_DIR,
+        String(start.json && start.json.defaultDir));
 
     // Le cas exact qui laissait la fenêtre vide.
     const gone = await get(`/api/browse-dirs?path=${encodeURIComponent(path.join(root, 'parti'))}`);
@@ -310,6 +340,61 @@ server.listen(0, '127.0.0.1', async () => {
         names.join(', ') || 'aucun');
     check('le parent est indiqué', !!(listed.json && listed.json.parent),
         String(listed.json && listed.json.parent));
+
+    /*
+     * Le choix du dossier, et le retour au défaut par la pastille.
+     *
+     * C'est ce qui remplace le bouton de réinitialisation : la pastille mène au
+     * dossier par défaut comme à n'importe quel autre, et « Choisir ce dossier »
+     * envoie alors son chemin absolu. Retenu tel quel, ce serait un choix
+     * explicite — le menu afficherait le chemin complet plutôt que
+     * « data/downloads/ », et déplacer le projet laisserait le bot écrire dans
+     * l'ancien dossier.
+     */
+    console.log('\nLe choix du dossier\n');
+
+    const post = (dir) => new Promise((resolve) => {
+        const body = JSON.stringify({ dir });
+        const req = http.request({
+            host: '127.0.0.1', port, path: '/api/download-dir', method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+        }, (res) => {
+            let text = '';
+            res.on('data', (c) => (text += c));
+            res.on('end', () => {
+                let json = null;
+                try { json = JSON.parse(text); } catch (e) {}
+                resolve({ status: res.statusCode, json });
+            });
+        });
+        req.end(body);
+    });
+
+    const chosen = await post(root);
+    check('un dossier ordinaire est retenu tel quel',
+        chosen.status === 200 && chosen.json.dir === root && chosen.json.isDefault === false,
+        `${chosen.json && chosen.json.dir}`);
+    check('  … et la base le garde', storedDir === root, String(storedDir));
+
+    const back = await post(downloadDir.DEFAULT_DIR);
+    check('désigner le dossier par défaut vaut retour au défaut',
+        back.status === 200 && back.json.isDefault === true,
+        `isDefault : ${back.json && back.json.isDefault}`);
+    check('  … la base ne retient donc aucun chemin', storedDir === null, String(storedDir));
+
+    // Sous Windows, « C:\Data » et « c:\data » sont le même dossier : la
+    // pastille ne doit pas se laisser prendre à la casse du chemin.
+    if (process.platform === 'win32') {
+        await post(root);
+        const cased = await post(downloadDir.DEFAULT_DIR.toUpperCase());
+        check('  … quelle que soit la casse du chemin',
+            cased.json && cased.json.isDefault === true && storedDir === null,
+            String(storedDir));
+    }
+
+    const empty = await post('');
+    check('un chemin vide reste le retour au défaut',
+        empty.status === 200 && empty.json.isDefault === true, String(empty.status));
 
     server.close();
     fs.rmSync(root, { recursive: true, force: true });

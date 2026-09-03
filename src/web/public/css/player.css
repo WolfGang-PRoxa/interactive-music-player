@@ -721,8 +721,20 @@ input:checked + .switch-slider:before {
     color: var(--text-main);
 }
 
+/*
+ * Le pied du sélecteur : un seul bouton depuis que le retour au dossier par
+ * défaut est passé en pastille, là-haut avec les autres raccourcis.
+ *
+ * `.maintenance-actions` empile ses boutons sur toute la largeur, ce qui a du
+ * sens quand ils sont deux à se répondre. Seul, « Choisir ce dossier » étalé
+ * d'un bord à l'autre pèserait plus lourd que ce qu'il fait — il confirme un
+ * choix déjà pris au-dessus. Il reprend donc sa largeur propre, rangé à
+ * droite, là où une fenêtre pose sa validation.
+ */
 .dir-browser-actions {
     margin-top: 1rem;
+    flex-direction: row;
+    justify-content: flex-end;
 }
 
 /*
@@ -769,12 +781,12 @@ input:checked + .switch-slider:before {
     border-color: var(--c-primary);
 }
 
-/* La pastille du dossier de téléchargement du système.
+/* Les pastilles de raccourci : le dossier par défaut, celui du système.
 
-   Elle porte un mot, là où ses voisines portent une lettre de disque : la
+   Elles portent un mot, là où leurs voisines portent une lettre de disque : la
    police à chasse fixe, faite pour aligner « C:\ » sur « D:\ », n'a plus de
    raison d'être ici et étirerait le libellé sans rien y gagner. */
-.dir-downloads-chip {
+.dir-shortcut-chip {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
@@ -782,7 +794,7 @@ input:checked + .switch-slider:before {
     font-size: 0.76rem;
 }
 
-.dir-downloads-chip svg {
+.dir-shortcut-chip svg {
     width: 13px;
     height: 13px;
     flex-shrink: 0;

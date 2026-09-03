@@ -161,29 +161,33 @@ window.MusicPlayer = window.MusicPlayer || {};
         const currentPath = (payload.path || '').toLowerCase();
 
         /*
-         * Le dossier de téléchargement du système.
+         * Les deux raccourcis, avant les disques.
          *
-         * C'est là que la plupart des gens rangent ce qu'ils récupèrent, et
-         * l'atteindre en parcourant l'arborescence demande quatre ou cinq pas
-         * depuis la racine. La pastille les remplace.
+         * Le dossier par défaut du bot d'abord, celui du système ensuite : de
+         * l'application vers la machine, puis vers les disques. Ce sont les
+         * deux seules destinations qu'on redemande souvent, et les atteindre en
+         * parcourant l'arborescence demande quatre ou cinq pas depuis une
+         * racine.
          *
-         * Elle conduit l'explorateur là-bas plutôt que de valider sur-le-champ,
-         * comme les racines à côté d'elle : le chemin se pose dans le champ, on
-         * voit ce qu'il contient, et on peut encore descendre d'un cran — vers
-         * un sous-dossier « Musique », par exemple — avant de confirmer.
+         * Elles conduisent l'explorateur là-bas plutôt que de valider
+         * sur-le-champ, comme les racines à côté d'elles : le chemin se pose
+         * dans le champ, on voit ce que le dossier contient, et on peut encore
+         * descendre d'un cran — vers un sous-dossier « Musique », par
+         * exemple — avant de confirmer.
          *
-         * Absente si le système n'en déclare pas, ou si le dossier a disparu :
-         * une pastille qui ne mène nulle part vaut moins que pas de pastille.
+         * Une pastille absente vaut mieux qu'une pastille qui ne mène nulle
+         * part : celle du système ne paraît pas si le système n'en déclare
+         * aucun, ou si le dossier a disparu depuis.
          */
-        if (payload.downloads) {
+        const shortcut = (target, label, glyph) => {
             const chip = document.createElement('button');
             chip.type = 'button';
-            chip.className = 'dir-root-chip dir-downloads-chip';
-            if (currentPath === payload.downloads.toLowerCase()) chip.classList.add('is-current');
-            chip.title = payload.downloads;
+            chip.className = 'dir-root-chip dir-shortcut-chip';
+            if (currentPath === target.toLowerCase()) chip.classList.add('is-current');
+            // Le chemin complet en infobulle : le libellé dit à quoi sert le
+            // raccourci, pas où il mène.
+            chip.title = target;
 
-            // Flèche descendant sur un socle : l'icône du téléchargement, la
-            // même que partout ailleurs dans le tableau de bord.
             const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             icon.setAttribute('viewBox', '0 0 24 24');
             icon.setAttribute('fill', 'none');
@@ -191,17 +195,29 @@ window.MusicPlayer = window.MusicPlayer || {};
             icon.setAttribute('stroke-width', '2');
             icon.setAttribute('stroke-linecap', 'round');
             icon.setAttribute('stroke-linejoin', 'round');
-            const glyph = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            glyph.setAttribute('d', 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3');
-            icon.appendChild(glyph);
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', glyph);
+            icon.appendChild(path);
             chip.appendChild(icon);
 
-            const label = document.createElement('span');
-            label.textContent = t('download_dir_downloads', 'Téléchargements');
-            chip.appendChild(label);
+            const text = document.createElement('span');
+            text.textContent = label;
+            chip.appendChild(text);
 
-            chip.addEventListener('click', () => browse(payload.downloads));
+            chip.addEventListener('click', () => browse(target));
             bar.appendChild(chip);
+        };
+
+        // Un dossier, et une flèche descendant sur un socle : les mêmes glyphes
+        // que partout ailleurs dans le tableau de bord.
+        const FOLDER = 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z';
+        const DOWNLOAD = 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3';
+
+        if (payload.defaultDir) {
+            shortcut(payload.defaultDir, t('download_dir_default', 'Dossier par défaut'), FOLDER);
+        }
+        if (payload.downloads) {
+            shortcut(payload.downloads, t('download_dir_downloads', 'Téléchargements'), DOWNLOAD);
         }
 
         // Une seule racine — tout système autre que Windows — : la montrer
@@ -328,9 +344,6 @@ window.MusicPlayer = window.MusicPlayer || {};
                 commit(typed || (browsing ? browsing.path : ''));
             });
         }
-
-        const resetBtn = el('btn-download-dir-reset');
-        if (resetBtn) resetBtn.addEventListener('click', () => commit(''));
 
         const manual = el('input-download-dir');
         if (manual) {

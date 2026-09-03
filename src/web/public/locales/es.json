@@ -159,7 +159,7 @@
     "download_dir_title": "Carpeta de descargas",
     "download_dir_downloads": "Descargas",
     "download_dir_manual": "O escriba una ruta:",
-    "download_dir_reset": "Carpeta predeterminada",
+    "download_dir_default": "Carpeta predeterminada",
     "download_dir_save": "Elegir esta carpeta",
     "download_dir_empty": "Ninguna subcarpeta.",
     "download_dir_not_writable": "Esta carpeta no puede recibir archivos.",

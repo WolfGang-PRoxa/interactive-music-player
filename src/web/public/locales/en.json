@@ -159,7 +159,7 @@
     "download_dir_title": "Download folder",
     "download_dir_downloads": "Downloads",
     "download_dir_manual": "Or type a path:",
-    "download_dir_reset": "Default folder",
+    "download_dir_default": "Default folder",
     "download_dir_save": "Choose this folder",
     "download_dir_empty": "No subfolder.",
     "download_dir_not_writable": "This folder cannot receive files.",

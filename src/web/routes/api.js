@@ -1133,8 +1133,7 @@ function createApiRouter(webServer) {
     router.post('/download-dir', (req, res) => {
         const wanted = req.body && typeof req.body.dir === 'string' ? req.body.dir : null;
 
-        // Chaîne vide ou absente : retour au dossier par défaut. C'est ce que
-        // fait le bouton « réinitialiser » du sélecteur.
+        // Chaîne vide ou absente : retour au dossier par défaut.
         if (!wanted || !wanted.trim()) {
             database.setDownloadDir(null);
             return res.json({ dir: downloadDir.DEFAULT_DIR, isDefault: true });
@@ -1144,6 +1143,30 @@ function createApiRouter(webServer) {
         if (!verdict.ok) {
             log.warn(`[WebServer DownloadDir] Refused: ${wanted} (${verdict.reason})`);
             return res.status(400).json({ error: verdict.reason });
+        }
+
+        /*
+         * Désigner le dossier par défaut, c'est revenir au défaut.
+         *
+         * Le sélecteur y mène par une pastille, comme à n'importe quel autre
+         * dossier : ce qui arrive ici est alors le chemin absolu de
+         * `data/downloads`. L'enregistrer tel quel serait un choix explicite —
+         * le menu afficherait « Vers C:\…\data\downloads » au lieu de « Vers
+         * data/downloads/ », et un déplacement du projet laisserait le bot
+         * écrire dans l'ancien dossier.
+         *
+         * Le retenir comme nul rend au chemin son caractère relatif, et fait de
+         * la pastille l'équivalent exact du bouton de réinitialisation qu'elle
+         * remplace. La comparaison ignore la casse sous Windows, où
+         * « C:\Data » et « c:\data » sont le même dossier.
+         */
+        const asDefault = process.platform === 'win32'
+            ? verdict.resolved.toLowerCase() === downloadDir.DEFAULT_DIR.toLowerCase()
+            : verdict.resolved === downloadDir.DEFAULT_DIR;
+
+        if (asDefault) {
+            database.setDownloadDir(null);
+            return res.json({ dir: downloadDir.DEFAULT_DIR, isDefault: true });
         }
 
         database.setDownloadDir(verdict.resolved);
@@ -1200,7 +1223,7 @@ function createApiRouter(webServer) {
         if (!target) {
             return res.json({
                 path: null, parent: null, requested: wanted, roots, downloads,
-                dirs: [], writable: false,
+                defaultDir: downloadDir.DEFAULT_DIR, dirs: [], writable: false,
             });
         }
 
@@ -1210,7 +1233,7 @@ function createApiRouter(webServer) {
         } catch (e) {
             return res.json({
                 path: null, parent: null, requested: wanted, roots, downloads,
-                dirs: [], writable: false,
+                defaultDir: downloadDir.DEFAULT_DIR, dirs: [], writable: false,
             });
         }
 
@@ -1247,6 +1270,7 @@ function createApiRouter(webServer) {
             requested: target === wanted ? null : wanted,
             roots,
             downloads,
+            defaultDir: downloadDir.DEFAULT_DIR,
             writable: downloadDir.validate(target).ok,
             dirs,
         });

@@ -376,13 +376,13 @@ El botón con forma de carpeta, a la derecha de esa línea del menú, abre un
 explorador de la máquina anfitriona — y no un campo donde teclear una ruta, ya
 que esa máquina no es necesariamente aquella desde la que usted mira. En Windows
 las unidades se ofrecen en la parte alta de la ventana: sin ellas, subir desde
-una carpeta de `C:` lleva a `C:\` y nunca a `D:`. Una pastilla
-**Descargas** conduce de un clic a la carpeta de descargas del sistema — la del
+una carpeta de `C:` lleva a `C:\` y nunca a `D:`. Dos pastillas las
+preceden: **Carpeta predeterminada**, que devuelve a `data/downloads/`, y
+**Descargas**, que conduce a la carpeta de descargas del sistema — la del
 navegador, a menudo el destino correcto y cuatro o cinco pasos más abajo en el
-árbol; lleva allí el explorador en lugar de validar, de modo que aún se puede
-bajar un nivel antes de confirmar. El campo «O introducir una
-ruta» permanece para los casos que el explorador no cubre, y «Carpeta por
-defecto» devuelve a `data/downloads/`.
+árbol. Una y otra llevan allí el explorador en lugar de validar: se ve lo que la
+carpeta contiene, y aún se puede bajar un nivel antes de confirmar. El campo «O
+introducir una ruta» permanece para los casos que el explorador no cubre.
 
 La carpeta la retiene **el bot**, y no el navegador: es común a todos sus
 servidores y a todos sus dispositivos. Una ruta que no existe, que no es una

@@ -159,7 +159,7 @@
     "download_dir_title": "Download-Ordner",
     "download_dir_downloads": "Downloads",
     "download_dir_manual": "Oder einen Pfad eingeben:",
-    "download_dir_reset": "Standardordner",
+    "download_dir_default": "Standardordner",
     "download_dir_save": "Diesen Ordner wählen",
     "download_dir_empty": "Kein Unterordner.",
     "download_dir_not_writable": "Dieser Ordner kann keine Dateien aufnehmen.",

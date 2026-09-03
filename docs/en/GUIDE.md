@@ -364,12 +364,13 @@ The folder button, at the right of that row of the menu, opens a browser of the
 host machine — rather than a field to type a path into, that machine not
 necessarily being the one you are looking from. On Windows the drives are
 offered at the top of the window: without them, going up from a folder of `C:`
-leads to `C:\` and never to `D:`. A **Downloads** chip goes straight to the
-system's download folder — the browser's own, usually the right destination and
-four or five steps further down the tree; it takes the browser there rather
-than confirming, so you can still go one level deeper first. The "Or enter a path" field stays there for
-the cases the browser does not cover, and "Default folder" returns to
-`data/downloads/`.
+leads to `C:\` and never to `D:`. Two chips come before them: **Default
+folder**, which returns to `data/downloads/`, and **Downloads**, which goes to
+the system's download folder — the browser's own, usually the right destination
+and four or five steps further down the tree. Both take the browser there rather
+than confirming: you see what the folder holds, and can still go one level
+deeper before confirming. The "Or enter a path" field stays there for the cases
+the browser does not cover.
 
 The folder is remembered **by the bot**, not by the browser: it is shared by all
 your servers and all your devices. A path that does not exist, that is not a

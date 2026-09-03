@@ -159,7 +159,7 @@
     "download_dir_title": "Dossier de téléchargement",
     "download_dir_downloads": "Téléchargements",
     "download_dir_manual": "Ou saisir un chemin :",
-    "download_dir_reset": "Dossier par défaut",
+    "download_dir_default": "Dossier par défaut",
     "download_dir_save": "Choisir ce dossier",
     "download_dir_empty": "Aucun sous-dossier.",
     "download_dir_not_writable": "Ce dossier ne peut pas recevoir de fichiers.",
