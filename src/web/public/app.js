@@ -2314,6 +2314,25 @@
             // trace ni saut ne doivent en découler.
             if (audio.unlockInProgress) return;
 
+            /*
+             * La condition est calculée une fois, et sert aux deux.
+             *
+             * Elle était écrite deux fois : une pour le journal, une pour
+             * l'envoi — et les deux ne disaient pas la même chose, le libellé
+             * ayant oublié la clause du pilote. Un tableau de bord qui n'est pas
+             * pilote écrivait donc « saut ENVOYE » sans rien envoyer.
+             *
+             * Le mensonge a coûté cher. Quand l'élection de pilote manquait sur
+             * un serveur, la lecture s'y arrêtait en fin de piste, le journal se
+             * remplissait d'annonces de sauts que personne n'avait reçues, et
+             * rien côté serveur ne pouvait le contredire : il n'avait rien vu
+             * passer. Chercher pourquoi un saut « envoyé » n'arrivait pas mène
+             * partout sauf à l'endroit.
+             */
+            const announces = state.settings.broadcastMode === 'personal'
+                && audio === activeAudio
+                && state.pilot !== false;
+
             // Tracé même lorsque le garde écarte l'envoi : savoir qu'un élément
             // s'est terminé sans provoquer de saut vaut autant que l'inverse.
             sendWS({
@@ -2324,12 +2343,13 @@
                         + `| actif ${audio === activeAudio ? 'oui' : 'non'} `
                         + `| fondu sortant ${audio.isMixFadingOut ? 'oui' : 'non'} `
                         + `| mode ${state.settings.broadcastMode} `
-                        + `| saut ${(state.settings.broadcastMode === 'personal' && audio === activeAudio) ? 'ENVOYE' : 'ecarte'}`
+                        + `| pilote ${state.pilot === false ? 'non' : 'oui'} `
+                        + `| saut ${announces ? 'ENVOYE' : 'ecarte'}`
                 }
             });
             // Seul le pilote annonce les fins de piste — voir le déclenchement du
             // fondu plus haut, et l'élection côté serveur.
-            if (state.settings.broadcastMode === 'personal' && audio === activeAudio && state.pilot !== false) {
+            if (announces) {
                 console.log('[Audio] ended, skipping to next track');
                 sendWS({
                     type: 'skip',

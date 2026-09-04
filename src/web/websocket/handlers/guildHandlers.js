@@ -29,9 +29,30 @@ async function handleSelectChannel(ctx) {
 
         const { guildId: targetGuildId, channelId } = data;
         if (targetGuildId && channelId) {
+            const previousGuildId = ws.selectedGuildId;
             ws.selectedGuildId = targetGuildId;
             ws.selectedVoiceChannelId = channelId;
             database.setLastVoiceChannel(targetGuildId, channelId);
+
+            /*
+             * L'élection du pilote suit le tableau de bord.
+             *
+             * Elle n'avait lieu qu'à la connexion et à la déconnexion d'un
+             * client : changer de serveur depuis l'interface amenait donc sur
+             * une guilde sans pilote, et plus personne n'y annonçait les fins
+             * de piste. La lecture s'y arrêtait au bout du morceau, jusqu'à ce
+             * que la roue de secours du serveur avance la file une demi-minute
+             * plus tard — un blanc à chaque titre, sans rien dans le journal
+             * pour le dire.
+             *
+             * La guilde quittée est réélue d'abord : ce tableau de bord en
+             * était peut-être le pilote, et un autre encore ouvert dessus doit
+             * prendre le relais.
+             */
+            if (previousGuildId && previousGuildId !== targetGuildId) {
+                webServer._ensurePilot(previousGuildId);
+            }
+            webServer._ensurePilot(targetGuildId);
 
             const guild = webServer.client.guilds.cache.get(targetGuildId);
             if (guild) {

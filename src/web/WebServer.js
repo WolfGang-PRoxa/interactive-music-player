@@ -802,8 +802,19 @@ class WebServer {
     _ensurePilot(guildId) {
         if (!guildId) return null;
 
+        /*
+         * Le pilote en place n'est gardé que s'il est encore sur cette guilde.
+         *
+         * Sa seule connexion ne suffit pas : un tableau de bord qui change de
+         * serveur reste ouvert, et resterait donc inscrit comme pilote d'une
+         * guilde qu'il ne regarde plus. Elle n'aurait alors plus personne pour
+         * annoncer ses fins de piste, tout en paraissant pourvue.
+         */
         const currentPilot = this.pilots.get(guildId);
-        if (currentPilot && currentPilot.readyState === 1) return currentPilot;
+        if (currentPilot && currentPilot.readyState === 1
+            && currentPilot.selectedGuildId === guildId) {
+            return currentPilot;
+        }
 
         for (const client of this.wss.clients) {
             if (client.readyState === 1 && client.selectedGuildId === guildId) {
