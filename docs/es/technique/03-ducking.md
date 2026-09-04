@@ -160,6 +160,44 @@ no vale nada.
 
 ---
 
+## El oído de la conexión
+
+Todo lo anterior supone que la conexión de voz sepa **recibir**. No está
+garantizado: discord-player 7 ya no se apoya en `@discordjs/voice` sino en
+`discord-voip`, una bifurcación reducida a la difusión cuyas conexiones no
+tienen `receiver` — el símbolo `VoiceReceiver` ni siquiera existe allí.
+
+El manifiesto del proyecto pide por tanto redirigir ese nombre a
+`@discordjs/voice`, que sí lo tiene. Pero npm coloca igualmente una copia propia
+bajo la carpeta de discord-player:
+
+```
+node_modules/
+├── discord-voip/          ← el alias a @discordjs/voice, con receiver
+└── discord-player/
+    └── node_modules/
+        └── discord-voip/  ← la verdadera discord-voip, sin él
+```
+
+Como Node busca primero en la carpeta de quien pide, gana la segunda, y los
+`overrides` no pueden nada: discord-player declara `discord-voip: ^7.2.0`, un
+rango que `@discordjs/voice@0.19.2` no satisface, y npm renuncia en silencio —
+un archivo de bloqueo regenerado sale idéntico.
+
+[`tools/keep-voice-receiver.js`](../../../tools/keep-voice-receiver.js),
+enganchado a `postinstall`, aparta la copia anidada tras cada instalación. Node
+sube entonces un nivel y encuentra la que oye. El gesto debe repetirse cada vez,
+incluidas las instalaciones que el propio bot desencadena al cambiar de versión
+([06 — Persistencia](06-persistance.md)).
+
+La avería, al menos, ahora hace ruido. No lo hacía: leer `receiver.speaking`
+lanzaba una excepción que subía por `setupDucking`, llevándose consigo el
+controlador de volumen y el emisor de silencio, y el registro solo mostraba un
+«Cannot read properties of undefined» sin relación aparente con el sonido. El
+`DuckingManager` comprueba ahora el oído antes de engancharse a él, y lo dice.
+
+---
+
 ## VolumeController
 
 Encapsula el `queue.node` de discord-player para ofrecer transiciones

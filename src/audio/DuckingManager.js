@@ -47,6 +47,37 @@ class DuckingManager {
     _setupListeners() {
         this._active = true;
 
+        /*
+         * Une connexion sans oreille.
+         *
+         * Le ducking suppose que la connexion vocale sache *recevoir*, ce qui
+         * n'a rien d'acquis : discord-player s'appuie sur `discord-voip`, un
+         * embranchement de `@discordjs/voice` réduit à la diffusion, dont les
+         * connexions n'ont pas de `receiver` du tout. Le paquet de dépendances
+         * du projet redirige ce nom vers `@discordjs/voice`, mais npm range
+         * volontiers une copie propre à discord-player sous son dossier, où
+         * cette redirection ne s'applique pas.
+         *
+         * Le cas est donc réel, et il coûtait cher : la lecture de
+         * `receiver.speaking` levait une exception qui remontait à travers
+         * `setupDucking`, emportant avec elle tout ce qui la suivait — le
+         * contrôleur de volume et le diffuseur de silence. Le journal ne
+         * montrait qu'un « Cannot read properties of undefined » sans rapport
+         * apparent avec le son, et le ducking paraissait simplement inerte.
+         *
+         * Mieux vaut le dire, et laisser le reste s'installer.
+         */
+        const receiver = this.connection?.receiver;
+        if (!receiver?.speaking) {
+            log.warn('[Ducking] Voice connection without a receiver: nobody can be heard '
+                + 'speaking, so ducking stays inert. The « discord-voip » package resolved '
+                + 'by discord-player must be « @discordjs/voice » for this to work.');
+            // `_active` reste levé : le gestionnaire est bien en place, et une
+            // connexion ultérieure pourvue d'un receiver doit pouvoir être
+            // écoutée. L'abaisser ici ferait renoncer `updateConnection()`.
+            return;
+        }
+
         this._onSpeakingStart = (userId) => {
             this._handleSpeakingStart(userId);
         };
@@ -55,8 +86,8 @@ class DuckingManager {
             this._handleSpeakingEnd(userId);
         };
 
-        this.connection.receiver.speaking.on('start', this._onSpeakingStart);
-        this.connection.receiver.speaking.on('end', this._onSpeakingEnd);
+        receiver.speaking.on('start', this._onSpeakingStart);
+        receiver.speaking.on('end', this._onSpeakingEnd);
     }
 
     /**
@@ -302,11 +333,14 @@ class DuckingManager {
      * Supprime les listeners du receiver.
      */
     _removeListeners() {
-        if (this._onSpeakingStart) {
-            this.connection.receiver.speaking.removeListener('start', this._onSpeakingStart);
+        // Même prudence qu'à la pose : sans receiver, aucun écouteur n'a été
+        // posé, et le retrait n'a rien à défaire.
+        const speaking = this.connection?.receiver?.speaking;
+        if (speaking && this._onSpeakingStart) {
+            speaking.removeListener('start', this._onSpeakingStart);
         }
-        if (this._onSpeakingEnd) {
-            this.connection.receiver.speaking.removeListener('end', this._onSpeakingEnd);
+        if (speaking && this._onSpeakingEnd) {
+            speaking.removeListener('end', this._onSpeakingEnd);
         }
         this._onSpeakingStart = null;
         this._onSpeakingEnd = null;
