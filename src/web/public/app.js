@@ -56,6 +56,18 @@
     let activeAudio = primaryAudio;
     window.MusicPlayer.activeAudio = activeAudio;
 
+    /*
+     * Correction de niveau du lecteur du navigateur, posée avant tout le reste.
+     *
+     * Elle enveloppe la propriété « volume » des deux éléments : il faut donc
+     * qu'aucun volume n'ait encore été écrit dessus, sans quoi la valeur déjà
+     * posée échapperait au gain jusqu'à la prochaine écriture.
+     */
+    if (typeof window.MusicPlayer.attachLoudnessGain === 'function') {
+        window.MusicPlayer.attachLoudnessGain(primaryAudio);
+        window.MusicPlayer.attachLoudnessGain(secondaryAudio);
+    }
+
     let fadeAudio = null;
     let mixTransitionNextTrack = null;
 
@@ -194,6 +206,10 @@
     const mixDurationRange = document.getElementById('mix-duration-range');
     const mixDurationVal = document.getElementById('mix-duration-val');
     const mixTypeButtons = document.querySelectorAll('.mix-type-btn');
+    const lufsSyncToggle = document.getElementById('lufs-sync-toggle');
+    const lufsSyncOptions = document.getElementById('lufs-sync-options');
+    const lufsSyncRange = document.getElementById('lufs-sync-range');
+    const lufsSyncVal = document.getElementById('lufs-sync-val');
 
     const btnClearHistory = document.getElementById('btn-clear-history');
     const btnClearQueue = document.getElementById('btn-clear-queue');
@@ -956,6 +972,20 @@
             });
         }
 
+        // --- Synchronisation des niveaux sonores ---
+        if (state.settings.lufsSyncEnabled !== undefined && lufsSyncToggle) {
+            lufsSyncToggle.checked = state.settings.lufsSyncEnabled;
+            lufsSyncOptions.classList.toggle('disabled', !state.settings.lufsSyncEnabled);
+        }
+
+        // Le curseur sous le doigt garde la main : l'état qui revient porte la
+        // valeur qu'on vient d'envoyer, avec un tour de retard.
+        if (state.settings.lufsSyncTarget !== undefined && lufsSyncRange
+            && document.activeElement !== lufsSyncRange) {
+            lufsSyncRange.value = state.settings.lufsSyncTarget;
+            lufsSyncVal.textContent = formatLufsTarget(state.settings.lufsSyncTarget);
+        }
+
         // Qualité d'import : le serveur fait autorité, le sélecteur le reflète
         if (state.settings.importAudioQuality !== undefined && importAudioQualitySelect
             && importAudioQualitySelect.value !== String(state.settings.importAudioQuality)) {
@@ -1021,6 +1051,13 @@
 
         // Synchroniser le lecteur personnel du navigateur
         syncPersonalAudio();
+
+        // Le gain de sonie de chaque élément, relu de l'état : les adresses
+        // viennent peut-être d'être posées par la ligne précédente, et c'est
+        // l'adresse qui dit quelle piste un élément est en train de lire.
+        if (typeof window.MusicPlayer.applyLoudnessGains === 'function') {
+            window.MusicPlayer.applyLoudnessGains(state);
+        }
 
         // Mettre à jour l'IHM des playlists
         updatePlaylistsUI();
@@ -1669,6 +1706,61 @@
             data: { mixDuration: val }
         });
     });
+
+    /**
+     * « −14.0 LUFS », avec le vrai signe moins.
+     *
+     * Le trait d'union du clavier est plus court et plus haut que le signe
+     * moins : dans une valeur affichée en gros, à côté d'un curseur, la
+     * différence se voit.
+     *
+     * @param {number|string} value
+     * @returns {string}
+     */
+    function formatLufsTarget(value) {
+        const number = parseFloat(value);
+        if (!Number.isFinite(number)) return '—';
+        return `${number.toFixed(1).replace('-', '−')} LUFS`;
+    }
+
+    // --- Synchronisation des niveaux sonores ---
+    if (lufsSyncToggle) {
+        lufsSyncToggle.addEventListener('change', (e) => {
+            const checked = e.target.checked;
+            lufsSyncOptions.classList.toggle('disabled', !checked);
+            sendWS({ type: 'updateSettings', data: { lufsSyncEnabled: checked } });
+        });
+
+        /*
+         * Le curseur émet pendant qu'on le déplace, pas seulement au
+         * relâchement : le réglage doit s'entendre sur le morceau en cours
+         * pendant qu'on cherche le bon niveau. Les envois sont regroupés — un
+         * curseur produit une valeur par pixel parcouru, et chacune coûte une
+         * diffusion d'état à tous les tableaux de bord connectés.
+         */
+        let lufsSendTimer = null;
+        const pushLufsTarget = (value, immediate) => {
+            if (lufsSendTimer) {
+                clearTimeout(lufsSendTimer);
+                lufsSendTimer = null;
+            }
+            const emit = () => {
+                lufsSendTimer = null;
+                sendWS({ type: 'updateSettings', data: { lufsSyncTarget: value } });
+            };
+            if (immediate) emit();
+            else lufsSendTimer = setTimeout(emit, 120);
+        };
+
+        lufsSyncRange.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            lufsSyncVal.textContent = formatLufsTarget(value);
+            pushLufsTarget(value, false);
+        });
+        lufsSyncRange.addEventListener('change', (e) => {
+            pushLufsTarget(parseFloat(e.target.value), true);
+        });
+    }
 
     // Mix type segmented control buttons
     mixTypeButtons.forEach(btn => {

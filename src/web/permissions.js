@@ -113,6 +113,8 @@ const ACTION_GROUPS = {
     // Volume, atténuation, diffusion, qualité
     selectChannel: 'volume',
     setTrackQuality: 'volume',
+    setTrackLoudness: 'volume',
+    requestTrackLoudness: 'volume',
     toggleVoiceDetection: 'volume',
 
     // Maître seul
@@ -155,6 +157,8 @@ const SETTINGS_FIELDS = {
     mixEnabled: 'playback',
     mixDuration: 'playback',
     mixType: 'playback',
+    lufsSyncEnabled: 'playback',
+    lufsSyncTarget: 'playback',
 };
 
 /** Droits d'un invité à qui rien n'a été accordé. */

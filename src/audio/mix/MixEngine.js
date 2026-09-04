@@ -44,6 +44,8 @@ const MixBus = require('./MixBus');
 const MixSource = require('./MixSource');
 const { FRAME_DURATION_MS } = require('./format');
 const database = require('../../database/Database');
+const loudness = require('../loudness');
+const loudnessAnalyzer = require('../LoudnessAnalyzer');
 const log = require('../../utils/logger');
 
 /**
@@ -358,6 +360,7 @@ class MixEngine {
             startMs: seek,
             speed: this._speed(settings),
             gain: 1,
+            levelGain: loudness.linearGain(track.url, settings),
         });
 
         try {
@@ -387,6 +390,11 @@ class MixEngine {
 
         this._fadeStarted = false;
         this._source = source;
+
+        // La mesure de sonie manque tant que le morceau n'a jamais été joué :
+        // on la demande ici, et le gain se posera de lui-même quand elle
+        // tombera — `applyLoudness()` est rappelée sur l'événement de mesure.
+        loudnessAnalyzer.ensure(track);
 
         // Entrée en fondu d'un morceau qui démarre seul — un démarrage manuel,
         // un saut de piste. L'enchaînement de fin de morceau, lui, amène le
@@ -504,6 +512,30 @@ class MixEngine {
         }
     }
 
+    /**
+     * Réaligne le niveau des morceaux en cours sur les réglages courants.
+     *
+     * Contrairement à la vitesse, rien n'est à relancer : le gain vit dans le
+     * mixage, pas dans le décodeur. C'est ce qui rend le curseur de LUFS
+     * immédiat, y compris au milieu d'un fondu enchaîné — le morceau qui entre
+     * est corrigé en même temps que celui qui sort.
+     *
+     * Le cache de réglages est court-circuité : cette méthode est appelée juste
+     * après l'écriture en base, et lire une valeur vieille de deux dixièmes de
+     * seconde reviendrait à appliquer le réglage précédent.
+     */
+    applyLoudness() {
+        if (!this.active) return;
+
+        this._settingsRead = 0;
+        const settings = this._settings();
+
+        for (const source of [this._source, this._incoming]) {
+            if (!source || !source.track) continue;
+            source.setLevelGain(loudness.linearGain(source.track.url, settings));
+        }
+    }
+
     // ─── Horloge et enchaînement ──────────────────────────────────────────
 
     /**
@@ -611,10 +643,16 @@ class MixEngine {
         const next = this._predictableNextTrack();
         if (!next) return;
 
+        // Mesuré pendant qu'il attend son tour : le fondu enchaîné le versera
+        // au bon niveau, sans le saut de gain qu'une mesure tardive imposerait
+        // en plein milieu du croisement.
+        loudnessAnalyzer.ensure(next);
+
         const source = new MixSource(next, {
             player: this.queue.player,
             speed: this._speed(settings),
             gain: 0,
+            levelGain: loudness.linearGain(next.url, settings),
         });
 
         const preparation = source.start()

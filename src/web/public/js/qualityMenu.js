@@ -40,12 +40,35 @@ const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const ICON_LINK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>';
 const FOLDER_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>';
 const ICON_COPY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+const ICON_LEVEL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="13"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="18" y1="20" x2="18" y2="9"></line></svg>';
+const ICON_RESET = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>';
+
+/*
+ * Bornes du curseur de niveau sonore.
+ *
+ * Recopiées de `src/audio/loudness.js`, où elles font autorité : le serveur
+ * ramène de toute façon dans ses bornes ce qu'on lui envoie. Les tenir
+ * identiques évite seulement au curseur d'afficher une position que le réglage
+ * n'atteindra jamais. Une divergence est vérifiée par tests/loudness.js.
+ */
+const LUFS_MIN = -40;
+const LUFS_MAX = -3;
+const LUFS_STEP = 0.5;
+
+/**
+ * Délai de regroupement des envois pendant qu'on déplace le curseur.
+ *
+ * Le réglage doit s'entendre en direct, mais un curseur émet une valeur par
+ * pixel parcouru : sans ce frein, une traversée du rail enverrait une centaine
+ * de messages et autant de diffusions d'état.
+ */
+const LUFS_SEND_INTERVAL_MS = 120;
 
 let menuEl = null;
 let submenuEl = null;
 /** URL de la piste ouverte : sert à retrouver son état frais à chaque diffusion. */
 let openedUrl = null;
-/** 'audio' | 'video' | null — sous-menu actuellement déplié. */
+/** 'audio' | 'video' | 'loudness' | null — sous-menu actuellement déplié. */
 let submenuOpen = null;
 
 function t(key, fallback) {
@@ -311,6 +334,421 @@ function buildSourceButton(track) {
     return btn;
 }
 
+// ─── Niveau sonore (LUFS) ─────────────────────────────────────────────────
+
+/**
+ * Sonie d'une piste, avec des valeurs de repli.
+ *
+ * L'état peut arriver d'un serveur qui ne connaît pas encore ce champ — le
+ * temps d'un rechargement après mise à jour, notamment. Le menu doit alors
+ * s'afficher sans ce réglage plutôt que de refuser de s'ouvrir.
+ *
+ * @param {object} track
+ * @returns {object}
+ */
+function loudnessOf(track) {
+    const raw = (track && track.loudness) || {};
+    return {
+        status: raw.status || 'unavailable',
+        measured: Number.isFinite(raw.measured) ? raw.measured : null,
+        peak: Number.isFinite(raw.peak) ? raw.peak : null,
+        target: Number.isFinite(raw.target) ? raw.target : null,
+        customized: !!raw.customized,
+        synced: !!raw.synced,
+        gainDb: Number.isFinite(raw.gainDb) ? raw.gainDb : 0,
+        degradation: Number.isFinite(raw.degradation) ? raw.degradation : 0
+    };
+}
+
+/** « −14.0 LUFS », avec le vrai signe moins plutôt que le trait d'union. */
+function formatLufs(value) {
+    if (!Number.isFinite(value)) return '—';
+    return `${value.toFixed(1).replace('-', '−')} LUFS`;
+}
+
+/** « +3.2 dB », « −1.5 dB », « 0 dB ». */
+function formatGain(db) {
+    if (!Number.isFinite(db) || Math.abs(db) < 0.05) return '0 dB';
+    const sign = db > 0 ? '+' : '−';
+    return `${sign}${Math.abs(db).toFixed(1)} dB`;
+}
+
+/**
+ * Dégradation attendue, en clair.
+ *
+ * Reprend le calcul du serveur — la marge sous le plafond, bornée à zéro — pour
+ * que la barre suive le curseur sans attendre l'aller-retour, puis se recale
+ * sur la valeur reçue à la diffusion d'état suivante.
+ *
+ * @param {number} db - Gain qu'on s'apprête à appliquer
+ * @param {number|null} peak - Pic réel du fichier, en dBTP
+ * @returns {number} 0 à 1
+ */
+function degradationFor(db, peak) {
+    const headroom = Math.max(0, -(Number.isFinite(peak) ? peak : 0));
+    const overshoot = db - headroom;
+    if (overshoot <= 0) return 0;
+    return Math.min(1, overshoot / 12);
+}
+
+/**
+ * Libellé de l'état de la dégradation.
+ * @param {number} ratio - 0 à 1
+ */
+function degradationLabel(ratio) {
+    if (ratio <= 0) return t('loudness_quality_intact', 'Qualité préservée');
+    if (ratio < 0.34) return t('loudness_quality_slight', 'Léger écrêtage');
+    if (ratio < 0.67) return t('loudness_quality_marked', 'Écrêtage marqué');
+    return t('loudness_quality_severe', 'Saturation importante');
+}
+
+/**
+ * Construit le bouton « Niveau sonore » du menu principal.
+ *
+ * Sa valeur est le gain appliqué, pas la cible : c'est le seul des deux chiffres
+ * qui dise quelque chose sans ouvrir le sous-menu — « ce morceau est remonté de
+ * 3 dB » se lit, « ce morceau vise −11 LUFS » ne se lit qu'en connaissant sa
+ * mesure.
+ *
+ * @param {object} track
+ * @returns {HTMLElement}
+ */
+function buildLoudnessButton(track) {
+    const level = loudnessOf(track);
+
+    const btn = document.createElement('button');
+    btn.className = 'quality-menu-item';
+    btn.dataset.qualityType = 'loudness';
+
+    const icon = document.createElement('span');
+    icon.className = 'quality-menu-icon';
+    icon.innerHTML = ICON_LEVEL;
+
+    const label = document.createElement('span');
+    label.className = 'quality-menu-label';
+    label.textContent = t('loudness_menu_label', 'Niveau sonore');
+
+    const value = document.createElement('span');
+    value.className = 'quality-menu-value quality-menu-loudness-value';
+    btn.appendChild(icon);
+    btn.appendChild(label);
+    btn.appendChild(value);
+
+    const chevron = document.createElement('span');
+    chevron.className = 'quality-menu-arrow';
+    chevron.innerHTML = ICON_CHEVRON;
+    btn.appendChild(chevron);
+
+    writeLoudnessValue(value, level);
+
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleSubmenu('loudness', btn);
+    });
+
+    return btn;
+}
+
+/**
+ * Écrit, sur place, la valeur affichée par le bouton « Niveau sonore ».
+ * @param {HTMLElement} value
+ * @param {object} level
+ */
+function writeLoudnessValue(value, level) {
+    if (!value) return;
+
+    let text;
+    let desired = false;
+
+    if (level.status === 'analyzing') {
+        text = t('loudness_analyzing_short', 'analyse…');
+        desired = true;
+    } else if (level.status !== 'measured') {
+        text = t('loudness_unmeasured_short', 'non mesuré');
+        desired = true;
+    } else {
+        text = formatGain(level.gainDb);
+        // Un gain nul n'est pas un réglage : c'est l'absence de correction.
+        desired = Math.abs(level.gainDb) < 0.05;
+    }
+
+    if (value.textContent !== text) value.textContent = text;
+    value.classList.toggle('is-desired', desired);
+}
+
+/**
+ * Construit le panneau de réglage du niveau sonore.
+ *
+ * Ce sous-menu n'est pas une liste de choix comme les deux autres : c'est un
+ * réglage continu, qui s'entend pendant qu'on le déplace. Trois repères y sont
+ * tenus visibles en permanence, parce que le curseur seul ne dit rien —
+ * la valeur visée, la mesure d'origine (le point où le morceau est rendu tel
+ * qu'il est), et ce que le gain coûte au son.
+ *
+ * @param {object} track
+ * @returns {HTMLElement}
+ */
+function buildLoudnessPanel(track) {
+    const level = loudnessOf(track);
+
+    const panel = document.createElement('div');
+    panel.className = 'quality-submenu loudness-panel glass-card';
+    panel.addEventListener('click', (e) => e.stopPropagation());
+    panel.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    if (level.status !== 'measured') {
+        panel.appendChild(buildLoudnessNotice(level.status));
+        return panel;
+    }
+
+    // --- En-tête : la valeur visée, et le retour à l'origine ---
+    const head = document.createElement('div');
+    head.className = 'loudness-head';
+
+    const reading = document.createElement('span');
+    reading.className = 'loudness-reading';
+    reading.textContent = formatLufs(level.target);
+
+    const reset = document.createElement('button');
+    reset.className = 'loudness-reset';
+    reset.innerHTML = ICON_RESET;
+    reset.dataset.tooltip = t('loudness_reset_hint', 'Revenir au niveau d\'origine du fichier');
+
+    head.appendChild(reading);
+    head.appendChild(reset);
+    panel.appendChild(head);
+
+    // --- Le curseur ---
+    const rail = document.createElement('div');
+    rail.className = 'loudness-rail';
+
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.className = 'loudness-slider';
+    slider.min = String(LUFS_MIN);
+    slider.max = String(LUFS_MAX);
+    slider.step = String(LUFS_STEP);
+    slider.value = String(level.target);
+
+    /*
+     * Repère de la mesure d'origine, posé sur le rail.
+     *
+     * « La valeur initiale doit rester visible » : elle l'est en toutes lettres
+     * plus bas, mais c'est ici qu'elle se lit d'un coup d'œil — le curseur
+     * ramené sur ce trait, le morceau sort tel qu'il a été enregistré.
+     */
+    const mark = document.createElement('span');
+    mark.className = 'loudness-origin-mark';
+    positionOriginMark(mark, level.measured);
+
+    rail.appendChild(slider);
+    rail.appendChild(mark);
+    panel.appendChild(rail);
+
+    const bounds = document.createElement('div');
+    bounds.className = 'loudness-bounds';
+    bounds.innerHTML = `<span>${String(LUFS_MIN).replace('-', '−')}</span>`
+        + `<span>${String(LUFS_MAX).replace('-', '−')}</span>`;
+    panel.appendChild(bounds);
+
+    // --- Mesure d'origine et gain appliqué ---
+    const facts = document.createElement('div');
+    facts.className = 'loudness-facts';
+
+    const origin = document.createElement('span');
+    origin.className = 'loudness-origin';
+    origin.textContent = `${t('loudness_measured', 'Mesuré')} ${formatLufs(level.measured)}`;
+
+    const gain = document.createElement('span');
+    gain.className = 'loudness-gain';
+    gain.textContent = formatGain(level.gainDb);
+
+    facts.appendChild(origin);
+    facts.appendChild(gain);
+    panel.appendChild(facts);
+
+    // --- Indicateur de dégradation ---
+    const meter = document.createElement('div');
+    meter.className = 'loudness-meter';
+    const fill = document.createElement('span');
+    fill.className = 'loudness-meter-fill';
+    meter.appendChild(fill);
+    panel.appendChild(meter);
+
+    const verdict = document.createElement('div');
+    verdict.className = 'loudness-verdict';
+    panel.appendChild(verdict);
+
+    // La synchronisation commune recouvre ce réglage : le dire évite de laisser
+    // croire à un réglage propre à la piste, et annonce ce que toucher au
+    // curseur va faire.
+    if (level.synced) {
+        const note = document.createElement('div');
+        note.className = 'loudness-synced-note';
+        note.textContent = t('loudness_synced_note',
+            'Synchronisation active — la régler ici la désactive.');
+        panel.appendChild(note);
+    }
+
+    panel._track = track;
+    panel._peak = level.peak;
+    panel._measured = level.measured;
+    panel._slider = slider;
+    panel._reading = reading;
+    panel._gain = gain;
+    panel._fill = fill;
+    panel._verdict = verdict;
+
+    paintLoudness(panel, level.target);
+
+    slider.addEventListener('input', () => {
+        const wanted = parseFloat(slider.value);
+        paintLoudness(panel, wanted);
+        sendLoudness(track.url, wanted, false);
+    });
+    // Le relâchement force l'envoi de la dernière position, que le
+    // regroupement aurait pu retenir.
+    slider.addEventListener('change', () => {
+        sendLoudness(track.url, parseFloat(slider.value), true);
+    });
+
+    reset.addEventListener('click', (e) => {
+        e.stopPropagation();
+        slider.value = String(level.measured);
+        paintLoudness(panel, level.measured);
+        sendLoudness(track.url, null, true);
+    });
+
+    return panel;
+}
+
+/**
+ * Message affiché quand il n'y a rien à régler.
+ * @param {string} status
+ * @returns {HTMLElement}
+ */
+function buildLoudnessNotice(status) {
+    const notice = document.createElement('div');
+    notice.className = 'loudness-notice';
+
+    if (status === 'analyzing' || status === 'pending') {
+        notice.classList.add('is-working');
+        notice.textContent = t('loudness_analyzing',
+            'Analyse du niveau sonore en cours…');
+    } else if (status === 'failed') {
+        notice.textContent = t('loudness_failed',
+            'Le niveau de ce fichier n\'a pas pu être mesuré.');
+    } else {
+        notice.textContent = t('loudness_unavailable',
+            'Niveau réglable une fois le morceau préchargé.');
+    }
+
+    return notice;
+}
+
+/**
+ * Place le repère de la mesure d'origine sur le rail.
+ *
+ * Le pouce d'un `input[type=range]` fait 16 px et ne sort jamais du rail : sa
+ * course utile est donc plus courte que la largeur, de la moitié d'un pouce à
+ * chaque bout. Sans cette correction, le repère et le pouce ne coïncideraient
+ * qu'au milieu — l'écart atteignant huit pixels aux extrémités, soit près d'un
+ * décibel et demi.
+ *
+ * @param {HTMLElement} mark
+ * @param {number} measured
+ */
+function positionOriginMark(mark, measured) {
+    if (!Number.isFinite(measured)) {
+        mark.style.display = 'none';
+        return;
+    }
+    const clamped = Math.min(LUFS_MAX, Math.max(LUFS_MIN, measured));
+    const ratio = (clamped - LUFS_MIN) / (LUFS_MAX - LUFS_MIN);
+    mark.style.left = `calc(8px + ${(ratio * 100).toFixed(2)}% - ${(ratio * 16).toFixed(2)}px)`;
+    mark.style.display = '';
+}
+
+/**
+ * Met à jour les affichages du panneau pour une cible donnée.
+ *
+ * Calculé ici plutôt qu'attendu du serveur : le curseur doit répondre sous le
+ * doigt, et un aller-retour réseau par cran se verrait.
+ *
+ * @param {HTMLElement} panel
+ * @param {number} target
+ */
+function paintLoudness(panel, target) {
+    if (!panel || !panel._reading) return;
+
+    const db = target - panel._measured;
+    const ratio = degradationFor(db, panel._peak);
+
+    panel._reading.textContent = formatLufs(target);
+    panel._gain.textContent = formatGain(db);
+    panel._fill.style.width = `${(ratio * 100).toFixed(1)}%`;
+    panel._verdict.textContent = degradationLabel(ratio);
+    panel.classList.toggle('is-degraded', ratio > 0);
+    panel.classList.toggle('is-severe', ratio >= 0.67);
+}
+
+/** Dernier envoi de niveau, pour n'en émettre qu'un par intervalle. */
+let loudnessSentAt = 0;
+let loudnessPending = null;
+
+/**
+ * Envoie une cible de niveau au serveur, au plus une fois par intervalle.
+ *
+ * @param {string} url
+ * @param {number|null} target - null remet la piste à son niveau d'origine
+ * @param {boolean} immediate - Fin de geste : passe outre le regroupement
+ */
+function sendLoudness(url, target, immediate) {
+    if (typeof window.MusicPlayer.sendWS !== 'function') return;
+
+    const emit = () => {
+        loudnessSentAt = Date.now();
+        loudnessPending = null;
+        window.MusicPlayer.sendWS({ type: 'setTrackLoudness', data: { url, target } });
+    };
+
+    if (loudnessPending) {
+        clearTimeout(loudnessPending);
+        loudnessPending = null;
+    }
+
+    const waited = Date.now() - loudnessSentAt;
+    if (immediate || waited >= LUFS_SEND_INTERVAL_MS) {
+        emit();
+        return;
+    }
+    loudnessPending = setTimeout(emit, LUFS_SEND_INTERVAL_MS - waited);
+}
+
+/**
+ * Recale le panneau ouvert sur l'état reçu, sans le reconstruire.
+ *
+ * Le curseur sous le doigt est laissé tranquille : l'état qui revient porte la
+ * valeur qu'on vient d'envoyer, mais avec un tour de retard — la réappliquer
+ * ferait reculer le pouce d'un cran à chaque diffusion.
+ *
+ * @param {object} track
+ */
+function refreshLoudnessPanel(track) {
+    if (!submenuEl || submenuOpen !== 'loudness' || !submenuEl._slider) return;
+
+    const level = loudnessOf(track);
+    submenuEl._peak = level.peak;
+    submenuEl._measured = level.measured;
+
+    const slider = submenuEl._slider;
+    if (document.activeElement === slider || slider.matches(':active')) return;
+    if (parseFloat(slider.value) === level.target) return;
+
+    slider.value = String(level.target);
+    paintLoudness(submenuEl, level.target);
+}
+
 /** Ouvre (ou referme) le sous-menu de choix rattaché à un bouton. */
 function toggleSubmenu(type, btn) {
     if (submenuOpen === type) {
@@ -323,6 +761,25 @@ function toggleSubmenu(type, btn) {
 
     const track = findTrack(openedUrl);
     if (!track) return;
+
+    if (type === 'loudness') {
+        submenuEl = buildLoudnessPanel(track);
+        menuContainer().appendChild(submenuEl);
+        raiseToFront(submenuEl);
+        positionSubmenu(btn);
+
+        // Le fichier est peut-être mesurable sans l'avoir jamais été : le bot
+        // seul peut le lire, et ouvrir ce panneau est le moment où la mesure
+        // devient utile.
+        if (loudnessOf(track).status !== 'measured'
+            && typeof window.MusicPlayer.sendWS === 'function') {
+            window.MusicPlayer.sendWS({
+                type: 'requestTrackLoudness',
+                data: { url: track.url }
+            });
+        }
+        return;
+    }
 
     const options = type === 'audio' ? AUDIO_BITRATES : VIDEO_HEIGHTS;
     const current = type === 'audio'
@@ -429,7 +886,12 @@ function applyQuality(type, value) {
 function signature(track) {
     return [
         track.title, track.isLocal, track.hasVideo,
-        track.cachedAudioQuality, track.desiredAudioQuality, track.desiredVideoQuality
+        track.cachedAudioQuality, track.desiredAudioQuality, track.desiredVideoQuality,
+        // L'état de la mesure, jamais la cible : celle-ci change à chaque cran
+        // du curseur, et reconstruire le menu à ce rythme arracherait le pouce
+        // de sous le doigt. Le passage de « en analyse » à « mesuré », lui,
+        // change bien la composition du panneau.
+        loudnessOf(track).status
     ].join('|');
 }
 
@@ -440,6 +902,8 @@ function signature(track) {
 function updateMenuValues(track) {
     if (!menuEl) return;
     updateStatus(menuEl.querySelector('.quality-menu-status'), track);
+    writeLoudnessValue(menuEl.querySelector('.quality-menu-loudness-value'), loudnessOf(track));
+    refreshLoudnessPanel(track);
 }
 
 /**
@@ -487,6 +951,11 @@ function renderMenu(force) {
     // règle pas. Elle vaut aussi pour un fichier local, dont c'est même le seul
     // bouton — sa qualité, elle, n'est pas négociable.
     menuEl.appendChild(buildSourceButton(track));
+
+    // Le niveau sonore vaut pour tout ce qui s'écoute, fichier local compris —
+    // c'est même là qu'il sert le plus, un enregistrement personnel n'ayant
+    // traversé aucune normalisation de plateforme.
+    menuEl.appendChild(buildLoudnessButton(track));
 
     if (track.isLocal) return;
 

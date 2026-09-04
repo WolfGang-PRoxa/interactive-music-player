@@ -346,6 +346,53 @@ liegen, als eine laufende Wiedergabe abzuschneiden.
 
 ---
 
+## Lautheit (LUFS)
+
+LUFS (EBU R128) misst die *wahrgenommene* Lautheit, nicht die Amplitude: zwei
+Dateien mit gleichem LUFS werden gleich laut gehört, unabhängig von ihrer
+Dynamik. Drei Module teilen sich das Thema, und die Trennung ist wesentlich.
+
+[`loudness.js`](../../../src/audio/loudness.js) macht nur die Umrechnung: es
+kennt weder FFmpeg noch den Audioweg. Ein Titel trägt eine **Messung**
+(`measured`, `peak`) und gegebenenfalls ein **Ziel** (`target`); die Verstärkung
+in Dezibel ist ihre Differenz, begrenzt. Ohne Messung ist die Verstärkung null —
+ein Ziel allein sagt nichts, und nach Gefühl zu korrigieren wäre schlimmer, als
+nichts zu tun.
+
+[`LoudnessAnalyzer`](../../../src/audio/LoudnessAnalyzer.js) erzeugt die Messung,
+indem es `ffmpeg -af loudnorm=print_format=json` auf die Datei anwendet — den
+Vorlade-Cache, wenn es ihn gibt, sonst die Datei auf der Platte. Eine Analyse
+zur Zeit: das Dekodieren der Wiedergabe geht vor. Das Ergebnis wird in die
+Datenbank geschrieben und nie neu berechnet, da eine Datei ihre Lautheit nicht
+ändert. Eine entfernte Quelle ohne Vorladen wird nicht analysiert; sie nur zum
+Messen herunterzuladen kostete den Preis eines Vorladens, das niemand verlangt
+hat.
+
+Die Anwendung unterscheidet sich je nach Audioweg:
+
+- **Mischbus** — [`MixSource`](../../../src/audio/mix/MixSource.js) trägt einen
+  `levelGain`, getrennt von der Blendenhüllkurve. Getrennt, weil er 1
+  überschreiten kann, wo die Hüllkurve es nicht kann, und weil er etwas anderes
+  beschreibt: die Hüllkurve sagt, wo eine Blende steht, die Pegelverstärkung
+  sagt, wie laut der Titel gehört wird. Beide werden pro Frame multipliziert.
+  Eine Änderung wird über zehn Frames (200 ms) verteilt, sonst wäre jede Raste
+  des Reglers als Knacken zu hören.
+- **Browser** —
+  [`loudnessGain.js`](../../../src/web/public/js/loudnessGain.js) umhüllt die
+  Eigenschaft `volume` beider `<audio>`-Elemente. Der Rest des Dashboards
+  schreibt weiterhin die *gewollte* Lautstärke — Blendenrampen, Ducking,
+  Herunterfahren — und die Hülle legt das Produkt ab. Ein `<audio>`
+  überschreitet die Lautstärke 1 nie: die Absenkung ist exakt, eine Anhebung hat
+  nur den Spielraum, den der Hauptregler lässt.
+
+Die Angleichung ist eine **Schicht**, nie ein Schreibvorgang. Ist
+`lufsSyncEnabled` gesetzt, liefert `effectiveTarget()` das gemeinsame Ziel,
+ohne die einzelnen Ziele anzutasten, die in der Datenbank bleiben. Genau diese
+Unterscheidung erlaubt es, die Option abzuwählen und jedem Titel die
+Einstellung zurückzugeben, die er hatte.
+
+---
+
 ## Lokale Dateien
 
 [`LocalFilePlayer`](../../../src/audio/LocalFilePlayer.js) liefert das

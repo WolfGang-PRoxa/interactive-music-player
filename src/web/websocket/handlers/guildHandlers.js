@@ -10,7 +10,8 @@ const presenceManager = require('../../../audio/PresenceManager');
 const playbackStateManager = require('../../../database/PlaybackStateManager');
 const { restoreHistory } = require('../../../utils/historyOrder');
 const { ensureEngine } = require('../../../audio/mix');
-const { applySpeed, cancelMixEffects } = require('../../../audio/playbackSettings');
+const { applySpeed, cancelMixEffects, applyLoudness } = require('../../../audio/playbackSettings');
+const loudness = require('../../../audio/loudness');
 const downloadFormats = require('../../../utils/downloadFormats');
 const log = require('../../../utils/logger');
 
@@ -604,6 +605,13 @@ async function handleUpdateSettings(ctx) {
                 delete data.importFormat;
             }
 
+            // La cible de sonie est ramenée dans les bornes du curseur plutôt
+            // qu'écartée : hors bornes, elle reste une intention lisible — le
+            // plus fort, ou le plus discret possible.
+            if (data.lufsSyncTarget !== undefined) {
+                data.lufsSyncTarget = loudness.clampTarget(data.lufsSyncTarget);
+            }
+
             database.updateSettings(currentGuildId, data);
 
             // Un compte à rebours déjà lancé tourne sur l'ancien délai : le
@@ -621,6 +629,21 @@ async function handleUpdateSettings(ctx) {
             // Mettre à jour la vitesse de lecture
             if (queue && data.playbackSpeed !== undefined) {
                 applySpeed(queue, data.playbackSpeed);
+            }
+
+            /*
+             * Synchronisation des niveaux sonores.
+             *
+             * Rien n'est écrit sur les pistes : la cible commune est une couche
+             * par-dessus les cibles individuelles, jamais à leur place. Décocher
+             * l'option suffit donc à rendre à chaque morceau le réglage qu'il
+             * avait — il n'a jamais cessé d'être en base.
+             *
+             * Le gain, lui, s'entend tout de suite : c'est un multiplicateur du
+             * mixage, que le bus reprend sans relancer le moindre décodeur.
+             */
+            if (data.lufsSyncEnabled !== undefined || data.lufsSyncTarget !== undefined) {
+                applyLoudness(queue);
             }
 
             // Désactivation du mix en cours de route

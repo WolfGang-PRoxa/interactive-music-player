@@ -334,6 +334,51 @@ reproducción en curso.
 
 ---
 
+## Nivel sonoro (LUFS)
+
+El LUFS (EBU R128) mide la sonoridad *percibida*, no la amplitud: dos archivos
+con el mismo LUFS se oyen al mismo nivel, sea cual sea su dinámica. Tres módulos
+se reparten el asunto, y la separación importa.
+
+[`loudness.js`](../../../src/audio/loudness.js) solo hace la conversión: no
+conoce ni FFmpeg ni la cadena de audio. Una pista lleva una **medida**
+(`measured`, `peak`) y, eventualmente, un **objetivo** (`target`); la ganancia
+en decibelios es su diferencia, acotada. Sin medida la ganancia es nula — un
+objetivo por sí solo no significa nada, y corregir a ojo sería peor que no hacer
+nada.
+
+[`LoudnessAnalyzer`](../../../src/audio/LoudnessAnalyzer.js) produce la medida
+lanzando `ffmpeg -af loudnorm=print_format=json` sobre el archivo — la caché de
+precarga si existe, el archivo del disco si no. Un análisis a la vez: la
+decodificación de la reproducción pasa antes. El resultado se escribe en la base
+y no se vuelve a calcular, ya que un archivo no cambia de sonoridad. Una fuente
+remota sin precargar no se analiza; descargarla para medirla costaría el precio
+de una precarga que nadie ha pedido.
+
+La aplicación difiere según la cadena de audio:
+
+- **Bus de mezcla** — [`MixSource`](../../../src/audio/mix/MixSource.js) lleva
+  un `levelGain` separado de la envolvente de fundido. Separado, porque puede
+  superar 1 cuando la envolvente no puede, y porque describe otra cosa: la
+  envolvente dice dónde está un fundido, la ganancia de nivel dice a qué nivel
+  se oye la pista. Ambos se multiplican por trama. Un cambio se reparte en diez
+  tramas (200 ms), sin lo cual cada paso del deslizador se oiría como un chasquido.
+- **Navegador** —
+  [`loudnessGain.js`](../../../src/web/public/js/loudnessGain.js) envuelve la
+  propiedad `volume` de los dos elementos `<audio>`. El resto del panel sigue
+  escribiendo el volumen *deseado* — rampas de fundido, ducking, apagado — y la
+  envoltura coloca el producto. Un `<audio>` no supera el volumen 1: la
+  atenuación es exacta, la amplificación solo dispone del margen que deja el
+  control principal.
+
+La sincronización es una **capa**, nunca una escritura. Cuando `lufsSyncEnabled`
+está activo, `effectiveTarget()` devuelve el objetivo común sin tocar los
+objetivos individuales, que permanecen en la base. Es esa distinción, y solo
+ella, la que permite desmarcar la opción y devolver a cada pista el ajuste que
+tenía.
+
+---
+
 ## Archivos locales
 
 [`LocalFilePlayer`](../../../src/audio/LocalFilePlayer.js) proporciona el escaneo

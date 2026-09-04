@@ -438,6 +438,45 @@ tiempo que lleva.
 Cuando una pista posee un vídeo asociado, el panel de control puede mostrarlo de
 fondo. Los archivos de audio locales disponen de un visualizador gráfico.
 
+### Nivel sonoro (LUFS)
+
+Dos pistas ajustadas al mismo volumen no se oyen al mismo nivel: un máster
+reciente ronda los −7 LUFS, una grabación clásica los −25. El control de volumen
+no cambia nada, ya que actúa sobre ambas a la vez.
+
+El clic derecho sobre una pista — en la cola, el historial o una lista — abre un
+menú cuya entrada **Nivel sonoro** despliega un ajuste:
+
+- **El deslizador** apunta a una sonoridad, en LUFS, y no a un volumen. El valor
+  se muestra encima y sigue al deslizador en tiempo real; la corrección se oye
+  mientras se desplaza, sin reiniciar la reproducción.
+- **La marca del raíl** señala la sonoridad medida del archivo: con el
+  deslizador encima, la pista suena tal como fue grabada. La medida también se
+  indica con todas sus letras bajo el raíl.
+- **El botón circular** devuelve a la pista ese nivel original.
+- **La barra degradada** anuncia lo que la corrección le cuesta al sonido. Subir
+  el nivel más allá del margen que deja el archivo recorta los picos: la barra
+  pasa del verde al rojo a medida que el recorte se agrava.
+
+Medir exige leer el archivo de principio a fin, algo que solo el bot puede
+hacer. Por eso se lanza cuando la pista arranca o cuando este menú se abre, y
+nunca se vuelve a calcular. Una pista remota sin precargar no es medible: el
+ajuste espera su precarga.
+
+La caja **Encadenamiento Mix** lleva un interruptor **Sincronizar los LUFS**,
+desactivado por defecto, y su propio deslizador. Activado, alinea todas las
+pistas sobre un mismo objetivo — cada una corregida según su propia medida. Los
+ajustes hechos pista por pista no se borran por ello: solo quedan cubiertos, y
+desmarcar el interruptor los devuelve tal cual. Ajustar una pista a mano
+mientras la sincronización está activa la desactiva, y solo esa pista conserva
+el nuevo valor.
+
+En difusión personal, la corrección la aplica el navegador. Una atenuación es
+exacta allí, pero una amplificación solo dispone del margen que deja el control
+de volumen principal: pedir +6 dB cuando ya está al máximo solo dará una parte.
+En difusión compartida, donde el bot mezcla el sonido él mismo, la corrección se
+aplica por completo.
+
 ### Velocidad y encadenamiento
 
 - **Velocidad de reproducción** — ajustable de 0,20× a 3,05×, en pasos de 0,01.

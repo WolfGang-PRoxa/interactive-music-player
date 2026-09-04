@@ -11,6 +11,9 @@ const database = require('../database/Database');
 const broadcastManager = require('../broadcast/BroadcastManager');
 const playbackStateManager = require('../database/PlaybackStateManager');
 const preloadManager = require('../audio/PreloadManager');
+const loudness = require('../audio/loudness');
+const loudnessAnalyzer = require('../audio/LoudnessAnalyzer');
+const { applyLoudness } = require('../audio/playbackSettings');
 const { activeEngine } = require('../audio/mix');
 const { foldVirtualElapsed } = require('../audio/PlaybackSession');
 const auth = require('./auth');
@@ -207,6 +210,37 @@ class WebServer {
                 log.error('[WebServer] Preload onProgress error:', e.message);
             }
         };
+
+        /*
+         * Une mesure de sonie vient de tomber.
+         *
+         * Elle arrive après coup — le morceau joue peut-être déjà — et c'est
+         * bien pour cela qu'il faut la poser sur les flux en cours : sans ce
+         * rappel, un morceau lancé avant sa mesure resterait à son niveau
+         * d'origine jusqu'au suivant, alors même que le tableau de bord
+         * afficherait la correction comme appliquée.
+         */
+        loudnessAnalyzer.on('measured', () => {
+            try {
+                const { useMainPlayer } = require('discord-player');
+                const player = useMainPlayer();
+                if (player && player.queues) {
+                    player.queues.cache.forEach((queue) => applyLoudness(queue));
+                }
+            } catch (e) {
+                log.error('[WebServer] Loudness apply error:', e.message);
+            }
+
+            try {
+                this.wss?.clients?.forEach((c) => {
+                    if (c.readyState !== 1 || !c.selectedGuildId) return;
+                    const state = this.getState(c.selectedGuildId, c.selectedVoiceChannelId);
+                    c.send(JSON.stringify({ type: 'state', data: state }));
+                });
+            } catch (e) {
+                log.error('[WebServer] Loudness broadcast error:', e.message);
+            }
+        });
 
         // Intervalle de mise à jour périodique (progrès de lecture, synco état)
         setInterval(() => {
@@ -1183,6 +1217,10 @@ class WebServer {
                 mixEnabled: !!settings.mixEnabled,
                 mixDuration: settings.mixDuration !== undefined ? settings.mixDuration : 5,
                 mixType: settings.mixType || 'volume',
+                lufsSyncEnabled: !!settings.lufsSyncEnabled,
+                lufsSyncTarget: settings.lufsSyncTarget !== undefined
+                    ? settings.lufsSyncTarget
+                    : loudness.DEFAULT_SYNC_TARGET,
                 importAudioQuality: settings.importAudioQuality || '320',
                 importVideoQuality: settings.importVideoQuality || '720',
                 // Destination du champ d'ajout. Sa valeur par défaut vit dans
@@ -1940,6 +1978,73 @@ function formatTrackWithPreload(t) {
         cachedAudioQuality: pInfo.cachedAudioQuality || null,
         desiredAudioQuality: desired.audio,
         desiredVideoQuality: desired.video,
-        requalify: pInfo.requalify || null
+        requalify: pInfo.requalify || null,
+        loudness: trackLoudness(t, pInfo)
+    };
+}
+
+/**
+ * Niveau sonore d'une piste, tel que le menu contextuel l'affiche.
+ *
+ * Quatre choses distinctes, qu'il ne faut pas confondre :
+ * - `measured` est ce que vaut le fichier, et ne change jamais ;
+ * - `target` est ce que l'utilisateur en veut, curseur compris ;
+ * - `gainDb` est l'écart effectivement appliqué, bornes comprises ;
+ * - `synced` dit que la cible vient du réglage commun et non de la piste.
+ *
+ * `target` est rendue même quand rien n'a été réglé : le curseur doit bien
+ * s'ouvrir quelque part, et c'est la mesure qui fait ce point de départ — la
+ * position où le gain est nul.
+ *
+ * @param {object} t
+ * @param {object} pInfo - État de préchargement déjà calculé pour cette piste
+ * @returns {object}
+ */
+function trackLoudness(t, pInfo) {
+    const url = t && t.url;
+    const settings = t ? currentLoudnessSettings() : {};
+    const measure = url ? loudness.measurement(url) : null;
+    const explicit = url ? loudness.effectiveTarget(url, settings) : null;
+    const db = url ? loudness.gainDb(url, settings) : 0;
+
+    // Un fichier est mesurable dès qu'il est sur le disque du bot — en cache,
+    // ou déposé par l'utilisateur. L'état de préchargement le dit déjà, et le
+    // redemander coûterait un accès disque par piste et par seconde.
+    const measurable = !!(pInfo && (pInfo.isPreloaded || pInfo.isLocal));
+
+    return {
+        status: loudnessAnalyzer.statusFor(t, measurable),
+        measured: measure ? measure.measured : null,
+        peak: measure ? measure.peak : null,
+        target: explicit !== null ? explicit
+            : (measure ? loudness.clampTarget(measure.measured) : null),
+        // Une cible héritée du réglage commun s'affiche, mais ne se présente
+        // pas comme un choix fait sur cette piste-là.
+        customized: explicit !== null && !settings.lufsSyncEnabled,
+        synced: !!settings.lufsSyncEnabled,
+        gainDb: Math.round(db * 10) / 10,
+        degradation: loudness.degradation(db, measure ? measure.peak : 0)
+    };
+}
+
+/**
+ * Réglages de synchronisation du premier serveur connu.
+ *
+ * Même raison que pour `currentImportSettings()` : le tableau de bord est
+ * mono-utilisateur, et une piste doit s'entendre pareil quel que soit le
+ * serveur affiché au moment où on la regarde.
+ */
+function currentLoudnessSettings() {
+    // L'entrée brute du cache plutôt que `getSettings()` : celui-ci refabrique
+    // le jeu complet des valeurs par défaut à chaque appel, et cette fonction
+    // est appelée pour chaque piste de chaque diffusion d'état. Les deux seuls
+    // champs lus ici portent leur propre repli.
+    const firstGuildId = database.cache.size > 0 ? database.cache.keys().next().value : null;
+    const settings = (firstGuildId && database.cache.get(firstGuildId)) || {};
+    return {
+        lufsSyncEnabled: !!settings.lufsSyncEnabled,
+        lufsSyncTarget: Number.isFinite(settings.lufsSyncTarget)
+            ? settings.lufsSyncTarget
+            : loudness.DEFAULT_SYNC_TARGET
     };
 }

@@ -721,6 +721,36 @@
                     </div>
                 </div>
 
+                <!--
+                     Synchronisation des niveaux sonores.
+
+                     Hors de « mix-options » à dessein : ce réglage ne dépend
+                     pas de l'enchaînement, il aligne le niveau des morceaux
+                     qu'ils s'enchaînent ou non. Il vit dans cette boîte parce
+                     que c'est celle du passage d'un titre au suivant — le seul
+                     moment où un écart de niveau s'entend vraiment.
+                -->
+                <div class="setting-row lufs-sync-row">
+                    <div class="setting-label">
+                        <svg class="icon-level" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="6" y1="20" x2="6" y2="13"></line>
+                            <line x1="12" y1="20" x2="12" y2="4"></line>
+                            <line x1="18" y1="20" x2="18" y2="9"></line>
+                        </svg>
+                        <span data-i18n="lufs_sync_label">Synchroniser les LUFS</span>
+                        <small data-i18n="lufs_sync_sub">Aligner tous les morceaux sur un même niveau perçu</small>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="lufs-sync-toggle">
+                        <span class="switch-slider"></span>
+                    </label>
+                </div>
+
+                <div class="lufs-sync-options" id="lufs-sync-options">
+                    <div class="lufs-sync-readout" id="lufs-sync-val">−14.0 LUFS</div>
+                    <input type="range" id="lufs-sync-range" min="-40" max="-3" step="0.5" value="-14">
+                </div>
+
                 <div class="card-resize-handle"></div>
             </section>
 
@@ -2353,6 +2383,7 @@
     <script src="js/sharedControl.js"></script>
     <script src="js/settingsModal.js"></script>
     <script src="js/qualityMenu.js"></script>
+    <script src="js/loudnessGain.js"></script>
     <script src="js/queue.js"></script>
     <script src="js/playlists.js"></script>
     <script src="js/playlistTabsScroll.js"></script>

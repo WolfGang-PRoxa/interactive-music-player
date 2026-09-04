@@ -422,6 +422,44 @@ track has to be resolved first, then transcoded, which takes the time it takes.
 When a track has an associated video, the dashboard can display it in the
 background. Local audio files get a graphical visualiser.
 
+### Loudness (LUFS)
+
+Two tracks set to the same volume are not heard at the same level: a recent
+master sits around −7 LUFS, a classical recording around −25. The volume slider
+changes nothing, since it acts on both at once.
+
+Right-clicking a track — in the queue, the history or a playlist — opens a menu
+whose **Loudness** entry unfolds a control:
+
+- **The slider** targets a loudness, in LUFS, not a volume. The value is shown
+  above it and follows the slider in real time; the correction is heard while
+  you move it, without restarting playback.
+- **The mark on the rail** shows the file's measured loudness: with the slider
+  on it, the track comes out exactly as it was recorded. The measurement is also
+  spelled out below the rail.
+- **The circular button** gives the track that original level back.
+- **The gradient bar** shows what the correction costs the sound. Raising the
+  level beyond the headroom the file leaves clips the peaks: the bar goes from
+  green to red as the clipping worsens.
+
+Measuring means reading the file from end to end, which only the bot can do. It
+is therefore started when the track begins or when this menu opens, and never
+recomputed afterwards. A remote track that has not been preloaded cannot be
+measured: the control waits for its preload.
+
+The **Mix crossfade** card carries a **Synchronize LUFS** switch, off by
+default, and its own slider. Turned on, it brings every track to a single
+target — each corrected according to its own measurement. Per-track settings are
+not erased for all that: they are merely covered, and unticking the switch gives
+them back as they were. Setting a track by hand while synchronization is on
+turns it off, and only that track keeps the new value.
+
+In personal broadcast, the correction is applied by the browser. Attenuation is
+exact there, but a boost only has the headroom the main volume slider leaves:
+asking for +6 dB while it is already at maximum will only deliver part of it. In
+shared broadcast, where the bot mixes the sound itself, the correction is
+applied in full.
+
 ### Speed and crossfading
 
 - **Playback speed** — adjustable from 0.20× to 3.05×, in steps of 0.01.

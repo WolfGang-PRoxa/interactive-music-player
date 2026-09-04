@@ -459,3 +459,247 @@
         animation: none !important;
     }
 }
+
+/* --- Panneau de niveau sonore (LUFS) --- */
+
+/*
+ * Contrairement aux deux autres sous-menus, celui-ci n'est pas une liste : la
+ * sonie est un réglage continu. Il lui faut donc une largeur fixe — un curseur
+ * dont le rail change de longueur d'une ouverture à l'autre ne se règle pas de
+ * la même façon deux fois de suite.
+ */
+.loudness-panel {
+    width: 258px;
+    min-width: 258px;
+    padding: 0.7rem 0.75rem 0.6rem;
+    gap: 0;
+}
+
+.loudness-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+}
+
+/*
+ * La valeur visée, en gros. C'est elle que l'utilisateur suit du regard pendant
+ * qu'il déplace le pouce : les chiffres tabulaires empêchent la ligne de danser
+ * quand on passe de « −9.5 » à « −10.0 ».
+ */
+.loudness-reading {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--c-primary);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+}
+
+.loudness-reset {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-card);
+    color: var(--text-muted);
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.25s ease;
+}
+
+.loudness-reset svg {
+    width: 13px;
+    height: 13px;
+}
+
+.loudness-reset:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--text-main);
+}
+
+/* La flèche du bouton fait le tour : le geste dit le retour en arrière mieux
+   que le libellé qui ne tient pas dans 26 pixels. */
+.loudness-reset:hover svg {
+    animation: loudness-rewind 0.5s ease;
+}
+
+@keyframes loudness-rewind {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(-360deg); }
+}
+
+.loudness-rail {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 0.25rem 0 0.1rem;
+}
+
+.loudness-slider {
+    width: 100%;
+}
+
+/*
+ * Repère de la mesure d'origine.
+ *
+ * Sous le rail plutôt que dessus : le pouce le traverse à chaque passage, et
+ * un trait posé par-dessus clignoterait derrière lui.
+ */
+.loudness-origin-mark {
+    position: absolute;
+    top: 50%;
+    width: 2px;
+    height: 14px;
+    margin-top: -7px;
+    border-radius: 1px;
+    background: var(--text-muted);
+    opacity: 0.75;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.loudness-bounds {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.66rem;
+    color: var(--text-muted);
+    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 0.45rem;
+}
+
+.loudness-facts {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-bottom: 0.35rem;
+}
+
+.loudness-origin {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.loudness-gain {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-main);
+    flex-shrink: 0;
+}
+
+/*
+ * Indicateur de dégradation.
+ *
+ * Le dégradé est porté par la barre entière, pas par la partie remplie : la
+ * couleur au bout du remplissage désigne alors toujours le même niveau de
+ * dommage, quel que soit l'endroit où il s'arrête. Un dégradé qui s'étirerait
+ * avec le remplissage serait rouge dès le premier dixième de décibel.
+ */
+.loudness-meter {
+    position: relative;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.07);
+    overflow: hidden;
+}
+
+html[data-theme="light"] .loudness-meter {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.loudness-meter-fill {
+    position: absolute;
+    inset: 0;
+    width: 0;
+    border-radius: 3px;
+    background: linear-gradient(90deg,
+        var(--c-success) 0%,
+        #f2c94c 45%,
+        #f2994a 70%,
+        var(--c-error) 100%);
+    /* 258 px de panneau moins ses 2 × 12 px de marge intérieure : le dégradé
+       couvre exactement la barre, sans quoi sa fin — le rouge — tomberait à
+       côté du bord droit et l'échelle mentirait. */
+    background-size: 234px 100%;
+    background-repeat: no-repeat;
+    transition: width 0.12s linear;
+}
+
+.loudness-verdict {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--c-success);
+    margin-top: 0.3rem;
+    transition: color 0.2s ease;
+}
+
+.loudness-panel.is-degraded .loudness-verdict {
+    color: #f2c94c;
+}
+
+.loudness-panel.is-severe .loudness-verdict {
+    color: var(--c-error);
+}
+
+/* Le gain lui-même passe au rouge quand il coûte quelque chose : c'est le
+   chiffre qu'on relit avant de refermer le menu. */
+.loudness-panel.is-degraded .loudness-gain {
+    color: #f2c94c;
+}
+
+.loudness-panel.is-severe .loudness-gain {
+    color: var(--c-error);
+}
+
+.loudness-synced-note {
+    font-size: 0.68rem;
+    line-height: 1.35;
+    color: var(--text-muted);
+    margin-top: 0.45rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid var(--border-card);
+}
+
+.loudness-notice {
+    font-size: 0.74rem;
+    line-height: 1.4;
+    color: var(--text-muted);
+    padding: 0.15rem 0.1rem;
+    max-width: 210px;
+}
+
+.loudness-notice.is-working::after {
+    content: '';
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    margin-left: 0.4rem;
+    vertical-align: -1px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: loudness-spin 0.8s linear infinite;
+}
+
+@keyframes loudness-spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .loudness-reset:hover svg,
+    .loudness-notice.is-working::after {
+        animation: none !important;
+    }
+    .loudness-meter-fill {
+        transition: none;
+    }
+}

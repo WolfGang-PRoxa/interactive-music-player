@@ -1608,6 +1608,63 @@
     cursor: not-allowed;
 }
 
+/* --- Synchronisation des niveaux sonores --- */
+
+/*
+ * Séparée des options d'enchaînement par un filet : elle vit dans la même
+ * boîte mais ne dépend pas de l'interrupteur du haut, et rien d'autre ne le
+ * dirait — deux rangées qui se suivent se lisent comme un même bloc.
+ */
+.lufs-sync-row {
+    margin-top: 0.9rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--border-card);
+}
+
+.lufs-sync-row .icon-level {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+.lufs-sync-options {
+    transition: opacity 0.3s ease;
+    padding-top: 0.5rem;
+}
+
+.lufs-sync-options.disabled {
+    opacity: 0.35;
+    pointer-events: none;
+    user-select: none;
+}
+
+.lufs-sync-options.disabled input[type="range"] {
+    cursor: not-allowed;
+}
+
+/*
+ * La valeur au-dessus du rail, et non à côté.
+ *
+ * Centrée : le chiffre est ici la seule légende du curseur — il n'y a pas
+ * d'unité familière comme les secondes ou les pourcents des rangées voisines —
+ * et le poser au-dessus, au milieu, le rattache au rail entier plutôt qu'à son
+ * extrémité droite.
+ */
+.lufs-sync-readout {
+    text-align: center;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--c-primary);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    margin-bottom: 0.35rem;
+}
+
+.lufs-sync-options input[type="range"] {
+    width: 100%;
+    display: block;
+}
+
 /* Playback Source Selector (in Player Card) */
 .playback-source-container {
     display: flex;

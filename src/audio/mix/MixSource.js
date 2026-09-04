@@ -64,6 +64,15 @@ const PRIMING_BUFFER_MS = 400;
  */
 const MAX_PRIMING_DELAY_MS = 20000;
 
+/**
+ * Trames sur lesquelles s'étale un changement de gain de mise à niveau.
+ *
+ * Dix trames font 200 ms. Assez court pour que le curseur de LUFS réponde sous
+ * le doigt, assez long pour qu'un saut de gain ne s'entende pas comme un clic —
+ * ce que produirait, à chaque cran du curseur, une application immédiate.
+ */
+const LEVEL_SLEW_FRAMES = 10;
+
 /** Fréquence de coupure au plus bas du balayage de filtre, en Hz. */
 const LOW_CUTOFF_HZ = 400;
 
@@ -105,8 +114,9 @@ class MixSource extends EventEmitter {
      * @param {number} [options.departMs] - Position de départ dans le morceau
      * @param {number} [options.vitesse] - Multiplicateur de vitesse
      * @param {number} [options.gain] - Gain initial, 0 à 1
+     * @param {number} [options.levelGain] - Gain de mise à niveau (LUFS)
      */
-    constructor(track, { player, startMs = 0, speed = 1, gain = 1 } = {}) {
+    constructor(track, { player, startMs = 0, speed = 1, gain = 1, levelGain = 1 } = {}) {
         super();
 
         this.track = track;
@@ -136,6 +146,22 @@ class MixSource extends EventEmitter {
         this._fadeFrame = 0;
         this._fadeCurve = 'puissance';
         this._onFadeComplete = null;
+
+        /*
+         * --- Gain de mise à niveau (LUFS) ---
+         *
+         * Séparé de l'enveloppe, et pour deux raisons. Il peut dépasser 1,
+         * quand l'enveloppe ne le peut pas : monter le niveau d'un morceau
+         * discret est précisément ce qu'on lui demande. Et il ne décrit pas le
+         * même phénomène : l'enveloppe dit où en est un fondu, celui-ci dit à
+         * quel niveau le morceau doit s'entendre — un fondu enchaîné doit
+         * pouvoir traverser le second sans effacer le premier.
+         */
+        this._levelGain = levelGain > 0 ? levelGain : 1;
+        this._levelStart = this._levelGain;
+        this._levelTarget = this._levelGain;
+        this._levelFrames = 0;
+        this._levelFrame = 0;
 
         // --- Balayage de filtre (enchaînement « effets ») ---
         this._filterActive = false;
@@ -385,11 +411,17 @@ class MixSource extends EventEmitter {
         this._resumeDecoding();
 
         const startGain = this._gain;
+        const startLevel = this._levelGain;
         const endGain = this._advanceEnvelope();
+        const endLevel = this._advanceLevel();
 
         if (this._filterActive) this._applyFilter(pcm);
 
-        return { pcm, startGain, endGain };
+        // Les deux gains sont remis au bus déjà multipliés : il interpole entre
+        // le début et la fin de la trame, et c'est bien leur produit qui doit
+        // suivre cette rampe — un fondu sur un morceau remonté de 6 dB reste un
+        // fondu, pas un fondu suivi d'un saut de niveau.
+        return { pcm, startGain: startGain * startLevel, endGain: endGain * endLevel };
     }
 
     /**
@@ -493,6 +525,51 @@ class MixSource extends EventEmitter {
         }
 
         return this._gain;
+    }
+
+    // ─── Gain de mise à niveau ────────────────────────────────────────────
+
+    /**
+     * Amène le morceau au niveau demandé.
+     *
+     * Le changement est étalé sur quelques trames plutôt qu'appliqué d'un coup :
+     * le curseur du tableau de bord émet une valeur par cran, et chaque saut de
+     * gain non lissé s'entendrait comme un craquement.
+     *
+     * @param {number} value - Facteur multiplicatif, 1 pour laisser tel quel
+     * @param {boolean} [immediate] - Applique sans transition, à la création
+     */
+    setLevelGain(value, immediate = false) {
+        const target = Number.isFinite(value) && value > 0 ? value : 1;
+        if (target === this._levelTarget) return;
+
+        this._levelTarget = target;
+        if (immediate) {
+            this._levelGain = target;
+            this._levelStart = target;
+            this._levelFrames = 0;
+            return;
+        }
+
+        this._levelStart = this._levelGain;
+        this._levelFrame = 0;
+        this._levelFrames = LEVEL_SLEW_FRAMES;
+    }
+
+    /** @returns {number} Gain de niveau après avancement d'une trame. */
+    _advanceLevel() {
+        if (this._levelFrames === 0) return this._levelGain;
+
+        this._levelFrame++;
+        const t = Math.min(1, this._levelFrame / this._levelFrames);
+        this._levelGain = this._levelStart + (this._levelTarget - this._levelStart) * t;
+
+        if (t >= 1) {
+            this._levelGain = this._levelTarget;
+            this._levelFrames = 0;
+        }
+
+        return this._levelGain;
     }
 
     // ─── Balayage de filtre ───────────────────────────────────────────────

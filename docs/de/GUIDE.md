@@ -454,6 +454,46 @@ es braucht.
 Wenn zu einem Titel ein Video gehört, kann das Dashboard es im Hintergrund
 anzeigen. Lokale Audiodateien erhalten eine grafische Visualisierung.
 
+### Lautheit (LUFS)
+
+Zwei Titel mit derselben Lautstärke werden nicht gleich laut gehört: ein neueres
+Master liegt bei etwa −7 LUFS, eine klassische Aufnahme bei etwa −25. Der
+Lautstärkeregler ändert daran nichts, da er auf beide zugleich wirkt.
+
+Ein Rechtsklick auf einen Titel — in der Warteschlange, im Verlauf oder in einer
+Playlist — öffnet ein Menü, dessen Eintrag **Lautheit** eine Einstellung
+aufklappt:
+
+- **Der Regler** zielt auf eine Lautheit in LUFS, nicht auf eine Lautstärke. Der
+  Wert steht darüber und folgt dem Regler in Echtzeit; die Korrektur ist
+  hörbar, während man ihn bewegt, ohne die Wiedergabe neu zu starten.
+- **Die Marke auf der Schiene** zeigt die gemessene Lautheit der Datei: steht
+  der Regler darauf, klingt der Titel genau so, wie er aufgenommen wurde. Die
+  Messung steht außerdem ausgeschrieben unter der Schiene.
+- **Die runde Schaltfläche** gibt dem Titel diese Ausgangslautheit zurück.
+- **Der Verlaufsbalken** zeigt, was die Korrektur den Klang kostet. Wird die
+  Lautheit über den Spielraum der Datei hinaus angehoben, werden die Spitzen
+  gekappt: der Balken wandert von Grün nach Rot, je stärker das Clipping wird.
+
+Die Messung verlangt, die Datei von Anfang bis Ende zu lesen, was nur der Bot
+kann. Sie wird daher gestartet, wenn der Titel beginnt oder wenn dieses Menü
+sich öffnet, und danach nie neu berechnet. Ein entfernter Titel ohne Vorladen
+ist nicht messbar: die Einstellung wartet auf sein Vorladen.
+
+Die Karte **DJ-Übergang** trägt einen Schalter **LUFS angleichen**,
+standardmäßig aus, und einen eigenen Regler. Eingeschaltet bringt er alle Titel
+auf dasselbe Ziel — jeden nach seiner eigenen Messung korrigiert. Die einzeln
+vorgenommenen Einstellungen werden deswegen nicht gelöscht: sie werden nur
+überdeckt, und das Abwählen des Schalters gibt sie unverändert zurück. Wird ein
+Titel von Hand eingestellt, während die Angleichung aktiv ist, schaltet sie sich
+ab, und nur dieser Titel behält den neuen Wert.
+
+Bei persönlicher Ausgabe wendet der Browser die Korrektur an. Eine Absenkung ist
+dort exakt, eine Anhebung hat aber nur den Spielraum, den der
+Hauptlautstärkeregler lässt: +6 dB zu verlangen, während er bereits am Anschlag
+steht, liefert nur einen Teil davon. Bei gemeinsamer Ausgabe, wo der Bot den Ton
+selbst mischt, wird die Korrektur vollständig angewendet.
+
 ### Geschwindigkeit und Übergänge
 
 - **Wiedergabegeschwindigkeit** — einstellbar von 0,20× bis 3,05×, in Schritten

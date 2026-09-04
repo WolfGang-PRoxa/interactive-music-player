@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const database = require('../../database/Database');
 const preloadManager = require('../../audio/PreloadManager');
+const loudnessAnalyzer = require('../../audio/LoudnessAnalyzer');
 const { resolveMediaPath, isAllowedMediaFilename } = require('../../utils/mediaPaths');
 const { arePathsOrUrlsEqual } = require('../../utils/paths');
 const downloadDir = require('../../utils/downloadDir');
@@ -544,6 +545,11 @@ function createApiRouter(webServer) {
         if (!req.headers.range || req.headers.range.startsWith('bytes=0-')) {
             log.info(`[WebServer Stream] Starting the stream for: ${track.title}`);
         }
+
+        // Le navigateur applique lui-même le gain de sonie, mais il lui faut
+        // la mesure : c'est ici qu'un morceau commence à jouer en diffusion
+        // personnelle, et le seul endroit du chemin qui voie passer le fichier.
+        loudnessAnalyzer.ensure(track);
 
         // Si la piste est déjà dans le cache de préchargement
         const cachedPath = preloadManager.getCachedPath(track);

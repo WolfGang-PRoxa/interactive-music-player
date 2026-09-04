@@ -434,6 +434,45 @@ prend.
 Lorsqu'une piste possède une vidéo associée, le tableau de bord peut l'afficher
 en fond. Les fichiers audio locaux bénéficient d'un visualiseur graphique.
 
+### Niveau sonore (LUFS)
+
+Deux morceaux réglés au même volume ne s'entendent pas au même niveau : un
+master récent sort autour de −7 LUFS, un enregistrement classique autour de −25.
+Le curseur de volume n'y change rien, puisqu'il agit sur les deux à la fois.
+
+Le clic droit sur une piste — dans la file, l'historique ou une playlist — ouvre
+un menu dont l'entrée **Niveau sonore** déplie un réglage :
+
+- **Le curseur** vise une sonie, en LUFS, et non un volume. La valeur s'affiche
+  au-dessus et suit le curseur en temps réel ; la correction s'entend pendant
+  qu'on le déplace, sans relancer la lecture.
+- **Le repère sur le rail** marque la sonie mesurée du fichier : curseur posé
+  dessus, le morceau sort tel qu'il a été enregistré. La mesure est aussi
+  rappelée en toutes lettres sous le rail.
+- **Le bouton circulaire** rend au morceau ce niveau d'origine.
+- **La barre dégradée** annonce ce que la correction coûte au son. Monter le
+  niveau au-delà de la marge que laisse le fichier écrête les crêtes : la barre
+  passe du vert au rouge à mesure que l'écrêtage s'aggrave.
+
+La mesure demande de lire le fichier d'un bout à l'autre, ce que seul le bot
+peut faire. Elle est donc lancée quand le morceau démarre ou quand ce menu
+s'ouvre, et n'est jamais recalculée ensuite. Une piste distante non préchargée
+n'est pas mesurable : le réglage attend son préchargement.
+
+La boîte **Enchaînement Mix** porte un interrupteur **Synchroniser les LUFS**,
+désactivé par défaut, et son propre curseur. Activé, il aligne tous les morceaux
+sur une même cible — chacun corrigé selon sa propre mesure. Les réglages faits
+piste par piste ne sont pas effacés pour autant : ils sont simplement recouverts,
+et décocher l'interrupteur les rend tels quels. Régler une piste à la main
+pendant que la synchronisation est active la désactive, et seule cette piste
+garde la nouvelle valeur.
+
+En diffusion personnelle, la correction est appliquée par le navigateur. Une
+atténuation y est exacte, mais une amplification n'a que la marge que laisse le
+curseur de volume principal : demander +6 dB alors qu'il est déjà à fond n'en
+donnera qu'une partie. En diffusion commune, où le bot mélange lui-même le son,
+la correction est appliquée entièrement.
+
 ### Vitesse et enchaînement
 
 - **Vitesse de lecture** — réglable de 0,20× à 3,05×, par pas de 0,01.

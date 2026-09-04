@@ -36,6 +36,7 @@ window.MusicPlayer = window.MusicPlayer || {};
             '#btn-play-pause', '#btn-skip', '#btn-previous', '#btn-stop',
             '#progress-bar-wrapper', '.play-mode-switch', '#speed-pad-container',
             '#playback-source-select', '#mix-enable-toggle', '#mix-options-container',
+            '#lufs-sync-toggle', '#lufs-sync-options',
         ],
         queue: [
             '#search-form', '#add-target-select', '#btn-clear-queue', '#btn-clear-history',

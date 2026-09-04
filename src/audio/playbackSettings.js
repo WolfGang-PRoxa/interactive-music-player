@@ -74,4 +74,28 @@ function cancelMixEffects(queue) {
     }
 }
 
-module.exports = { applySpeed, cancelMixEffects };
+/**
+ * Réaligne le niveau sonore du morceau en cours sur les réglages courants.
+ *
+ * Sans effet hors du bus de mixage : la chaîne de discord-player passe son gain
+ * à FFmpeg, qu'il faudrait relancer pour le changer — donc rompre le flux, là
+ * où ce réglage doit s'entendre pendant qu'on déplace le curseur. En diffusion
+ * personnelle, c'est le navigateur qui applique le gain, sur les mêmes valeurs
+ * reçues dans l'état.
+ *
+ * @param {import('discord-player').GuildQueue} queue
+ */
+function applyLoudness(queue) {
+    if (!queue) return;
+
+    const engine = activeEngine(queue);
+    if (!engine) return;
+
+    try {
+        engine.applyLoudness();
+    } catch (err) {
+        log.error('[PlaybackSettings] Loudness change impossible:', err.message);
+    }
+}
+
+module.exports = { applySpeed, cancelMixEffects, applyLoudness };

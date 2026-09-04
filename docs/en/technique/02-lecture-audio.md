@@ -334,6 +334,49 @@ playback in progress.
 
 ---
 
+## Loudness (LUFS)
+
+LUFS (EBU R128) measures *perceived* loudness, not amplitude: two files at the
+same LUFS are heard at the same level, whatever their dynamics. Three modules
+share the subject, and the separation matters.
+
+[`loudness.js`](../../../src/audio/loudness.js) only does the conversion: it
+knows neither FFmpeg nor the audio path. A track carries a **measurement**
+(`measured`, `peak`) and, possibly, a **target** (`target`); the gain in
+decibels is their difference, bounded. Without a measurement the gain is zero —
+a target alone means nothing, and correcting by guesswork would be worse than
+doing nothing.
+
+[`LoudnessAnalyzer`](../../../src/audio/LoudnessAnalyzer.js) produces the
+measurement by running `ffmpeg -af loudnorm=print_format=json` on the file — the
+preload cache if it exists, the disk file otherwise. One analysis at a time:
+decoding for playback comes first. The result is written to the database and
+never recomputed, a file's loudness not being subject to change. A remote source
+that has not been preloaded is not analysed; downloading it just to measure it
+would cost the price of a preload nobody asked for.
+
+Applying it differs by audio path:
+
+- **Mixing bus** — [`MixSource`](../../../src/audio/mix/MixSource.js) carries a
+  `levelGain` separate from the fade envelope. Separate, because it can exceed 1
+  where the envelope cannot, and because it describes something else: the
+  envelope says where a fade stands, the level gain says how loud the track is
+  heard. The two are multiplied per frame. A change is spread over ten frames
+  (200 ms), without which every notch of the slider would be heard as a click.
+- **Browser** —
+  [`loudnessGain.js`](../../../src/web/public/js/loudnessGain.js) wraps the
+  `volume` property of both `<audio>` elements. The rest of the dashboard goes
+  on writing the *intended* volume — fade ramps, ducking, shutdown — and the
+  wrapper lays down the product. An `<audio>` never exceeds volume 1:
+  attenuation is exact, a boost only has the headroom the main slider leaves.
+
+Synchronization is a **layer**, never a write. When `lufsSyncEnabled` is set,
+`effectiveTarget()` returns the common target without touching the individual
+ones, which stay in the database. That distinction, and it alone, is what allows
+the option to be unticked and every track to be given back the setting it had.
+
+---
+
 ## Local files
 
 [`LocalFilePlayer`](../../../src/audio/LocalFilePlayer.js) provides the folder

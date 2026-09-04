@@ -30,6 +30,7 @@ latence perceptible.
 | **Préchargement** | Les pistes à venir sont mises en cache : démarrage instantané, résistance aux coupures réseau |
 | **Reprise après redémarrage** | Le bot repart sur la piste interrompue, à sa position exacte |
 | **Vitesse et enchaînement** | 0,20× à 3,05× ; fondu enchaîné entre pistes, par volume ou avec effet |
+| **Niveau sonore (LUFS)** | Sonie mesurée par piste, réglable au décibel près, et synchronisable sur une cible commune |
 | **Aucune dépendance externe** | Ni base de données, ni build, ni FFmpeg à installer |
 
 ---

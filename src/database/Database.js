@@ -21,7 +21,7 @@ class GuildDatabase {
         this.filepath = path.join(process.cwd(), 'data', 'settings.json');
         this.cache = new Map();
         /** Stockage global des playlists (commun a tous les salons) */
-        this.globalData = { playlists: [], trackQuality: {}, bridges: {} };
+        this.globalData = { playlists: [], trackQuality: {}, trackLoudness: {}, bridges: {} };
         this._saveTimer = null;
         this._init();
 
@@ -44,7 +44,7 @@ class GuildDatabase {
 
         // Charger les donnees globales
         if (data.__global__) {
-            this.globalData = { playlists: [], trackQuality: {}, bridges: {}, ...data.__global__ };
+            this.globalData = { playlists: [], trackQuality: {}, trackLoudness: {}, bridges: {}, ...data.__global__ };
         }
 
         for (const [key, settings] of Object.entries(data)) {
@@ -179,6 +179,18 @@ class GuildDatabase {
             mixEnabled: false,
             mixDuration: 5,
             mixType: 'volume',
+
+            /**
+             * Alignement du niveau sonore de tous les morceaux sur une meme
+             * cible, en LUFS.
+             *
+             * Desactive par defaut : c'est un reglage qui recouvre ceux faits
+             * piste par piste, et l'imposer d'entree ferait entendre des
+             * corrections que personne n'a demandees.
+             */
+            lufsSyncEnabled: false,
+            lufsSyncTarget: -14,
+
             fadeinEnabled: false,
             fadeinDuration: 5,
             fadeoutEnabled: true,
@@ -379,6 +391,73 @@ class GuildDatabase {
             audio: patch.audio || currentQuality.audio,
             video: patch.video || currentQuality.video
         };
+        this._save();
+    }
+
+    // --- Niveau sonore par piste (commun a tous les salons) ---
+
+    /**
+     * Sonie d'une piste : ce qu'elle vaut, et ce qu'on veut qu'elle vaille.
+     *
+     * `measured` et `peak` viennent de l'analyse du fichier ; `target` est le
+     * reglage de l'utilisateur. Les deux vivent dans la meme entree mais n'ont
+     * pas la meme duree de vie : la mesure est definitive, la cible se change
+     * et se retire.
+     *
+     * Indexee par URL, comme la qualite : une meme piste apparait dans la file,
+     * l'historique et les playlists, et doit s'y entendre pareil.
+     *
+     * @param {string} url
+     * @returns {{ measured?: number, peak?: number, target?: number }|null}
+     */
+    getTrackLoudness(url) {
+        if (!url) return null;
+        return this.globalData.trackLoudness?.[url] || null;
+    }
+
+    /**
+     * Enregistre la mesure d'une piste, sans toucher a la cible.
+     *
+     * @param {string} url
+     * @param {{ measured: number, peak: number }} measure
+     */
+    setTrackLoudnessMeasure(url, measure) {
+        if (!url || !measure || !Number.isFinite(measure.measured)) return;
+        if (!this.globalData.trackLoudness) this.globalData.trackLoudness = {};
+
+        const entry = this.globalData.trackLoudness[url] || {};
+        entry.measured = measure.measured;
+        entry.peak = Number.isFinite(measure.peak) ? measure.peak : 0;
+        this.globalData.trackLoudness[url] = entry;
+        this._save();
+    }
+
+    /**
+     * Fixe — ou retire — la cible d'une piste, sans toucher a la mesure.
+     *
+     * Retirer la cible n'est pas la ramener a la mesure : c'est dire qu'il n'y
+     * a plus rien a corriger. La distinction compte pour la synchronisation,
+     * qui recouvre les cibles sans les effacer et doit pouvoir rendre exactement
+     * l'etat d'avant.
+     *
+     * @param {string} url
+     * @param {number|null} target - null efface le reglage
+     */
+    setTrackLoudnessTarget(url, target) {
+        if (!url) return;
+        if (!this.globalData.trackLoudness) this.globalData.trackLoudness = {};
+
+        const entry = this.globalData.trackLoudness[url] || {};
+        if (target === null || target === undefined) {
+            if (entry.target === undefined) return;
+            delete entry.target;
+        } else {
+            if (!Number.isFinite(target)) return;
+            if (entry.target === target) return;
+            entry.target = target;
+        }
+
+        this.globalData.trackLoudness[url] = entry;
         this._save();
     }
 

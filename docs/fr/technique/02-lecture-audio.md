@@ -336,6 +336,51 @@ temporairement que couper une lecture en cours.
 
 ---
 
+## Niveau sonore (LUFS)
+
+Le LUFS (EBU R128) mesure la sonie *perçue*, non l'amplitude : deux fichiers de
+même LUFS s'entendent au même niveau, quelle que soit leur dynamique. Trois
+modules se partagent le sujet, et la séparation compte.
+
+[`loudness.js`](../../../src/audio/loudness.js) ne fait que la conversion : il
+ne connaît ni FFmpeg ni le chemin audio. Une piste porte une **mesure**
+(`measured`, `peak`) et, éventuellement, une **cible** (`target`) ; le gain en
+décibels est leur écart, borné. Sans mesure, le gain est nul — une cible seule
+ne veut rien dire, et corriger au jugé serait pire que ne rien faire.
+
+[`LoudnessAnalyzer`](../../../src/audio/LoudnessAnalyzer.js) produit la mesure
+en lançant `ffmpeg -af loudnorm=print_format=json` sur le fichier — le cache de
+préchargement s'il existe, le fichier disque sinon. Une analyse à la fois : le
+décodage de la lecture passe avant. Le résultat est écrit en base et n'est
+jamais recalculé, un fichier ne changeant pas de sonie. Une source distante non
+préchargée n'est pas analysée ; la télécharger pour la mesurer coûterait le prix
+d'un préchargement que personne n'a demandé.
+
+L'application diffère selon le chemin audio :
+
+- **Bus de mixage** — [`MixSource`](../../../src/audio/mix/MixSource.js) porte
+  un `levelGain` séparé de l'enveloppe de fondu. Séparé, parce qu'il peut
+  dépasser 1 quand l'enveloppe ne le peut pas, et parce qu'il décrit autre
+  chose : l'enveloppe dit où en est un fondu, le gain de niveau dit à quel
+  niveau le morceau s'entend. Les deux sont multipliés à la trame. Un changement
+  est étalé sur dix trames (200 ms), sans quoi chaque cran du curseur
+  s'entendrait comme un craquement.
+- **Navigateur** —
+  [`loudnessGain.js`](../../../src/web/public/js/loudnessGain.js) enveloppe la
+  propriété `volume` des deux éléments `<audio>`. Le reste du tableau de bord
+  continue d'écrire le volume *voulu* — rampes de fondu, ducking, extinction —
+  et l'enveloppe pose le produit. Un `<audio>` ne dépasse pas le volume 1 :
+  l'atténuation est exacte, l'amplification n'a que la marge laissée par le
+  curseur principal.
+
+La synchronisation est une **couche**, jamais une écriture. Quand
+`lufsSyncEnabled` est levé, `effectiveTarget()` rend la cible commune sans
+toucher aux cibles individuelles, qui restent en base. C'est cette distinction,
+et elle seule, qui permet de décocher l'option et de rendre à chaque piste le
+réglage qu'elle avait.
+
+---
+
 ## Fichiers locaux
 
 [`LocalFilePlayer`](../../../src/audio/LocalFilePlayer.js) fournit le scan de
