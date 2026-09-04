@@ -53,14 +53,37 @@ function el(tag = 'div') {
             if (v === '') this.children = [];
         },
         offsetHeight: 0,
+        offsetLeft: 0,
+        offsetWidth: 0,
         classList: {
             add: (...n) => n.forEach(c => classes.add(c)),
             remove: (...n) => n.forEach(c => classes.delete(c)),
             contains: (c) => classes.has(c),
         },
-        appendChild(child) { this.children.push(child); return child; },
+        /*
+         * Une mise en page mesurable : chaque graduation large de 40, posée
+         * tous les 50 px. Sans elle, le module ne trouve aucune géométrie et
+         * saute le calcul du glissement — le chemin même qu'on veut éprouver.
+         */
+        appendChild(child) {
+            child.offsetWidth = SLOT_WIDTH;
+            child.offsetLeft = this.children.length * SLOT_PITCH;
+            this.children.push(child);
+            return child;
+        },
+        querySelector(sel) {
+            const m = /\[data-speed="([^"]+)"\]/.exec(sel);
+            if (!m) return null;
+            return this.children.find(c => c.dataset.speed === m[1]) || null;
+        },
     };
 }
+
+/** Gabarit des graduations du banc : largeur, et pas entre deux centres. */
+const SLOT_WIDTH = 40;
+const SLOT_PITCH = 50;
+/** Largeur du cadre : le repère est donc à 70. */
+const PAD_WIDTH = 140;
 
 /**
  * Monte le pad avec son vrai `rebuildSpeedPadTrack`.
@@ -73,6 +96,7 @@ function mount() {
 
     const indicator = el();
     const container = el();
+    container.clientWidth = PAD_WIDTH;
     const track = el();
 
     const clicks = [];
@@ -111,6 +135,21 @@ function mount() {
 
     return {
         MP, track, indicator, timeouts,
+        /** Le décalage de la piste, tel que la feuille l'appliquerait. */
+        translate: () => parseFloat(track.dataset.translateX),
+        /**
+         * Place le pad comme s'il montrait cette valeur sous le repère.
+         *
+         * C'est ce que fait `updateSpeedPad`, que ce banc neutralise : sans
+         * cela la piste n'aurait aucune position de départ à quitter.
+         */
+        centreOn(speed) {
+            const target = track.children.find(c => c.dataset.speed === speed);
+            const offset = PAD_WIDTH / 2 - target.offsetLeft - target.offsetWidth / 2;
+            track.dataset.translateX = offset;
+            track.style.transform = `translateX(${offset}px)`;
+            return offset;
+        },
         /** Un clic sur l'indicateur d'échelle, 400 ms après le précédent. */
         toggleScale() {
             clock += 400;
@@ -200,6 +239,66 @@ console.log('\nQuand la valeur disparaît de l’échelle\n');
     check('la graduation retenue n’a aucun retard',
         !!kept && (kept.delay === '0ms' || !kept.delay),
         kept ? `${kept.speed} → ${kept.delay}` : 'introuvable');
+}
+
+// ─────────────────── D'où part le glissement ───────────────────
+
+/*
+ * Le déplacement doit valoir l'écart que la valeur avait avec le repère, et non
+ * la distance entre deux `translateX` appartenant à des échelles différentes.
+ *
+ * En pas de 0,01, ce décalage vaut des milliers de pixels ; en classique,
+ * quelques dizaines. Animer de l'un à l'autre faisait traverser toute la
+ * graduation — le pad semblait revenir depuis 0,25 — alors que la valeur
+ * n'avait bougé que d'un centième.
+ */
+console.log('\nLe point de départ du glissement\n');
+
+{
+    const s = mount();
+    s.MP.currentSpeed = '1.00';
+    s.toggleScale();   // → 0,05
+    s.toggleScale();   // → 0,01
+
+    // Le pad montre 1,01 sous le repère, et 1,00 juste à sa gauche.
+    const before = s.centreOn('1.01');
+    s.MP.currentSpeed = '1.01';
+
+    s.toggleScale();   // → classique : repli sur 1,00
+
+    check('la valeur se rabat sur 1,00', s.MP.currentSpeed === '1.00', s.MP.currentSpeed);
+
+    /*
+     * 1,00 était à une graduation à gauche du repère, soit un pas. Le
+     * glissement doit donc valoir ce pas, vers la droite — et non les 3 600 px
+     * qui séparaient les deux décalages.
+     */
+    const kept = s.track.children.find(c => c.dataset.speed === '1.00');
+    const arrival = PAD_WIDTH / 2 - kept.offsetLeft - kept.offsetWidth / 2;
+    const departure = s.translate();
+
+    check('  … le glissement part d’un pas à gauche de l’arrivée',
+        arrival - departure === SLOT_PITCH, `${departure} → ${arrival}`);
+    check('  … et non de la position de l’ancienne échelle',
+        departure !== before, `ancienne ${before}, départ ${departure}`);
+    check('  … le décalage restant de l’ordre du pas, pas de la piste entière',
+        Math.abs(arrival - departure) <= SLOT_PITCH * 2,
+        `${Math.abs(arrival - departure)} px`);
+}
+
+{
+    // Sans géométrie mesurable — cadre pas encore disposé —, aucun point de
+    // départ n'est posé : rien ne doit traverser l'écran pour autant.
+    const s = mount();
+    s.MP.currentSpeed = '1.00';
+    s.toggleScale();
+    s.toggleScale();
+    s.MP.currentSpeed = '1.01';
+    s.track.children.forEach(c => { c.offsetWidth = 0; });
+
+    s.toggleScale();
+    check('une mise en page non mesurable ne fait pas tomber la bascule',
+        s.MP.currentSpeed === '1.00', s.MP.currentSpeed);
 }
 
 console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);

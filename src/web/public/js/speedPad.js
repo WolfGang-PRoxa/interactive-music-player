@@ -44,6 +44,21 @@ function getSpeeds() {
     return classicSpeeds;
 }
 
+/**
+ * Décalage à appliquer à la piste pour amener cette graduation sous le repère.
+ *
+ * Le repère est au milieu du cadre ; une graduation y est centrée quand la
+ * piste est décalée de la moitié du cadre, moins la position de la graduation
+ * et la moitié de sa largeur.
+ *
+ * @returns {number|null} null si la mise en page n'est pas encore mesurable.
+ */
+function centreOffsetFor(container, el) {
+    const width = container.clientWidth || container.offsetWidth || 140;
+    if (!el || !width || !el.offsetWidth) return null;
+    return width / 2 - el.offsetLeft - el.offsetWidth / 2;
+}
+
 function getPadPairs() {
     return [
         {
@@ -94,6 +109,32 @@ window.MusicPlayer.rebuildSpeedPadTrack = function(triggerBounce = false) {
     const currentSpeeds = getSpeeds();
 
     pairs.forEach(({ indicator, container, track }) => {
+        /*
+         * Où la valeur retenue se trouve-t-elle à l'écran, avant que la piste
+         * ne soit refaite ?
+         *
+         * C'est de là que le glissement doit partir. Le `translateX` en place
+         * appartient à l'ancienne échelle et n'a plus de sens dans la nouvelle :
+         * en pas de 0,01 il vaut des milliers de pixels, en classique quelques
+         * dizaines. Animer de l'un à l'autre faisait traverser toute la
+         * graduation — le pad semblait revenir depuis 0,25 — alors que la
+         * valeur, elle, n'avait bougé que d'un centième.
+         *
+         * On note donc l'écart entre cette valeur et le repère. Elle est déjà
+         * celle du repli : `togglePrecisionMode` l'a posée avant d'appeler
+         * cette fonction, et elle existe encore dans l'ancien contenu tant
+         * qu'on en descend — c'est le seul cas où un glissement a lieu.
+         */
+        let keptOffset = null;
+        if (triggerBounce) {
+            const previous = track.querySelector(
+                `[data-speed="${window.MusicPlayer.currentSpeed}"]`);
+            const centred = centreOffsetFor(container, previous);
+            if (centred !== null) {
+                keptOffset = parseFloat(track.dataset.translateX || '0') - centred;
+            }
+        }
+
         track.classList.remove('switching');
         track.innerHTML = '';
 
@@ -159,6 +200,30 @@ window.MusicPlayer.rebuildSpeedPadTrack = function(triggerBounce = false) {
             }
             track.appendChild(el);
         });
+
+        /*
+         * Le point de départ du glissement, posé sans transition.
+         *
+         * La graduation retenue est replacée là où elle se voyait à l'instant,
+         * puis `updateSpeedPad` l'amène sous le repère avec la transition
+         * ressort de `.switching`. Le déplacement vaut alors exactement l'écart
+         * que la valeur avait avec le repère — un cran, pas une traversée.
+         *
+         * Sans point de départ mesurable — première construction, cadre pas
+         * encore disposé —, on part de l'arrivée : les graduations rebondissent
+         * quand même, et rien ne traverse l'écran.
+         */
+        if (triggerBounce) {
+            const kept = track.querySelector(
+                `[data-speed="${window.MusicPlayer.currentSpeed}"]`);
+            const target = centreOffsetFor(container, kept);
+            if (target !== null) {
+                const start = target + (keptOffset === null ? 0 : keptOffset);
+                track.style.transition = 'none';
+                track.style.transform = `translateX(${start}px)`;
+                track.dataset.translateX = start;
+            }
+        }
 
         track.offsetHeight;
         if (triggerBounce) {
