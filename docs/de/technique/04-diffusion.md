@@ -29,6 +29,44 @@ sendet ihn in den Sprachkanal. Alle hören dasselbe, das Ducking greift.
 
 ---
 
+## Eine Stream-Adresse, eine einzige Datei
+
+Im persönlichen Modus holt der Browser den Ton von `/api/stream`, einer Adresse,
+die nichts als die Titelkennung trägt. Diese Adresse kann jedoch zwei sehr
+verschiedene Dateien bezeichnen: die MP3 aus dem Vorlade-Cache oder die
+Originaldatei auf der Platte. Die erste existiert noch nicht, während das
+Vorladen sie schreibt, und verschwindet später, wenn der Cache aufgeräumt wird.
+
+Ein Browser lädt eine Mediendatei nicht in einem Stück: er fordert über mehrere
+Minuten Abschnitte an, auf derselben Adresse. Die Datei je Anfrage zu wählen
+lässt daher einen MP3-Abschnitt in einer WAV-Dekodierung landen, die ohne ihn
+begonnen hat — und das hört sich weder wie Stille noch wie ein Fehler an,
+sondern wie ein **enormes weißes Rauschen**: komprimierte Bytes, als rohe
+Abtastwerte gelesen, sind Zufallsrauschen in voller Lautstärke.
+
+Die Repräsentation wird deshalb beim ersten gelieferten Byte festgelegt und
+jedem Abschnitt **desselben Ladevorgangs** unverändert geliefert, auch wenn der
+Cache inzwischen aufgetaucht ist.
+
+Was einen Ladevorgang kennzeichnet, ist der Parameter `load` der Adresse, vom
+Dashboard gesetzt und bei jedem Wiedergabestart hochgezählt — keinesfalls die
+angeforderte Position. Ein Bereich ab null sieht wie ein Neustart aus, ist aber
+auch das, was eine Wiedergabe **in Schleife** sendet, und dort hat der Browser
+nichts vergessen: er behält seine Bytes unter dieser Adresse und seinen Dekoder
+auf dem im ersten Durchgang erkannten Format. Genau das Neuwählen in diesem
+Moment erzeugte vierzig Sekunden Rauschen und danach Stille, bei der zweiten
+Schleife eines zwischenzeitlich vorgeladenen Titels. Da sich die Adresse mit
+jedem Ladevorgang ändert, kann der Browser nie zwei Formen unter einer Ressource
+vermischen.
+
+Verschwindet die festgelegte Datei mitten in der Wiedergabe, wird die Anfrage
+mit einem 404 abgelehnt statt im anderen Format bedient — das Dashboard lädt den
+Titel an der erreichten Position unter einer neuen Adresse neu, was einige
+hundert Millisekunden Stille statt des Rauschens kostet. Siehe
+[`api.js`](../../../src/web/routes/api.js) und den Test `tests/streamSource.js`.
+
+---
+
 ## Persönlicher Modus: der virtuelle Player
 
 Im persönlichen Modus **dekodiert der Bot überhaupt keinen Ton**. Er hält einen

@@ -32,9 +32,10 @@
     "test:download-dir": "node tests/downloadDir.js",
     "test:download-formats": "node tests/downloadFormats.js",
     "test:loudness": "node tests/loudness.js",
+    "test:stream-source": "node tests/streamSource.js",
     "test:docs-languages": "node tests/docsLanguages.js",
     "test:docs-integrity": "node tests/docsIntegrity.js",
-    "test": "node tests/deviceMode.js && node tests/dragPreview.js && node tests/speedPadPointer.js && node tests/speedPadScale.js && node tests/queueHandoff.js && node tests/favoriteChannel.js && node tests/sharedControl.js && node tests/toastSwipe.js && node tests/streamResolution.js && node tests/coffeeSteam.js && node tests/githubTail.js && node tests/powerCharge.js && node tests/cardChrome.js && node tests/addTarget.js && node tests/pausePrecision.js && node tests/searchHistory.js && node tests/downloadDir.js && node tests/downloadFormats.js && node tests/loudness.js && node tests/docsLanguages.js && node tests/docsIntegrity.js && node tests/smoke.js"
+    "test": "node tests/deviceMode.js && node tests/dragPreview.js && node tests/speedPadPointer.js && node tests/speedPadScale.js && node tests/queueHandoff.js && node tests/favoriteChannel.js && node tests/sharedControl.js && node tests/toastSwipe.js && node tests/streamResolution.js && node tests/coffeeSteam.js && node tests/githubTail.js && node tests/powerCharge.js && node tests/cardChrome.js && node tests/addTarget.js && node tests/pausePrecision.js && node tests/searchHistory.js && node tests/downloadDir.js && node tests/downloadFormats.js && node tests/loudness.js && node tests/streamSource.js && node tests/docsLanguages.js && node tests/docsIntegrity.js && node tests/smoke.js"
   },
   "keywords": [
     "discord",

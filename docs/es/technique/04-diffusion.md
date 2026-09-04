@@ -29,6 +29,43 @@ y lo emite en el canal de voz. Todo el mundo oye lo mismo, el ducking se aplica.
 
 ---
 
+## Una dirección de flujo, un solo archivo
+
+En modo personal, el navegador busca el sonido en `/api/stream`, una dirección
+que solo lleva el identificador de la pista. Ahora bien, esa dirección puede
+designar dos archivos muy distintos: el MP3 de la caché de precarga, o el
+archivo original del disco. El primero aún no existe mientras la precarga lo
+escribe, y desaparece después cuando la caché hace limpieza.
+
+Un navegador no descarga un medio de una sola vez: pide porciones a lo largo de
+la reproducción, en la misma dirección, durante varios minutos. Elegir el
+archivo en cada petición hace por tanto que una porción de MP3 aterrice en una
+decodificación de WAV empezada sin ella — y eso no se oye ni como un silencio ni
+como un error, sino como un **enorme ruido blanco**: bytes comprimidos leídos
+como muestras en bruto son ruido aleatorio, a pleno nivel.
+
+La representación se fija por tanto en el primer byte servido y se sirve igual
+a todas las porciones de la **misma carga**, aunque la caché haya aparecido
+entretanto.
+
+Lo que identifica una carga es el parámetro `load` de la dirección, puesto por
+el panel e incrementado en cada puesta en reproducción — desde luego no la
+posición pedida. Un rango que parte de cero parece un nuevo comienzo, pero es
+también lo que envía una reproducción **en bucle**, y ahí el navegador no ha
+olvidado nada: conserva sus bytes bajo esa dirección y su decodificador abierto
+sobre el formato reconocido en la primera pasada. Volver a elegir en ese momento
+es precisamente lo que producía cuarenta segundos de ruido y luego silencio, en
+el segundo bucle de una pista precargada entretanto. Como la dirección cambia en
+cada carga, el navegador nunca puede mezclar dos formas bajo un mismo recurso.
+
+Si el archivo fijado desaparece en plena reproducción, la petición se rechaza
+con un 404 en vez de servirse en el otro formato — el panel recarga la pista en
+la posición alcanzada, bajo una dirección nueva, lo que cuesta un silencio de
+unos cientos de milisegundos en lugar del ruido. Véase
+[`api.js`](../../../src/web/routes/api.js) y el test `tests/streamSource.js`.
+
+---
+
 ## Modo personal: el reproductor virtual
 
 En modo personal, **el bot no decodifica sonido alguno**. Mantiene al día un

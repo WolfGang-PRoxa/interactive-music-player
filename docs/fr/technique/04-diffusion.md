@@ -30,6 +30,44 @@ s'applique.
 
 ---
 
+## Une adresse de flux, un seul fichier
+
+En mode personnel, le navigateur va chercher le son sur `/api/stream`, une
+adresse qui ne porte que l'identifiant de la piste. Or cette adresse peut
+désigner deux fichiers très différents : le MP3 du cache de préchargement, ou le
+fichier d'origine sur le disque. Le premier n'existe pas encore pendant que le
+préchargement l'écrit, et disparaît ensuite quand le cache fait le ménage.
+
+Un navigateur ne télécharge pas un média d'un seul tenant : il en demande des
+tranches au fil de la lecture, sur la même adresse, pendant plusieurs minutes.
+Choisir le fichier à chaque requête fait donc atterrir une tranche de MP3 dans
+un décodage de WAV commencé sans elle — et cela ne s'entend ni comme un silence
+ni comme une erreur, mais comme un **énorme bruit blanc** : des octets
+compressés lus comme des échantillons bruts sont du bruit aléatoire, à plein
+niveau.
+
+La représentation est donc retenue au premier octet servi et resservie telle
+quelle à toutes les tranches du **même chargement**, même si le cache est apparu
+entretemps.
+
+Ce qui identifie un chargement est le paramètre `load` de l'adresse, posé par le
+tableau de bord et incrémenté à chaque mise en lecture — surtout pas la position
+demandée. Une plage repartant de zéro ressemble à un nouveau départ, mais c'est
+aussi ce qu'envoie une lecture **en boucle**, et là le navigateur n'a rien
+oublié : il garde ses octets sous cette adresse et son décodeur ouvert sur le
+format reconnu au premier passage. Rechoisir à ce moment-là est précisément ce
+qui produisait quarante secondes de bruit puis un silence, à la seconde boucle
+d'un morceau préchargé entretemps. L'adresse changeant à chaque chargement, le
+navigateur ne peut jamais mélanger deux formes sous une même ressource.
+
+Si le fichier retenu disparaît en pleine lecture, la requête est refusée par un
+404 plutôt que servie dans l'autre format — le tableau de bord recharge la piste
+à la position atteinte, sous une adresse neuve, ce qui coûte un blanc de
+quelques centaines de millisecondes au lieu du bruit. Voir
+[`api.js`](../../../src/web/routes/api.js) et le test `tests/streamSource.js`.
+
+---
+
 ## Mode personnel : le lecteur virtuel
 
 En mode personnel, **le bot ne décode aucun son**. Il tient à jour un état de

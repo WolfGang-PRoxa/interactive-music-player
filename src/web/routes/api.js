@@ -307,6 +307,121 @@ function listDocuments(lang) {
     });
 }
 
+/*
+ * ─── Stabilité de la source servie à /stream ──────────────────────────────
+ *
+ * Une même adresse de flux peut désigner deux fichiers très différents : le
+ * MP3 du cache de préchargement, ou le fichier d'origine sur le disque. Le
+ * premier n'existe pas encore pendant que le préchargement l'écrit, et il peut
+ * disparaître ensuite, quand le cache fait le ménage.
+ *
+ * Or un navigateur ne télécharge pas un média d'un seul tenant : il en demande
+ * des tranches au fil de la lecture, sur la même adresse, pendant plusieurs
+ * minutes. Si le choix est refait à chaque requête, une tranche de MP3 finit
+ * dans un décodage de WAV commencé sans lui — et cela ne s'entend pas comme un
+ * silence ou une erreur, mais comme un énorme bruit blanc : des octets
+ * compressés interprétés comme des échantillons bruts sont du bruit aléatoire.
+ *
+ * La représentation est donc retenue au premier octet servi, et resservie telle
+ * quelle à toutes les tranches du même chargement.
+ *
+ * ## Ce qui identifie un chargement
+ *
+ * Le paramètre `load` de l'adresse, posé par le tableau de bord, et lui seul.
+ * Surtout pas la position demandée : une plage repartant de zéro ressemble à un
+ * nouveau départ, mais c'est aussi ce qu'envoie une lecture en boucle — et là,
+ * le navigateur n'a rien oublié. Il garde ses octets déjà téléchargés sous cette
+ * adresse et le décodeur ouvert sur le format reconnu au premier passage.
+ * Rechoisir à ce moment-là est précisément ce qui produisait le bruit blanc, à
+ * la seconde boucle d'un morceau préchargé entretemps.
+ *
+ * Une adresse sans `load` — un onglet resté sur une version antérieure du
+ * tableau de bord — retombe sur la piste comme identifiant : la source y est
+ * alors figée pour de bon, ce qui est moins efficace mais jamais faux.
+ */
+
+/** @type {Map<string, {file: string, mime: string, at: number}>} chargement → source */
+const servedSources = new Map();
+
+/**
+ * Nombre de chargements dont on garde la source retenue.
+ *
+ * Un chargement par mise en lecture, et deux éléments audio qui se relaient :
+ * la soixantaine couvre une longue session d'écoute. La borne n'existe que pour
+ * qu'une session de plusieurs jours ne fasse pas grossir la table indéfiniment.
+ */
+const MAX_SERVED_SOURCES = 64;
+
+/**
+ * Choisit la représentation d'une piste : le cache s'il est prêt, le fichier
+ * d'origine sinon.
+ *
+ * @param {object} track
+ * @returns {{file: string, mime: string}|null}
+ */
+function pickStreamSource(track) {
+    const cachedPath = preloadManager.getCachedPath(track);
+    if (cachedPath) return { file: cachedPath, mime: 'audio/mpeg' };
+
+    // Fichier local : servi uniquement s'il est sous une racine autorisée.
+    const localPath = resolveMediaPath(track.url);
+    if (localPath) return { file: localPath, mime: mimeFor(localPath) };
+
+    return null;
+}
+
+/**
+ * Source à servir pour cette requête.
+ *
+ * @param {object} track
+ * @param {string|undefined} load - Identifiant du chargement, paramètre `load`
+ *   de l'adresse. Absent, la piste sert d'identifiant de repli.
+ * @returns {{file: string, mime: string, gone: boolean}|null} `gone` est vrai
+ *   lorsque la source retenue a disparu en pleine lecture : l'appelant doit
+ *   alors interrompre plutôt que de livrer des octets d'un autre format.
+ */
+function streamSourceFor(track, load) {
+    const key = load ? `${track.url}#${load}` : track.url;
+    const pinned = servedSources.get(key);
+
+    if (pinned) {
+        // Toujours sur le disque : on s'y tient, même si le cache vient
+        // d'apparaître et proposerait mieux. Changer maintenant casserait le
+        // décodage en cours ; le prochain chargement, lui, en profitera.
+        if (fs.existsSync(pinned.file)) {
+            pinned.at = Date.now();
+            return { ...pinned, gone: false };
+        }
+
+        // Le fichier retenu a été supprimé sous nos pieds — une éviction de
+        // cache. Rien ne peut être servi sans rompre le décodage en cours.
+        servedSources.delete(key);
+        return { file: null, mime: null, gone: true };
+    }
+
+    const chosen = pickStreamSource(track);
+    if (!chosen) {
+        servedSources.delete(key);
+        return null;
+    }
+
+    chosen.at = Date.now();
+    servedSources.set(key, chosen);
+
+    // Les plus anciennes d'abord : c'est l'ordre d'insertion d'une Map, et
+    // `at` remis à jour ne le change pas — d'où la relecture explicite.
+    while (servedSources.size > MAX_SERVED_SOURCES) {
+        let oldestKey = null;
+        let oldest = Infinity;
+        for (const [entryKey, entry] of servedSources) {
+            if (entry.at < oldest) { oldest = entry.at; oldestKey = entryKey; }
+        }
+        servedSources.delete(oldestKey);
+    }
+
+    return { ...chosen, gone: false };
+}
+
 /** Hauteurs vidéo proposées dans l'interface, en pixels. */
 const VALID_VIDEO_HEIGHTS = ['2160', '1440', '1080', '720', '480', '360'];
 const DEFAULT_VIDEO_HEIGHT = 720;
@@ -551,24 +666,25 @@ function createApiRouter(webServer) {
         // personnelle, et le seul endroit du chemin qui voie passer le fichier.
         loudnessAnalyzer.ensure(track);
 
-        // Si la piste est déjà dans le cache de préchargement
-        const cachedPath = preloadManager.getCachedPath(track);
-        if (cachedPath) {
-            try {
-                serveFileWithRange(req, res, cachedPath, 'audio/mpeg');
-            } catch (err) {
-                log.error('[WebServer Stream] Error reading the preload cache file:', err.message);
-                res.status(500).send(err.message);
-            }
-            return;
+        const source = streamSourceFor(track, req.query.load);
+
+        if (source && source.gone) {
+            // La source retenue a disparu en pleine lecture. Servir l'autre
+            // fichier livrerait un format que le décodage en cours ne sait pas
+            // interpréter — le fameux bruit blanc. Mieux vaut couper : le
+            // tableau de bord recharge la piste à la position atteinte, sous une
+            // adresse neuve, et la reprise ne coûte qu'un blanc de quelques
+            // centaines de millisecondes.
+            log.warn('[WebServer Stream] Source vanished mid-playback, '
+                + `reload requested for: ${track.title}`);
+            return res.status(404).send('Source du flux renouvelée, rechargement nécessaire');
         }
-        // Si c'est un fichier local : servi uniquement s'il est sous une racine autorisée
-        const localPath = resolveMediaPath(track.url);
-        if (localPath) {
+
+        if (source) {
             try {
-                serveFileWithRange(req, res, localPath, mimeFor(localPath));
+                serveFileWithRange(req, res, source.file, source.mime);
             } catch (err) {
-                log.error('[WebServer Stream] Error reading the local file:', err.message);
+                log.error('[WebServer Stream] Error reading the audio file:', err.message);
                 res.status(500).send(err.message);
             }
             return;

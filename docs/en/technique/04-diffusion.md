@@ -29,6 +29,42 @@ emits it into the voice channel. Everyone hears the same thing, ducking applies.
 
 ---
 
+## One stream URL, one single file
+
+In personal mode the browser fetches the sound from `/api/stream`, a URL that
+carries nothing but the track identifier. That URL, however, can designate two
+very different files: the MP3 from the preload cache, or the original file on
+disk. The first does not exist yet while the preload is writing it, and
+disappears later when the cache is tidied up.
+
+A browser does not download a media file in one go: it asks for slices as
+playback proceeds, on the same URL, over several minutes. Choosing the file per
+request therefore lands a slice of MP3 in a WAV decode that started without it —
+and that is heard neither as silence nor as an error, but as an **enormous white
+noise**: compressed bytes read as raw samples are random noise, at full level.
+
+The representation is therefore settled on the first byte served and served
+unchanged to every slice of the **same load**, even if the cache has appeared in
+the meantime.
+
+What identifies a load is the URL's `load` parameter, set by the dashboard and
+incremented on every start of playback — certainly not the requested position. A
+range starting from zero looks like a fresh start, but it is also what a
+**looping** track sends, and there the browser has forgotten nothing: it keeps
+its bytes under that URL and its decoder open on the format recognised on the
+first pass. Re-choosing at that moment is precisely what produced forty seconds
+of noise and then silence, on the second loop of a track preloaded in between.
+Since the URL changes with every load, the browser can never mix two forms under
+one resource.
+
+If the settled file disappears mid-playback, the request is refused with a 404
+rather than served in the other format — the dashboard reloads the track at the
+position reached, under a fresh URL, which costs a few hundred milliseconds of
+silence instead of the noise. See [`api.js`](../../../src/web/routes/api.js) and
+the test `tests/streamSource.js`.
+
+---
+
 ## Personal mode: the virtual player
 
 In personal mode, **the bot decodes no sound at all**. It keeps a fictitious

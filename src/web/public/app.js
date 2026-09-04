@@ -2595,18 +2595,51 @@
     }
 
     /**
+     * Numéro du chargement en cours. Voir `streamUrlFor`.
+     *
+     * Il ne repart pas de zéro d'un morceau à l'autre : deux chargements
+     * successifs de la *même* piste doivent avoir des adresses différentes, et
+     * c'est précisément le cas d'une lecture en boucle.
+     */
+    let streamLoadCounter = 0;
+
+    /**
      * Adresse du flux d'une piste, telle que la sert le bot.
      *
+     * ## Pourquoi chaque appel rend une adresse différente
+     *
+     * Une piste peut être servie sous deux formes : le MP3 du cache de
+     * préchargement, ou le fichier d'origine. Le cache apparaît quand le
+     * préchargement se termine, disparaît quand il est évincé — deux évènements
+     * qui tombent en pleine écoute.
+     *
+     * Or le navigateur ne retient pas un média par ce qu'il contient mais par
+     * son adresse : les octets déjà téléchargés restent en cache sous cette
+     * adresse, et le décodeur ouvert sur elle garde le format qu'il a reconnu au
+     * premier octet. Redonner la même adresse à un morceau servi entretemps sous
+     * l'autre forme mélange donc les deux dans un seul décodage. Le résultat ne
+     * s'entend ni comme un silence ni comme une erreur : c'est du bruit blanc à
+     * plein niveau, des octets compressés lus comme des échantillons bruts.
+     *
+     * C'est exactement ce qui se produisait sur une lecture en boucle : le
+     * morceau repartait sur la même adresse, le préchargement s'étant terminé
+     * pendant le premier passage.
+     *
+     * Un numéro de chargement rend donc chaque adresse unique. Le navigateur y
+     * voit une ressource neuve — rien à mélanger —, et le serveur est libre d'y
+     * servir la meilleure forme disponible, qu'il retient ensuite pour toutes
+     * les tranches de ce chargement-là.
+     *
      * @param {object} track
-     * @param {number} [attempt=0] - Numéro de reprise. Non nul, il s'ajoute à
-     *   l'adresse : le navigateur tient une réponse tronquée pour valide et la
-     *   resservirait de son cache, indéfiniment identique à elle-même.
+     * @param {number} [attempt=0] - Numéro de reprise, ajouté pour la lisibilité
+     *   des journaux : l'unicité, elle, est déjà acquise.
      * @returns {string}
      */
     function streamUrlFor(track, attempt = 0) {
         const scheme = window.location.protocol === 'https:' ? 'https:' : 'http:';
         const base = `${scheme}//${window.location.host}/api/stream`
-            + `?guildId=${state.guildId}&trackUrl=${encodeURIComponent(track.url)}`;
+            + `?guildId=${state.guildId}&trackUrl=${encodeURIComponent(track.url)}`
+            + `&load=${++streamLoadCounter}`;
         return attempt > 0 ? `${base}&retry=${attempt}` : base;
     }
 
