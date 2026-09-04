@@ -415,7 +415,15 @@ class WebServer {
             // Seule l'identité est retenue, jamais les droits : le maître peut
             // en retirer pendant que l'invité est connecté, et une copie prise
             // ici resterait celle d'avant. Ils sont relus à chaque message.
-            ws.identity = req?.identity || { authorized: true, master: true, session: null };
+            //
+            // Le repli n'accorde rien. Il fut un temps où une socket arrivée
+            // sans identité ne pouvait être que celle du porteur du jeton, donc
+            // du maître ; depuis que le jeton ne suffit plus à l'être, ce repli
+            // ouvrirait tout à un incident. C'est le même raisonnement que
+            // `identityOf()` dans wsHandler.js : faire pencher l'accident du
+            // côté qui ne coûte rien.
+            ws.identity = req?.identity
+                || { authorized: true, master: false, session: null, pendingLogin: true };
 
             if (!ws.identity.master && ws.identity.session) {
                 log.info(`[WebServer] Guest dashboard connected: `
@@ -659,7 +667,7 @@ class WebServer {
         const sessions = require('./sessions');
         const oauth = require('./oauth');
 
-        const identity = ws.identity || { master: true };
+        const identity = ws.identity || { master: false };
 
         if (identity.master) {
             return {

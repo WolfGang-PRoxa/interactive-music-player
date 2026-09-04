@@ -94,14 +94,35 @@ function purgeStates() {
 
 /**
  * Ouvre un trajet d'authentification.
+ *
+ * Le `state` ne sert pas qu'à se prémunir de la falsification : il transporte
+ * aussi ce que le rappel ne pourra pas redécouvrir tout seul.
+ *
+ * Le cas qui l'impose est celui du porteur du jeton. Le tableau de bord
+ * s'ouvre sur `127.0.0.1`, où le cookie du jeton est posé, tandis que Discord
+ * renvoie sur `PUBLIC_URL` — un nom de domaine, un tunnel, une adresse de
+ * réseau local. Deux hôtes différents, donc deux bocaux à cookies : le rappel
+ * arrive sans jeton, et rien ne permettrait plus de reconnaître celui qui est
+ * devant la machine. La question est donc posée ici, sur l'origine du tableau
+ * de bord où le cookie existe, et la réponse voyage dans le `state`.
+ *
+ * Elle y voyage sans risque : le `state` est tiré au hasard, gardé côté
+ * serveur, valable cinq minutes et consommé une fois. Le navigateur n'en
+ * connaît que la valeur, jamais ce qu'elle recouvre.
+ *
  * @param {string} [returnTo] Chemin à rouvrir une fois l'invité reconnu.
+ * @param {{ holdsToken?: boolean }} [carried] Ce que le rappel devra savoir.
  * @returns {string} L'URL vers laquelle rediriger le navigateur.
  */
-function buildAuthorizeUrl(returnTo = '/') {
+function buildAuthorizeUrl(returnTo = '/', carried = {}) {
     purgeStates();
 
     const state = crypto.randomBytes(16).toString('hex');
-    pendingStates.set(state, { createdAt: Date.now(), returnTo });
+    pendingStates.set(state, {
+        createdAt: Date.now(),
+        returnTo,
+        holdsToken: Boolean(carried.holdsToken),
+    });
 
     const url = new URL(AUTHORIZE_URL);
     url.searchParams.set('client_id', clientId());
@@ -123,7 +144,8 @@ function buildAuthorizeUrl(returnTo = '/') {
  * seconde session.
  *
  * @param {string} state
- * @returns {{ returnTo: string }|null} null si inconnu, déjà servi ou périmé.
+ * @returns {{ returnTo: string, holdsToken: boolean }|null} null si inconnu,
+ *   déjà servi ou périmé.
  */
 function consumeState(state) {
     purgeStates();
@@ -133,7 +155,10 @@ function consumeState(state) {
     if (!entry) return null;
 
     pendingStates.delete(state);
-    return { returnTo: entry.returnTo || '/' };
+    return {
+        returnTo: entry.returnTo || '/',
+        holdsToken: Boolean(entry.holdsToken),
+    };
 }
 
 /**

@@ -33,6 +33,43 @@ Lo que no lo está:
 
 [`auth.js`](../../../src/web/auth.js) protege **HTTP y WebSocket**.
 
+### El token abre, no nombra
+
+El token es único y compartido: llevarlo demuestra que se está delante de la
+máquina, nunca quién se es. Como el bot actúa sobre servidores poblados de
+personas reales, no tiene razón alguna para obedecer a un anónimo.
+
+Los derechos van por tanto ligados a una **sesión de Discord**, nunca al token.
+Una petición que presenta el token sin sesión obtiene acceso a la página — hay
+que servir la que lleva la ventana de conexión — y nada más: `identify()`
+devuelve `master: false` y levanta `pendingLogin`, que el panel traduce en una
+ventana que no se cierra
+([`loginGate.js`](../../../src/web/public/js/loginGate.js)).
+
+La persona propietaria es la primera cuenta que vuelve de Discord **presentando
+el token** ([`owner.js`](../../../src/web/owner.js)). No es un atajo: el token
+aparece en la consola de quien ha lanzado el bot, y el enlace de invitación
+enviado a los oyentes no lo lleva. La reivindicación es única — una segunda
+cuenta no desposee a la primera, pues de lo contrario el último en llegar
+tomaría el mando y compartir el control dejaría de existir.
+
+El token se constata a la ida, en `/auth/discord`, y la respuesta viaja en el
+`state` de OAuth. Es necesario: el panel se abre en `127.0.0.1`, donde vive su
+cookie, mientras que Discord redirige a `PUBLIC_URL` — un túnel, un nombre de
+dominio, una dirección de red local. Dos hosts, dos tarros de cookies, y una
+llamada de retorno sin token. El `state` es aleatorio, se guarda en el servidor
+y se consume una vez: poner ese dato en él no lo expone.
+
+Una excepción, y solo una: la instalación cuya aplicación de Discord no está
+configurada *no puede* recibir ninguna conexión. Allí el token recupera su
+antiguo papel. Negarse equivaldría a encerrar al instalador fuera de su propio
+bot por un secreto que falta en un archivo, lo que no protege a nadie.
+
+La consecuencia se ve en los repliegues: un socket que llega sin identidad se
+trata como invitado sin derechos, nunca como maestro. Mientras el token hacía al
+maestro, ese repliegue no tenía consecuencias; ahora abriría todo ante un
+incidente.
+
 ### Origen del testigo
 
 `DASHBOARD_TOKEN` si está definido, y si no un testigo de 32 octetos generado en

@@ -104,6 +104,30 @@ El bot efectúa entonces las siguientes operaciones:
 El panel de control está protegido por un **testigo de acceso**. Sin él, la
 página muestra «Acceso denegado».
 
+### Iniciar sesión con Discord
+
+Al abrir, una ventana pide iniciar sesión con tu cuenta de Discord. No se
+cierra: el panel gobierna un bot presente en tus servidores, y no obedece a
+nadie que se niegue a decir quién es.
+
+Solo se piden tu identificador, tu nombre y tu avatar — ni tus servidores ni tu
+correo electrónico. Además, tu cuenta debe pertenecer a un servidor donde el bot
+esté presente.
+
+La **primera cuenta que inicie sesión presentando el token** se convierte en
+propietaria de la instalación, de una vez por todas. Es quien ha lanzado el bot:
+el token aparece en su consola, y el enlace de invitación enviado a los oyentes
+no lo lleva. La persona propietaria conserva todos los derechos; las demás solo
+tienen los que ella les concede (véase «Compartir el control»).
+
+Para entregar la instalación a otra cuenta, elimina el archivo
+`data/owner.json` y vuelve a conectarte con el token.
+
+Si la aplicación de Discord no está configurada — falta `DISCORD_CLIENT_SECRET`
+o `PUBLIC_URL` —, iniciar sesión es imposible: la ventana indica entonces lo que
+queda por rellenar y deja entrar solo con el token, como antes. Nadie se queda
+encerrado fuera de su propio bot por una variable olvidada.
+
 ### Recuperar el testigo
 
 Se crea en el primer arranque y se le ofrece de tres maneras:

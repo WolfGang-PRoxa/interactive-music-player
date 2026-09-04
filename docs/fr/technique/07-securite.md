@@ -33,6 +33,43 @@ Ce qui ne l'est pas :
 
 [`auth.js`](../../../src/web/auth.js) protège **HTTP et WebSocket**.
 
+### Le jeton ouvre, il ne nomme pas
+
+Le jeton est unique et partagé : le porter prouve qu'on est devant la machine,
+jamais qui l'on est. Le bot agissant sur des serveurs peuplés de gens réels, il
+n'a aucune raison d'obéir à un anonyme.
+
+Les droits sont donc attachés à une **session Discord**, jamais au jeton. Une
+requête qui présente le jeton sans session obtient l'accès à la page — il faut
+bien servir celle qui porte la fenêtre de connexion — et rien d'autre :
+`identify()` rend `master: false` et lève `pendingLogin`, que le tableau de bord
+traduit par une fenêtre qui ne se ferme pas
+([`loginGate.js`](../../../src/web/public/js/loginGate.js)).
+
+Le propriétaire est le premier compte revenu de Discord **en présentant le
+jeton** ([`owner.js`](../../../src/web/owner.js)). Ce n'est pas un raccourci :
+le jeton s'affiche dans la console de celui qui a lancé le bot, et le lien
+d'invitation posté aux auditeurs ne le porte pas. La revendication est unique —
+un second compte ne dépossède pas le premier, sans quoi le dernier arrivé
+prendrait la main et le partage du contrôle n'existerait plus.
+
+Le jeton est constaté à l'aller, sur `/auth/discord`, et la réponse voyage dans
+le `state` OAuth. C'est nécessaire : le tableau de bord s'ouvre sur `127.0.0.1`
+où son cookie est posé, tandis que Discord renvoie sur `PUBLIC_URL` — un tunnel,
+un nom de domaine, une adresse de réseau local. Deux hôtes, deux bocaux à
+cookies, et un rappel qui n'a pas le jeton. Le `state` est tiré au hasard, gardé
+côté serveur et consommé une fois : y placer ce fait ne l'expose pas.
+
+Une exception, et une seule : l'installation dont l'application Discord n'est
+pas configurée ne *peut* recevoir aucune connexion. Le jeton y reprend son
+ancien rôle. Refuser reviendrait à enfermer l'installateur hors de son propre
+bot pour un secret manquant dans un fichier, ce qui ne protège personne.
+
+La conséquence tient dans les replis : une socket arrivée sans identité est
+traitée en invité sans droit, jamais en maître. Tant que le jeton faisait le
+maître, ce repli était sans conséquence ; il ouvrirait maintenant tout à un
+incident.
+
 ### Origine du jeton
 
 `DASHBOARD_TOKEN` s'il est défini, sinon un jeton de 32 octets généré au premier

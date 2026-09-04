@@ -951,6 +951,71 @@
 
     <audio id="personal-audio-player" style="display: none;"></audio>
     
+    <!--
+         Connexion Discord obligatoire.
+
+         Cette fenêtre-ci ne se ferme pas : ni croix, ni clic à côté, ni touche
+         d'échappement. Ce n'est pas une confirmation qu'on écarte, c'est la
+         porte — le tableau de bord derrière elle n'obéira à rien tant que le
+         serveur ne sait pas à qui il parle.
+
+         Elle est écrite dans le balisage plutôt que fabriquée en JavaScript, et
+         posée *avant* le reste : c'est ce qui la fait apparaître avec la page
+         plutôt qu'une seconde après, le temps qu'un script décide de la créer.
+         La feuille de style la laisse masquée ; js/loginGate.js la découvre dès
+         qu'il a demandé au serveur où l'on en est.
+    -->
+    <div id="login-gate" class="login-gate hidden" role="dialog" aria-modal="true"
+         aria-labelledby="login-gate-title">
+        <div class="login-gate-box">
+            <div class="login-gate-mark">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+            </div>
+
+            <h2 id="login-gate-title" data-i18n="login_gate_title">Connectez-vous avec Discord</h2>
+            <p class="login-gate-lead" data-i18n="login_gate_lead">Ce tableau de bord pilote un bot présent sur vos serveurs. Il a besoin de savoir qui vous êtes avant de vous laisser la main.</p>
+
+            <a id="btn-login-discord" class="login-gate-btn" href="/auth/discord">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M20.317 4.369a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.865-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.009c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.891.077.077 0 0 0-.041.107c.36.698.772 1.363 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.056c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028ZM8.02 15.331c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.211 0 2.176 1.096 2.157 2.42 0 1.332-.955 2.418-2.157 2.418Zm7.975 0c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.211 0 2.176 1.096 2.157 2.42 0 1.332-.946 2.418-2.157 2.418Z"/>
+                </svg>
+                <span data-i18n="login_gate_action">Se connecter avec Discord</span>
+            </a>
+
+            <p class="login-gate-note" data-i18n="login_gate_scope">Seuls votre identifiant, votre nom et votre avatar sont demandés.</p>
+
+            <!--
+                 Le repli quand l'application Discord n'est pas configurée : sans
+                 secret ni URL de rappel, la connexion est matériellement
+                 impossible, et une porte sans clé enfermerait l'installateur
+                 hors de son propre bot. On dit alors ce qui manque, et on laisse
+                 entrer par le jeton comme avant.
+            -->
+            <div class="login-gate-fallback hidden" id="login-gate-fallback">
+                <div class="login-gate-warning">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                    <div>
+                        <strong data-i18n="login_gate_unconfigured_title">Authentification Discord non configurée</strong>
+                        <p data-i18n="login_gate_unconfigured_body">Renseignez <code>DISCORD_CLIENT_ID</code>, <code>DISCORD_CLIENT_SECRET</code> et <code>PUBLIC_URL</code> dans le fichier <code>.env</code>, puis déclarez l'URL de rappel dans le portail développeur Discord.</p>
+                        <p class="login-gate-callback" id="login-gate-callback"></p>
+                    </div>
+                </div>
+                <button id="btn-login-bypass" class="login-gate-secondary">
+                    <span data-i18n="login_gate_continue_token">Continuer avec le jeton</span>
+                </button>
+            </div>
+
+            <p class="login-gate-error hidden" id="login-gate-error"></p>
+        </div>
+    </div>
+
     <!-- Maintenance Modal -->
     <div id="maintenance-modal" class="maintenance-overlay hidden">
         <div class="maintenance-box">
@@ -2415,6 +2480,7 @@
     <script src="js/settingsModal.js"></script>
     <script src="js/qualityMenu.js"></script>
     <script src="js/loudnessGain.js"></script>
+    <script src="js/loginGate.js"></script>
     <script src="js/queue.js"></script>
     <script src="js/playlists.js"></script>
     <script src="js/playlistTabsScroll.js"></script>

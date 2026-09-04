@@ -111,6 +111,30 @@ Der Bot führt daraufhin folgende Schritte aus:
 Das Dashboard ist durch ein **Zugangstoken** geschützt. Ohne dieses zeigt die
 Seite „Zugriff verweigert".
 
+### Mit Discord anmelden
+
+Beim Öffnen fordert ein Fenster zur Anmeldung mit dem Discord-Konto auf. Es
+lässt sich nicht schließen: das Dashboard steuert einen Bot auf deinen Servern
+und gehorcht niemandem, der seinen Namen nicht nennt.
+
+Angefragt werden nur deine Kennung, dein Name und dein Avatar — weder deine
+Server noch deine E-Mail-Adresse. Dein Konto muss außerdem Mitglied eines
+Servers sein, auf dem der Bot ist.
+
+Das **erste Konto, das sich unter Vorlage des Tokens anmeldet**, wird ein für
+alle Mal Eigentümer der Installation. Das ist, wer den Bot gestartet hat: das
+Token steht in dessen Konsole, und der an Zuhörer verschickte Einladungslink
+trägt es nicht. Der Eigentümer behält alle Rechte; alle anderen haben nur die,
+die er ihnen einräumt (siehe „Kontrolle teilen").
+
+Um die Installation an ein anderes Konto zu übergeben, lösche die Datei
+`data/owner.json` und melde dich erneut mit dem Token an.
+
+Ist die Discord-Anwendung nicht eingerichtet — `DISCORD_CLIENT_SECRET` oder
+`PUBLIC_URL` fehlen —, ist eine Anmeldung unmöglich: das Fenster nennt dann, was
+noch einzutragen ist, und lässt allein mit dem Token herein, wie zuvor. Niemand
+sperrt sich wegen einer vergessenen Variable aus seinem eigenen Bot aus.
+
 ### Das Token abrufen
 
 Es wird beim ersten Start erzeugt und Ihnen auf drei Wegen angeboten:

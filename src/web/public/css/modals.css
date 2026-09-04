@@ -2479,3 +2479,230 @@ html[data-theme="light"] .import-info-chips span {
     background: rgba(0, 0, 0, 0.04);
 }
 
+/*
+ * ─── La porte du tableau de bord ───────────────────────────────────────────
+ *
+ * La connexion Discord conditionne l'accès, et cette fenêtre-ci ne se ferme
+ * pas : ni croix, ni clic à côté, ni touche d'échappement.
+ *
+ * D'où un z-index au-dessus de toutes les autres fenêtres — celles des réglages
+ * et des versions montent déjà à 20000, et une porte qu'un autre panneau peut
+ * recouvrir n'en est plus une. Et d'où le blocage du défilement du corps :
+ * faire glisser la page derrière la fenêtre donnerait l'impression d'un
+ * tableau de bord accessible sous un voile, alors qu'il n'obéit à rien.
+ */
+.login-gate {
+    position: fixed;
+    inset: 0;
+    z-index: 30000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background: rgba(8, 7, 12, 0.82);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+
+.login-gate.hidden {
+    display: none !important;
+}
+
+body.login-gate-open {
+    overflow: hidden;
+}
+
+.login-gate-box {
+    width: 100%;
+    max-width: 30rem;
+    padding: 2.4rem 2.2rem 2rem;
+    border-radius: 20px;
+    background: var(--bg-main);
+    border: 1px solid var(--border-card-hover);
+    box-shadow: 0 28px 70px rgba(0, 0, 0, 0.55);
+    text-align: center;
+}
+
+/* Le cadenas, posé dans un rond : l'objet du propos avant la première ligne. */
+.login-gate-mark {
+    width: 54px;
+    height: 54px;
+    margin: 0 auto 1.1rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--c-primary);
+    background: color-mix(in srgb, var(--c-primary) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--c-primary) 30%, transparent);
+}
+
+.login-gate-mark svg {
+    width: 24px;
+    height: 24px;
+}
+
+.login-gate-box h2 {
+    margin: 0 0 0.6rem;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.login-gate-lead {
+    margin: 0 0 1.5rem;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: var(--text-muted);
+}
+
+/*
+ * Le bouton porte le bleu de Discord, et non la couleur du thème.
+ *
+ * C'est le seul endroit du tableau de bord où c'est justifié : on ne demande
+ * pas d'valider un réglage, on renvoie vers un autre service, et l'utilisateur
+ * doit reconnaître où il s'apprête à aller avant de cliquer.
+ */
+.login-gate-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 0.85rem 1.2rem;
+    border: none;
+    border-radius: 12px;
+    background: #5865f2;
+    color: #fff;
+    font-family: var(--font-primary);
+    font-size: 0.95rem;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.login-gate-btn:hover {
+    background: #4752c4;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 22px rgba(88, 101, 242, 0.4);
+}
+
+.login-gate-btn:active {
+    transform: translateY(0);
+}
+
+.login-gate-btn svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.login-gate-btn[hidden] {
+    display: none;
+}
+
+.login-gate-note {
+    margin: 0.9rem 0 0;
+    font-size: 0.76rem;
+    line-height: 1.5;
+    color: var(--text-muted);
+    opacity: 0.8;
+}
+
+/* --- Le repli, quand l'application Discord n'est pas configurée --- */
+
+.login-gate-fallback {
+    margin-top: 0.4rem;
+    text-align: left;
+}
+
+.login-gate-fallback.hidden {
+    display: none;
+}
+
+.login-gate-warning {
+    display: flex;
+    gap: 0.7rem;
+    padding: 0.9rem 1rem;
+    border-radius: 12px;
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    color: #f59e0b;
+}
+
+.login-gate-warning svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.login-gate-warning strong {
+    display: block;
+    font-size: 0.85rem;
+    margin-bottom: 0.3rem;
+}
+
+.login-gate-warning p {
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    color: var(--text-muted);
+}
+
+.login-gate-warning code {
+    background: rgba(255, 255, 255, 0.08);
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+    font-size: 0.92em;
+    word-break: break-all;
+}
+
+html[data-theme="light"] .login-gate-warning code {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.login-gate-callback {
+    margin-top: 0.45rem !important;
+    font-family: monospace;
+    font-size: 0.72rem !important;
+    word-break: break-all;
+    opacity: 0.85;
+}
+
+.login-gate-secondary {
+    width: 100%;
+    margin-top: 0.9rem;
+    padding: 0.7rem 1rem;
+    border-radius: 10px;
+    background: var(--bg-select);
+    border: 1px solid var(--border-card);
+    color: var(--text-main);
+    font-family: var(--font-primary);
+    font-size: 0.86rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.login-gate-secondary:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-card-hover);
+}
+
+.login-gate-error {
+    margin: 1rem 0 0;
+    font-size: 0.8rem;
+    color: var(--c-error);
+}
+
+.login-gate-error.hidden {
+    display: none;
+}
+
+@media (max-width: 480px) {
+    .login-gate-box {
+        padding: 1.8rem 1.3rem 1.5rem;
+    }
+}

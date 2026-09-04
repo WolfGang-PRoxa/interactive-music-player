@@ -33,6 +33,42 @@ What is not:
 
 [`auth.js`](../../../src/web/auth.js) protects **both HTTP and WebSocket**.
 
+### The token opens, it does not name
+
+The token is single and shared: holding it proves one is at the machine, never
+who one is. Since the bot acts on servers populated by real people, it has no
+reason to obey an anonymous caller.
+
+Rights are therefore attached to a **Discord session**, never to the token. A
+request presenting the token without a session gets access to the page — the one
+carrying the sign-in window has to be served — and nothing else: `identify()`
+returns `master: false` and raises `pendingLogin`, which the dashboard turns
+into a window that does not close
+([`loginGate.js`](../../../src/web/public/js/loginGate.js)).
+
+The owner is the first account back from Discord **while presenting the token**
+([`owner.js`](../../../src/web/owner.js)). That is not a shortcut: the token is
+printed in the console of whoever started the bot, and the invitation link
+posted to listeners does not carry it. The claim happens once — a second account
+does not dispossess the first, otherwise the latest arrival would take over and
+sharing control would no longer exist.
+
+The token is established on the way out, at `/auth/discord`, and the answer
+travels in the OAuth `state`. This is necessary: the dashboard opens on
+`127.0.0.1`, where its cookie lives, while Discord redirects to `PUBLIC_URL` — a
+tunnel, a domain name, a local network address. Two hosts, two cookie jars, and
+a callback that has no token. The `state` is random, kept server-side and
+consumed once: putting that fact in it exposes nothing.
+
+One exception, and one only: an installation whose Discord application is not
+configured *cannot* receive a sign-in. The token resumes its former role there.
+Refusing would lock the installer out of their own bot over a secret missing
+from a file, which protects nobody.
+
+The consequence shows in the fallbacks: a socket arriving without an identity is
+treated as a guest with no rights, never as the master. While the token made the
+master, that fallback was harmless; it would now open everything to an accident.
+
 ### Origin of the token
 
 `DASHBOARD_TOKEN` if it is defined, otherwise a 32-byte token generated on first

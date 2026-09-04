@@ -103,6 +103,30 @@ Le bot effectue alors les opérations suivantes :
 Le tableau de bord est protégé par un **jeton d'accès**. Sans lui, la page
 affiche « Accès refusé ».
 
+### Se connecter avec Discord
+
+À l'ouverture, une fenêtre demande de vous connecter avec votre compte Discord.
+Elle ne se ferme pas : le tableau de bord pilote un bot présent sur vos
+serveurs, et n'obéit à personne qui refuse de se nommer.
+
+Seuls votre identifiant, votre nom et votre avatar sont demandés — ni vos
+serveurs, ni votre adresse électronique. Votre compte doit par ailleurs être
+membre d'un serveur où le bot est présent.
+
+Le **premier compte à se connecter en présentant le jeton** devient le
+propriétaire de l'installation, une fois pour toutes. C'est celui qui a lancé le
+bot : le jeton s'affiche dans sa console, et le lien d'invitation envoyé aux
+auditeurs ne le porte pas. Le propriétaire garde tous les droits ; les autres
+n'ont que ceux qu'il leur accorde (voir « Partager le contrôle »).
+
+Pour rendre l'installation à un autre compte, supprimez le fichier
+`data/owner.json` et reconnectez-vous avec le jeton.
+
+Si l'application Discord n'est pas configurée — `DISCORD_CLIENT_SECRET` ou
+`PUBLIC_URL` manquants —, la connexion est impossible : la fenêtre dit alors ce
+qu'il reste à renseigner et laisse entrer avec le seul jeton, comme avant. Nul
+ne se retrouve enfermé hors de son propre bot pour une variable oubliée.
+
 ### Récupérer le jeton
 
 Il est créé au premier démarrage et vous est proposé de trois façons :

@@ -34,6 +34,45 @@ Was es nicht ist:
 
 [`auth.js`](../../../src/web/auth.js) schützt **HTTP und WebSocket**.
 
+### Das Token öffnet, es benennt nicht
+
+Das Token ist einzig und geteilt: es zu besitzen beweist, dass man an der
+Maschine sitzt, nie wer man ist. Da der Bot auf Servern voller echter Menschen
+handelt, hat er keinen Grund, einem Anonymen zu gehorchen.
+
+Rechte hängen deshalb an einer **Discord-Sitzung**, nie am Token. Eine Anfrage,
+die das Token ohne Sitzung vorlegt, erhält Zugang zur Seite — die das
+Anmeldefenster trägt, muss ja ausgeliefert werden — und sonst nichts:
+`identify()` liefert `master: false` und setzt `pendingLogin`, was das Dashboard
+in ein Fenster übersetzt, das sich nicht schließen lässt
+([`loginGate.js`](../../../src/web/public/js/loginGate.js)).
+
+Eigentümer ist das erste Konto, das **unter Vorlage des Tokens** von Discord
+zurückkommt ([`owner.js`](../../../src/web/owner.js)). Das ist keine Abkürzung:
+das Token steht in der Konsole dessen, der den Bot gestartet hat, und der an
+Zuhörer geschickte Einladungslink trägt es nicht. Die Beanspruchung geschieht
+einmal — ein zweites Konto enteignet das erste nicht, sonst übernähme der
+zuletzt Gekommene, und geteilte Kontrolle gäbe es nicht mehr.
+
+Das Token wird auf dem Hinweg festgestellt, unter `/auth/discord`, und die
+Antwort reist im OAuth-`state`. Das ist nötig: das Dashboard öffnet sich auf
+`127.0.0.1`, wo sein Cookie liegt, während Discord auf `PUBLIC_URL` zurückleitet
+— einen Tunnel, einen Domänennamen, eine Adresse im lokalen Netz. Zwei Hosts,
+zwei Cookie-Gläser, und ein Rückruf ohne Token. Der `state` ist zufällig, bleibt
+serverseitig und wird einmal verbraucht: diese Tatsache darin preiszugeben
+kostet nichts.
+
+Eine Ausnahme, und nur eine: eine Installation ohne eingerichtete
+Discord-Anwendung *kann* keine Anmeldung entgegennehmen. Dort nimmt das Token
+seine alte Rolle wieder ein. Ablehnen hieße, den Installierenden wegen eines in
+einer Datei fehlenden Geheimnisses aus seinem eigenen Bot auszusperren, was
+niemanden schützt.
+
+Die Folge zeigt sich in den Rückfalllösungen: ein ohne Identität eintreffender
+Socket gilt als Gast ohne Rechte, nie als Master. Solange das Token den Master
+machte, war dieser Rückfall folgenlos; jetzt öffnete er bei einem Zwischenfall
+alles.
+
 ### Herkunft des Tokens
 
 `DASHBOARD_TOKEN`, sofern gesetzt, sonst ein beim ersten Start erzeugtes Token

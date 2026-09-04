@@ -18,11 +18,20 @@
  * sur une URL contenant ?token=... : le middleware pose alors le cookie et
  * redirige vers l'URL propre.
  *
- * **Deux façons d'entrer.** Le jeton ouvre tout : c'est celle du maître de
- * session, qui a lancé le bot et lit le jeton dans sa console. Depuis le partage
- * du contrôle, une seconde porte existe : une session Discord (voir oauth.js et
- * sessions.js) identifie un invité, qui n'obtient alors que les droits que le
- * maître lui a accordés — voir permissions.js, où se décide ce qu'il peut faire.
+ * **Le jeton ouvre la porte, il ne dit plus qui entre.** Il fut un temps où le
+ * porter suffisait à tout pouvoir, anonymement. Le tableau de bord demande
+ * désormais à chacun de se nommer : les droits sont attachés à une session
+ * Discord (voir oauth.js et sessions.js), qu'on soit propriétaire de
+ * l'installation (owner.js) ou invité pourvu de quelques droits
+ * (permissions.js). Un jeton sans session obtient l'accès à la page — il faut
+ * bien servir celle qui porte la fenêtre de connexion — et rien d'autre :
+ * `pendingLogin` le signale, et l'interface bloque tant qu'il n'a pas répondu.
+ *
+ * La seule exception est l'installation dont l'application Discord n'est pas
+ * configurée : s'y connecter est alors matériellement impossible, et refuser
+ * reviendrait à enfermer quelqu'un hors de son propre bot pour un secret
+ * manquant dans un fichier. Le jeton y reprend son ancien rôle, et l'interface
+ * le dit au lieu de le taire.
  *
  * Ce module ne tranche pas les droits. Il répond seulement à « qui frappe ? »,
  * et refuse ceux qui ne sont ni l'un ni l'autre.
@@ -33,6 +42,7 @@ const fs = require('fs');
 const path = require('path');
 const log = require('../utils/logger');
 const sessions = require('./sessions');
+const owner = require('./owner');
 
 const COOKIE_NAME = 'dashboard_token';
 const TOKEN_FILE = path.join(process.cwd(), 'data', 'dashboard-token');
@@ -158,17 +168,108 @@ function isPublicPath(url) {
  */
 function identify(req) {
     const { value, source } = extractToken(req);
-    if (safeEquals(value, getToken())) {
-        return { authorized: true, master: true, session: null, tokenSource: source };
-    }
+    const holdsToken = safeEquals(value, getToken());
 
     const cookies = parseCookies(req.headers.cookie);
     const session = sessions.touch(cookies[sessions.COOKIE_NAME]);
+
+    /*
+     * La session Discord passe avant le jeton, et l'ordre compte.
+     *
+     * Le tableau de bord ne s'ouvre plus à un porteur de jeton anonyme : il lui
+     * demande d'abord de dire qui il est. Le propriétaire est donc reconnu à sa
+     * session, pas à son cookie de jeton — sans quoi il resterait le seul de
+     * toute l'installation à ne pas avoir de nom, et la fenêtre de connexion
+     * n'aurait aucun effet sur lui.
+     *
+     * Le jeton n'a pas pour autant disparu : il reste ce qui distingue celui
+     * qui est devant la machine de celui qui a cliqué sur un lien
+     * d'invitation, et c'est à ce titre qu'il désigne le propriétaire lors de
+     * la toute première connexion (voir owner.js).
+     */
     if (session) {
-        return { authorized: true, master: false, session, tokenSource: null };
+        /*
+         * La revendication de dernier recours.
+         *
+         * Elle a normalement lieu au retour de Discord, où le compte vient
+         * d'être reconnu. Mais une session peut très bien exister sans que
+         * l'installation ait été revendiquée : c'est le cas de celles ouvertes
+         * avant que cette règle n'existe, et de celles dont le rappel est
+         * arrivé sur une autre origine que le tableau de bord.
+         *
+         * Sans ce rattrapage, ces comptes-là sont coincés : la fenêtre de
+         * connexion ne s'ouvre plus, puisqu'ils sont connectés, et rien ne leur
+         * offre plus l'occasion de revendiquer quoi que ce soit. Il faudrait
+         * effacer le cookie de session à la main pour s'en sortir.
+         *
+         * La condition reste la même — être connecté *et* porter le jeton —,
+         * seul le moment change.
+         */
+        if (holdsToken && !owner.isClaimed()) {
+            owner.claim({
+                id: session.userId,
+                username: session.displayName || session.username,
+                avatar: session.avatar,
+            });
+        }
+
+        return {
+            authorized: true,
+            master: owner.isOwner(session),
+            session,
+            holdsToken,
+            pendingLogin: false,
+            tokenSource: holdsToken ? source : null,
+        };
     }
 
-    return { authorized: false, master: false, session: null, tokenSource: null };
+    if (holdsToken) {
+        /*
+         * Le jeton sans session. Deux situations, et une seule porte ouverte.
+         *
+         * Application Discord configurée : l'accès est accordé — il faut bien
+         * servir la page qui porte la fenêtre de connexion — mais sans aucun
+         * droit, et `pendingLogin` dit au tableau de bord de la présenter.
+         *
+         * Application non configurée : la connexion Discord est matériellement
+         * impossible, et refuser serait enfermer quelqu'un hors de son propre
+         * bot pour un secret manquant dans un fichier. Le jeton reprend alors
+         * son rôle d'avant, et l'interface le signale au lieu de le taire.
+         */
+        const canLogIn = oauthConfigured();
+        return {
+            authorized: true,
+            master: !canLogIn,
+            session: null,
+            holdsToken: true,
+            pendingLogin: canLogIn,
+            tokenSource: source,
+        };
+    }
+
+    return {
+        authorized: false,
+        master: false,
+        session: null,
+        holdsToken: false,
+        pendingLogin: false,
+        tokenSource: null,
+    };
+}
+
+/**
+ * L'application Discord est-elle en état de recevoir une connexion ?
+ *
+ * Chargé à l'appel et non en tête de fichier : `oauth.js` n'a de sens que pour
+ * l'identification par Discord, et l'exiger au chargement ferait dépendre
+ * l'authentification de base d'un module qui peut très bien rester inerte.
+ */
+function oauthConfigured() {
+    try {
+        return require('./oauth').isConfigured();
+    } catch (e) {
+        return false;
+    }
 }
 
 function unauthorizedPage() {

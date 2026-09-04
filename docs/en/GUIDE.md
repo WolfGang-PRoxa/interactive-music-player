@@ -100,6 +100,30 @@ The bot then carries out the following operations:
 The dashboard is protected by an **access token**. Without it, the page shows
 "Access denied".
 
+### Signing in with Discord
+
+On opening, a window asks you to sign in with your Discord account. It does not
+close: the dashboard drives a bot that lives on your servers, and obeys nobody
+who will not give a name.
+
+Only your id, your name and your avatar are requested — neither your servers nor
+your email address. Your account must also be a member of a server the bot is
+in.
+
+The **first account to sign in while presenting the token** becomes the owner of
+the installation, once and for all. That is whoever started the bot: the token
+is printed in their console, and the invitation link sent to listeners does not
+carry it. The owner keeps every right; the others have only what the owner
+grants them (see "Sharing control").
+
+To hand the installation to another account, delete the `data/owner.json` file
+and sign in again with the token.
+
+If the Discord application is not configured — `DISCORD_CLIENT_SECRET` or
+`PUBLIC_URL` missing — signing in is impossible: the window then says what is
+left to fill in and lets you in with the token alone, as before. Nobody ends up
+locked out of their own bot over a forgotten variable.
+
 ### Retrieving the token
 
 It is created on first startup and offered to you in three ways:

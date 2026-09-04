@@ -18,6 +18,8 @@
 const express = require('express');
 const oauth = require('../oauth');
 const sessions = require('../sessions');
+const owner = require('../owner');
+const auth = require('../auth');
 const log = require('../../utils/logger');
 
 /** Page d'erreur du trajet, dans le style de celle de web/auth.js. */
@@ -94,6 +96,40 @@ async function isKnownMember(client, userId) {
 function createAuthRouter(webServer) {
     const router = express.Router();
 
+    /**
+     * Ce que le tableau de bord a besoin de savoir avant de s'afficher.
+     *
+     * Il ne peut pas le déduire seul : le cookie de session est `httpOnly` —
+     * donc invisible au script — et l'état de l'application Discord n'est connu
+     * que du serveur. Cette adresse n'est pas publique, contrairement aux deux
+     * suivantes : elle décrit l'installation, et ne se répond qu'à qui a déjà
+     * passé la porte.
+     */
+    router.get('/state', (req, res) => {
+        const identity = req.identity || auth.identify(req);
+        const session = identity.session;
+
+        res.json({
+            loggedIn: Boolean(session),
+            master: Boolean(identity.master),
+            // Vrai quand il ne manque plus que la connexion : c'est ce seul
+            // champ qui décide de l'affichage de la fenêtre bloquante.
+            pendingLogin: Boolean(identity.pendingLogin),
+            holdsToken: Boolean(identity.holdsToken),
+            oauthReady: oauth.isConfigured(),
+            claimed: owner.isClaimed(),
+            // Le nom du propriétaire n'est rendu qu'à lui-même : un invité n'a
+            // pas à savoir de quel compte dépend l'installation.
+            owner: identity.master ? owner.get() : null,
+            user: session ? {
+                id: session.userId,
+                displayName: session.displayName || '',
+                avatar: session.avatar || null,
+            } : null,
+            callbackUrl: oauth.redirectUri(),
+        });
+    });
+
     router.get('/discord', (req, res) => {
         if (!oauth.isConfigured()) {
             return res.status(503).type('html').send(errorPage(
@@ -108,7 +144,21 @@ function createAuthRouter(webServer) {
         // absolue ferait de cette adresse un tremplin vers n'importe quel site.
         const safeReturnTo = returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : '/';
 
-        res.redirect(302, oauth.buildAuthorizeUrl(safeReturnTo));
+        /*
+         * Le jeton est constaté ici, et non au rappel.
+         *
+         * Cette adresse-ci est ouverte depuis le tableau de bord, sur l'origine
+         * où son cookie existe. Le rappel, lui, arrive sur `PUBLIC_URL` — un
+         * autre hôte dès que le tableau de bord est ouvert sur `127.0.0.1`, ce
+         * qui est le cas ordinaire — et n'y verrait aucun cookie. La réponse
+         * voyage donc dans le `state`, que ce serveur a lui-même émis.
+         *
+         * `req.identity` est absent : ce chemin est public, le middleware n'y
+         * pose rien.
+         */
+        res.redirect(302, oauth.buildAuthorizeUrl(safeReturnTo, {
+            holdsToken: auth.identify(req).holdsToken,
+        }));
     });
 
     router.get('/discord/callback', async (req, res) => {
@@ -157,6 +207,23 @@ function createAuthRouter(webServer) {
                 'Accès refusé',
                 'Votre compte Discord ne fait partie d\'aucun serveur où ce bot est présent.'
             ));
+        }
+
+        /*
+         * La revendication de l'installation, s'il y a lieu.
+         *
+         * Le premier compte à revenir de Discord **en présentant le jeton** en
+         * devient le propriétaire. Le jeton est écrit dans la console de celui
+         * qui a lancé le bot, et le lien d'invitation posté aux auditeurs ne le
+         * porte pas : le tenir, c'est être devant la machine.
+         *
+         * Le fait est lu dans le `state`, constaté à l'aller sur l'origine du
+         * tableau de bord : ici, sur `PUBLIC_URL`, le cookie du jeton n'existe
+         * pas. La requête est tout de même interrogée en second recours, pour
+         * le cas où les deux adresses n'en font qu'une.
+         */
+        if (!owner.isClaimed() && (route.holdsToken || auth.identify(req).holdsToken)) {
+            owner.claim(user);
         }
 
         const { id } = sessions.create(user);
