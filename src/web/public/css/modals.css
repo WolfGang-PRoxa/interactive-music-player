@@ -825,6 +825,57 @@
     background: color-mix(in srgb, var(--c-violet) 18%, transparent);
 }
 
+/*
+ * La remise du contrôle, au survol du bouton de partage.
+ *
+ * Le glyphe montre une personne entière et, derrière elle, une seconde réduite
+ * à deux fragments — un arc de tête, un bout d'épaule. C'est déjà le propos du
+ * bouton : quelqu'un qui n'est pas encore là. Une étincelle part donc de la
+ * première et va dessiner la seconde, qui reste ensuite allumée tant que le
+ * pointeur demeure.
+ *
+ * Le vocabulaire est celui du bouton d'alimentation voisin — un glyphe parcouru
+ * par une lueur, rien qui ne bouge — mais il dit l'inverse. Là-bas le courant
+ * revient sur lui-même et referme un circuit ; ici il franchit l'écart entre
+ * deux corps et ne revient pas. C'est bien ce que fait le bouton : donner.
+ *
+ * Comme pour l'alimentation, l'opacité nulle est le repos et le script ne pose
+ * la sienne qu'en style en ligne — un attribut de présentation passerait sous
+ * la feuille de style dans la cascade, et ne rallumerait jamais rien.
+ */
+.btn-share-control .share-grant,
+.btn-share-control .share-grant-spark {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.btn-share-control .share-grant {
+    stroke: #f3e8ff;
+    filter: drop-shadow(0 0 2px color-mix(in srgb, var(--c-violet) 85%, transparent));
+}
+
+.btn-share-control .share-grant-spark {
+    fill: #f3e8ff;
+    stroke: none;
+    filter: drop-shadow(0 0 3px color-mix(in srgb, var(--c-violet) 90%, transparent));
+}
+
+/* Le rail de l'étincelle n'est là que pour être mesuré. */
+.btn-share-control .share-grant-track {
+    stroke: none;
+    fill: none;
+    pointer-events: none;
+}
+
+/*
+ * La lueur déborde du tracé, et le bout d'épaule de la seconde personne touche
+ * le bord du repère : sans cela, l'ombre portée serait coupée net à l'aplomb de
+ * l'icône.
+ */
+.btn-share-control svg {
+    overflow: visible;
+}
+
 /* Nombre d'invités actuellement pourvus d'au moins un droit. */
 .share-badge {
     position: absolute;
@@ -2427,3 +2478,4 @@ html[data-theme="light"] .version-target {
 html[data-theme="light"] .import-info-chips span {
     background: rgba(0, 0, 0, 0.04);
 }
+

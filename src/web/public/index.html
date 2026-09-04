@@ -244,6 +244,37 @@
                         <circle cx="9" cy="7" r="4"></circle>
                         <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
                         <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        <!--
+                             La remise du contrôle, au survol — voir
+                             js/headerButtonAnimations.js.
+
+                             Le glyphe porte déjà tout le propos : une personne
+                             entière devant, et derrière une seconde réduite à
+                             deux fragments — un arc de tête, un bout d'épaule.
+                             Quelqu'un qui n'est pas encore là.
+
+                             Une étincelle part donc de la première et va
+                             l'allumer. Ce qui suit n'est pas un second dessin
+                             mais les deux mêmes tracés recopiés au caractère
+                             près, posés par-dessus : la lueur suit le glyphe,
+                             elle n'en invente pas un autre.
+
+                             Le chemin de l'étincelle, lui, ne se voit jamais.
+                             Il n'est là que pour être mesuré : le script y
+                             promène le point par « getPointAtLength », comme la
+                             queue du chat est rééchantillonnée sur sa courbe.
+                             Il part du bord de la tête de devant et atterrit sur
+                             le premier point de l'arc de la seconde — exactement
+                             là où la lueur prend le relais.
+
+                             Invisibles tant que le script ne s'exécute pas : la
+                             feuille de style les laisse à opacité nulle, et lui
+                             seul les rallume.
+                        -->
+                        <path class="share-grant-track" d="M11.9 4.2C13.4 2.2 14.8 2.2 16 3.13"></path>
+                        <path class="share-grant share-grant-arc" d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        <path class="share-grant share-grant-body" d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <circle class="share-grant-spark" cx="11.9" cy="4.2" r="1.15"></circle>
                     </svg>
                     <span class="share-badge hidden" id="share-badge">0</span>
                 </button>

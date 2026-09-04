@@ -1132,4 +1132,225 @@ window.MusicPlayer = window.MusicPlayer || {};
             }
         });
     }
+
+    /* ─────────────────── La remise du contrôle ───────────────────
+     *
+     * Ce bouton donne à quelqu'un d'autre la main sur le bot. Le glyphe dit
+     * déjà tout : une personne entière au premier plan, et derrière elle une
+     * seconde réduite à deux fragments — un arc de tête, un bout d'épaule.
+     * Quelqu'un qui n'est pas encore là.
+     *
+     * L'animation ne fait donc qu'achever la phrase. Une étincelle quitte la
+     * première tête, franchit l'écart, touche le sommet de la seconde, et de ce
+     * point la lueur descend l'arc puis file dans l'épaule : le second
+     * personnage se dessine. Il reste ensuite allumé, respirant lentement, tant
+     * que le pointeur demeure.
+     *
+     * ## Pourquoi cette animation-là
+     *
+     * Le vocabulaire est celui du bouton d'alimentation voisin — un glyphe
+     * parcouru par une lueur, rien qui ne se déplace — et c'est voulu : les deux
+     * boutons se touchent dans l'en-tête, et deux grammaires différentes à
+     * quelques pixels l'une de l'autre se verraient. Mais il dit l'inverse.
+     * Là-bas le courant revient sur lui-même et referme un circuit : une chose
+     * qui se suffit. Ici il franchit l'écart entre deux corps et ne revient
+     * pas. C'est exactement ce que fait le bouton : donner.
+     *
+     * ## Trois contraintes, et ce qu'elles imposent
+     *
+     * **Rien ne se déplace.** Le glyphe n'est ni déformé ni décalé : ce sont ses
+     * propres tracés, recopiés au caractère près et parcourus. Un dessin qui
+     * bouge sous le curseur d'un bouton de 38 pixels devient illisible, et
+     * l'icône doit rester reconnaissable pendant toute l'animation.
+     *
+     * **La lueur ne passe jamais sur la pastille.** Le compteur d'invités est
+     * posé hors du bouton, en haut à droite ; tout ce qui est animé ici reste
+     * dans le repère de l'icône.
+     *
+     * **L'étincelle suit une vraie courbe.** Son rail est un tracé du SVG, mesuré
+     * par le navigateur et parcouru par `getPointAtLength` — comme la queue du
+     * chat est rééchantillonnée sur la sienne. Interpoler en ligne droite entre
+     * deux points aurait fait passer l'étincelle *à travers* la tête de devant
+     * au lieu de la contourner.
+     *
+     * ## L'ordre du tracé, qui n'est pas indifférent
+     *
+     * L'arc de tête se dessine depuis son premier point, celui où l'étincelle
+     * atterrit ; l'épaule, elle, se dessine depuis sa *fin*, car son tracé part
+     * du bord extérieur et remonte vers le corps. Prises toutes deux dans le
+     * sens de leur écriture, la lueur repartirait du bord de l'icône alors
+     * qu'elle vient d'arriver au centre : deux traits qui s'allument à contre-
+     * sens l'un de l'autre, et le geste ne se lit plus. D'où le décalage de
+     * tiret négatif sur le second.
+     */
+    const btnShare = document.getElementById('btn-open-share');
+    const shareReducedMotion = window.matchMedia
+        ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        : false;
+    const grantArc = btnShare ? btnShare.querySelector('.share-grant-arc') : null;
+    const grantBody = btnShare ? btnShare.querySelector('.share-grant-body') : null;
+    const grantSpark = btnShare ? btnShare.querySelector('.share-grant-spark') : null;
+    const grantTrack = btnShare ? btnShare.querySelector('.share-grant-track') : null;
+
+    if (grantArc && grantBody && grantSpark && grantTrack && !shareReducedMotion) {
+        /**
+         * Longueur d'un tracé, mesurée par le navigateur.
+         *
+         * Les replis sont les valeurs exactes du glyphe, gardées écrites : elles
+         * couvrent les moteurs qui ne savent pas mesurer, et permettent de
+         * vérifier ce que les autres rapportent.
+         *
+         * · l'arc de tête est un arc de rayon 4 sous une corde de 7,75, soit
+         *   4 × 2·asin(7,75/8) ≈ 10,56 ;
+         * · l'épaule est un segment vertical de 2 suivi d'un arc de rayon 4 sous
+         *   une corde de √(3² + 3,87²), soit 2 + 5,27 ≈ 7,27 ;
+         * · le rail de l'étincelle est une Bézier cubique d'environ 4,63.
+         */
+        const grantLength = (el, fallback) => {
+            try {
+                const l = typeof el.getTotalLength === 'function' ? el.getTotalLength() : 0;
+                return l > 0 ? l : fallback;
+            } catch (e) {
+                return fallback;
+            }
+        };
+
+        const ARC_LENGTH = grantLength(grantArc, 10.561);
+        const BODY_LENGTH = grantLength(grantBody, 7.269);
+        const TRACK_LENGTH = grantLength(grantTrack, 4.631);
+
+        /** Secondes. L'étincelle traverse, puis la lueur descend le personnage. */
+        const SPARK_TRAVEL = 0.34;
+        const ARC_DRAW = 0.30;
+        /* L'épaule part avant que l'arc n'ait fini : la lueur est un seul trait
+           qui continue, pas deux gestes mis bout à bout. */
+        const BODY_START = SPARK_TRAVEL + ARC_DRAW - 0.08;
+        const BODY_DRAW = 0.26;
+        const GRANTED_AT = BODY_START + BODY_DRAW;
+
+        /** Une fois la remise faite, le personnage respire au lieu de rester figé. */
+        const BREATH_PERIOD = 3.2;
+        const BREATH_DEPTH = 0.2;
+
+        /** Secondes d'extinction au départ du pointeur. */
+        const RELEASE = 0.25;
+
+        let grantFrame = null;
+        let grantStart = 0;
+        let releasingFrom = null;
+        /** Opacités au moment du départ du pointeur : l'extinction part de là. */
+        let releasedFrom = { arc: 0, body: 0, spark: 0 };
+
+        const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+
+        /**
+         * Fraction dessinée d'un tracé, de 0 (rien) à 1 (entier).
+         *
+         * @param {SVGPathElement} el
+         * @param {number} length
+         * @param {number} ratio
+         * @param {boolean} reversed - Dessiner depuis la fin du tracé
+         */
+        const draw = (el, length, ratio, reversed) => {
+            const shown = Math.max(0, Math.min(1, ratio));
+            const offset = length * (1 - shown);
+            el.style.strokeDasharray = `${length} ${length}`;
+            el.style.strokeDashoffset = String(reversed ? -offset : offset);
+        };
+
+        /** Pose l'étincelle à une fraction de son rail. */
+        const placeSpark = (ratio) => {
+            if (typeof grantTrack.getPointAtLength !== 'function') return;
+            try {
+                const p = grantTrack.getPointAtLength(TRACK_LENGTH * Math.max(0, Math.min(1, ratio)));
+                grantSpark.setAttribute('cx', String(p.x));
+                grantSpark.setAttribute('cy', String(p.y));
+            } catch (e) {
+                // Moteur sans géométrie : l'étincelle reste à son point de départ,
+                // et c'est la lueur du personnage qui porte l'animation.
+            }
+        };
+
+        /** Rend le repos à la feuille de style plutôt que de l'écrire à la main. */
+        const restGrant = () => {
+            for (const el of [grantArc, grantBody, grantSpark]) {
+                el.style.removeProperty('opacity');
+                el.style.removeProperty('stroke-dasharray');
+                el.style.removeProperty('stroke-dashoffset');
+            }
+            grantSpark.setAttribute('cx', '11.9');
+            grantSpark.setAttribute('cy', '4.2');
+        };
+
+        function stepGrant(now) {
+            const elapsed = (now - grantStart) / 1000;
+
+            if (releasingFrom !== null) {
+                const gone = (now - releasingFrom) / 1000;
+                if (gone >= RELEASE) {
+                    grantFrame = null;
+                    releasingFrom = null;
+                    restGrant();
+                    return;
+                }
+                /*
+                 * L'extinction repart des opacités atteintes, jamais de un.
+                 * Quitter le bouton pendant que l'étincelle traverse trouve le
+                 * second personnage encore éteint : le faire descendre depuis
+                 * un le ferait apparaître pour disparaître aussitôt — un éclair
+                 * là où l'on quittait justement sans rien avoir demandé.
+                 */
+                const fading = 1 - gone / RELEASE;
+                grantArc.style.opacity = String(releasedFrom.arc * fading);
+                grantBody.style.opacity = String(releasedFrom.body * fading);
+                grantSpark.style.opacity = String(releasedFrom.spark * fading);
+                grantFrame = requestAnimationFrame(stepGrant);
+                return;
+            }
+
+            // --- La traversée ---
+            const crossing = Math.min(1, elapsed / SPARK_TRAVEL);
+            placeSpark(easeOut(crossing));
+            // L'étincelle s'éteint en touchant l'arc : ce qu'elle portait est
+            // passé dans le trait, elle n'a plus de raison d'être là.
+            grantSpark.style.opacity = String(elapsed < SPARK_TRAVEL
+                ? Math.min(1, elapsed / 0.08)
+                : Math.max(0, 1 - (elapsed - SPARK_TRAVEL) / 0.12));
+
+            // --- Le personnage se dessine ---
+            draw(grantArc, ARC_LENGTH, (elapsed - SPARK_TRAVEL) / ARC_DRAW, false);
+            draw(grantBody, BODY_LENGTH, (elapsed - BODY_START) / BODY_DRAW, true);
+
+            if (elapsed < GRANTED_AT) {
+                grantArc.style.opacity = elapsed > SPARK_TRAVEL ? '1' : '0';
+                grantBody.style.opacity = elapsed > BODY_START ? '1' : '0';
+                grantFrame = requestAnimationFrame(stepGrant);
+                return;
+            }
+
+            // --- La respiration ---
+            const breath = 1 - BREATH_DEPTH
+                + BREATH_DEPTH * Math.cos((elapsed - GRANTED_AT) * 2 * Math.PI / BREATH_PERIOD);
+            grantArc.style.opacity = String(breath);
+            grantBody.style.opacity = String(breath);
+            grantFrame = requestAnimationFrame(stepGrant);
+        }
+
+        btnShare.addEventListener('mouseenter', () => {
+            releasingFrom = null;
+            grantStart = performance.now();
+            if (grantFrame === null) grantFrame = requestAnimationFrame(stepGrant);
+        });
+
+        btnShare.addEventListener('mouseleave', () => {
+            if (grantFrame === null || releasingFrom !== null) return;
+            releasedFrom = {
+                arc: Number(grantArc.style.opacity) || 0,
+                body: Number(grantBody.style.opacity) || 0,
+                spark: Number(grantSpark.style.opacity) || 0,
+            };
+            releasingFrom = performance.now();
+        });
+    }
+
 })();
