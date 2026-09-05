@@ -307,10 +307,11 @@ de destino:
 - **Selector de canal de voz** — cambia instantáneamente el bot de un canal a
   otro. Cada canal conserva su propia cola y su historial.
 - **Canal favorito** — un canal puede marcarse como favorito (la estrella, en el
-  selector); ahí es donde el bot y el panel de control se colocan al arrancar el
-  bot. Marcarlo no desplaza nada en el momento, y no le retiene: cambie de canal
-  cuando quiera, el favorito solo tomará el mando en el siguiente arranque. Solo
-  hay uno, para todos los servidores.
+  selector); ahí es donde el bot y el panel de control se colocan cuando
+  **enciende** el bot. Marcarlo no desplaza nada en el momento y nunca le retiene
+  durante la sesión. Un **reinicio**, en cambio, no lo recupera: le devuelve al
+  canal donde estaba escuchando, ya que la reproducción no se ha interrumpido.
+  Solo hay uno, para todos los servidores.
 
 ### Actividad vocal
 

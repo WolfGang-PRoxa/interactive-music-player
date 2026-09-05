@@ -272,19 +272,34 @@ lui, et le premier auditeur entrant dans le favori l'y rappelait quel que soit
 le salon où on l'avait installé. Un salon marqué d'une étoile devenait ainsi une
 prison : plus moyen de travailler durablement ailleurs.
 
-### Le salon favori : une valeur de démarrage, et rien d'autre
+### Le salon favori : à l'allumage, jamais à la reprise
 
-Le favori (`defaultVoiceChannelId`) désigne le salon sur lequel le bot et le
-tableau de bord se posent quand le process démarre ou redémarre. Il est lu à
-deux endroits, tous deux au démarrage :
+Le favori (`defaultVoiceChannelId`) désigne le salon d'ouverture **d'une
+session** : allumer un bot éteint en ouvre une, et c'est là tout son objet. Un
+**redémarrage** n'en ouvre pas — le process repart, l'écoute continue — et ramène
+donc là où l'on était, comme le fait déjà un rechargement de page. Le favori
+passait auparavant devant dans les deux cas, et rapatriait tout le monde sur lui
+à chaque redémarrage, y compris après une mise à jour installée en pleine écoute
+ailleurs.
 
-- [`Database.appliquerSalonFavori()`](../../../src/database/Database.js), appelé une
-  fois à `ClientReady`, en fait le **salon courant** (`setLastVoiceChannel`) ;
+Les deux lancements se ressemblent trait pour trait vus du démarrage : c'est
+l'instance qui se relance qui les distingue, en posant `IMP_RESTART` sur celle
+qu'elle lance (cf. [`systemHandlers`](../../../src/web/websocket/handlers/systemHandlers.js)).
+La même variable sert à supprimer le fondu d'ouverture, et n'est consommée que
+plus tard, par la restauration.
+
+Le favori est lu à deux endroits, tous deux au démarrage :
+
+- [`Database.applyStartupChannel()`](../../../src/database/Database.js), appelé une
+  fois à `ClientReady`, en fait le **salon courant** à l'allumage, et le laisse
+  de côté à la reprise ;
 - [`PlaybackStateManager.restoreAll()`](../../../src/database/PlaybackStateManager.js)
-  lui donne la priorité pour choisir le salon à restaurer, puis inscrit ce choix
-  comme rattachement — y compris quand le salon est désert et que la connexion
-  est remise à plus tard, sans quoi la règle de présence irait chercher le bot
-  ailleurs que là où le tableau de bord l'annonce en attente.
+  choisit le salon à restaurer selon la même distinction — à la reprise, celui
+  qui jouait à l'arrêt d'abord ; à l'allumage, celui que la ligne précédente
+  vient de fixer —, et inscrit ce choix comme rattachement, y compris quand le salon est
+  désert et que la connexion est remise à plus tard, sans quoi la règle de
+  présence irait chercher le bot ailleurs que là où le tableau de bord l'annonce
+  en attente.
 
 Passé ce point, plus personne ne le lit. Marquer un salon d'une étoile en pleine
 session ne déplace donc rien : le réglage est noté pour le prochain démarrage.

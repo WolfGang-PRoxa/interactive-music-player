@@ -305,10 +305,11 @@ destination :
 - **Sélecteur de salon vocal** — bascule instantanément le bot d'un salon à un
   autre. Chaque salon conserve sa propre file d'attente et son historique.
 - **Salon favori** — un salon peut être marqué comme favori (l'étoile, dans le
-  sélecteur) ; c'est là que le bot et le tableau de bord se placent au démarrage
-  du bot. Le marquer ne déplace rien sur le moment, et ne vous retient pas :
-  changez de salon quand vous voulez, le favori ne reprendra la main qu'au
-  prochain démarrage. Il n'y en a qu'un, tous serveurs confondus.
+  sélecteur) ; c'est là que le bot et le tableau de bord se placent quand vous
+  **allumez** le bot. Le marquer ne déplace rien sur le moment et ne vous retient
+  jamais pendant la session. Un **redémarrage**, en revanche, ne le rappelle pas :
+  il vous ramène sur le salon où vous écoutiez, puisque la lecture, elle, n'a pas
+  été interrompue. Il n'y en a qu'un, tous serveurs confondus.
 
 ### Activité vocale
 

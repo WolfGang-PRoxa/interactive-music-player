@@ -299,10 +299,11 @@ destination channel:
 - **Voice channel selector** — instantly switches the bot from one channel to
   another. Each channel keeps its own queue and history.
 - **Favourite channel** — a channel can be marked as favourite (the star, in the
-  selector); that is where the bot and the dashboard settle when the bot starts.
-  Marking it moves nothing at the time, and does not hold you back: change
-  channel whenever you like, the favourite will only take over at the next
-  startup. There is only one, across all servers.
+  selector); that is where the bot and the dashboard settle when you **switch the
+  bot on**. Marking it moves nothing at the time and never holds you back during
+  the session. A **restart**, however, does not recall it: it brings you back to
+  the channel you were listening on, since the playback itself was never
+  interrupted. There is only one, across all servers.
 
 ### Voice activity
 

@@ -475,7 +475,7 @@ class WebServer {
 
         // 1. Le dernier salon visité. Le salon favori n'est plus consulté ici :
         //    il est appliqué une fois au démarrage du bot
-        //    (`Database.appliquerSalonFavori`), ce qui en fait précisément ce
+        //    (`Database.applyStartupChannel`), ce qui en fait précisément ce
         //    dernier salon visité tant que personne n'en a choisi d'autre. Le
         //    lire à chaque connexion en faisait tout autre chose : un tableau de
         //    bord rouvert — ou simplement reconnecté après une coupure réseau —

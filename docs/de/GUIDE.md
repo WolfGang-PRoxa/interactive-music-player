@@ -319,10 +319,11 @@ Der Befehl `/broadcast`, **Administratoren vorbehalten**, ändert den Zielkanal:
   einen anderen. Jeder Kanal behält seine eigene Warteschlange und seinen
   Verlauf.
 - **Bevorzugter Kanal** — ein Kanal kann als bevorzugt markiert werden (der
-  Stern in der Auswahl); dorthin stellen sich Bot und Dashboard beim Start des
-  Bots. Das Markieren verschiebt im Augenblick nichts und hält Sie nicht fest:
-  wechseln Sie den Kanal, wann Sie wollen, der Favorit übernimmt erst beim
-  nächsten Start. Es gibt nur einen, über alle Server hinweg.
+  Stern in der Auswahl); dorthin stellen sich Bot und Dashboard, wenn Sie den Bot
+  **einschalten**. Das Markieren verschiebt im Augenblick nichts und hält Sie
+  während der Sitzung nie fest. Ein **Neustart** ruft ihn dagegen nicht zurück:
+  er bringt Sie in den Kanal, in dem Sie gehört haben, denn die Wiedergabe wurde
+  nicht unterbrochen. Es gibt nur einen, über alle Server hinweg.
 
 ### Sprachaktivität
 

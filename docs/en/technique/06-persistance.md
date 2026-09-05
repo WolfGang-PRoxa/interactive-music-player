@@ -123,15 +123,16 @@ real modification will persist it.
 | `addTrackToPlaylist`, `removeTrackFromPlaylist`, `movePlaylistTrack` | Track management |
 | `toggleVoiceDetection`, `isVoiceDetectionDisabled` | Ducking exclusions |
 | `setLastVoiceChannel`, `getLastVoiceChannel` | Last channel visited |
-| `appliquerSalonFavori()` | Makes the favourite the current channel — at startup only |
+| `applyStartupChannel()` | Settles the opening channel — at startup only |
 
 `updateSettings` applies one particular rule: setting a favourite channel
 (`defaultVoiceChannelId`) removes it from all the other servers — there is only
 one global favourite.
 
-`appliquerSalonFavori()` is called once, at `ClientReady`. It writes the
-favourite into the last channel visited, and that is this setting's whole role:
-to decide the opening channel, then step aside. Reading it elsewhere would make
+`applyStartupChannel()` is called once, at `ClientReady`. It writes the
+favourite into the last channel visited on switch-on, and leaves it aside on
+resume — a restart must bring you back where you were. Reading it elsewhere would
+make
 it a permanent preference, which would endlessly bring the bot and the dashboard
 back to it — see
 [Presence in voice channels](04-diffusion.md#presence-in-voice-channels).

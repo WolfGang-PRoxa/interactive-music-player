@@ -123,16 +123,17 @@ est simplement mise en cache ; la première modification réelle la persistera.
 | `addTrackToPlaylist`, `removeTrackFromPlaylist`, `movePlaylistTrack` | Gestion des pistes |
 | `toggleVoiceDetection`, `isVoiceDetectionDisabled` | Exclusions de ducking |
 | `setLastVoiceChannel`, `getLastVoiceChannel` | Dernier salon visité |
-| `appliquerSalonFavori()` | Fait du favori le salon courant — au démarrage seulement |
+| `applyStartupChannel()` | Fixe le salon d'ouverture — au démarrage seulement |
 
 `updateSettings` applique une règle particulière : définir un salon favori
 (`defaultVoiceChannelId`) le retire de tous les autres serveurs — il n'y a qu'un
 favori global.
 
-`appliquerSalonFavori()` est appelé une fois, à `ClientReady`. Il écrit le favori
-dans le dernier salon visité, et c'est tout le rôle de ce réglage : décider du
-salon d'ouverture, puis s'effacer. Le lire ailleurs en ferait une préférence
-permanente, qui ramènerait sans fin le bot et le tableau de bord sur lui — voir
+`applyStartupChannel()` est appelé une fois, à `ClientReady`. Il écrit le favori
+dans le dernier salon visité à l'allumage, et le laisse de côté à la reprise —
+un redémarrage doit ramener là où l'on était. Le lire ailleurs
+en ferait une préférence permanente, qui ramènerait sans fin le bot et le tableau
+de bord sur lui — voir
 [Présence dans les salons vocaux](04-diffusion.md#présence-dans-les-salons-vocaux).
 
 ---

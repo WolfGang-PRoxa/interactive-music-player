@@ -126,16 +126,16 @@ wird ihn festschreiben.
 | `addTrackToPlaylist`, `removeTrackFromPlaylist`, `movePlaylistTrack` | Verwaltung der Titel |
 | `toggleVoiceDetection`, `isVoiceDetectionDisabled` | Ausschlüsse vom Ducking |
 | `setLastVoiceChannel`, `getLastVoiceChannel` | Zuletzt besuchter Kanal |
-| `appliquerSalonFavori()` | Macht den Favoriten zum aktuellen Kanal — nur beim Start |
+| `applyStartupChannel()` | Legt den Eröffnungskanal fest — nur beim Start |
 
 `updateSettings` wendet eine besondere Regel an: einen bevorzugten Kanal zu
 setzen (`defaultVoiceChannelId`) entfernt ihn von allen anderen Servern — es gibt
 nur einen globalen Favoriten.
 
-`appliquerSalonFavori()` wird einmal aufgerufen, bei `ClientReady`. Es schreibt
-den Favoriten in den zuletzt besuchten Kanal, und darin erschöpft sich die Rolle
-dieser Einstellung: über den Eröffnungskanal zu entscheiden und dann
-zurückzutreten. Ihn anderswo zu lesen machte ihn zu einer dauerhaften Vorliebe,
+`applyStartupChannel()` wird einmal aufgerufen, bei `ClientReady`. Es schreibt
+den Favoriten beim Einschalten in den zuletzt besuchten Kanal und lässt ihn beim
+Fortsetzen beiseite — ein Neustart muss dorthin zurückführen, wo man war.
+Ihn anderswo zu lesen machte ihn zu einer dauerhaften Vorliebe,
 die Bot und Dashboard endlos zu ihm zurückholte — siehe
 [Präsenz in den Sprachkanälen](04-diffusion.md#präsenz-in-den-sprachkanälen).
 

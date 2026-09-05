@@ -140,7 +140,7 @@ class PresenceManager {
      * import, ou restaurée sans salon —, il ramenait le bot chez lui, et le
      * premier auditeur entrant dans le favori l'y rappelait quel que soit le
      * salon où on l'avait installé. Le favori ne vaut qu'au démarrage, où
-     * `Database.appliquerSalonFavori()` en fait le salon courant une fois pour
+     * `Database.applyStartupChannel()` en fait le salon courant une fois pour
      * toutes ; la restauration d'état l'inscrit ensuite comme rattachement, et
      * c'est à ce titre — et non comme favori — qu'il est retrouvé ici.
      *

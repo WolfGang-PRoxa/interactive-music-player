@@ -269,17 +269,31 @@ que entraba en el favorito lo llamaba allí fuera cual fuera el canal donde se l
 hubiera instalado. Un canal marcado con una estrella se convertía así en una
 prisión: ya no había modo de trabajar de forma duradera en otra parte.
 
-### El canal favorito: un valor de arranque, y nada más
+### El canal favorito: al encender, nunca al reanudar
 
-El favorito (`defaultVoiceChannelId`) designa el canal sobre el que el bot y el
-panel de control se posan cuando el proceso arranca o se reinicia. Se lee en dos
-lugares, ambos en el arranque:
+El favorito (`defaultVoiceChannelId`) designa el canal de apertura **de una
+sesión**: encender un bot apagado abre una, y ese es todo su objeto. Un
+**reinicio** no abre ninguna — el proceso rearranca, la escucha sigue — y por
+tanto devuelve a donde se estaba, como ya hacía una recarga de página. Antes el
+favorito pasaba delante en ambos casos y repatriaba a todo el mundo sobre él en
+cada reinicio, incluso tras una actualización instalada mientras se escuchaba en
+otro sitio.
 
-- [`Database.appliquerSalonFavori()`](../../../src/database/Database.js), llamado
-  una vez en `ClientReady`, hace de él el **canal actual**
-  (`setLastVoiceChannel`);
+Vistos desde el arranque, los dos lanzamientos son indistinguibles: es la
+instancia que se relanza la que los diferencia, poniendo `IMP_RESTART` en la que
+lanza (véase [`systemHandlers`](../../../src/web/websocket/handlers/systemHandlers.js)).
+La misma variable sirve para suprimir el fundido de apertura, y solo se consume
+más tarde, en la restauración.
+
+El favorito se lee en dos lugares, ambos en el arranque:
+
+- [`Database.applyStartupChannel()`](../../../src/database/Database.js), llamado
+  una vez en `ClientReady`, hace de él el **canal actual** al encender, y lo deja
+  de lado al reanudar;
 - [`PlaybackStateManager.restoreAll()`](../../../src/database/PlaybackStateManager.js)
-  le da prioridad para elegir el canal que restaurar, y luego inscribe esa
+  elige el canal que restaurar según la misma distinción — al reanudar, primero
+  el que sonaba al apagar; al encender, el que la línea anterior acaba de fijar —
+  e inscribe esa
   elección como vínculo — incluso cuando el canal está desierto y la conexión se
   aplaza, sin lo cual la regla de presencia iría a buscar al bot a otro sitio
   distinto de aquel donde el panel de control lo anuncia en espera.

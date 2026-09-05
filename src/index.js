@@ -404,14 +404,18 @@ client.once(Events.ClientReady, async (readyClient) => {
     // raison de la garder.
     versioning.cleanTempDirs();
 
-    // Le salon favori vaut ici, et nulle part ailleurs : il devient le salon
-    // courant le temps d'un démarrage, puis s'efface derrière les choix de
-    // l'utilisateur. C'est ce qui lui permet de désigner le salon d'ouverture
-    // sans pour autant retenir le bot — et le tableau de bord — prisonniers de
-    // ce salon pour le reste de la session.
-    const favorite = database.applyFavoriteChannel();
-    if (favorite) {
-        log.info(`[Startup] Favorite channel applied: ${favorite.channelId} (guild ${favorite.guildId}).`);
+    // Le salon d'ouverture se décide ici, et nulle part ailleurs.
+    //
+    // Le favori vaut à l'allumage, jamais à la reprise : lancer un bot éteint
+    // est un début de session, un redémarrage n'en est pas un. `IMP_RESTART`
+    // est posé par l'instance qui se relance (cf. systemHandlers) ; il n'est pas
+    // consommé ici, `PlaybackStateManager.restoreAll()` en a besoin ensuite pour
+    // supprimer le fondu d'ouverture.
+    const resuming = process.env.IMP_RESTART === '1';
+    const startup = database.applyStartupChannel({ resuming });
+    if (startup) {
+        log.info(`[Startup] Voice channel ${startup.channelId} (guild ${startup.guildId}), `
+            + `from the ${startup.source === 'last' ? 'last visited channel' : 'favorite channel'}.`);
     }
 
     // Démarrer le serveur Web intégré pour le Dashboard

@@ -124,15 +124,16 @@ se pone en caché; la primera modificación real la persistirá.
 | `addTrackToPlaylist`, `removeTrackFromPlaylist`, `movePlaylistTrack` | Gestión de las pistas |
 | `toggleVoiceDetection`, `isVoiceDetectionDisabled` | Exclusiones de ducking |
 | `setLastVoiceChannel`, `getLastVoiceChannel` | Último canal visitado |
-| `appliquerSalonFavori()` | Hace del favorito el canal actual — solo en el arranque |
+| `applyStartupChannel()` | Fija el canal de apertura — solo en el arranque |
 
 `updateSettings` aplica una regla particular: definir un canal favorito
 (`defaultVoiceChannelId`) lo retira de todos los demás servidores — solo hay un
 favorito global.
 
-`appliquerSalonFavori()` se invoca una vez, en `ClientReady`. Escribe el favorito
-en el último canal visitado, y ese es todo el papel de este ajuste: decidir el
-canal de apertura, y luego borrarse. Leerlo en otra parte lo convertiría en una
+`applyStartupChannel()` se invoca una vez, en `ClientReady`. Escribe el favorito
+en el último canal visitado al encender, y lo deja de lado al reanudar: un
+reinicio debe devolver a donde se estaba. Leerlo en otra parte lo convertiría en
+una
 preferencia permanente, que devolvería sin fin al bot y al panel de control sobre
 él — véase
 [Presencia en los canales de voz](04-diffusion.md#presencia-en-los-canales-de-voz).

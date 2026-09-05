@@ -335,7 +335,7 @@ async function handleSelectChannel(ctx) {
  *
  * Le réglage est enregistré, et rien de plus : marquer un salon ne déplace ni
  * le bot ni le tableau de bord. Le favori ne se lit qu'au démarrage du bot
- * (`Database.appliquerSalonFavori`), où il devient le salon courant. La
+ * (`Database.applyStartupChannel`), où il devient le salon courant. La
  * diffusion qui suit ne sert donc qu'à rallumer l'étoile dans le sélecteur.
  */
 function handleSetDefaultChannel(ctx) {

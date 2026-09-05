@@ -266,16 +266,30 @@ home, and the first listener entering the favourite called it back there
 whatever channel it had been installed in. A channel marked with a star thus
 became a prison: no way to work lastingly anywhere else.
 
-### The favourite channel: a startup value, and nothing else
+### The favourite channel: on switch-on, never on resume
 
-The favourite (`defaultVoiceChannelId`) designates the channel that the bot and
-the dashboard settle on when the process starts or restarts. It is read in two
-places, both at startup:
+The favourite (`defaultVoiceChannelId`) designates the opening channel **of a
+session**: switching on a bot that was off opens one, and that is its whole
+purpose. A **restart** opens none — the process restarts, the listening carries
+on — and therefore brings you back where you were, as a page reload already did.
+The favourite used to come first in both cases, and repatriated everyone onto it
+at every restart, including after an update installed while listening elsewhere.
 
-- [`Database.appliquerSalonFavori()`](../../../src/database/Database.js), called
-  once at `ClientReady`, makes it the **current channel** (`setLastVoiceChannel`);
+Seen from startup the two launches are indistinguishable: it is the instance
+relaunching itself that tells them apart, by setting `IMP_RESTART` on the one it
+spawns (see [`systemHandlers`](../../../src/web/websocket/handlers/systemHandlers.js)).
+The same variable serves to skip the startup fade-in, and is consumed only later,
+by the restore.
+
+The favourite is read in two places, both at startup:
+
+- [`Database.applyStartupChannel()`](../../../src/database/Database.js), called
+  once at `ClientReady`, makes it the **current channel** on switch-on, and
+  leaves it aside on resume;
 - [`PlaybackStateManager.restoreAll()`](../../../src/database/PlaybackStateManager.js)
-  gives it priority when choosing which channel to restore, then records that
+  chooses which channel to restore along the same distinction — on resume, the
+  one that was playing at shutdown first; on switch-on, the one the previous line
+  has just settled — and records that
   choice as the attachment — including when the channel is deserted and the
   connection is put off until later, without which the presence rule would go
   looking for the bot somewhere other than where the dashboard announces it as

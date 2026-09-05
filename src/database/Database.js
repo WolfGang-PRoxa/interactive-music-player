@@ -307,27 +307,56 @@ class GuildDatabase {
     }
 
     /**
-     * Fait du salon favori le salon courant. À n'appeler qu'au démarrage.
+     * Fixe le salon sur lequel se poser au démarrage. À n'appeler qu'alors.
      *
-     * C'est là tout le rôle du favori : désigner le salon sur lequel le bot et
-     * le tableau de bord se posent quand le process démarre ou redémarre. Passé
-     * ce point il ne vaut plus rien de particulier, et tout le monde ne suit
-     * plus que le dernier salon choisi.
+     * **Le favori vaut à l'allumage, jamais à la reprise.** Lancer un bot éteint
+     * est un début de session : le favori dit par où commencer, et c'est tout son
+     * objet. Un redémarrage n'en est pas un — le process repart, pas l'écoute —
+     * et doit ramener là où l'on était, exactement comme le fait déjà un
+     * rechargement de page.
      *
-     * L'écrire ici plutôt que de le consulter partout est ce qui rend cette
-     * règle tenable : chaque lecture du favori ailleurs dans le code en faisait
-     * une préférence permanente, qui ramenait sans fin le bot et le tableau de
-     * bord sur lui — impossible alors de s'installer durablement ailleurs.
+     * La distinction ne se devine pas : c'est l'instance qui se relance qui la
+     * transmet, par `IMP_RESTART` (cf. `systemHandlers.restartProcess`). Sans
+     * elle, un salon marqué d'une étoile rapatriait tout le monde à chaque
+     * redémarrage — y compris après une mise à jour installée en pleine écoute
+     * ailleurs, ce qui n'était demandé par personne.
+     *
+     * Passé ce point, ni l'un ni l'autre ne valent plus rien de particulier :
+     * tout le projet ne suit que le salon courant. L'écrire ici plutôt que de
+     * consulter le favori partout est ce qui rend la règle tenable — chaque
+     * lecture ailleurs en refaisait une préférence permanente, qui ramenait sans
+     * fin le bot et le tableau de bord sur lui.
      *
      * Il n'y a qu'un favori, tous serveurs confondus (cf. `updateSettings`).
      *
-     * @returns {{ guildId: string, channelId: string }|null} Le salon appliqué.
+     * @param {{ resuming?: boolean }} [options] `resuming` : ce lancement
+     *   poursuit une session précédente plutôt que d'en ouvrir une.
+     * @returns {{ guildId: string, channelId: string, source: 'last'|'favorite' }|null}
+     *   Le salon retenu, et ce qui l'a désigné.
      */
-    applyFavoriteChannel() {
+    applyStartupChannel({ resuming = false } = {}) {
+        const last = this.getLastVoiceChannel();
+        if (resuming && last.guildId && last.channelId) {
+            // Rien à écrire : c'est déjà le salon courant. Le rendre tout de
+            // même permet à l'appelant de dire lequel des deux a tranché.
+            return { guildId: last.guildId, channelId: last.channelId, source: 'last' };
+        }
+
         for (const [guildId, settings] of this.cache.entries()) {
             if (!settings.defaultVoiceChannelId) continue;
             this.setLastVoiceChannel(guildId, settings.defaultVoiceChannelId);
-            return { guildId, channelId: settings.defaultVoiceChannelId };
+            return {
+                guildId,
+                channelId: settings.defaultVoiceChannelId,
+                source: 'favorite',
+            };
+        }
+
+        // Aucun favori. Le dernier salon visité reste le meilleur point de
+        // départ ; c'est aussi ce qui rend l'allumage identique à la reprise
+        // pour qui n'a jamais posé d'étoile.
+        if (last.guildId && last.channelId) {
+            return { guildId: last.guildId, channelId: last.channelId, source: 'last' };
         }
         return null;
     }

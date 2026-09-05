@@ -280,17 +280,32 @@ gleichgültig, in welchem Kanal man ihn eingerichtet hatte. Ein mit einem Stern
 markierter Kanal wurde so zum Gefängnis: kein dauerhaftes Arbeiten anderswo mehr
 möglich.
 
-### Der bevorzugte Kanal: ein Startwert und sonst nichts
+### Der bevorzugte Kanal: beim Einschalten, nie beim Fortsetzen
 
-Der Favorit (`defaultVoiceChannelId`) bezeichnet den Kanal, auf den sich Bot und
-Dashboard setzen, wenn der Prozess startet oder neu startet. Er wird an zwei
-Stellen gelesen, beide beim Start:
+Der Favorit (`defaultVoiceChannelId`) bezeichnet den Eröffnungskanal **einer
+Sitzung**: einen ausgeschalteten Bot einzuschalten eröffnet eine, und darin
+erschöpft sich sein Zweck. Ein **Neustart** eröffnet keine — der Prozess startet
+neu, das Hören läuft weiter — und führt daher dorthin zurück, wo man war, wie es
+ein Neuladen der Seite schon tat. Zuvor ging der Favorit in beiden Fällen vor und
+holte bei jedem Neustart alle zu sich zurück, auch nach einem Update, das während
+des Hörens anderswo eingespielt wurde.
 
-- [`Database.appliquerSalonFavori()`](../../../src/database/Database.js), einmal
-  bei `ClientReady` aufgerufen, macht ihn zum **aktuellen Kanal**
-  (`setLastVoiceChannel`);
+Vom Start aus gesehen gleichen sich beide Starts aufs Haar: die Instanz, die sich
+neu startet, unterscheidet sie, indem sie `IMP_RESTART` bei der von ihr
+gestarteten setzt (siehe
+[`systemHandlers`](../../../src/web/websocket/handlers/systemHandlers.js)). Dieselbe
+Variable dient dazu, die Einblendung beim Start zu unterdrücken, und wird erst
+später verbraucht, bei der Wiederherstellung.
+
+Der Favorit wird an zwei Stellen gelesen, beide beim Start:
+
+- [`Database.applyStartupChannel()`](../../../src/database/Database.js), einmal
+  bei `ClientReady` aufgerufen, macht ihn beim Einschalten zum **aktuellen
+  Kanal** und lässt ihn beim Fortsetzen beiseite;
 - [`PlaybackStateManager.restoreAll()`](../../../src/database/PlaybackStateManager.js)
-  gibt ihm den Vorrang bei der Wahl des wiederherzustellenden Kanals und trägt
+  wählt den wiederherzustellenden Kanal nach derselben Unterscheidung — beim
+  Fortsetzen zuerst den beim Beenden spielenden, beim Einschalten den, den die
+  vorige Zeile gerade festgelegt hat — und trägt
   diese Wahl dann als Zuordnung ein — auch dann, wenn der Kanal verlassen ist und
   die Verbindung auf später verschoben wird, denn sonst suchte die Präsenzregel
   den Bot anderswo als dort, wo das Dashboard ihn als wartend ankündigt.

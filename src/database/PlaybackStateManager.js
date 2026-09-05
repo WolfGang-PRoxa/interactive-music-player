@@ -390,14 +390,31 @@ class PlaybackStateManager {
                     };
                 }
 
-                // Le seul autre endroit où le salon favori est lu, avec
-                // `Database.appliquerSalonFavori()` — et pour la même raison :
-                // on démarre. Il désigne le salon sur lequel se poser, avant
-                // celui qui jouait à l'arrêt. Partout ailleurs dans le projet,
-                // le favori n'a plus cours ; c'est le rattachement inscrit
-                // ci-dessous qui porte ce choix pour le reste de la session.
-                const defaultChannelId = settings.defaultVoiceChannelId;
-                const channelId = defaultChannelId || activeChannelId || settings.lastVoiceChannelId;
+                /*
+                 * Où se reposer, et l'ordre dépend de la nature du lancement.
+                 *
+                 * Une reprise doit retrouver ce qui jouait : le process est
+                 * reparti, pas l'écoute. Un allumage, lui, ouvre une session, et
+                 * c'est là que le favori a son mot à dire — `applyStartupChannel()`
+                 * l'a déjà inscrit comme salon courant, il suffit de le suivre.
+                 *
+                 * Le favori passait avant tout dans les deux cas, et c'est ce qui
+                 * rapatriait tout le monde sur lui à chaque redémarrage.
+                 *
+                 * Partout ailleurs dans le projet, le favori n'a pas cours ;
+                 * c'est le rattachement inscrit ci-dessous qui porte ce choix
+                 * pour le reste de la session.
+                 */
+                const channelId = isRestart
+                    ? (activeChannelId || settings.lastVoiceChannelId || settings.defaultVoiceChannelId)
+                    : (settings.lastVoiceChannelId || settings.defaultVoiceChannelId || activeChannelId);
+
+                // Lequel a tranché : c'est la seule chose que le journal ne peut
+                // pas redécouvrir après coup, et la première qu'on cherche quand
+                // le bot repart ailleurs qu'attendu.
+                const chosenBy = channelId === activeChannelId ? 'the channel that was playing'
+                    : channelId === settings.lastVoiceChannelId ? 'the current channel'
+                    : 'the favorite channel';
 
                 let voiceChannel = null;
                 if (channelId) {
@@ -411,11 +428,8 @@ class PlaybackStateManager {
                 const channelReachable = voiceChannel && presenceManager.connectionAllowed(voiceChannel);
 
                 if (channelReachable) {
-                    if (defaultChannelId && defaultChannelId === voiceChannel.id) {
-                        log.info(`[PlaybackState] Restoring the voice connection for guild ${guildId} on the default channel: ${voiceChannel.name}...`);
-                    } else {
-                        log.info(`[PlaybackState] Restoring the voice connection for guild ${guildId} on channel ${voiceChannel.name}...`);
-                    }
+                    log.info(`[PlaybackState] Restoring the voice connection for guild ${guildId} `
+                        + `on channel ${voiceChannel.name}, from ${chosenBy}...`);
                 } else if (voiceChannel) {
                     log.info(`[PlaybackState] Channel « ${voiceChannel.name} » deserted: `
                         + `playback for guild ${guildId} is restored and waiting for a listener.`);
