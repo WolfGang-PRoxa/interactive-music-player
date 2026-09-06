@@ -28,6 +28,8 @@
     "toast_playlist_empty": "La playlist « {name} » est vide",
     "toast_action_play_playlist": "Jouer « {name} »",
     "toast_action_play_queue": "Jouer la file d'attente",
+    "toast_audio_blocked": "Le son attend un clic sur la page.",
+    "toast_action_resume_audio": "Reprendre le son",
     "default_playlist_name": "Ma Playlist",
     "card_volume_broadcast": "Volume & Diffusion",
     "main_volume": "Volume Principal",

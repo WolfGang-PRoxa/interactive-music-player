@@ -2500,6 +2500,33 @@
     });
 
     /**
+     * Dit que le son attend un geste — une fois, et pas davantage.
+     *
+     * C'est le seul échec de lecture dont le remède tienne dans un clic, et
+     * c'était le seul que la page taisait : elle l'écrivait dans la console et
+     * l'envoyait au serveur, laissant devant l'écran un silence que rien
+     * n'expliquait. Le navigateur refuse la lecture tant qu'aucun geste n'a
+     * porté sur la page, et sa décision est prise avant que le tableau de bord
+     * n'ait son mot à dire — la seule chose utile est de la rendre lisible.
+     *
+     * Une fois, et pas à chaque état : on repasse ici une fois par seconde tant
+     * que le blocage dure, et un message répété serait pire que le silence.
+     */
+    let blockedNoticeShown = false;
+
+    function announceBlockedPlayback() {
+        if (blockedNoticeShown || audioUnlocked) return;
+        blockedNoticeShown = true;
+
+        // N'importe quel clic ferait l'affaire — l'écouteur de déverrouillage
+        // les capte tous. Le bouton n'est là que pour dire lequel.
+        showToast(t('toast_audio_blocked'), {
+            label: t('toast_action_resume_audio'),
+            onClick: unlockAudio
+        });
+    }
+
+    /**
      * Place un élément audio fraîchement chargé à la position déjà atteinte côté
      * serveur.
      *
@@ -3106,6 +3133,12 @@
                         // vif d'un morceau à l'autre. Le journal du bot n'a rien
                         // à y gagner.
                         if (err && err.name === 'AbortError') return;
+
+                        // Le remède tient dans un clic, et personne ne peut le
+                        // deviner : ce refus-là se dit à l'écran.
+                        if (err && err.name === 'NotAllowedError') {
+                            announceBlockedPlayback();
+                        }
                         // Le reste est remonté au serveur : cet avertissement ne
                         // partait que dans la console du navigateur, hors de
                         // portée depuis un téléphone — et c'est le seul indice
