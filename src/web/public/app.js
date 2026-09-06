@@ -1038,6 +1038,13 @@
             updateFormatFieldVisibility();
         }
 
+        // La sonie du morceau en cours, affichée à droite de « Volume
+        // Principal ». Elle est peinte ici, avec le reste de l'état, pour
+        // qu'elle change au même instant que le titre au-dessus d'elle.
+        if (typeof window.MusicPlayer.refreshOutputLevel === 'function') {
+            window.MusicPlayer.refreshOutputLevel();
+        }
+
         // Delegate Speakers, Queue, and History UI rendering to js/queue.js module
         if (typeof window.MusicPlayer.updateSpeakersUI === 'function') {
             window.MusicPlayer.updateSpeakersUI();

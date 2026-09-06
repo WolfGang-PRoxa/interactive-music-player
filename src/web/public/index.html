@@ -650,6 +650,21 @@
                             <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
                         </svg>
                         <span data-i18n="main_volume">Volume Principal</span>
+                        <!--
+                             La sonie mesurée du fichier en cours, et le gain
+                             que son réglage lui applique — voir
+                             js/outputLevel.js.
+
+                             À droite du libellé et non près du curseur : le
+                             curseur porte une consigne, ces deux-là rendent
+                             compte. Les mêler laisserait croire que l'un se
+                             règle comme l'autre, alors que le premier décrit
+                             le fichier tel qu'il est.
+                        -->
+                        <span class="output-level" id="output-level" hidden>
+                            <span class="output-level-db" id="output-level-db">—</span>
+                            <span class="output-level-gain hidden" id="output-level-gain"></span>
+                        </span>
                     </div>
                     <div class="slider-container">
                         <input type="range" id="volume-range" min="0" max="100" value="70">
@@ -2481,9 +2496,11 @@
     <script src="js/qualityMenu.js"></script>
     <script src="js/loudnessGain.js"></script>
     <script src="js/loginGate.js"></script>
+    <script src="js/outputLevel.js"></script>
     <script src="js/queue.js"></script>
     <script src="js/playlists.js"></script>
     <script src="js/playlistTabsScroll.js"></script>
+    <script src="js/scrollFade.js"></script>
     <script src="js/scrollLock.js"></script>
     <script src="js/video.js"></script>
     <script src="js/logs.js"></script>

@@ -849,3 +849,65 @@ input:checked + .switch-slider:before {
     height: 13px;
     flex-shrink: 0;
 }
+
+/*
+ * La sonie du fichier en cours, et le gain qu'on lui applique.
+ *
+ * Posés à droite du libellé, jamais près du curseur : celui-ci porte une
+ * consigne, ces deux-là rendent compte. Les mêler laisserait croire qu'on peut
+ * agir dessus, alors que le premier décrit le fichier tel qu'il est.
+ *
+ * En chiffres tabulaires et à largeur minimale fixée : la mesure change à
+ * chaque titre, et une ligne qui se réajuste d'un morceau à l'autre déplace le
+ * libellé sous les yeux.
+ */
+.output-level {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.45rem;
+    margin-left: 0.6rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+}
+
+.output-level[hidden] {
+    display: none;
+}
+
+.output-level-db {
+    min-width: 5.8em;
+    text-align: right;
+    color: var(--text-muted);
+    transition: color 0.2s ease;
+}
+
+/* L'analyse n'a pas encore rendu son verdict : le point d'attente s'efface, au
+   lieu de se donner pour une mesure. */
+.output-level-db.is-pending {
+    opacity: 0.45;
+}
+
+/*
+ * Le gain de sonie, distingué de la mesure par sa couleur.
+ *
+ * Les deux valeurs se suivent et se liraient volontiers comme une seule coupée
+ * en deux. Celle-ci est ce qu'on fait à la piste, l'autre ce qu'elle est : ni
+ * la même origine, ni la même durée de vie.
+ */
+.output-level-gain {
+    padding: 0.05rem 0.32rem;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--c-primary) 14%, transparent);
+    color: var(--c-primary);
+}
+
+.output-level-gain.is-boost {
+    background: color-mix(in srgb, var(--c-accent) 14%, transparent);
+    color: var(--c-accent);
+}
+
+.output-level-gain.hidden {
+    display: none;
+}
