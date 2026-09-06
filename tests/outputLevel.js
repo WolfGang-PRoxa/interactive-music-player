@@ -77,8 +77,14 @@ function mount() {
     };
     els['output-level'].hidden = true;   // tel que le balisage le livre
 
+    // Ce que le module demande au système d'infobulles, et quand.
+    const refreshed = [];
+
     const sandbox = {
-        window: { MusicPlayer: { state: null } },
+        window: {
+            MusicPlayer: { state: null },
+            TooltipSystem: { refresh: (el) => refreshed.push(el) },
+        },
         document: { getElementById: (id) => els[id] || null },
         Number, Math, console,
     };
@@ -91,6 +97,7 @@ function mount() {
     return {
         els,
         api,
+        refreshed,
         /**
          * Pose un état et repeint, comme le fait `updateUI`.
          *
@@ -261,6 +268,50 @@ console.log('\nCe que les infobulles ajoutent aux deux nombres\n');
     m.play({ status: 'measured', measured: -14, gainDb: 0 }, { title: '' });
     check('un morceau sans nom n\'hérite pas de celui d\'avant',
         db.getAttribute('data-tooltip-title') === null);
+}
+
+{
+    // Le morceau change pendant qu'on lit l'infobulle : elle est composée à son
+    // ouverture, et annoncerait sinon le titre du précédent à côté du nombre du
+    // suivant — se contredisant à deux centimètres d'intervalle.
+    const m = mount();
+    const loudness = { status: 'measured', measured: -14, gainDb: 0 };
+
+    m.play(loudness, { title: 'Premier morceau' });
+    const apresPremier = m.refreshed.length;
+
+    m.play(loudness, { title: 'Deuxième morceau' });
+    check('un changement de morceau reprend les deux infobulles',
+        m.refreshed.length === apresPremier + 2
+        && m.refreshed.includes(m.els['output-level-db'])
+        && m.refreshed.includes(m.els['output-level-gain']),
+        'ouvertes, elles suivent ; fermées, la reprise ne coûte rien');
+
+    // Sans garde, on repasserait ici une fois par seconde : une infobulle
+    // ouverte serait redessinée et replacée sous le curseur sans raison.
+    const avant = m.refreshed.length;
+    m.play(loudness, { title: 'Deuxième morceau' });
+    m.play(loudness, { title: 'Deuxième morceau' });
+    check('  … mais un état identique ne la fait pas sauter',
+        m.refreshed.length === avant, `${m.refreshed.length - avant} reprises de trop`);
+
+    // La pochette compte autant que le nom : deux morceaux homonymes n'ont pas
+    // la même image, et c'est elle qu'on regarde en premier.
+    m.play(loudness, { title: 'Deuxième morceau', thumbnail: 'https://exemple/autre.jpg' });
+    check('  … et une pochette qui change compte comme un changement',
+        m.refreshed.length === avant + 2);
+}
+
+{
+    const TIPS = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'public', 'js', 'tooltipSystem.js'), 'utf8');
+
+    check('le système d\'infobulles sait se redessiner',
+        /return \{ init, hide, refresh \};/.test(TIPS));
+    check('  … seulement pour celle qui est ouverte',
+        /if \(!tooltipEl \|\| currentTarget !== target\) return;/.test(TIPS)
+        && /classList\.contains\('visible'\)/.test(TIPS),
+        'redessiner une infobulle fermée la ferait apparaître');
 }
 
 {

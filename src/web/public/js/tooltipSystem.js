@@ -247,6 +247,26 @@ const TooltipSystem = (() => {
         tooltipEl.style.top = y + 'px';
     }
 
+    /**
+     * Redessine l'infobulle affichée, si c'est bien celle de cet élément.
+     *
+     * Le contenu est composé à l'ouverture et n'était jamais repris : une
+     * infobulle survolée au moment où le morceau change gardait le nom et la
+     * pochette du précédent, et se contredisait donc avec le nombre qu'elle
+     * commentait, juste à côté.
+     *
+     * Elle est replacée du même mouvement : un titre plus long la fait grandir,
+     * et une infobulle qui grandit sans être replacée déborde de la fenêtre.
+     *
+     * L'appelant ne doit la réclamer que sur un vrai changement — repasser ici à
+     * chaque état la ferait sauter au curseur une fois par seconde.
+     */
+    function refresh(target) {
+        if (!tooltipEl || currentTarget !== target) return;
+        if (!tooltipEl.classList.contains('visible')) return;
+        show(target);
+    }
+
     function hide() {
         if (tooltipEl) {
             tooltipEl.classList.remove('visible');
@@ -254,7 +274,7 @@ const TooltipSystem = (() => {
         clearTimeout(showTimer);
     }
 
-    return { init, hide };
+    return { init, hide, refresh };
 })();
 
 if (typeof window !== 'undefined') {
