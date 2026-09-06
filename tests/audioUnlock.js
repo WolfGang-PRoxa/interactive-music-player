@@ -17,9 +17,11 @@
  *  - **Ce refus-là seul se dit à l'écran.** `AbortError` est le refus ordinaire
  *    d'un enchaînement un peu vif ; l'annoncer serait du bruit.
  *
- *  - **Il ne se dit qu'une fois.** On repasse par ce chemin à chaque état reçu,
- *    soit une fois par seconde tant que le blocage dure : un message répété
- *    serait pire que le silence qu'il commente.
+ *  - **Il se dit dans la durée, et se retire seul.** La condition tient tant
+ *    qu'aucun geste n'a porté sur la page : une notification qui s'efface au
+ *    bout de quatre secondes laisserait ensuite le même silence inexpliqué.
+ *    D'où une note posée près de la barre de progression, qui disparaît à
+ *    l'instant où le son est acquis — et pas avant, ni après.
  *
  *  - **Les quatre langues le disent.** Une clé absente d'un fichier laisse la
  *    notification vide dans cette langue — donc muette là où elle importe le
@@ -78,15 +80,26 @@ console.log('Ce que la page annonce, et ce qu\'elle garde pour elle\n');
 
 {
     const fn = APP.slice(APP.indexOf('function announceBlockedPlayback'),
-        APP.indexOf('function announceBlockedPlayback') + 700);
+        APP.indexOf('function announceBlockedPlayback') + 400);
 
-    check('l\'annonce ne se répète pas',
-        /if \(blockedNoticeShown \|\| audioUnlocked\) return;/.test(fn)
-        && /blockedNoticeShown = true;/.test(fn),
+    check('l\'annonce ne se relève pas deux fois',
+        /if \(playbackBlocked \|\| audioUnlocked\) return;/.test(fn),
         'on repasse ici une fois par seconde tant que le blocage dure');
 
+    // Elle dure autant que la condition : c'est tout l'intérêt d'une note
+    // plutôt que d'une notification, et elle doit donc savoir se retirer.
+    check('  … et se retire dès que le son est acquis',
+        (APP.match(/clearBlockedPlayback\(\);/g) || []).length === 2,
+        'les deux issues du déverrouillage la lèvent');
+
     check('elle propose le geste qu\'elle attend',
-        /showToast\(/.test(fn) && /onClick: unlockAudio/.test(fn));
+        /btn-resume-blocked/.test(APP)
+        && /resumeBlockedBtn\.addEventListener\('click', unlockAudio\)/.test(APP));
+
+    // Une notification qui passe laisserait ensuite le silence inexpliqué.
+    check('  … sans passer par une notification fugace',
+        !/toast_audio_blocked|toast_action_resume_audio/.test(APP),
+        'la condition dure plus longtemps qu\'un toast');
 
     // Le bouton n'est qu'une commodité : l'écouteur de déverrouillage capte
     // tous les gestes, et sans `once`, chacun est une nouvelle occasion.
@@ -101,7 +114,7 @@ console.log('Ce que la page annonce, et ce qu\'elle garde pour elle\n');
 console.log('\nCe que les quatre langues en disent\n');
 
 {
-    const keys = ['toast_audio_blocked', 'toast_action_resume_audio'];
+    const keys = ['playback_blocked_body', 'playback_blocked_action'];
     const langs = ['fr', 'en', 'es', 'de'];
 
     for (const lang of langs) {
@@ -118,8 +131,36 @@ console.log('\nCe que les quatre langues en disent\n');
 
         const missing = keys.filter(k => typeof parsed[k] !== 'string' || !parsed[k].trim());
         check(`  … et porte de quoi expliquer le silence`, missing.length === 0,
-            missing.length ? `manque : ${missing.join(', ')}` : parsed.toast_audio_blocked);
+            missing.length ? `manque : ${missing.join(', ')}`
+                : parsed.playback_blocked_action);
+
+        // Les clés du toast d'avant n'ont plus d'appelant : les laisser ferait
+        // croire, au prochain passage, qu'un message existe quelque part.
+        check(`  … et plus celles du message d'avant`,
+            parsed.toast_audio_blocked === undefined
+            && parsed.toast_action_resume_audio === undefined);
     }
+}
+
+{
+    const MARKUP = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'public', 'index.html'), 'utf8');
+
+    const zone = MARKUP.slice(MARKUP.indexOf('<div class="progress-container">'),
+        MARKUP.indexOf('id="progress-bar-wrapper"'));
+
+    // Elle voisine avec la note du salon vide : les deux répondent à la même
+    // question — pourquoi rien ne sort alors que l'état se dit en marche.
+    check('la note est dans la carte de lecture, près de sa sœur',
+        zone.includes('id="playback-blocked-notice"')
+        && zone.includes('id="playback-wait-notice"'));
+
+    check('  … masquée tant que rien ne la justifie',
+        /class="playback-blocked-notice hidden"/.test(zone));
+
+    check('  … et traduite comme le reste de la page',
+        zone.includes('data-i18n="playback_blocked_body"')
+        && zone.includes('data-i18n="playback_blocked_action"'));
 }
 
 // ───────────────────── Le fragment qui achète l'autorisation ─────────────────

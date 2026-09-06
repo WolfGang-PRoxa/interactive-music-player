@@ -2462,12 +2462,14 @@
         const targets = [primaryAudio, secondaryAudio].filter((el) => el && !el.playbackGranted);
         if (targets.length === 0) {
             audioUnlocked = true;
+            clearBlockedPlayback();
             return;
         }
 
         Promise.all(targets.map(grantPlayback)).then((results) => {
             if (results.every(Boolean)) {
                 audioUnlocked = true;
+                clearBlockedPlayback();
                 UNLOCK_GESTURES.forEach((evt) => {
                     document.removeEventListener(evt, unlockAudio, true);
                 });
@@ -2500,31 +2502,46 @@
     });
 
     /**
-     * Dit que le son attend un geste — une fois, et pas davantage.
+     * Explique, dans la carte de lecture, que le navigateur retient le son.
      *
-     * C'est le seul échec de lecture dont le remède tienne dans un clic, et
-     * c'était le seul que la page taisait : elle l'écrivait dans la console et
-     * l'envoyait au serveur, laissant devant l'écran un silence que rien
-     * n'expliquait. Le navigateur refuse la lecture tant qu'aucun geste n'a
-     * porté sur la page, et sa décision est prise avant que le tableau de bord
-     * n'ait son mot à dire — la seule chose utile est de la rendre lisible.
+     * Le refus est le sien, et sa décision est prise avant que le tableau de
+     * bord n'ait son mot à dire : la seule chose utile est de la rendre lisible.
+     * Elle tient à ceci — il ne démarre pas le son tout seul sur une adresse
+     * qu'il connaît encore mal, et il l'apprend au fil des écoutes. C'est donc
+     * un état de passage, ce que le texte dit, pour que le silence ne passe pas
+     * pour une panne.
      *
-     * Une fois, et pas à chaque état : on repasse ici une fois par seconde tant
-     * que le blocage dure, et un message répété serait pire que le silence.
+     * Une note posée près de la barre de progression, et non une notification
+     * qui passe : la condition dure tant qu'aucun geste n'a porté sur la page,
+     * et un message qui s'efface au bout de quatre secondes laisserait ensuite
+     * le même silence inexpliqué. Elle voisine avec celle du salon vide, qui
+     * répond à la même question — pourquoi rien ne sort alors que l'état se dit
+     * en marche.
      */
-    let blockedNoticeShown = false;
+    let playbackBlocked = false;
+
+    function renderBlockedNotice() {
+        const notice = document.getElementById('playback-blocked-notice');
+        if (notice) notice.classList.toggle('hidden', !playbackBlocked);
+    }
 
     function announceBlockedPlayback() {
-        if (blockedNoticeShown || audioUnlocked) return;
-        blockedNoticeShown = true;
-
-        // N'importe quel clic ferait l'affaire — l'écouteur de déverrouillage
-        // les capte tous. Le bouton n'est là que pour dire lequel.
-        showToast(t('toast_audio_blocked'), {
-            label: t('toast_action_resume_audio'),
-            onClick: unlockAudio
-        });
+        if (playbackBlocked || audioUnlocked) return;
+        playbackBlocked = true;
+        renderBlockedNotice();
     }
+
+    /** Le son est acquis : l'explication n'a plus lieu d'être. */
+    function clearBlockedPlayback() {
+        if (!playbackBlocked) return;
+        playbackBlocked = false;
+        renderBlockedNotice();
+    }
+
+    // Le bouton de la note. N'importe quel clic ferait l'affaire — l'écouteur de
+    // déverrouillage les capte tous — mais il faut bien en désigner un.
+    const resumeBlockedBtn = document.getElementById('btn-resume-blocked');
+    if (resumeBlockedBtn) resumeBlockedBtn.addEventListener('click', unlockAudio);
 
     /**
      * Place un élément audio fraîchement chargé à la position déjà atteinte côté

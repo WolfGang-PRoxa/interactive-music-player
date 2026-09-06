@@ -395,6 +395,24 @@
                         </svg>
                         <span id="playback-wait-text"></span>
                     </div>
+                    <!--
+                         Le navigateur retient le son, faute de connaître encore
+                         cette adresse — voir announceBlockedPlayback dans app.js.
+
+                         Sœur de la note ci-dessus : toutes deux expliquent un
+                         lecteur qui ne sonne pas alors que l'état le dit en
+                         marche. Celle-ci porte en plus un bouton, parce que son
+                         empêchement se lève d'un geste.
+                    -->
+                    <div class="playback-blocked-notice hidden" id="playback-blocked-notice">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                            <line x1="23" y1="9" x2="17" y2="15"></line>
+                            <line x1="17" y1="9" x2="23" y2="15"></line>
+                        </svg>
+                        <span data-i18n="playback_blocked_body">Le navigateur ne lance pas le son tout seul sur une adresse qu'il connaît encore mal. Il l'apprend à chaque écoute : d'ici quelques sessions, la reprise après rechargement redeviendra automatique.</span>
+                        <button type="button" class="playback-blocked-btn" id="btn-resume-blocked" data-i18n="playback_blocked_action">Reprendre le son</button>
+                    </div>
                     <div class="progress-bar-wrapper" id="progress-bar-wrapper">
                         <div class="progress-buffer" id="progress-buffer"></div>
                         <div class="progress-fill" id="progress-bar"></div>
