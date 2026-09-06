@@ -596,7 +596,15 @@ async function handleUpdateSettings(ctx) {
                 const seconds = Number(data.presenceDepartureDelay);
                 if (Number.isFinite(seconds)) {
                     data.presenceDepartureDelay = Math.min(300, Math.max(0, Math.round(seconds)));
-                    log.info(`[Presence] Leaving an empty channel set to ${data.presenceDepartureDelay}s.`);
+
+                    // La fenêtre de réglages renvoie tout son lot à chaque
+                    // `input`, et ce délai voyage donc avec le curseur de
+                    // n’importe quel autre réglage : tirer celui des toasts
+                    // écrivait une ligne par pixel parcouru. Le journal
+                    // annonçait un changement là où il n’y en avait aucun.
+                    if (data.presenceDepartureDelay !== oldSettings.presenceDepartureDelay) {
+                        log.info(`[Presence] Leaving an empty channel set to ${data.presenceDepartureDelay}s.`);
+                    }
                 } else {
                     delete data.presenceDepartureDelay;
                 }
