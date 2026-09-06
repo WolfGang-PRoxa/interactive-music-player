@@ -137,7 +137,66 @@
     animation: none !important;
 }
 
-/* Queue Playlist Container */
+/*
+ * Les bords des listes s'effacent, au lieu d'être coupés net.
+ *
+ * Un masque, et non un calque coloré posé par-dessus : les cartes sont en verre
+ * dépoli et changent avec le thème, si bien qu'un dégradé vers une couleur
+ * supposée du fond se trahirait au premier changement de style, et poserait une
+ * bande terne sur le flou. Le masque efface vers le transparent — ce qui est
+ * derrière reste derrière.
+ *
+ * Les deux hauteurs sont écrites par js/scrollFade.js et valent ce que chaque
+ * bord cache réellement, plafonné. À zéro — liste courte, ou défilement en
+ * butée — les arrêts du dégradé se confondent avec les bords, et le masque ne
+ * fait rien.
+ */
+.playlist-queue,
+.playlist-history,
+.playlist-tracks-list {
+    --scroll-fade-top: 0px;
+    --scroll-fade-bottom: 0px;
+    -webkit-mask-image: linear-gradient(to bottom,
+        transparent 0,
+        #000 var(--scroll-fade-top),
+        #000 calc(100% - var(--scroll-fade-bottom)),
+        transparent 100%);
+    mask-image: linear-gradient(to bottom,
+        transparent 0,
+        #000 var(--scroll-fade-top),
+        #000 calc(100% - var(--scroll-fade-bottom)),
+        transparent 100%);
+}
+
+/*
+ * Pendant un glisser-déposer, le cadre reprend ses arêtes.
+ *
+ * Le masque s'applique à tout ce que peint l'élément, bordure comprise : le
+ * liseré et l'ombre interne qui désignent la cible de dépôt s'effaceraient
+ * justement à leurs deux extrémités. Savoir où l'on dépose importe alors plus
+ * que la douceur du bord.
+ */
+body.is-dragging-active .playlist-queue,
+body.is-dragging-active .playlist-history,
+body.is-dragging-active .playlist-tracks-list {
+    -webkit-mask-image: none;
+    mask-image: none;
+}
+
+/*
+ * Queue Playlist Container
+ *
+ * La fin de liste respire de la même mesure que l'intervalle entre deux pistes.
+ *
+ * Sans cette marge, la dernière piste bute contre le bord du conteneur : son
+ * trait du bas et ses angles arrondis se confondent avec lui, et l'œil lit une
+ * ligne coupée là où la liste est simplement finie. Le défaut ne se voit qu'en
+ * bout de défilement — c'est-à-dire précisément au moment où l'on cherche à
+ * savoir si l'on est arrivé au bout.
+ *
+ * La valeur reprend le « gap » de la ligne du dessus et doit le suivre : la
+ * liste s'arrête ainsi sur le temps qu'elle bat depuis son premier élément.
+ */
 .playlist-queue {
     display: flex;
     flex-direction: column;
@@ -146,6 +205,7 @@
     overflow-y: auto;
     overflow-x: hidden;
     padding-right: 4px;
+    padding-bottom: 0.6rem;
     min-height: 0;
 }
 
@@ -262,7 +322,7 @@
     background: rgba(87, 242, 135, 0.1);
 }
 
-/* History Playlist Container */
+/* History Playlist Container — marge de fin : voir .playlist-queue. */
 .playlist-history {
     display: flex;
     flex-direction: column;
@@ -271,6 +331,7 @@
     overflow-y: auto;
     overflow-x: hidden;
     padding-right: 4px;
+    padding-bottom: 0.6rem;
 }
 
 .history-item {
@@ -790,7 +851,7 @@ html[data-style="neon-cyberpunk"] .history-item.is-preloaded {
     transform: scale(1.05);
 }
 
-/* Track lists */
+/* Track lists — marge de fin : voir .playlist-queue. */
 .playlist-tracks-list {
     display: flex;
     flex-direction: column;
@@ -800,6 +861,7 @@ html[data-style="neon-cyberpunk"] .history-item.is-preloaded {
     flex-grow: 1;
     min-height: 0;
     padding-right: 4px;
+    padding-bottom: 8px;
 }
 
 .playlist-track-item {
