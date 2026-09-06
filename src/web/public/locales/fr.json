@@ -30,6 +30,8 @@
     "toast_action_play_queue": "Jouer la file d'attente",
     "toast_audio_blocked": "Le son attend un clic sur la page.",
     "toast_action_resume_audio": "Reprendre le son",
+    "tooltip_output_lufs": "Sonie mesurée du fichier en cours, en LUFS. Deux fichiers de même sonie s'entendent au même niveau, quel que soit le volume.",
+    "tooltip_output_gain": "Gain appliqué à cette piste par son réglage de sonie. Il s'ajoute au volume principal, sans le déplacer.",
     "default_playlist_name": "Ma Playlist",
     "card_volume_broadcast": "Volume & Diffusion",
     "main_volume": "Volume Principal",

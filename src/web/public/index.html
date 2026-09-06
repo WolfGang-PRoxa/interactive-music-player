@@ -662,8 +662,12 @@
                              le fichier tel qu'il est.
                         -->
                         <span class="output-level" id="output-level" hidden>
-                            <span class="output-level-db" id="output-level-db">—</span>
-                            <span class="output-level-gain hidden" id="output-level-gain"></span>
+                            <span class="output-level-db" id="output-level-db"
+                                  data-tooltip="Sonie mesurée du fichier en cours, en LUFS. Deux fichiers de même sonie s'entendent au même niveau, quel que soit le volume."
+                                  data-i18n-tooltip="tooltip_output_lufs">—</span>
+                            <span class="output-level-gain hidden" id="output-level-gain"
+                                  data-tooltip="Gain appliqué à cette piste par son réglage de sonie. Il s'ajoute au volume principal, sans le déplacer."
+                                  data-i18n-tooltip="tooltip_output_gain"></span>
                         </span>
                     </div>
                     <div class="slider-container">

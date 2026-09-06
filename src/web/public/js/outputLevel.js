@@ -62,16 +62,24 @@ window.MusicPlayer = window.MusicPlayer || {};
     }
 
     /**
+     * Pochette de repli, quand la piste n'en a pas.
+     *
+     * Servie par le bot, non chargée depuis un site tiers : le tableau de bord
+     * s'utilise en réseau local, et une adresse distante laisserait un trou à
+     * la première coupure d'accès.
+     */
+    const FALLBACK_ART = 'img/itunes-fallback.png';
+
+    /**
      * Ce que l'état dit de la piste en cours.
      *
      * Le même objet dans les deux modes de diffusion : la sonie est une
      * propriété du fichier, elle ne dépend pas de l'endroit d'où sort le son.
      *
+     * @param {object|null} track
      * @returns {{ status: string, measured: number|null, gainDb: number }|null}
      */
-    function reading() {
-        const state = window.MusicPlayer.state;
-        const track = state && state.currentTrack;
+    function reading(track) {
         const loudness = track && track.loudness;
         if (!loudness) return null;
 
@@ -82,8 +90,34 @@ window.MusicPlayer = window.MusicPlayer || {};
         };
     }
 
+    /**
+     * Donne aux deux infobulles de quoi se situer.
+     *
+     * Les deux la portent, et c'est voulu : chacune ne commente qu'un nombre, et
+     * un nombre ne dit rien tant qu'on ignore de quel morceau il parle. Le
+     * survol de l'un ou de l'autre doit y répondre sans qu'il faille aller
+     * chercher le titre ailleurs dans la page.
+     *
+     * @param {object|null} track
+     */
+    function describe(track) {
+        const title = (track && track.title) || '';
+        const art = (track && track.thumbnail) || FALLBACK_ART;
+
+        for (const el of [dbEl, gainEl]) {
+            el.setAttribute('data-tooltip-image', art);
+            // Une vignette distante peut avoir disparu depuis qu'on en a reçu
+            // l'adresse ; le repli reprend alors la main.
+            el.setAttribute('data-tooltip-image-fallback', FALLBACK_ART);
+            if (title) el.setAttribute('data-tooltip-title', title);
+            else el.removeAttribute('data-tooltip-title');
+        }
+    }
+
     function paint() {
-        const now = reading();
+        const state = window.MusicPlayer.state;
+        const track = (state && state.currentTrack) || null;
+        const now = reading(track);
 
         // Rien en lecture, ou un fichier que l'analyse ne peut pas atteindre :
         // il n'y a pas de valeur à taire, il n'y en a pas.
@@ -93,6 +127,7 @@ window.MusicPlayer = window.MusicPlayer || {};
         }
 
         box.hidden = false;
+        describe(track);
 
         if (now.measured === null) {
             // L'analyse tourne. Sans ce point d'attente, le nombre surgirait de

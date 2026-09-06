@@ -30,6 +30,8 @@
     "toast_action_play_queue": "Reproducir la cola",
     "toast_audio_blocked": "El sonido espera un clic en la página.",
     "toast_action_resume_audio": "Reanudar el sonido",
+    "tooltip_output_lufs": "Sonoridad medida del archivo en reproducción, en LUFS. Dos archivos con la misma sonoridad se oyen al mismo nivel, sea cual sea el volumen.",
+    "tooltip_output_gain": "Ganancia que aplica el ajuste de sonoridad de esta pista. Se suma al volumen principal sin moverlo.",
     "default_playlist_name": "Mi Lista",
     "card_volume_broadcast": "Volumen y Difusión",
     "main_volume": "Volumen Principal",

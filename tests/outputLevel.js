@@ -52,6 +52,7 @@ const check = (label, ok, detail = '') => {
 /** Élément factice : ce que le module lit et écrit, et rien de plus. */
 function makeElement(id) {
     const classes = new Set();
+    const attributes = new Map();
     return {
         id,
         hidden: false,
@@ -62,6 +63,9 @@ function makeElement(id) {
             toggle(name, on) { if (on) classes.add(name); else classes.delete(name); },
             contains: (name) => classes.has(name),
         },
+        setAttribute: (name, value) => attributes.set(name, value),
+        removeAttribute: (name) => attributes.delete(name),
+        getAttribute: (name) => (attributes.has(name) ? attributes.get(name) : null),
     };
 }
 
@@ -87,12 +91,18 @@ function mount() {
     return {
         els,
         api,
-        /** Pose un état et repeint, comme le fait `updateUI`. */
-        play: (loudness, extra = {}) => {
+        /**
+         * Pose un état et repeint, comme le fait `updateUI`.
+         *
+         * @param {object|null} loudness - `null` pour « rien en lecture ».
+         * @param {object} [track] - De quoi compléter la piste : titre, vignette.
+         */
+        play: (loudness, track = {}) => {
             api.state = {
                 settings: { broadcastMode: 'everyone' },
-                currentTrack: loudness === null ? null : { title: 'x', loudness },
-                ...extra,
+                currentTrack: loudness === null
+                    ? null
+                    : Object.assign({ title: 'x' }, track, { loudness }),
             };
             api.refreshOutputLevel();
         },
@@ -208,6 +218,91 @@ console.log('\nCe que le mode de diffusion n\'y change pas\n');
 
     check('la sonie est la même en diffusion personnelle', dbOf(m) === commune,
         'elle est une propriété du fichier, pas de sa destination');
+}
+
+// ───────────────────── Ce que les infobulles situent ─────────────────────
+
+console.log('\nCe que les infobulles ajoutent aux deux nombres\n');
+
+{
+    const m = mount();
+    const db = m.els['output-level-db'];
+    const gain = m.els['output-level-gain'];
+
+    m.play({ status: 'measured', measured: -14, gainDb: 2 },
+        { title: 'Daft Punk — Around the World', thumbnail: 'https://exemple/pochette.jpg' });
+
+    // Les deux nombres la portent : chacun ne commente qu'une valeur, et une
+    // valeur ne dit rien tant qu'on ignore de quel morceau elle parle.
+    check('les deux indicateurs nomment le morceau',
+        db.getAttribute('data-tooltip-title') === 'Daft Punk — Around the World'
+        && gain.getAttribute('data-tooltip-title') === 'Daft Punk — Around the World');
+
+    check('  … et montrent sa pochette',
+        db.getAttribute('data-tooltip-image') === 'https://exemple/pochette.jpg'
+        && gain.getAttribute('data-tooltip-image') === 'https://exemple/pochette.jpg');
+
+    // Une adresse reçue il y a une minute peut ne plus rien servir.
+    check('  … en gardant un repli sous la main',
+        db.getAttribute('data-tooltip-image-fallback') === 'img/itunes-fallback.png',
+        'une vignette distante peut avoir disparu');
+
+    // Sans pochette, le repli prend directement la place.
+    m.play({ status: 'measured', measured: -14, gainDb: 0 }, { title: 'Un fichier local' });
+    check('un fichier sans pochette montre l\'image de repli',
+        db.getAttribute('data-tooltip-image') === 'img/itunes-fallback.png',
+        db.getAttribute('data-tooltip-image'));
+
+    check('le repli est servi par le bot, pas par un site tiers',
+        !/^https?:/.test(db.getAttribute('data-tooltip-image')),
+        'le tableau de bord s\'utilise en réseau local');
+
+    // Un titre vide ne doit pas laisser l'attribut de la piste précédente.
+    m.play({ status: 'measured', measured: -14, gainDb: 0 }, { title: '' });
+    check('un morceau sans nom n\'hérite pas de celui d\'avant',
+        db.getAttribute('data-tooltip-title') === null);
+}
+
+{
+    const row = MARKUP.slice(MARKUP.indexOf('id="output-level"'),
+        MARKUP.indexOf('id="volume-range"'));
+
+    // Sans `data-tooltip`, la délégation ne reconnaît même pas la cible.
+    check('les deux indicateurs se déclarent survolables',
+        (row.match(/data-tooltip=/g) || []).length === 2,
+        'la délégation cherche [data-tooltip], et rien d\'autre');
+    check('  … et sont traduits comme le reste de la page',
+        row.includes('data-i18n-tooltip="tooltip_output_lufs"')
+        && row.includes('data-i18n-tooltip="tooltip_output_gain"'));
+
+    for (const lang of ['fr', 'en', 'es', 'de']) {
+        const dict = JSON.parse(fs.readFileSync(
+            path.join(ROOT, 'src', 'web', 'public', 'locales', `${lang}.json`), 'utf8'));
+        const both = ['tooltip_output_lufs', 'tooltip_output_gain']
+            .every(k => typeof dict[k] === 'string' && dict[k].trim());
+        check(`${lang}.json explique les deux nombres`, both);
+    }
+
+    check('l\'image de repli est bien dans le dépôt',
+        fs.existsSync(path.join(ROOT, 'src', 'web', 'public', 'img', 'itunes-fallback.png')));
+}
+
+{
+    const TIPS = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'public', 'js', 'tooltipSystem.js'), 'utf8');
+
+    // Le nom affiché vient du fichier en cours, donc d'ailleurs : une balise
+    // glissée dans un titre ne doit pas devenir du balisage.
+    // L'affectation, et non le mot : il figure aussi dans le commentaire qui
+    // explique pourquoi on s'en passe.
+    check('l\'infobulle illustrée est bâtie nœud par nœud',
+        /name\.textContent = title;/.test(TIPS) && !/\.innerHTML\s*=/.test(TIPS),
+        'le titre vient d\'un fichier, pas de nous');
+
+    // La centaine d'infobulles textuelles de la page ne doit pas changer de
+    // chemin pour autant.
+    check('  … et le texte seul repasse par où il passait',
+        /if \(!image\) \{\s*tooltipEl\.textContent = text;/.test(TIPS));
 }
 
 // ───────────────────── Le raccordement ─────────────────────

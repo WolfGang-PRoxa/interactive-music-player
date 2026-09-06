@@ -30,6 +30,8 @@
     "toast_action_play_queue": "Warteschlange abspielen",
     "toast_audio_blocked": "Der Ton wartet auf einen Klick auf der Seite.",
     "toast_action_resume_audio": "Ton fortsetzen",
+    "tooltip_output_lufs": "Gemessene Lautheit der laufenden Datei, in LUFS. Zwei Dateien gleicher Lautheit klingen gleich laut, unabhängig von der Lautstärke.",
+    "tooltip_output_gain": "Verstärkung, die die Lautheitseinstellung dieses Titels anwendet. Sie kommt zur Hauptlautstärke hinzu, ohne sie zu verändern.",
     "default_playlist_name": "Meine Playlist",
     "card_volume_broadcast": "Lautstärke & Übertragung",
     "main_volume": "Hauptlautstärke",

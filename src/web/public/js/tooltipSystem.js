@@ -150,11 +150,69 @@ const TooltipSystem = (() => {
             }
         } catch (e) {}
 
-        tooltipEl.textContent = text;
+        renderTooltip(target, text);
         // Position near cursor
         positionTooltip();
         // Trigger the CSS transition
         tooltipEl.classList.add('visible');
+    }
+
+    /**
+     * Compose le contenu de l'infobulle.
+     *
+     * Le cas courant — du texte seul — repasse par `textContent`, qui vide
+     * l'élément et n'interprète rien. C'est ce qui protège la centaine
+     * d'infobulles de la page : leur chemin ne change pas d'un iota.
+     *
+     * L'entête illustrée est une option, demandée par `data-tooltip-image`, et
+     * elle est bâtie nœud par nœud plutôt que par `innerHTML` : le nom qui s'y
+     * affiche est celui d'un fichier venu d'ailleurs — une balise glissée dans
+     * un titre ne doit pas devenir du balisage.
+     */
+    function renderTooltip(target, text) {
+        const image = target.getAttribute('data-tooltip-image');
+        const title = target.getAttribute('data-tooltip-title');
+
+        tooltipEl.classList.toggle('has-media', !!image);
+
+        if (!image) {
+            tooltipEl.textContent = text;
+            return;
+        }
+
+        tooltipEl.textContent = '';
+
+        const header = document.createElement('div');
+        header.className = 'tooltip-media';
+
+        const img = document.createElement('img');
+        img.src = image;
+        img.alt = '';
+
+        // Une vignette distante peut avoir disparu depuis qu'on en a reçu
+        // l'adresse. Le repli reprend alors la main, plutôt que de laisser
+        // l'icône d'image brisée du navigateur au milieu de l'infobulle.
+        const fallback = target.getAttribute('data-tooltip-image-fallback');
+        if (fallback) {
+            img.addEventListener('error', () => { img.src = fallback; }, { once: true });
+        }
+        header.appendChild(img);
+
+        if (title) {
+            const name = document.createElement('span');
+            name.className = 'tooltip-media-title';
+            name.textContent = title;
+            header.appendChild(name);
+        }
+
+        tooltipEl.appendChild(header);
+
+        if (text) {
+            const body = document.createElement('div');
+            body.className = 'tooltip-text';
+            body.textContent = text;
+            tooltipEl.appendChild(body);
+        }
     }
 
     function positionTooltip() {
