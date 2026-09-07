@@ -170,7 +170,34 @@ class WebServer {
              * Elle se lit à la suite de l'adresse du tableau de bord, parce que
              * c'est la ligne que l'on cherche des yeux au démarrage.
              */
-            require('./oauth').logConfiguration();
+            /*
+             * Le partage d'abord, la trace OAuth ensuite, et l'ordre est le sujet.
+             *
+             * Quand un Funnel publie déjà ce tableau de bord, l'adresse publique
+             * se déduit de la machine — inutile de la recopier à la main dans
+             * PUBLIC_URL, et surtout inutile de la voir voyager avec le dépôt.
+             * Une installation sur une seconde machine héritait sinon de
+             * l'adresse de la première, et l'aller-retour de connexion Discord
+             * renvoyait l'utilisateur sur l'ordinateur d'à côté.
+             *
+             * Une valeur écrite à la main l'emporte toujours : elle peut désigner
+             * un domaine, un tunnel tiers, une adresse de réseau local, toutes
+             * choses que cette machine ne peut pas deviner.
+             */
+            require('./tailscale').announce(port).then((shared) => {
+                if (!process.env.PUBLIC_URL && shared.publicUrl
+                    && shared.step === require('./tailscale').STEP.SERVING) {
+                    process.env.PUBLIC_URL = shared.publicUrl;
+                    log.info('[Tailscale] PUBLIC_URL derived from this machine: '
+                        + shared.publicUrl);
+                }
+                require('./oauth').logConfiguration();
+            }).catch((err) => {
+                // Le partage est un confort : son diagnostic ne doit jamais
+                // empêcher la trace qui suit, ni le démarrage.
+                log.warn(`[Tailscale] Sharing state unknown: ${err.message}`);
+                require('./oauth').logConfiguration();
+            });
 
             // Ouvrir automatiquement le navigateur après 5 secondes si aucun client n'est connecté
             //
