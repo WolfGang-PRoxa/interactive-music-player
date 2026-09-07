@@ -80,6 +80,32 @@ function isVideo(container) {
     return Object.prototype.hasOwnProperty.call(VIDEO_CONTAINERS, String(container));
 }
 
+/** Hauteur retenue quand le réglage manque ou n'a pas de sens. */
+const DEFAULT_HEIGHT = 720;
+
+/**
+ * Les dimensions d'une image noire, pour la définition demandée.
+ *
+ * Le menu ne propose qu'une hauteur — c'est ainsi qu'on parle des définitions —
+ * et le 16/9 en donne la largeur. Une image noire n'a certes pas de cadrage
+ * propre, mais elle se range avec de vraies vidéos : un 4/3 y sauterait aux yeux
+ * dans une bibliothèque, et certains lecteurs ajoutent des bandes pour compenser.
+ *
+ * Les deux nombres sont arrondis au pair. L'encodage en 4:2:0 échantillonne la
+ * couleur par blocs de deux pixels, et refuse une dimension impaire — 480p, dont
+ * la largeur exacte vaut 853,33, échouerait sans cet arrondi.
+ *
+ * @param {number|string} height
+ * @returns {string} « 1280x720 », tel que le filtre `color` l'attend.
+ */
+function blackCanvas(height) {
+    const asked = parseInt(height, 10);
+    const safe = Number.isFinite(asked) && asked >= 144 ? asked : DEFAULT_HEIGHT;
+    const h = safe % 2 ? safe + 1 : safe;
+    const w = Math.round((h * 16) / 9);
+    return `${w % 2 ? w + 1 : w}x${h}`;
+}
+
 /**
  * Ce qu'il faut passer à ffmpeg pour écrire une vidéo.
  *
@@ -160,6 +186,8 @@ module.exports = {
     DEFAULT_CONTAINER,
     DEFAULT_VIDEO_CONTAINER,
     isVideo,
+    blackCanvas,
+    DEFAULT_HEIGHT,
     encodeArgs,
     videoEncodeArgs,
 };

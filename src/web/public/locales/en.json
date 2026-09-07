@@ -357,6 +357,7 @@
     "import_video_quality_label": "Video",
     "import_format_label": "Format",
     "import_quality_download_notice": "Download to a folder: the video definition does not apply, only audio is written.",
+    "import_quality_video_notice": "Video container: the chosen resolution picks the stream, or sizes a black picture when the source has none.",
     "import_quality_lossless_notice": "FLAC and WAV are lossless: they keep everything, and the audio bitrate does not apply.",
     "import_quality_hint": "No effect on local files, which are imported as-is.",
     "import_quality_local_notice": "Local file detected: quality does not apply, it is imported as-is.",

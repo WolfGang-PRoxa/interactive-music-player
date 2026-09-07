@@ -1537,8 +1537,30 @@
         const videoField = importVideoQualitySelect
             ? importVideoQualitySelect.closest('.import-quality-field') : null;
 
+        /*
+         * La qualité vidéo n'est plus sans objet dès qu'un conteneur vidéo est
+         * choisi.
+         *
+         * Elle était grisée pour toute écriture sur le disque, et à raison tant
+         * que celle-ci n'écrivait que du son. Elle sert désormais deux fois : à
+         * choisir le flux qu'on va chercher, et — quand la source n'a pas
+         * d'image — à dimensionner celle qu'on fabrique.
+         *
+         * La liste vient du menu lui-même plutôt que d'une copie : ajouter un
+         * conteneur au balisage sans y penser ici le laisserait grisé sans
+         * raison visible.
+         */
+        const videoContainers = importFormatSelect
+            ? [...importFormatSelect.querySelectorAll('optgroup[data-i18n-label="import_group_video"] option')]
+                .map((o) => o.value)
+            : [];
+        const wantsVideo = !!importFormatSelect
+            && videoContainers.includes(importFormatSelect.value);
+
         if (audioField) audioField.classList.toggle('not-applicable', !local && toDisk && lossless);
-        if (videoField) videoField.classList.toggle('not-applicable', !local && toDisk);
+        if (videoField) {
+            videoField.classList.toggle('not-applicable', !local && toDisk && !wantsVideo);
+        }
 
         if (importQualityHint) {
             // Le message le plus précis l'emporte : une source locale rend tout
@@ -1546,6 +1568,7 @@
             // qu'une vidéo écartée d'un téléchargement qui n'écrit que du son.
             let notice = t('import_quality_hint');
             if (local) notice = t('import_quality_local_notice');
+            else if (toDisk && wantsVideo) notice = t('import_quality_video_notice');
             else if (toDisk && lossless) notice = t('import_quality_lossless_notice');
             else if (toDisk) notice = t('import_quality_download_notice');
 

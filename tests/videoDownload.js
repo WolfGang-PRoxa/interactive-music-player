@@ -114,12 +114,12 @@ console.log('\nL\'image noire, produite et relue\n');
         '-ar', '44100', '-ac', '1', '-y', son]);
     check('un son d\'essai est produit', fait.code === 0 && fs.existsSync(son), fait.err);
 
-    // Exactement ce que le gestionnaire assemble : l'entrée noire, le son, puis
-    // les arguments du module.
+    // Exactement ce que le gestionnaire assemble : l'entrée noire à la
+    // définition demandée, le son, puis les arguments du module.
     const { ext, args } = formats.videoEncodeArgs('mp4', 192, { still: true });
     const sortie = path.join(box, `resultat${ext}`);
     const res = run(['-v', 'error',
-        '-f', 'lavfi', '-i', 'color=c=black:s=1280x720:r=2',
+        '-f', 'lavfi', '-i', `color=c=black:s=${formats.blackCanvas(720)}:r=2`,
         '-i', son, ...args, '-y', sortie]);
 
     check('ffmpeg accepte la ligne de commande', res.code === 0, res.err);
@@ -140,6 +140,51 @@ console.log('\nL\'image noire, produite et relue\n');
     const duree = info && info.format ? parseFloat(info.format.duration) : 0;
     check('  … sur la durée du son, pas au-delà', duree > 2.5 && duree < 4,
         `${duree.toFixed(2)} s pour 3 s de son`);
+
+    /*
+     * La définition demandée doit se retrouver dans le fichier.
+     *
+     * C'est tout l'objet du menu « Vidéo », qui restait grisé pour les
+     * téléchargements : demander du 480p et recevoir un noir en 720p serait un
+     * réglage qui ment. On l'éprouve sur une valeur qui n'est pas le défaut,
+     * sans quoi le test passerait même si la hauteur était ignorée.
+     */
+    const petite = path.join(box, `petite${ext}`);
+    run(['-v', 'error',
+        '-f', 'lavfi', '-i', `color=c=black:s=${formats.blackCanvas(480)}:r=2`,
+        '-i', son, ...args, '-y', petite]);
+
+    const image480 = ((probe(petite) || {}).streams || []).find((s) => s.codec_type === 'video');
+    check('la définition demandée est celle du fichier écrit',
+        !!image480 && image480.width === 854 && image480.height === 480,
+        image480 ? `${image480.width}×${image480.height} pour 480p demandé` : 'aucune image');
+}
+
+// ───────────────────── Les dimensions du noir ─────────────────────
+
+console.log('\nLa taille de l\'image fabriquée\n');
+
+{
+    // Chaque entrée du menu, et le 16/9 qui en découle.
+    const attendu = {
+        2160: '3840x2160', 1440: '2560x1440', 1080: '1920x1080',
+        720: '1280x720', 480: '854x480', 360: '640x360',
+    };
+    for (const [hauteur, taille] of Object.entries(attendu)) {
+        check(`${hauteur}p donne ${taille}`, formats.blackCanvas(hauteur) === taille,
+            formats.blackCanvas(hauteur));
+    }
+
+    // 480p est le cas qui casse une implémentation naïve : sa largeur exacte
+    // vaut 853,33, et l'encodage en 4:2:0 refuse une dimension impaire.
+    check('  … dont 480p, dont la largeur tombe juste entre deux pixels',
+        formats.blackCanvas(480) === '854x480');
+
+    check('un réglage absent ou absurde retombe sur une valeur qui existe',
+        formats.blackCanvas(null) === '1280x720'
+        && formats.blackCanvas('bêtise') === '1280x720'
+        && formats.blackCanvas(12) === '1280x720',
+        'une hauteur de douze pixels n\'est pas une demande');
 }
 
 fs.rmSync(box, { recursive: true, force: true });
@@ -181,6 +226,30 @@ console.log('\nCe que la recherche d\'image répond\n');
         /function runFfmpeg\(/.test(HANDLER)
         && (HANDLER.match(/runFfmpeg\(/g) || []).length >= 3,
         'la gestion d\'erreur ne se maintient pas en double');
+
+    // La hauteur sert deux fois : à choisir le flux, et à tailler le noir.
+    check('la définition demandée guide la recherche d\'image',
+        /videoSource\.resolve\(url, height\)/.test(HANDLER));
+    check('  … et dimensionne l\'image fabriquée',
+        /blackCanvas\(height\)/.test(HANDLER)
+        && /color=c=black:s=\$\{canvas\}/.test(HANDLER),
+        'une taille fixe ignorerait le menu');
+
+    const APP = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'public', 'app.js'), 'utf8');
+
+    /*
+     * Le menu « Vidéo » restait grisé pour toute écriture sur le disque, et à
+     * raison tant que celle-ci n'écrivait que du son. Il ne l'est plus dès
+     * qu'un conteneur vidéo est choisi — sans quoi la définition ne pourrait
+     * pas être demandée, et le reste de ce fichier ne servirait à rien.
+     */
+    check('le menu de définition n\'est plus grisé pour un conteneur vidéo',
+        /not-applicable', !local && toDisk && !wantsVideo/.test(APP));
+
+    check('  … et la liste des conteneurs vient du menu, pas d\'une copie',
+        /optgroup\[data-i18n-label="import_group_video"\] option/.test(APP),
+        'une copie se désaccorderait du balisage sans prévenir');
 
     console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
     process.exit(failed > 0 ? 1 : 0);

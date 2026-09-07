@@ -50,6 +50,23 @@ function containerFor(guildId) {
     }
 }
 
+/**
+ * Définition visée, en pixels de hauteur, telle que le menu « Vidéo » la donne.
+ *
+ * Elle sert deux fois, et c'est pourquoi elle n'était plus grisée : à choisir le
+ * flux qu'on va chercher, et — quand la source n'a pas d'image — à dimensionner
+ * celle qu'on fabrique. Demander du 1080p et recevoir un noir en 720p serait un
+ * réglage qui ment.
+ */
+function videoHeightFor(guildId) {
+    try {
+        const choice = parseInt(database.getSettings(guildId).importVideoQuality, 10);
+        return Number.isFinite(choice) && choice > 0 ? choice : downloadFormats.DEFAULT_HEIGHT;
+    } catch (e) {
+        return downloadFormats.DEFAULT_HEIGHT;
+    }
+}
+
 function bitrateFor(guildId) {
     try {
         const choice = String(database.getSettings(guildId).importAudioQuality || '');
@@ -205,8 +222,8 @@ function runFfmpeg(args, inputStream, partial, finalPath, title) {
  *
  * @returns {Promise<string>} Chemin écrit.
  */
-async function transcodeVideo(track, url, dir, title, bitrate, container) {
-    const source = await videoSource.resolve(url);
+async function transcodeVideo(track, url, dir, title, bitrate, container, height) {
+    const source = await videoSource.resolve(url, height);
 
     const { ext, args: encoding } =
         downloadFormats.videoEncodeArgs(container, bitrate, { still: source.audioOnly });
@@ -226,7 +243,10 @@ async function transcodeVideo(track, url, dir, title, bitrate, container) {
             throw new Error(`Aucune source pour « ${title} »`);
         }
 
-        args.push('-f', 'lavfi', '-i', 'color=c=black:s=1280x720:r=2');
+        // La définition demandée, et non une taille fixe : le menu la
+        // propose, elle doit donc se retrouver dans le fichier écrit.
+        const canvas = downloadFormats.blackCanvas(height);
+        args.push('-f', 'lavfi', '-i', `color=c=black:s=${canvas}:r=2`);
         if (distant(audio)) args.push(...reconnect);
         args.push('-i', audio);
     } else {
@@ -286,6 +306,7 @@ async function handleDownloadTrack(ctx) {
             const playable = await preloadManager.resolvePlayableTrack(track);
             const trackTitle = playable.track.title || title;
             const bitrate = bitrateFor(currentGuildId);
+            const videoHeight = videoHeightFor(currentGuildId);
             const wanted = containerFor(currentGuildId);
 
             /**
@@ -301,8 +322,8 @@ async function handleDownloadTrack(ctx) {
                 // qu'un flux sonore, et le conteneur promettrait une image
                 // qu'il n'aurait pas.
                 if (downloadFormats.isVideo(container)) {
-                    return transcodeVideo(
-                        playable.track, playable.url, dir, trackTitle, bitrate, container);
+                    return transcodeVideo(playable.track, playable.url, dir, trackTitle,
+                        bitrate, container, videoHeight);
                 }
 
                 const input = await preloadManager.resolveAudioInput(playable.track, playable.url);
