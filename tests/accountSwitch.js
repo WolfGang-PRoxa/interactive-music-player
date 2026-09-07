@@ -130,18 +130,34 @@ console.log('\nCe que ferme une déconnexion\n');
     const paul = { id: '111', username: 'paul' };
     const marie = { id: '222', username: 'marie' };
 
-    const ancienne = sessions.create(paul);
-    const nouvelle = sessions.create(paul);
+    const surUnPoste = sessions.create(paul);
+    const surUnAutre = sessions.create(paul);
 
     /*
-     * Une identité n'a jamais qu'une session à la fois : `create` ferme les
-     * précédentes du même compte. Se reconnecter quelque part décroche donc ce
-     * qui était ouvert ailleurs, et c'est le comportement d'avant — noté ici
-     * parce qu'il se lit mal dans le code et qu'il surprend.
+     * Un compte tient plusieurs sessions, et il le faut.
+     *
+     * N'en garder qu'une les faisait s'expulser mutuellement : se connecter ici
+     * fermait la session de là-bas, dont le rechargement suivant renvoyait à la
+     * porte, ce qui fermait celle d'ici à son tour. Une boucle sans fin, et
+     * l'impression que la connexion ne tient jamais.
      */
-    check('se reconnecter remplace la session du compte',
-        sessions.get(ancienne.id) === null && sessions.get(nouvelle.id) !== null,
-        'une identité n\'en a jamais deux à la fois');
+    check('deux postes, un même compte, deux sessions valables',
+        sessions.get(surUnPoste.id) !== null && sessions.get(surUnAutre.id) !== null,
+        'sinon les deux machines se déconnectent l\'une l\'autre');
+
+    check('  … mais une seule ligne dans la fenêtre de partage',
+        sessions.listUsers().filter((u) => u.userId === '111').length === 1,
+        'deux sessions ne font pas deux invités');
+
+    // La traînée est bornée : sans plafond, chaque passage laisserait une trace
+    // de plus jusqu'à l'expiration.
+    for (let i = 0; i < 12; i += 1) sessions.create(paul);
+    check('  … et la traînée des connexions est plafonnée',
+        sessions.listUsers().filter((u) => u.userId === '111').length === 1
+        && sessions.get(surUnPoste.id) === null,
+        'les plus anciennes s\'effacent, jamais la plus récente');
+
+    const nouvelle = sessions.create(paul);
 
     // Celle d'un autre compte n'a rien à voir là-dedans.
     const celleDeMarie = sessions.create(marie);

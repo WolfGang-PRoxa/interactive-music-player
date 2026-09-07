@@ -99,9 +99,19 @@ function purgeExpired() {
 /**
  * Ouvre une session pour un compte Discord.
  *
- * Une identité n'a qu'une session à la fois : les précédentes du même compte
- * sont fermées. Sans quoi chaque passage par le lien d'invitation en laisserait
- * une de plus, toutes valables, et révoquer un invité en oublierait.
+ * Un compte en tient plusieurs à la fois, et il le faut : la même personne
+ * ouvre le tableau de bord sur son ordinateur, sur celui du bureau, sur son
+ * téléphone. N'en garder qu'une les faisait s'expulser mutuellement — se
+ * connecter ici fermait la session de là-bas, dont le rechargement suivant
+ * renvoyait à la porte, ce qui fermait celle d'ici à son tour. Une boucle sans
+ * fin, et l'impression que la connexion ne tient jamais.
+ *
+ * Deux craintes avaient motivé la session unique, et une seule tenait :
+ *
+ *  - « révoquer un invité en oublierait » — non : `revokeUser` parcourt tout le
+ *    magasin et ferme chaque session du compte, quel qu'en soit le nombre.
+ *  - « chaque passage en laisserait une de plus » — celle-là est réelle, d'où un
+ *    plafond : au-delà, les plus anciennes s'effacent d'elles-mêmes.
  *
  * @param {{ id: string, username: string, global_name?: string, avatar?: string }} user
  *   Réponse de `GET /users/@me`, telle que Discord la rend.
@@ -109,10 +119,7 @@ function purgeExpired() {
  */
 function create(user) {
     load();
-
-    for (const [id, session] of Object.entries(store)) {
-        if (session && session.userId === user.id) delete store[id];
-    }
+    keepRecent(String(user.id), MAX_PER_USER - 1);
 
     const id = crypto.randomBytes(32).toString('hex');
     const now = Date.now();
@@ -173,6 +180,32 @@ function destroy(sessionId) {
     return true;
 }
 
+/**
+ * Nombre de sessions simultanées par compte.
+ *
+ * Assez pour les appareils d'une personne — deux ordinateurs, un téléphone, un
+ * second navigateur — et assez peu pour qu'une suite de connexions ne laisse pas
+ * une traînée indéfinie derrière elle.
+ */
+const MAX_PER_USER = 8;
+
+/**
+ * Ne garde que les `limit` sessions les plus récentes d'un compte.
+ *
+ * Les plus anciennes partent en premier : c'est celle qu'on vient d'utiliser
+ * qu'il faut préserver, jamais celle qu'on a oubliée sur une machine prêtée.
+ *
+ * @param {string} userId
+ * @param {number} limit
+ */
+function keepRecent(userId, limit) {
+    const owned = Object.entries(store)
+        .filter(([, session]) => session && session.userId === userId)
+        .sort((a, b) => (b[1].lastSeenAt || 0) - (a[1].lastSeenAt || 0));
+
+    for (const [id] of owned.slice(Math.max(0, limit))) delete store[id];
+}
+
 /** Repousse l'expiration d'une session encore active. */
 function touch(sessionId) {
     const session = get(sessionId);
@@ -217,15 +250,30 @@ function revokeUser(userId) {
  */
 function listUsers() {
     load();
-    return Object.values(store)
-        .filter(Boolean)
-        .map((session) => ({
+
+    /*
+     * Un compte par ligne, et non une session par ligne.
+     *
+     * Depuis qu'une personne peut ouvrir le tableau de bord sur plusieurs
+     * appareils, compter les sessions la ferait apparaître deux fois dans la
+     * fenêtre de partage — deux lignes de droits pour un seul invité, dont on ne
+     * saurait laquelle fait foi.
+     */
+    const byUser = new Map();
+    for (const session of Object.values(store)) {
+        if (!session) continue;
+        const seen = session.lastSeenAt || 0;
+        const known = byUser.get(session.userId);
+        if (known && known.lastSeenAt >= seen) continue;
+        byUser.set(session.userId, {
             userId: session.userId,
             displayName: session.displayName,
             avatar: session.avatar || null,
-            lastSeenAt: session.lastSeenAt || 0,
-        }))
-        .sort((a, b) => b.lastSeenAt - a.lastSeenAt);
+            lastSeenAt: seen,
+        });
+    }
+
+    return [...byUser.values()].sort((a, b) => b.lastSeenAt - a.lastSeenAt);
 }
 
 /** Écrit sans attendre le délai — à l'extinction du process. */
