@@ -39,6 +39,7 @@ window.MusicPlayer = window.MusicPlayer || {};
     const nameEl = document.getElementById('account-name');
     const avatarEl = document.getElementById('account-avatar');
     const ownerNote = document.getElementById('account-owner-note');
+    const guestNote = document.getElementById('account-guest-note');
     const button = document.getElementById('btn-switch-account');
     if (!section || !nameEl || !button) return;
 
@@ -59,9 +60,10 @@ window.MusicPlayer = window.MusicPlayer || {};
     function render(state) {
         const identity = state && state.identity;
         const name = (identity && identity.displayName) || '';
-        const isMaster = state && state.role === 'master';
+        const isMaster = Boolean(state && state.role === 'master');
+        const holdsToken = Boolean(state && state.holdsToken);
 
-        const signature = `${name}|${(identity && identity.avatar) || ''}|${isMaster}`;
+        const signature = `${name}|${(identity && identity.avatar) || ''}|${isMaster}|${holdsToken}`;
         if (signature === shown) return;
         shown = signature;
 
@@ -79,9 +81,20 @@ window.MusicPlayer = window.MusicPlayer || {};
             if (avatar && avatarEl.getAttribute('src') !== avatar) avatarEl.src = avatar;
         }
 
-        // L'avertissement ne vaut que pour le maître : lui seul tient le jeton,
-        // donc lui seul emporte la propriété en changeant de compte.
-        if (ownerNote) ownerNote.classList.toggle('hidden', !isMaster);
+        /*
+         * Ce que le changement emporte dépend du jeton, pas du titre.
+         *
+         * Être maître se lit sur le compte Discord et vaut donc depuis
+         * n'importe quel poste ; tenir le jeton dit qu'on est devant la machine
+         * qui lance le bot. Seul le second fait suivre la propriété.
+         *
+         * La distinction n'a l'air de rien tant qu'on n'ouvre le tableau de bord
+         * que sur cette machine-là. Ouvert à distance, le maître ne tient plus
+         * le jeton : lui promettre un transfert serait lui annoncer ce qui
+         * n'arrivera pas, et le laisser invité chez lui sans l'avoir dit.
+         */
+        if (ownerNote) ownerNote.classList.toggle('hidden', !(isMaster && holdsToken));
+        if (guestNote) guestNote.classList.toggle('hidden', !(isMaster && !holdsToken));
     }
 
     /**

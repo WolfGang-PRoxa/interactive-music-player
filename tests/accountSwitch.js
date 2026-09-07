@@ -207,7 +207,7 @@ function makeElement(id) {
 function mount() {
     const els = {};
     for (const id of ['account-section', 'account-name', 'account-avatar',
-        'account-owner-note', 'btn-switch-account']) {
+        'account-owner-note', 'account-guest-note', 'btn-switch-account']) {
         els[id] = makeElement(id);
     }
 
@@ -254,21 +254,42 @@ function mount() {
             m.els['account-section'].classList.contains('hidden'),
             'entré par le jeton seul, il n\'y a pas de compte à nommer');
 
-        m.api.refreshAccount({ role: 'master', identity: { displayName: 'Paul', avatar: 'a.png' } });
+        m.api.refreshAccount({
+            role: 'master', holdsToken: true,
+            identity: { displayName: 'Paul', avatar: 'a.png' },
+        });
         check('le compte connecté est nommé',
             m.els['account-name'].textContent === 'Paul'
             && !m.els['account-section'].classList.contains('hidden'));
         check('  … avec sa pastille', m.els['account-avatar'].src === 'a.png'
             && !m.els['account-avatar'].classList.contains('hidden'));
 
-        // L'avertissement ne vaut que pour le maître : lui seul tient le jeton,
-        // donc lui seul emporte la propriété en changeant de compte.
-        check('le maître est prévenu de ce qu\'il emporte',
-            !m.els['account-owner-note'].classList.contains('hidden'));
+        check('devant la machine, le maître est prévenu de ce qu\'il emporte',
+            !m.els['account-owner-note'].classList.contains('hidden')
+            && m.els['account-guest-note'].classList.contains('hidden'));
+
+        /*
+         * Le même maître, ouvert depuis un autre poste.
+         *
+         * Être maître se lit sur le compte Discord et vaut de partout ; tenir le
+         * jeton dit qu'on est devant la machine qui lance le bot, et seul le
+         * second fait suivre la propriété. Lui promettre un transfert à distance
+         * serait lui annoncer ce qui n'arrivera pas, et le laisser invité chez
+         * lui sans l'avoir dit.
+         */
+        m.api.refreshAccount({
+            role: 'master', holdsToken: false,
+            identity: { displayName: 'Paul', avatar: 'a.png' },
+        });
+        check('à distance, on lui dit plutôt ce qu\'il perdrait',
+            m.els['account-owner-note'].classList.contains('hidden')
+            && !m.els['account-guest-note'].classList.contains('hidden'),
+            'la propriété ne suit qu\'au jeton, pas au titre');
 
         m.api.refreshAccount({ role: 'guest', identity: { displayName: 'Marie', avatar: null } });
-        check('un invité ne l\'est pas, la propriété ne le suit pas',
-            m.els['account-owner-note'].classList.contains('hidden'));
+        check('un invité n\'a ni l\'un ni l\'autre à savoir',
+            m.els['account-owner-note'].classList.contains('hidden')
+            && m.els['account-guest-note'].classList.contains('hidden'));
         check('  … et sans pastille, rien ne s\'affiche',
             m.els['account-avatar'].classList.contains('hidden'));
     }

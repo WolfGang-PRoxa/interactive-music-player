@@ -36,6 +36,7 @@
     "account_connected_as": "Conectado como:",
     "account_switch": "Cambiar de cuenta",
     "account_switch_owner": "La cuenta que elijas pasará a ser propietaria de este panel, en lugar de esta.",
+    "account_switch_keeps_owner": "La propiedad seguirá siendo de esta cuenta: recuperarla exige el token, impreso en la consola de la máquina que ejecuta el bot. Otra cuenta solo tendrá aquí los permisos que se le concedan.",
     "tooltip_hold_switch_account": "Mantén 1.5s para cerrar la sesión y elegir otra cuenta de Discord",
     "default_playlist_name": "Mi Lista",
     "card_volume_broadcast": "Volumen y Difusión",

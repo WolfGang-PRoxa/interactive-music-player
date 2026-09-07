@@ -36,6 +36,7 @@
     "account_connected_as": "Angemeldet als:",
     "account_switch": "Konto wechseln",
     "account_switch_owner": "Das gewählte Konto wird anstelle dieses Kontos Eigentümer dieses Dashboards.",
+    "account_switch_keeps_owner": "Der Besitz bleibt bei diesem Konto: ihn zu übernehmen erfordert das Token, das in der Konsole der Maschine steht, die den Bot ausführt. Ein anderes Konto hat hier nur die ihm gewährten Rechte.",
     "tooltip_hold_switch_account": "1,5 s halten, um die Sitzung zu schließen und ein anderes Discord-Konto zu wählen",
     "default_playlist_name": "Meine Playlist",
     "card_volume_broadcast": "Lautstärke & Übertragung",

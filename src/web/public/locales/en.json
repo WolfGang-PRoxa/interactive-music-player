@@ -36,6 +36,7 @@
     "account_connected_as": "Signed in as:",
     "account_switch": "Switch account",
     "account_switch_owner": "The account you choose will become the owner of this dashboard, in place of this one.",
+    "account_switch_keeps_owner": "Ownership will stay with this account: taking it over requires the token, printed in the console of the machine running the bot. Another account will only have the rights granted to it here.",
     "tooltip_hold_switch_account": "Hold 1.5s to close the session and pick another Discord account",
     "default_playlist_name": "My Playlist",
     "card_volume_broadcast": "Volume & Broadcast",

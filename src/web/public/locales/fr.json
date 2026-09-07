@@ -36,6 +36,7 @@
     "account_connected_as": "Connecté en tant que :",
     "account_switch": "Changer de compte",
     "account_switch_owner": "Le compte choisi deviendra propriétaire de ce tableau de bord, à la place de celui-ci.",
+    "account_switch_keeps_owner": "La propriété restera à ce compte : la reprendre demande le jeton, écrit dans la console de la machine qui lance le bot. Un autre compte n'aura ici que les droits qu'on lui accorde.",
     "tooltip_hold_switch_account": "Maintenir 1.5s pour fermer la session et choisir un autre compte Discord",
     "default_playlist_name": "Ma Playlist",
     "card_volume_broadcast": "Volume & Diffusion",

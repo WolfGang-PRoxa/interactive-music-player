@@ -685,6 +685,17 @@ class WebServer {
                     displayName: identity.session?.displayName || '',
                     avatar: identity.session?.avatar || null,
                 },
+                /*
+                 * Être maître et tenir le jeton ne sont pas la même chose.
+                 *
+                 * Le premier se lit sur le compte Discord, et vaut donc depuis
+                 * n'importe quel poste ; le second dit qu'on est devant la
+                 * machine, le jeton s'écrivant dans la console de celui qui
+                 * lance le bot. Le changement de compte n'emporte la propriété
+                 * qu'au second, et l'interface doit pouvoir annoncer laquelle
+                 * des deux situations est la sienne.
+                 */
+                holdsToken: Boolean(identity.holdsToken),
                 permissions: permissions.allPermissions(),
                 sharing: {
                     oauthReady: oauth.isConfigured(),
