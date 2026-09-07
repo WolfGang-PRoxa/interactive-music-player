@@ -151,6 +151,32 @@ function parseJson(text) {
     try { return JSON.parse(text); } catch (e) { return null; }
 }
 
+/**
+ * Où prendre l'installateur, pour cette machine-ci.
+ *
+ * Windows a un fichier qu'on peut tendre directement : servi en pièce jointe, le
+ * clic lance le téléchargement sans quitter le tableau de bord. C'est une étape
+ * de moins qu'une page où il faut encore trouver le bon bouton, et surtout le
+ * bon processeur — l'ARM et l'x86 n'ont pas le même paquet, et se tromper mène à
+ * une installation qui refuse de démarrer sans dire pourquoi.
+ *
+ * macOS passe par l'App Store et Linux par un script à coller dans un terminal :
+ * il n'y a là aucun fichier à tendre, et la page officielle reste le bon endroit.
+ *
+ * @returns {{ url: string, direct: boolean }}
+ */
+function installer() {
+    if (process.platform === 'win32') {
+        return {
+            url: process.arch === 'arm64'
+                ? 'https://pkgs.tailscale.com/stable/tailscale-setup-latest-arm64.msi'
+                : 'https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe',
+            direct: true,
+        };
+    }
+    return { url: 'https://tailscale.com/download', direct: false };
+}
+
 /** `machine.tailnet.ts.net.` → `https://machine.tailnet.ts.net` */
 function publicUrlFrom(dnsName) {
     const host = String(dnsName || '').replace(/\.$/, '');
@@ -220,7 +246,7 @@ function decide(state, funnel, port) {
  */
 async function inspect(port) {
     const bin = cliPath();
-    if (!bin) return { step: STEP.ABSENT, cli: null };
+    if (!bin) return { step: STEP.ABSENT, cli: null, installer: installer() };
 
     const status = await run(['status', '--json']);
     const state = parseJson(status.stdout);
@@ -329,6 +355,7 @@ module.exports = {
     STEP,
     cliPath,
     decide,
+    installer,
     inspect,
     announce,
     login,

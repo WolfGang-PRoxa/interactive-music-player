@@ -41,6 +41,8 @@ window.MusicPlayer = window.MusicPlayer || {};
     /** Dernier état reçu, pour redessiner sans redemander. */
     let current = null;
     let busy = false;
+    /** Un téléchargement demandé, en attente du constat qui le confirmera. */
+    let pendingDownload = false;
 
     function t(key, fallback) {
         const value = typeof window.MusicPlayer.t === 'function'
@@ -64,13 +66,57 @@ window.MusicPlayer = window.MusicPlayer || {};
         return el;
     }
 
-    function button(label, onClick, variant) {
+    /**
+     * Un bouton, avec son infobulle.
+     *
+     * Elle n'est pas décorative : l'étiquette dit le geste, l'infobulle dit ce
+     * qu'il déclenche. « J'ai installé Tailscale » ne laisse pas deviner que la
+     * machine sera réexaminée, et sans cela on clique sans savoir sur quoi.
+     */
+    function button(label, onClick, options) {
+        const { variant, tooltip, i18nTooltip } = options || {};
         const el = document.createElement('button');
         el.className = `tunnel-btn${variant ? ` ${variant}` : ''}`;
         el.textContent = label;
         el.disabled = busy;
+        if (tooltip) el.setAttribute('data-tooltip', tooltip);
+        if (i18nTooltip) el.setAttribute('data-i18n-tooltip', i18nTooltip);
         el.addEventListener('click', onClick);
         return el;
+    }
+
+    /**
+     * Vérifie avant de télécharger.
+     *
+     * Tailscale a pu être installé depuis l'ouverture de cette fenêtre — c'est
+     * même le cas ordinaire, puisqu'on vient d'aller le faire. Rapporter un
+     * installateur par-dessus une installation qui existe déjà ferait perdre du
+     * temps à qui n'avait qu'à cliquer sur « J'ai installé Tailscale ».
+     *
+     * Le téléchargement ne part donc qu'après le constat, et seulement si la
+     * commande manque toujours.
+     */
+    function checkThenDownload() {
+        pendingDownload = true;
+        ask('tunnelState');
+    }
+
+    /**
+     * Lance le téléchargement sans quitter la page.
+     *
+     * Le fichier est servi en pièce jointe : le navigateur l'enregistre au lieu
+     * d'y naviguer, et le tableau de bord reste ouvert derrière — avec l'étape
+     * suivante déjà affichée.
+     */
+    function startDownload(url) {
+        const a = document.createElement('a');
+        a.href = url;
+        a.rel = 'noreferrer noopener';
+        if (document.body) {
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
     }
 
     /** Un lien qui s'ouvre ailleurs : ce que le bot ne peut pas faire pour vous. */
@@ -101,15 +147,31 @@ window.MusicPlayer = window.MusicPlayer || {};
      * installé » n'apprend rien à qui vient d'ouvrir cette fenêtre.
      */
     const STEPS = {
-        absent: () => ({
+        absent: (state) => ({
             title: t('tunnel_absent_title', 'Tailscale n\'est pas installé'),
             body: t('tunnel_absent_body',
                 'Le tableau de bord ne sort pas de cette machine. Tailscale lui donne une '
                 + 'adresse joignable de partout, sans ouvrir de port sur votre box. '
                 + 'L\'installation demande les droits administrateur : elle se fait à la main, '
                 + 'puis cette fenêtre reprend la suite.'),
-            gestes: [link(t('tunnel_absent_action', 'Télécharger Tailscale'),
-                'https://tailscale.com/download')],
+            gestes: [button(
+                state.installer && state.installer.direct
+                    ? t('tunnel_absent_action', 'Télécharger l\'installateur')
+                    : t('tunnel_absent_page', 'Ouvrir la page de téléchargement'),
+                checkThenDownload,
+                {
+                    variant: 'primary',
+                    tooltip: t('tunnel_absent_tip',
+                        'Vérifie d\'abord que Tailscale n\'a pas été installé entre-temps, '
+                        + 'puis lance le téléchargement'),
+                    i18nTooltip: 'tunnel_absent_tip',
+                })],
+            recheck: {
+                label: t('tunnel_recheck_installed', 'J\'ai installé Tailscale'),
+                tooltip: t('tunnel_recheck_installed_tip',
+                    'Réexamine cette machine pour passer à l\'étape suivante'),
+                key: 'tunnel_recheck_installed_tip',
+            },
         }),
 
         unreachable: () => ({
@@ -118,6 +180,12 @@ window.MusicPlayer = window.MusicPlayer || {};
                 'La commande est là, mais le service ne répond pas. Il est sans doute arrêté : '
                 + 'lancez l\'application Tailscale, puis réessayez.'),
             gestes: [],
+            recheck: {
+                label: t('tunnel_recheck_started', 'J\'ai lancé Tailscale'),
+                tooltip: t('tunnel_recheck_started_tip',
+                    'Réexamine cette machine pour voir si le service répond'),
+                key: 'tunnel_recheck_started_tip',
+            },
         }),
 
         needsLogin: () => ({
@@ -143,6 +211,12 @@ window.MusicPlayer = window.MusicPlayer || {};
                 + 'certificats HTTPS, puis Funnel. Revenez ensuite ici.'),
             gestes: [link(t('tunnel_capability_action', 'Ouvrir la console'),
                 'https://login.tailscale.com/admin/dns')],
+            recheck: {
+                label: t('tunnel_recheck_enabled', 'C\'est activé dans la console'),
+                tooltip: t('tunnel_recheck_enabled_tip',
+                    'Réexamine les droits que ce réseau Tailscale accorde à la machine'),
+                key: 'tunnel_recheck_enabled_tip',
+            },
         }),
 
         ready: (state) => ({
@@ -228,9 +302,23 @@ window.MusicPlayer = window.MusicPlayer || {};
                 t('tunnel_error', 'Échec :') + ' ' + current.error));
         }
 
-        const again = button(t('tunnel_refresh', 'Réexaminer'), () => ask('tunnelState'));
-        again.classList.add('discreet');
-        zone.appendChild(actions(again));
+        /*
+         * Le bouton de reprise n'apparaît que là où l'on part faire quelque
+         * chose ailleurs — installer, démarrer, activer un droit dans une
+         * console. Ces gestes-là ne parviennent pas au bot, et il faut bien un
+         * moyen de lui dire de regarder à nouveau.
+         *
+         * Il porte le geste accompli plutôt que l'action technique : « J'ai
+         * installé Tailscale » se comprend sans rien savoir, là où « Réexaminer »
+         * n'apprenait ni ce qui était examiné ni pourquoi. Ailleurs — prêt,
+         * publié, adresse occupée — il n'y a rien à reprendre, et il disparaît.
+         */
+        if (step.recheck) {
+            zone.appendChild(actions(button(step.recheck.label, () => ask('tunnelState'), {
+                tooltip: step.recheck.tooltip,
+                i18nTooltip: step.recheck.key,
+            })));
+        }
     }
 
     /* ═════════════════════ Entrées ═════════════════════ */
@@ -240,6 +328,16 @@ window.MusicPlayer = window.MusicPlayer || {};
         busy = false;
         current = data || null;
         render();
+
+        // Le téléchargement demandé attendait ce constat : il ne part que si la
+        // commande manque toujours. Installée entre-temps, l'étape affichée est
+        // déjà la suivante, et rapporter un installateur n'aurait plus de sens.
+        if (pendingDownload) {
+            pendingDownload = false;
+            if (current && current.step === 'absent' && current.installer) {
+                startDownload(current.installer.url);
+            }
+        }
     };
 
     /**

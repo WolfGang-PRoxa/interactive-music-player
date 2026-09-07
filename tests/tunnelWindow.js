@@ -47,9 +47,18 @@ const check = (label, ok, detail = '') => {
  * le module efface la zone entre deux étapes — sans cela la doublure les
  * empilerait, et l'on croirait en voir deux à la fois là où il n'y en a qu'une.
  */
-function makeNode(tag) {
+function makeNode(tag, downloads) {
     let text = '';
     const node = {
+        /*
+         * Un clic programmé sur une ancre déclenche un téléchargement, sans
+         * écouteur : c'est ainsi que le module rapporte l'installateur. La
+         * doublure le note plutôt que de le faire.
+         */
+        click() {
+            if (node.tagName === 'A' && node.href && downloads) downloads.push(node.href);
+            if (node.listeners.click) node.listeners.click();
+        },
         tagName: tag.toUpperCase(),
         className: '',
         get textContent() { return text; },
@@ -61,15 +70,23 @@ function makeNode(tag) {
         style: {},
         disabled: false,
         listeners: {},
+        attributes: {},
         appendChild(child) { this.children.push(child); return child; },
+        removeChild(child) {
+            const i = this.children.indexOf(child);
+            if (i >= 0) this.children.splice(i, 1);
+        },
         addEventListener(type, fn) { this.listeners[type] = fn; },
+        setAttribute(name, value) { this.attributes[name] = value; },
         classList: { add(c) { node.className += ` ${c}`; } },
     };
     return node;
 }
 
 function mount() {
-    const zone = makeNode('div');
+    const downloads = [];
+    const zone = makeNode('div', downloads);
+    const body = makeNode('body', downloads);
     const sent = [];
 
     const sandbox = {
@@ -83,8 +100,9 @@ function mount() {
             },
         },
         document: {
+            body,
             getElementById: (id) => (id === 'share-tunnel' ? zone : null),
-            createElement: (tag) => makeNode(tag),
+            createElement: (tag) => makeNode(tag, downloads),
         },
         console,
     };
@@ -100,6 +118,7 @@ function mount() {
 
     return {
         zone, sent,
+        downloads: () => downloads,
         api: sandbox.window.MusicPlayer,
         show: (state) => sandbox.window.MusicPlayer.onTunnelState(state),
         nodes: () => flat(),
@@ -118,13 +137,57 @@ console.log('Ce que chaque étape montre, et propose\n');
 {
     const m = mount();
 
-    m.show({ step: 'absent' });
+    const INSTALLATEUR = {
+        url: 'https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe',
+        direct: true,
+    };
+
+    m.show({ step: 'absent', installer: INSTALLATEUR });
     check('l\'étape dit ce qui manque, et pourquoi',
         m.texts().some((x) => x.includes('tunnel_absent_title'))
         && m.texts().some((x) => x.includes('tunnel_absent_body')));
-    check('  … et envoie au téléchargement',
-        m.links().includes('https://tailscale.com/download'),
-        'l\'installation demande les droits administrateur');
+    const telecharger = () => m.buttons().find((b) => b.textContent === 'k#tunnel_absent_action');
+
+    check('  … et propose le téléchargement comme un vrai bouton',
+        !!telecharger(), 'un lien discret ne se remarquait pas');
+
+    check('  … avec une infobulle qui dit ce qu\'il déclenche',
+        !!telecharger().attributes['data-tooltip']
+        && telecharger().attributes['data-i18n-tooltip'] === 'tunnel_absent_tip');
+
+    /*
+     * Le clic ne télécharge pas : il constate d'abord.
+     *
+     * Tailscale a pu être installé depuis l'ouverture de la fenêtre — c'est même
+     * le cas ordinaire, puisqu'on vient d'aller le faire. Rapporter un
+     * installateur par-dessus une installation existante ferait perdre du temps
+     * à qui n'avait qu'à passer à l'étape suivante.
+     */
+    telecharger().listeners.click();
+    check('  … qui vérifie avant de télécharger',
+        m.sent[m.sent.length - 1].type === 'tunnelState',
+        'Tailscale a pu être installé entre-temps');
+
+    // Le constat revient : toujours absent, donc le téléchargement part.
+    m.show({ step: 'absent', installer: INSTALLATEUR });
+    check('  … et ne part que si la commande manque toujours',
+        m.downloads().includes(INSTALLATEUR.url), m.downloads().join(', '));
+
+    // L'autre issue : installé entre-temps, rien ne se télécharge.
+    telecharger().listeners.click();
+    const avantConstat = m.downloads().length;
+    m.show({ step: 'ready', publicUrl: 'https://x.ts.net' });
+    check('  … et pas du tout si elle est apparue entre-temps',
+        m.downloads().length === avantConstat,
+        'rapporter un installateur par-dessus une installation ferait perdre du temps');
+
+    // Sans fichier à tendre — macOS, Linux — c'est la page officielle.
+    m.show({ step: 'absent', installer: { url: 'https://tailscale.com/download', direct: false } });
+    check('  … sur une plateforme sans installateur direct, l\'étiquette change',
+        m.buttons().some((b) => b.textContent === 'k#tunnel_absent_page'),
+        'macOS passe par l\'App Store, Linux par un script');
+
+    m.show({ step: 'absent', installer: INSTALLATEUR });
 
     // Une seule étape est peinte : celle où l'on en est.
     check('  … sans montrer les suivantes',
@@ -159,6 +222,41 @@ console.log('Ce que chaque étape montre, et propose\n');
         m.texts().some((x) => x.includes('8080'))
         && !m.buttons().some((b) => b.textContent === 'k#tunnel_ready_action'),
         'quelqu\'un s\'en sert peut-être depuis des mois');
+}
+
+// ───────────────────── Le bouton de reprise ─────────────────────
+
+console.log('\nCe que propose le bouton de reprise\n');
+
+{
+    const m = mount();
+
+    /*
+     * Il n'apparaît que là où l'on part faire quelque chose ailleurs, et porte
+     * le geste accompli plutôt que l'action technique : « Réexaminer »
+     * n'apprenait ni ce qui était examiné ni pourquoi.
+     */
+    const attendus = {
+        absent: 'k#tunnel_recheck_installed',
+        unreachable: 'k#tunnel_recheck_started',
+        needsCapability: 'k#tunnel_recheck_enabled',
+    };
+
+    for (const [step, label] of Object.entries(attendus)) {
+        m.show({ step });
+        const bouton = m.buttons().find((b) => b.textContent === label);
+        check(`« ${step} » nomme le geste accompli`, !!bouton, label);
+        check('  … et l\'infobulle dit qu\'il réexamine',
+            !!bouton && !!bouton.attributes['data-tooltip']);
+    }
+
+    // Là où l'on n'est parti nulle part, il n'y a rien à reprendre.
+    for (const step of ['ready', 'serving', 'otherTarget']) {
+        m.show({ step, publicUrl: 'https://x.ts.net' });
+        const reprise = m.buttons().filter((b) => /recheck/.test(b.textContent));
+        check(`« ${step} » n'en propose aucun`, reprise.length === 0,
+            'rien ne s\'est passé ailleurs');
+    }
 }
 
 // ───────────────────── Les demandes ─────────────────────

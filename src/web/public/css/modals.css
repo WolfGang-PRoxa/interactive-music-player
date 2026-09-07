@@ -2949,21 +2949,6 @@ html[data-theme="light"] .login-gate-warning code {
     cursor: default;
 }
 
-/* « Réexaminer » est toujours là et n'est jamais ce qu'on vient faire : il
-   s'efface pour ne pas disputer la place au geste de l'étape. */
-.tunnel-btn.discreet {
-    border-color: transparent;
-    background: transparent;
-    color: var(--text-muted);
-    font-weight: 500;
-    padding-left: 0;
-}
-
-.tunnel-btn.discreet:hover {
-    background: transparent;
-    color: var(--text-main);
-}
-
 /*
  * La clé d'authentification, masquée à la saisie.
  *
