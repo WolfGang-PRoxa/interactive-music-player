@@ -99,6 +99,44 @@ function claim(user) {
 }
 
 /**
+ * Fait passer la propriété à un autre compte.
+ *
+ * Distinct de `claim`, dont le refus d'écraser est tout le contrat : ici
+ * l'écrasement est le but. L'appelant doit avoir constaté que le demandeur tient
+ * le jeton, c'est-à-dire qu'il est devant la machine — la seule autorité que ce
+ * module reconnaisse.
+ *
+ * Ce n'est pas un pouvoir nouveau : qui tient le jeton peut déjà supprimer
+ * `data/owner.json` et relancer le bot pour reprendre l'installation. La
+ * différence est que le geste devient visible et réversible depuis le tableau de
+ * bord, au lieu de passer par un fichier.
+ *
+ * @param {{ id: string, username?: string, avatar?: string|null }} user
+ * @returns {boolean}
+ */
+function transfer(user) {
+    load();
+    if (!user || !user.id) return false;
+
+    const previous = owner;
+    owner = {
+        id: String(user.id),
+        username: user.username || String(user.id),
+        avatar: user.avatar || null,
+        since: Date.now(),
+    };
+
+    try {
+        writeJsonAtomic(OWNER_FILE, owner);
+        log.success(`[Owner] Dashboard handed over to ${owner.username} (${owner.id})`
+            + (previous ? ` — was ${previous.username} (${previous.id}).` : '.'));
+    } catch (err) {
+        log.error('[Owner] Could not record the new owner:', err.message);
+    }
+    return true;
+}
+
+/**
  * Cette session est-elle celle du propriétaire ?
  * @param {{ userId?: string }|null} session
  * @returns {boolean}
@@ -119,4 +157,4 @@ function forget() {
     try { fs.rmSync(OWNER_FILE, { force: true }); } catch (e) {}
 }
 
-module.exports = { get, isClaimed, claim, isOwner, forget, OWNER_FILE };
+module.exports = { get, isClaimed, claim, transfer, isOwner, forget, OWNER_FILE };

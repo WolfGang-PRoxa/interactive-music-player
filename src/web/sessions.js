@@ -154,6 +154,25 @@ function get(sessionId) {
     return session;
 }
 
+/**
+ * Ferme une session, et une seule.
+ *
+ * Distincte de `revokeUser`, qui ferme les sessions d'un compte désigné :
+ * celle-ci ferme celle que porte ce navigateur, sans avoir à savoir de qui elle
+ * est. C'est le geste de son propre porteur — quitter son compte — et il ne doit
+ * rien devoir à une identité qu'on vient précisément d'abandonner.
+ *
+ * @param {string} sessionId
+ * @returns {boolean} La session existait-elle.
+ */
+function destroy(sessionId) {
+    load();
+    if (!sessionId || !store[sessionId]) return false;
+    delete store[sessionId];
+    save();
+    return true;
+}
+
 /** Repousse l'expiration d'une session encore active. */
 function touch(sessionId) {
     const session = get(sessionId);
@@ -225,6 +244,7 @@ module.exports = {
     create,
     get,
     touch,
+    destroy,
     revokeUser,
     listUsers,
     flush,

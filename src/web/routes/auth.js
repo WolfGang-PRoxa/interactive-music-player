@@ -156,8 +156,20 @@ function createAuthRouter(webServer) {
          * `req.identity` est absent : ce chemin est public, le middleware n'y
          * pose rien.
          */
+        /*
+         * Changer de compte, plutôt que rouvrir le même.
+         *
+         * Demandé par le tableau de bord, et constaté ici avec le jeton : les
+         * deux voyagent ensemble dans le `state`, car le rappel arrive sur une
+         * origine où aucun de ces cookies n'existe. Le drapeau fait deux choses
+         * — il demande à Discord de proposer ses comptes, et il autorisera la
+         * propriété à suivre.
+         */
+        const switching = req.query.switch === '1';
+
         res.redirect(302, oauth.buildAuthorizeUrl(safeReturnTo, {
             holdsToken: auth.identify(req).holdsToken,
+            claim: switching,
         }));
     });
 
@@ -222,8 +234,20 @@ function createAuthRouter(webServer) {
          * pas. La requête est tout de même interrogée en second recours, pour
          * le cas où les deux adresses n'en font qu'une.
          */
-        if (!owner.isClaimed() && (route.holdsToken || auth.identify(req).holdsToken)) {
+        const holdsToken = route.holdsToken || auth.identify(req).holdsToken;
+
+        if (!owner.isClaimed() && holdsToken) {
             owner.claim(user);
+        } else if (route.claim && holdsToken && !owner.isOwner({ userId: user.id })) {
+            /*
+             * La propriété suit le compte, parce que la personne est devant la
+             * machine — c'est ce que tenir le jeton veut dire, ici comme dans
+             * `owner.js`. Aucun pouvoir n'est accordé au passage : qui tient le
+             * jeton pouvait déjà supprimer `data/owner.json` et relancer. Le
+             * geste devient seulement visible, et réversible sans toucher au
+             * disque.
+             */
+            owner.transfer(user);
         }
 
         const { id } = sessions.create(user);
@@ -234,6 +258,25 @@ function createAuthRouter(webServer) {
         });
 
         res.redirect(302, route.returnTo);
+    });
+
+    /**
+     * Ferme la session de ce navigateur.
+     *
+     * Ni le jeton ni le propriétaire ne sont touchés : on ne quitte que son
+     * identité Discord, et la page qui suit rouvre donc sur la porte d'entrée.
+     * Les autres onglets du même compte gardent la leur — un téléphone posé
+     * ailleurs n'a pas à tomber parce qu'on change de compte sur le PC.
+     *
+     * En POST, et non par un lien : une adresse qui déconnecte au simple
+     * chargement se déclenche depuis n'importe quelle image d'une autre page.
+     */
+    router.post('/logout', (req, res) => {
+        const cookies = auth.parseCookies(req.headers.cookie || '');
+        const closed = sessions.destroy(cookies[sessions.COOKIE_NAME]);
+
+        res.clearCookie(sessions.COOKIE_NAME, { httpOnly: true, sameSite: 'lax' });
+        res.json({ ok: true, closed });
     });
 
     return router;

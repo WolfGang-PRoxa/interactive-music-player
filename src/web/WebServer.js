@@ -672,6 +672,19 @@ class WebServer {
         if (identity.master) {
             return {
                 role: 'master',
+                /*
+                 * Le maître reçoit son identité comme les invités.
+                 *
+                 * Il était le seul dont le tableau de bord ignorait le nom : ses
+                 * droits ne dépendent de personne, la question ne se posait donc
+                 * pas. Elle se pose depuis qu'on peut changer de compte — il faut
+                 * bien montrer duquel on part.
+                 */
+                identity: {
+                    userId: identity.session?.userId || null,
+                    displayName: identity.session?.displayName || '',
+                    avatar: identity.session?.avatar || null,
+                },
                 permissions: permissions.allPermissions(),
                 sharing: {
                     oauthReady: oauth.isConfigured(),

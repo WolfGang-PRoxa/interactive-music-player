@@ -1,1 +1,1 @@
-- [ ] 
+- [ ] Actuellement, on ne propose pas de formats de vidéo, dans le menu déroulant "format" de la box "ajouter un fichier"

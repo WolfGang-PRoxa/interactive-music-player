@@ -1515,6 +1515,48 @@
             </div>
 
             <div class="settings-modal-body">
+                <!--
+                    Le compte Discord, avant tout réglage : c'est l'identité de
+                    celui qui règle, et depuis peu quelque chose qui se change.
+                    Voir js/account.js.
+
+                    Le bouton se maintient au lieu de se cliquer, comme la
+                    réinitialisation générale plus bas : c'est l'idiome de la
+                    maison pour un geste dont on ne revient pas d'un clic
+                    malheureux.
+                -->
+                <div class="settings-section hidden" id="account-section">
+                    <h3 class="settings-section-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                        <span data-i18n="account_section">Compte Discord</span>
+                    </h3>
+
+                    <div class="setting-item-row">
+                        <div class="setting-item-label account-identity">
+                            <img id="account-avatar" class="account-avatar hidden" alt="">
+                            <span>
+                                <span data-i18n="account_connected_as">Connecté en tant que :</span>
+                                <span class="setting-item-hint" id="account-name"></span>
+                            </span>
+                        </div>
+                        <button id="btn-switch-account" class="btn-reset-all btn-hold-neutral" data-tooltip="Maintenir 1.5s pour changer de compte" data-i18n-tooltip="tooltip_hold_switch_account">
+                            <div class="btn-reset-progress"></div>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-reset-icon">
+                                <polyline points="17 1 21 5 17 9"></polyline>
+                                <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+                                <polyline points="7 23 3 19 7 15"></polyline>
+                                <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+                            </svg>
+                            <span class="btn-reset-text" data-i18n="account_switch">Changer de compte</span>
+                        </button>
+                    </div>
+
+                    <p class="account-note hidden" id="account-owner-note" data-i18n="account_switch_owner">Le compte choisi deviendra propriétaire de ce tableau de bord, à la place de celui-ci.</p>
+                </div>
+
                 <!-- Section 1: Paramètres Généraux -->
                 <div class="settings-section">
                     <h3 class="settings-section-title">
@@ -2523,6 +2565,7 @@
     <script src="js/playlists.js"></script>
     <script src="js/playlistTabsScroll.js"></script>
     <script src="js/scrollFade.js"></script>
+    <script src="js/account.js"></script>
     <script src="js/scrollLock.js"></script>
     <script src="js/video.js"></script>
     <script src="js/logs.js"></script>

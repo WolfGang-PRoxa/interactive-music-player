@@ -122,6 +122,7 @@ function buildAuthorizeUrl(returnTo = '/', carried = {}) {
         createdAt: Date.now(),
         returnTo,
         holdsToken: Boolean(carried.holdsToken),
+        claim: Boolean(carried.claim),
     });
 
     const url = new URL(AUTHORIZE_URL);
@@ -130,9 +131,16 @@ function buildAuthorizeUrl(returnTo = '/', carried = {}) {
     url.searchParams.set('response_type', 'code');
     url.searchParams.set('scope', 'identify');
     url.searchParams.set('state', state);
-    // Redemander l'accord à chaque fois n'apporte rien : l'invité a déjà dit oui
-    // une fois, et le bot ne demande que son nom.
-    url.searchParams.set('prompt', 'none');
+    /*
+     * Discord ne montre son sélecteur de comptes que si on le lui demande.
+     *
+     * `none` reconnecte en silence celui qui est déjà ouvert : c'est ce qu'il
+     * faut d'ordinaire — l'invité a déjà dit oui une fois, et le bot ne
+     * demande que son nom — et exactement ce qu'il ne faut pas quand on vient
+     * précisément pour en changer. Sans ce détour, « changer de compte »
+     * rouvrirait la session du même compte, sans rien dire.
+     */
+    url.searchParams.set('prompt', carried.claim ? 'consent' : 'none');
 
     return url.toString();
 }
@@ -144,7 +152,7 @@ function buildAuthorizeUrl(returnTo = '/', carried = {}) {
  * seconde session.
  *
  * @param {string} state
- * @returns {{ returnTo: string, holdsToken: boolean }|null} null si inconnu,
+ * @returns {{ returnTo: string, holdsToken: boolean, claim: boolean }|null} null si inconnu,
  *   déjà servi ou périmé.
  */
 function consumeState(state) {
@@ -158,6 +166,7 @@ function consumeState(state) {
     return {
         returnTo: entry.returnTo || '/',
         holdsToken: Boolean(entry.holdsToken),
+        claim: Boolean(entry.claim),
     };
 }
 

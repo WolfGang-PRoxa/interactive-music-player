@@ -873,6 +873,67 @@ html[data-style="neon-cyberpunk"] .speed-pad-container::before {
     z-index: 1;
 }
 
+/*
+ * Le bouton de maintien, en version neutre.
+ *
+ * Même mécanique que la réinitialisation ci-dessus — on maintient, une jauge se
+ * remplit —, mais changer de compte n'efface rien : le rouge de l'alerte y
+ * serait un contresens. Seules les couleurs changent, jamais la mécanique.
+ */
+/* Une étiquette de bouton qui passe à la ligne casse la jauge qui la
+   traverse : sur un écran étroit, elle se replierait en deux. */
+.btn-hold-neutral {
+    white-space: nowrap;
+}
+
+.btn-hold-neutral:hover {
+    color: var(--c-primary);
+    background: color-mix(in srgb, var(--c-primary) 10%, transparent);
+    border-color: color-mix(in srgb, var(--c-primary) 35%, transparent);
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--c-primary) 18%, transparent);
+}
+
+.btn-hold-neutral.holding {
+    color: #ffffff;
+    border-color: color-mix(in srgb, var(--c-primary) 65%, transparent);
+    box-shadow: 0 0 16px color-mix(in srgb, var(--c-primary) 40%, transparent);
+}
+
+.btn-hold-neutral .btn-reset-progress {
+    background: linear-gradient(90deg,
+        color-mix(in srgb, var(--c-primary) 40%, transparent),
+        color-mix(in srgb, var(--c-primary) 78%, transparent));
+}
+
+/* L'identité affichée : la pastille et le nom sur une même ligne de base. */
+.account-identity {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.account-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    object-fit: cover;
+    border: 1px solid var(--border-card);
+}
+
+/*
+ * Ce que le changement emporte avec lui.
+ *
+ * Dit sous le bouton, et non dans son infobulle : une conséquence qu'il faut
+ * survoler pour connaître n'est pas annoncée.
+ */
+.account-note {
+    margin-top: 0.5rem;
+    font-size: 0.74rem;
+    line-height: 1.4;
+    color: var(--text-muted);
+}
+
 .btn-reset-icon {
     width: 16px;
     height: 16px;

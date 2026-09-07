@@ -372,6 +372,7 @@ function verifyUpgrade(info) {
 
 module.exports = {
     getToken,
+    parseCookies,
     isAuthorized,
     identify,
     isPublicPath,

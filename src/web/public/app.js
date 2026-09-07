@@ -1038,6 +1038,13 @@
             updateFormatFieldVisibility();
         }
 
+        // Le compte connecté, dans les paramètres. Il ne change qu'au retour
+        // d'un trajet OAuth, donc jamais en cours de session — mais le premier
+        // état est aussi celui qui le fait apparaître.
+        if (typeof window.MusicPlayer.refreshAccount === 'function') {
+            window.MusicPlayer.refreshAccount(state);
+        }
+
         // La sonie du morceau en cours, affichée à droite de « Volume
         // Principal ». Elle est peinte ici, avec le reste de l'état, pour
         // qu'elle change au même instant que le titre au-dessus d'elle.
