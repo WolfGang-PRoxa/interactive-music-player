@@ -112,6 +112,7 @@ const ACTION_GROUPS = {
 
     // Volume, atténuation, diffusion, qualité
     selectChannel: 'volume',
+    requestTrackFormats: 'volume',
     setTrackQuality: 'volume',
     setTrackLoudness: 'volume',
     requestTrackLoudness: 'volume',

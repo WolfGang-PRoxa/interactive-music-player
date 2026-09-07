@@ -521,6 +521,12 @@
             if (typeof window.MusicPlayer.onControlRevoked === 'function') {
                 window.MusicPlayer.onControlRevoked(data);
             }
+        } else if (type === 'trackFormats') {
+            // Inventaire des qualités que porte réellement une source,
+            // demandé par le menu contextuel à l'ouverture d'un sous-menu.
+            if (typeof window.MusicPlayer.onTrackFormats === 'function') {
+                window.MusicPlayer.onTrackFormats(data);
+            }
         } else if (type === 'tunnelState') {
             // Réponse à une demande de la fenêtre de partage : constater le
             // tunnel lance deux processus, et ne voyage donc pas avec l'état.

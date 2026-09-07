@@ -14,6 +14,56 @@
 
 window.MusicPlayer = window.MusicPlayer || {};
 
+/**
+ * Ce que la source porte réellement, par adresse.
+ *
+ * `undefined` : jamais demandé. `null` : demandé, réponse en route. Sinon
+ * l'inventaire. Ces trois états sont ce que le sous-menu affiche — « recherche »
+ * n'est pas la même chose que « rien trouvé », et confondre les deux ferait
+ * clignoter une liste grise pendant deux secondes à chaque ouverture.
+ */
+const formatsByUrl = new Map();
+
+/** Demande l'inventaire d'une piste, une seule fois. */
+function askFormats(url) {
+    if (!url || formatsByUrl.has(url)) return;
+    if (typeof window.MusicPlayer.sendWS !== 'function') return;
+
+    formatsByUrl.set(url, null);
+    window.MusicPlayer.sendWS({ type: 'requestTrackFormats', data: { url } });
+}
+
+/**
+ * Une option est-elle tenable pour cette source ?
+ *
+ * Trois réponses, et la nuance porte sur l'audio.
+ *
+ * Pour la **vidéo**, la question est franche : la définition existe ou n'existe
+ * pas. Proposer du 4K sur une mise en ligne en 720p promet ce qu'on ne peut pas
+ * rendre.
+ *
+ * Pour l'**audio**, tout débit reste techniquement atteignable — le bot
+ * transcode. Mais viser au-dessus de ce que porte la source n'ajoute rien : on
+ * réencode 128 kbps vers 320 sans récupérer ce qui n'y est pas, pour un fichier
+ * deux fois plus lourd. Ce qui dépasse est donc marqué comme sans objet, pas
+ * comme impossible.
+ *
+ * Tant que rien n'est connu, tout est tenable : le menu d'avant proposait tout,
+ * et griser à l'aveugle serait pire que ne rien dire.
+ */
+function optionAvailable(type, value, formats) {
+    if (!formats || !formats.known) return true;
+
+    if (type === 'video') {
+        return Array.isArray(formats.heights) && formats.heights.includes(Number(value));
+    }
+
+    if (!formats.audioKbps) return true;
+    // Une marge : les débits variables flottent sous leur étiquette, et écarter
+    // 320 pour une source annoncée à 317 serait une exactitude inutile.
+    return Number(value) <= formats.audioKbps * 1.1;
+}
+
 /** Débits MP3 proposés, du plus élevé au plus faible. */
 const AUDIO_BITRATES = [
     { value: '320', label: '320 kbps' },
@@ -793,10 +843,53 @@ function toggleSubmenu(type, btn) {
     submenuEl.addEventListener('click', (e) => e.stopPropagation());
     submenuEl.addEventListener('contextmenu', (e) => e.preventDefault());
 
+    /*
+     * L'inventaire de la source, demandé ici et nulle part ailleurs.
+     *
+     * Il coûte un appel réseau d'une à trois secondes : le lancer à l'ouverture
+     * du menu principal, ou pire à chaque diffusion d'état, le paierait pour des
+     * pistes qu'on ne règle jamais. Ouvrir ce sous-menu est en revanche le seul
+     * moment où la question se pose.
+     */
+    askFormats(track.url);
+    const formats = formatsByUrl.get(track.url);
+
+    // Demandé, sans réponse encore : le dire, plutôt que de griser une liste
+    // qui redeviendra normale deux secondes plus tard.
+    if (formats === null) {
+        const pending = document.createElement('div');
+        pending.className = 'quality-submenu-pending';
+        pending.textContent = t('quality_formats_pending', 'Recherche des qualités…');
+        submenuEl.appendChild(pending);
+    }
+
     options.forEach(opt => {
         const choice = document.createElement('button');
         choice.className = 'quality-submenu-item';
         if (String(opt.value) === String(current)) choice.classList.add('is-current');
+
+        /*
+         * Ce que la source ne porte pas est montré, mais éteint.
+         *
+         * Retirer les lignes ferait sauter la liste d'une piste à l'autre, et
+         * l'on ne saurait pas si le 4K manque parce qu'il n'existe pas ou parce
+         * qu'on a mal regardé. Grisé, il dit les deux : le choix existe, cette
+         * source ne l'a pas.
+         *
+         * La valeur déjà retenue échappe à la règle. Elle peut avoir été choisie
+         * quand la source proposait autre chose, et l'éteindre laisserait un
+         * menu où rien n'est cochable — dont la ligne cochée.
+         */
+        const usable = optionAvailable(type, opt.value, formats)
+            || String(opt.value) === String(current);
+        if (!usable) {
+            choice.classList.add('is-unavailable');
+            choice.disabled = true;
+            choice.setAttribute('data-tooltip', type === 'video'
+                ? t('quality_video_absent', 'Cette définition n\'existe pas pour ce média')
+                : t('quality_audio_capped', 'Au-delà de ce que porte la source : '
+                    + 'le fichier serait plus lourd, pas meilleur'));
+        }
 
         const markEl = document.createElement('span');
         markEl.className = 'quality-submenu-check';
@@ -810,6 +903,7 @@ function toggleSubmenu(type, btn) {
 
         choice.addEventListener('click', (e) => {
             e.stopPropagation();
+            if (!usable) return;
             applyQuality(type, opt.value);
         });
 
@@ -1160,6 +1254,28 @@ window.MusicPlayer.applyRequalifyState = function(item, track) {
  * @param {HTMLElement} item
  * @param {() => object} resolveTrack - Relit la piste à l'ouverture, pas au branchement
  */
+/**
+ * L'inventaire arrive : le sous-menu ouvert le prend en compte séance tenante.
+ *
+ * Il s'est peint en « recherche… » une ou deux secondes plus tôt ; le laisser
+ * ainsi jusqu'à la prochaine ouverture ferait de la réponse une chose qu'on ne
+ * voit jamais. Rouvrir au même endroit remplace la liste sans la déplacer.
+ */
+window.MusicPlayer.onTrackFormats = function (data) {
+    if (!data || !data.url) return;
+    formatsByUrl.set(data.url, data);
+
+    if (openedUrl !== data.url || !submenuOpen) return;
+    const type = submenuOpen;
+    const bouton = menuEl ? menuEl.querySelector(`[data-quality-type="${type}"]`) : null;
+    if (!bouton) return;
+
+    // `toggleSubmenu` referme quand on lui redonne le type ouvert : on remet le
+    // drapeau à zéro pour qu'il rouvre au lieu de fermer.
+    submenuOpen = null;
+    toggleSubmenu(type, bouton);
+};
+
 window.MusicPlayer.attachQualityMenu = function(item, resolveTrack) {
     if (!item) return;
     item.addEventListener('contextmenu', (e) => {

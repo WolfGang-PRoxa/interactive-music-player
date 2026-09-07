@@ -40,6 +40,94 @@ const log = require('../utils/logger');
 const DEFAULT_HEIGHT = 1080;
 
 /**
+ * Durée de vie de l'inventaire retenu, en millisecondes.
+ *
+ * Interroger la source prend une à trois secondes : le refaire à chaque
+ * ouverture de menu serait insupportable, et la liste des formats d'une vidéo ne
+ * change pas d'une minute à l'autre. Dix minutes couvrent une session d'écoute
+ * sans figer une correction du côté de la plateforme.
+ */
+const INVENTORY_TTL_MS = 10 * 60 * 1000;
+
+/** url → { at: horodatage, value: inventaire } */
+const inventoryCache = new Map();
+
+/**
+ * Interroge la source et rend son entrée, ou null.
+ *
+ * Le résultat n'est pas retenu ici : `resolve` et `inventory` n'ont pas la même
+ * durée de vie utile, et c'est à chacune de décider ce qu'elle garde.
+ */
+async function dump(url) {
+    try {
+        const youtubedl = require('youtube-dl-exec');
+        const info = await youtubedl(url, {
+            dumpSingleJson: true,
+            noCheckCertificates: true,
+            noWarnings: true,
+            preferFreeFormats: true,
+            addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
+        }, { windowsHide: true });
+        return (info && info.entries && info.entries[0]) ? info.entries[0] : info;
+    } catch (err) {
+        // Source inconnue de l'outil, réseau coupé, page privée.
+        log.debug(`[VideoSource] No format list for ${url}: ${err.message}`);
+        return null;
+    }
+}
+
+/**
+ * Ce que la source porte réellement : définitions et meilleur débit sonore.
+ *
+ * Sert au menu clic droit, qui proposait jusqu'ici les six définitions et les
+ * cinq débits sans savoir si le fichier existait dans aucun d'eux. Offrir du 4K
+ * sur une vidéo mise en ligne en 720p n'est pas un choix, c'est une promesse
+ * qu'on ne tient pas.
+ *
+ * Pour l'audio, la question n'est pas tout à fait la même : le bot transcode
+ * vers le débit demandé, qui est donc toujours *techniquement* atteignable.
+ * Mais transcoder une source à 128 kbps vers un MP3 à 320 n'ajoute rien —
+ * seulement du poids. Le meilleur débit de la source dit donc jusqu'où le choix
+ * a du sens.
+ *
+ * @param {string} url - Adresse **déjà pontée** : une piste Spotify ou Deezer
+ *   doit être résolue par `resolvePlayableTrack` avant d'arriver ici, sans quoi
+ *   l'on interrogerait une page qui ne porte aucun flux.
+ * @returns {Promise<{ heights: number[], audioKbps: number|null, known: boolean }>}
+ */
+async function inventory(url) {
+    const inconnu = { heights: [], audioKbps: null, known: false };
+    if (!url || !/^https?:\/\//i.test(url)) return inconnu;
+
+    const cached = inventoryCache.get(url);
+    if (cached && Date.now() - cached.at < INVENTORY_TTL_MS) return cached.value;
+
+    const entry = await dump(url);
+    const formats = (entry && Array.isArray(entry.formats)) ? entry.formats : [];
+    if (!formats.length) return inconnu;
+
+    // Les définitions réellement présentes, sans doublon, de la plus haute à la
+    // plus basse : la même hauteur revient souvent en plusieurs codecs.
+    const heights = [...new Set(formats
+        .filter((f) => f && f.vcodec && f.vcodec !== 'none' && f.height)
+        .map((f) => Number(f.height)))]
+        .sort((a, b) => b - a);
+
+    const debits = formats
+        .filter((f) => f && f.acodec && f.acodec !== 'none' && Number(f.abr) > 0)
+        .map((f) => Number(f.abr));
+
+    const value = {
+        heights,
+        audioKbps: debits.length ? Math.round(Math.max(...debits)) : null,
+        known: true,
+    };
+
+    inventoryCache.set(url, { at: Date.now(), value });
+    return value;
+}
+
+/**
  * Le meilleur flux vidéo à la résolution voulue, et le son qui va avec.
  *
  * @param {string} url - L'adresse de la piste, telle que l'extracteur la connaît.
@@ -51,23 +139,9 @@ async function resolve(url, height = DEFAULT_HEIGHT) {
     const vide = { videoUrl: null, audioUrl: null, audioOnly: true, height: null };
     if (!url || !/^https?:\/\//i.test(url)) return vide;
 
-    let entry;
-    try {
-        const youtubedl = require('youtube-dl-exec');
-        const info = await youtubedl(url, {
-            dumpSingleJson: true,
-            noCheckCertificates: true,
-            noWarnings: true,
-            preferFreeFormats: true,
-            addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
-        }, { windowsHide: true });
-        entry = (info && info.entries && info.entries[0]) ? info.entries[0] : info;
-    } catch (err) {
-        // Source inconnue de l'outil, réseau coupé, page privée : il n'y a pas
-        // d'image, et l'appelant en fabriquera une plutôt que d'échouer.
-        log.debug(`[VideoSource] No format list for ${url}: ${err.message}`);
-        return vide;
-    }
+    // Interrogation partagée avec `inventory` : une source qui ne répond pas
+    // n'a pas d'image, et l'appelant en fabriquera une plutôt que d'échouer.
+    const entry = await dump(url);
 
     const formats = (entry && Array.isArray(entry.formats)) ? entry.formats : [];
     if (!formats.length) return vide;
@@ -100,4 +174,4 @@ async function resolve(url, height = DEFAULT_HEIGHT) {
     };
 }
 
-module.exports = { resolve, DEFAULT_HEIGHT };
+module.exports = { resolve, inventory, DEFAULT_HEIGHT };

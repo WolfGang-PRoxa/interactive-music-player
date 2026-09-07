@@ -703,3 +703,28 @@ html[data-theme="light"] .loudness-meter {
         transition: none;
     }
 }
+
+/*
+ * Ce que la source ne porte pas.
+ *
+ * Montré plutôt que retiré : une liste qui change de longueur d'une piste à
+ * l'autre ne dit pas si le 4K manque parce qu'il n'existe pas ou parce qu'on a
+ * mal regardé. Éteint, il dit les deux à la fois.
+ */
+.quality-submenu-item.is-unavailable {
+    opacity: 0.38;
+    cursor: not-allowed;
+}
+
+.quality-submenu-item.is-unavailable:hover {
+    background: transparent;
+}
+
+/* L'attente de l'inventaire : une à trois secondes, et il vaut mieux le dire
+   que laisser croire à une liste définitive. */
+.quality-submenu-pending {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.72rem;
+    font-style: italic;
+    color: var(--text-muted);
+}

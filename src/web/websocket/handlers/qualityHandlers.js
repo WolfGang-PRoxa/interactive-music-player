@@ -8,6 +8,7 @@
 const database = require('../../../database/Database');
 const preloadManager = require('../../../audio/PreloadManager');
 const loudness = require('../../../audio/loudness');
+const videoSource = require('../../../audio/videoSource');
 const loudnessAnalyzer = require('../../../audio/LoudnessAnalyzer');
 const { applyLoudness } = require('../../../audio/playbackSettings');
 const log = require('../../../utils/logger');
@@ -166,7 +167,56 @@ function findTrack(ctx, url) {
     return { url, title: url };
 }
 
+/**
+ * Dit quelles définitions et quel débit la source porte réellement.
+ *
+ * Le menu contextuel proposait les six définitions et les cinq débits sans
+ * jamais savoir si le fichier existait dans aucun d'eux. Offrir du 4K sur une
+ * vidéo mise en ligne en 720p n'est pas un choix, c'est une promesse qu'on ne
+ * tient pas — et l'utilisateur ne le découvrait qu'au fichier obtenu.
+ *
+ * La piste est d'abord **pontée**. Une adresse Spotify ou Deezer ne porte aucun
+ * flux : c'est la vidéo vers laquelle le bot la fait pointer qui en porte, et
+ * c'est donc elle qu'il faut interroger. Le pont étant celui qu'emploie la
+ * lecture, les définitions annoncées sont exactement celles qu'on obtiendra.
+ *
+ * L'appel prend une à trois secondes ; il ne part qu'à l'ouverture d'un
+ * sous-menu, et son résultat est retenu dix minutes.
+ */
+async function handleRequestTrackFormats(ctx) {
+    const { ws, data } = ctx;
+    const url = data && typeof data.url === 'string' ? data.url.trim() : '';
+    if (!url) return;
+
+    const send = (payload) => {
+        try {
+            ws.send(JSON.stringify({ type: 'trackFormats', data: { url, ...payload } }));
+        } catch (e) {
+            // Socket fermée : le menu qui attendait n'existe plus non plus.
+        }
+    };
+
+    // Un fichier du disque n'a qu'une forme, la sienne : rien à inventorier, et
+    // l'interroger lancerait un processus pour rien.
+    if (!/^https?:\/\//i.test(url)) {
+        return send({ known: false, local: true, heights: [], audioKbps: null });
+    }
+
+    try {
+        const playable = await preloadManager.resolvePlayableTrack({ url, title: url });
+        const target = (playable && playable.url) ? playable.url : url;
+        const found = await videoSource.inventory(target);
+        send({ ...found, local: false });
+    } catch (err) {
+        // Rien trouvé n'est pas une erreur d'interface : le menu retombe alors
+        // sur son comportement d'avant, qui propose tout.
+        log.debug(`[Quality] No format list for ${url}: ${err.message}`);
+        send({ known: false, local: false, heights: [], audioKbps: null });
+    }
+}
+
 module.exports = {
+    handleRequestTrackFormats,
     handleSetTrackQuality,
     handleSetTrackLoudness,
     handleRequestTrackLoudness,

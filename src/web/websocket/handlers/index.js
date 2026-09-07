@@ -51,6 +51,7 @@ module.exports = {
     setDefaultChannel: guildHandlers.handleSetDefaultChannel,
     setPlayMode: playbackHandlers.handleSetPlayMode,
     setTrackLoudness: qualityHandlers.handleSetTrackLoudness,
+    requestTrackFormats: qualityHandlers.handleRequestTrackFormats,
     setTrackQuality: qualityHandlers.handleSetTrackQuality,
     admitGuest: shareHandlers.handleAdmitGuest,
     tunnelState: tunnelHandlers.handleTunnelState,
