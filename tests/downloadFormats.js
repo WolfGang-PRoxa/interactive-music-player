@@ -212,6 +212,20 @@ stub('../src/audio/PreloadManager', {
         return { ffmpegInput: 'https://exemple/piste.webm', inputStream: null };
     },
 });
+/*
+ * La recherche de source, écartée : ce fichier éprouve le choix du conteneur et
+ * son repli, pas la sélection du flux.
+ *
+ * Sans ce double, `resolveAudio` lancerait youtube-dl sur une adresse inventée à
+ * chaque téléchargement d'essai, et ses arguments se mêleraient à ceux de ffmpeg
+ * dans ce que le test observe. Rendre `null` fait retomber le gestionnaire sur
+ * la résolution du préchargeur, doublée juste au-dessus — c'est le chemin que ce
+ * fichier veut suivre. Le choix du flux a son propre test.
+ */
+stub('../src/audio/videoSource', {
+    resolveAudio: async () => null,
+    resolve: async () => ({ videoUrl: null, audioUrl: null, audioOnly: true }),
+});
 stub('../src/web/websocket/handlerUtils', {
     searchLocalAwareTrack: async () => ({
         tracks: [{ title: 'Essai', url: 'https://exemple/piste' }],

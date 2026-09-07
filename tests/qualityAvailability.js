@@ -131,6 +131,75 @@ console.log('\nLe débit : atteignable, mais pas toujours utile\n');
         'ne rien savoir n\'est pas savoir que non');
 }
 
+// ───────────────────── Le flux réellement choisi ─────────────────────
+
+console.log('\nCe que la demande va réellement chercher\n');
+
+{
+    const source = require(path.join(ROOT, 'src', 'audio', 'videoSource.js'));
+    const { stepDown, VIDEO_LADDER, AUDIO_LADDER } = source;
+
+    // Le défaut signalé : la qualité demandée n'était pas celle chargée.
+    check('la définition demandée est prise quand elle existe',
+        stepDown(VIDEO_LADDER, 1080, [2160, 1440, 1080, 720]) === 1080);
+
+    check('  … sinon on descend, sans sauter de cran',
+        stepDown(VIDEO_LADDER, 2160, [1080, 720, 480]) === 1080
+        && stepDown(VIDEO_LADDER, 1440, [1080, 720]) === 1080);
+
+    /*
+     * Le piège d'une échelle prise au pied de la lettre.
+     *
+     * YouTube sert du 160, du 128, du 70 : un seul de ces débits figure au menu.
+     * Marcher sur les barreaux rendrait 128 pour une demande de 320, en
+     * laissant le 160 de côté — moins bien que ce qui existe, sans le dire.
+     */
+    check('un débit hors barreau n\'est pas ignoré pour autant',
+        stepDown(AUDIO_LADDER, 320, [160, 128, 70]) === 160,
+        '160 existe et vaut mieux que le barreau 128');
+
+    check('  … et une demande basse reste basse',
+        stepDown(AUDIO_LADDER, 128, [160, 128, 70]) === 128);
+
+    // Tout ce que porte la source est au-dessus : mieux vaut trop que rien.
+    check('quand tout dépasse la demande, on prend le plus petit',
+        stepDown(VIDEO_LADDER, 360, [2160, 1440]) === 1440
+        && stepDown(AUDIO_LADDER, 96, [160]) === 160,
+        'un fichier muet ou sans image ne vaut rien du tout');
+
+    check('une source sans rien ne rend rien',
+        stepDown(VIDEO_LADDER, 1080, []) === null);
+
+    const SRC = fs.readFileSync(path.join(ROOT, 'src', 'audio', 'videoSource.js'), 'utf8');
+
+    // Les deux demandes sont satisfaites séparément : une définition absente ne
+    // doit pas dégrader le son, ni l'inverse.
+    check('image et son sont choisis chacun pour leur compte',
+        /stepDown\(VIDEO_LADDER, height/.test(SRC)
+        && /stepDown\(AUDIO_LADDER, audioKbps/.test(SRC));
+
+    const HANDLER = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'websocket', 'handlers', 'downloadHandlers.js'), 'utf8');
+
+    check('les deux demandes partent ensemble vers la résolution',
+        /resolve\(url, \{ height, audioKbps: Number\(bitrate\) \}\)/.test(HANDLER));
+
+    /*
+     * Le défaut le plus trompeur des deux.
+     *
+     * Le transcodage écrivait bien un fichier au débit demandé, mais depuis le
+     * flux que l'extracteur proposait — parfois à 70 kbps. Le nombre inscrit
+     * dans le fichier était exact, et la qualité imaginaire.
+     */
+    check('le débit demandé choisit aussi la source, pas seulement la sortie',
+        /videoSource\.resolveAudio\(playable\.url, bitrate\)/.test(HANDLER),
+        'un fichier « 320 kbps » tiré d\'une source à 70 en portait le nom, pas la qualité');
+
+    check('  … avec repli sur le chemin d\'avant',
+        /: await preloadManager\.resolveAudioInput\(/.test(HANDLER),
+        'une source qui ne s\'inventorie pas doit continuer de se télécharger');
+}
+
 // ───────────────────── Le raccordement ─────────────────────
 
 console.log('\nCe qui tient les deux bouts\n');

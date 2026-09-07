@@ -223,7 +223,9 @@ function runFfmpeg(args, inputStream, partial, finalPath, title) {
  * @returns {Promise<string>} Chemin écrit.
  */
 async function transcodeVideo(track, url, dir, title, bitrate, container, height) {
-    const source = await videoSource.resolve(url, height);
+    // Les deux demandes voyagent ensemble mais sont satisfaites séparément :
+    // une définition absente ne doit pas dégrader le son, ni l'inverse.
+    const source = await videoSource.resolve(url, { height, audioKbps: Number(bitrate) });
 
     const { ext, args: encoding } =
         downloadFormats.videoEncodeArgs(container, bitrate, { still: source.audioOnly });
@@ -326,7 +328,22 @@ async function handleDownloadTrack(ctx) {
                         bitrate, container, videoHeight);
                 }
 
-                const input = await preloadManager.resolveAudioInput(playable.track, playable.url);
+                /*
+                 * Le débit demandé choisit la source, et pas seulement la sortie.
+                 *
+                 * Le transcodage écrivait bien un fichier au débit voulu, mais à
+                 * partir du flux que l'extracteur proposait — parfois à 70 kbps.
+                 * Le nombre était exact et la qualité imaginaire. On cherche donc
+                 * d'abord la meilleure source qui ne dépasse pas la demande.
+                 *
+                 * Le repli reste le chemin d'avant : une source qui ne se laisse
+                 * pas inventorier doit continuer de se télécharger.
+                 */
+                const choisi = await videoSource.resolveAudio(playable.url, bitrate);
+                const input = choisi
+                    ? { ffmpegInput: choisi.url, inputStream: null }
+                    : await preloadManager.resolveAudioInput(playable.track, playable.url);
+
                 if (!input.ffmpegInput && !input.inputStream) {
                     throw new Error(`Aucune source audio pour « ${trackTitle} »`);
                 }

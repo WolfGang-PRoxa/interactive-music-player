@@ -127,16 +127,107 @@ async function inventory(url) {
     return value;
 }
 
+/** Les barreaux du menu, du plus haut au plus bas. */
+const VIDEO_LADDER = [2160, 1440, 1080, 720, 480, 360];
+const AUDIO_LADDER = [320, 256, 192, 128, 96];
+
 /**
- * Le meilleur flux vidéo à la résolution voulue, et le son qui va avec.
+ * Descend jusqu'à ce que la source suive : la meilleure valeur qui ne dépasse
+ * pas la demande.
+ *
+ * C'est bien « descendre d'un cran à la fois », mais sur les valeurs que la
+ * source porte, et non sur les barreaux du menu. Pour la vidéo cela revient au
+ * même — les hauteurs servies *sont* les barreaux — et pour l'audio cela change
+ * tout : YouTube sert du 160, du 128, du 70, dont un seul est au menu. Marcher
+ * sur les barreaux rendrait 128 pour une demande de 320 en laissant le 160 de
+ * côté, c'est-à-dire moins bien que ce qui existe, et sans que rien ne le dise.
+ *
+ * Un dernier filet : si tout ce que porte la source est au-dessus de la demande,
+ * on prend la plus basse. Mieux vaut trop que rien — une image de 2160p pèse
+ * lourd, mais un fichier muet ou sans image ne vaut rien du tout.
+ *
+ * L'échelle du menu reste passée en argument : elle ne sert plus à choisir, mais
+ * elle dit d'où vient la demande, et un appelant qui l'oublierait signalerait
+ * qu'il a confondu les deux notions.
+ *
+ * @param {number[]} ladder - Les barreaux du menu, pour mémoire.
+ * @param {number} requested
+ * @param {number[]} available - Ce que la source porte réellement.
+ * @returns {number|null}
+ */
+function stepDown(ladder, requested, available) {
+    const has = [...new Set(available.map(Number))].filter((v) => Number.isFinite(v) && v > 0);
+    const target = Number(requested);
+    if (!has.length) return null;
+
+    const below = has.filter((v) => v <= target).sort((a, b) => b - a);
+    if (below.length) return below[0];
+
+    return has.sort((a, b) => a - b)[0];
+}
+
+/**
+ * Le flux sonore le plus proche du débit demandé, sans dépasser.
+ *
+ * Sert aux téléchargements qui n'écrivent que du son. Ils passaient jusqu'ici
+ * par la résolution du préchargeur, qui rend le flux que l'extracteur propose
+ * sans jamais regarder le débit voulu : le réglage n'agissait qu'au transcodage,
+ * si bien qu'un choix à 320 kbps produisait bien un fichier de 320 kbps — mais
+ * dont le contenu venait parfois d'une source à 70. Le nombre était exact, la
+ * qualité imaginaire.
+ *
+ * Rend `null` plutôt qu'un pis-aller quand la source ne se laisse pas
+ * inventorier : l'appelant retombe alors sur le chemin d'avant, qui fonctionne.
+ *
+ * @param {string} url - Adresse déjà pontée.
+ * @param {number} kbps - Débit demandé.
+ * @returns {Promise<{ url: string, kbps: number|null }|null>}
+ */
+async function resolveAudio(url, kbps) {
+    if (!url || !/^https?:\/\//i.test(url)) return null;
+
+    const entry = await dump(url);
+    const formats = (entry && Array.isArray(entry.formats)) ? entry.formats : [];
+    const sons = formats.filter((f) => f && f.acodec && f.acodec !== 'none' && f.url);
+    if (!sons.length) return null;
+
+    const debits = sons.map((f) => Number(f.abr) || 0).filter((v) => v > 0);
+    if (!debits.length) return null;
+
+    const retenu = stepDown(AUDIO_LADDER, kbps, debits);
+    const exact = sons.find((f) => Math.round(Number(f.abr) || 0) === retenu);
+    return exact ? { url: exact.url, kbps: retenu } : null;
+}
+
+/**
+ * Le flux vidéo et le flux audio, choisis chacun pour son compte.
+ *
+ * Les deux demandes sont indépendantes — on peut vouloir du 1080p avec un son
+ * modeste, ou l'inverse — et les chercher ensemble ferait qu'une définition
+ * absente dégraderait le son sans raison. Chacun descend donc son échelle de son
+ * côté, et l'on ne recoud qu'ensuite.
+ *
+ * Le son d'un format vidéo complet est pris tel quel : le séparer pour aller
+ * chercher un autre débit obligerait à réencoder l'image, ce qu'on refuse par
+ * ailleurs.
  *
  * @param {string} url - L'adresse de la piste, telle que l'extracteur la connaît.
- * @param {number} [height] - Hauteur visée, en pixels.
+ * @param {number|{height?: number, audioKbps?: number}} [wanted] - Hauteur visée,
+ *   ou les deux demandes. Un nombre seul reste accepté pour les appels d'avant.
  * @returns {Promise<{ videoUrl: string|null, audioUrl: string|null, audioOnly: boolean,
- *   height: number|null }>}
+ *   height: number|null, audioKbps: number|null }>}
  */
-async function resolve(url, height = DEFAULT_HEIGHT) {
-    const vide = { videoUrl: null, audioUrl: null, audioOnly: true, height: null };
+async function resolve(url, wanted = DEFAULT_HEIGHT) {
+    const ask = typeof wanted === 'object' && wanted !== null ? wanted : { height: wanted };
+    const height = Number.isFinite(Number(ask.height)) ? Number(ask.height) : DEFAULT_HEIGHT;
+    const audioKbps = Number.isFinite(Number(ask.audioKbps)) ? Number(ask.audioKbps) : null;
+    return resolveWith(url, height, audioKbps);
+}
+
+async function resolveWith(url, height, audioKbps) {
+    const vide = {
+        videoUrl: null, audioUrl: null, audioOnly: true, height: null, audioKbps: null,
+    };
     if (!url || !/^https?:\/\//i.test(url)) return vide;
 
     // Interrogation partagée avec `inventory` : une source qui ne répond pas
@@ -149,29 +240,56 @@ async function resolve(url, height = DEFAULT_HEIGHT) {
     const images = formats.filter((f) => f && f.vcodec && f.vcodec !== 'none' && f.height);
     if (!images.length) return vide;
 
-    // La plus haute qui ne dépasse pas la cible ; à défaut la plus petite qui
-    // existe, parce qu'une image trop grande vaut mieux que pas d'image.
-    const choisi = images
-        .filter((f) => f.height <= height)
-        .sort((a, b) => b.height - a.height)[0]
-        || images.sort((a, b) => a.height - b.height)[0];
-
+    // ── L'image, pour son compte ──
+    const retenue = stepDown(VIDEO_LADDER, height, images.map((f) => Number(f.height)));
+    const candidates = images.filter((f) => Number(f.height) === retenue);
+    // À définition égale, le débit le plus élevé : c'est le même nombre de
+    // pixels, mieux servis.
+    const choisi = candidates.sort((a, b) => (b.tbr || 0) - (a.tbr || 0))[0];
     if (!choisi || !choisi.url) return vide;
 
+    // ── Le son, pour le sien ──
     let audioUrl = null;
+    let sonRetenu = null;
+
     if (!choisi.acodec || choisi.acodec === 'none') {
-        const sons = formats
-            .filter((f) => f && f.acodec && f.acodec !== 'none')
-            .sort((a, b) => (b.tbr || 0) - (a.tbr || 0));
-        audioUrl = sons[0] ? sons[0].url : null;
+        const sons = formats.filter((f) => f && f.acodec && f.acodec !== 'none' && f.url);
+        const debits = sons.map((f) => Number(f.abr) || 0).filter((v) => v > 0);
+
+        if (debits.length && audioKbps) {
+            sonRetenu = stepDown(AUDIO_LADDER, audioKbps, debits);
+            const exact = sons.filter((f) => Math.round(Number(f.abr) || 0) === sonRetenu);
+            audioUrl = (exact[0] || null) && exact[0].url;
+        }
+
+        // Aucun débit annoncé, ou aucune demande : le meilleur disponible, comme
+        // avant. Ne rien prendre laisserait une vidéo muette.
+        if (!audioUrl) {
+            const meilleur = sons.sort((a, b) => (b.tbr || 0) - (a.tbr || 0))[0];
+            audioUrl = meilleur ? meilleur.url : null;
+            sonRetenu = meilleur ? Math.round(Number(meilleur.abr) || 0) || null : null;
+        }
+    } else {
+        // Format complet : son et image voyagent ensemble, et les séparer
+        // obligerait à réencoder l'image pour les recoudre.
+        sonRetenu = Math.round(Number(choisi.abr) || 0) || null;
     }
 
     return {
         videoUrl: choisi.url,
         audioUrl,
         audioOnly: false,
-        height: choisi.height || null,
+        height: Number(choisi.height) || null,
+        audioKbps: sonRetenu,
     };
 }
 
-module.exports = { resolve, inventory, DEFAULT_HEIGHT };
+module.exports = {
+    resolve,
+    resolveAudio,
+    inventory,
+    stepDown,
+    VIDEO_LADDER,
+    AUDIO_LADDER,
+    DEFAULT_HEIGHT,
+};
