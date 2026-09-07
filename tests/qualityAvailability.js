@@ -200,16 +200,118 @@ console.log('\nCe que la demande va réellement chercher\n');
         'une source qui ne s\'inventorie pas doit continuer de se télécharger');
 }
 
+// ───────────────────── La vidéo verticale ─────────────────────
+
+console.log('\nCe qu\'on appelle « 1080p » quand la vidéo est verticale\n');
+
+{
+    const SRC = fs.readFileSync(path.join(ROOT, 'src', 'audio', 'videoSource.js'), 'utf8');
+
+    /*
+     * Le défaut signalé, et sa cause.
+     *
+     * https://youtube.com/watch?v=jS0nFxAHkBU est verticale : son « 1080p » fait
+     * 1080 de large et 1920 de haut. Lire `height` faisait donc dire 1920 à ce
+     * que tout le monde nomme 1080p, et une demande de 2160p y trouvait un
+     * « 1920 » inférieur où s'arrêter — un nombre qui ne figure dans aucun menu.
+     */
+    check('la définition se mesure au petit côté, pas à la hauteur',
+        /Math\.min\(w, h\)/.test(SRC),
+        'une verticale de 1080×1920 s\'appelle 1080p partout');
+
+    check('  … et cette mesure sert partout',
+        (SRC.match(/definitionOf/g) || []).length >= 4,
+        'inventaire, choix du flux, et valeur rendue');
+
+    // Les formats réels de la vidéo signalée.
+    const reels = [[144, 256], [240, 426], [360, 640], [480, 854],
+        [608, 1080], [720, 1280], [1080, 1920]];
+    const definitions = reels.map(([w, h]) => Math.min(w, h));
+    const source = require(path.join(ROOT, 'src', 'audio', 'videoSource.js'));
+
+    check('2160p demandé sur cette vidéo donne 1080p',
+        source.stepDown(source.VIDEO_LADDER, 2160, definitions) === 1080,
+        'et non 1920, qui n\'est le nom de rien');
+
+    check('  … et non la hauteur brute, qui aurait donné 1920',
+        source.stepDown(source.VIDEO_LADDER, 2160, reels.map(([, h]) => h)) === 1920,
+        'ce que faisait le code d\'avant');
+}
+
+// ───────────────────── Le préchargement ─────────────────────
+
+console.log('\nLe débit inscrit dans le cache\n');
+
+{
+    const PRE = fs.readFileSync(path.join(ROOT, 'src', 'audio', 'PreloadManager.js'), 'utf8');
+
+    /*
+     * L'autre moitié du défaut signalé.
+     *
+     * Le préchargement transcodait au débit voulu sans regarder ce qu'il avait
+     * sous la main : une source à 130 kbps produisait un fichier nommé « 320 »,
+     * et le menu l'annonçait ainsi. Le nombre était exact — le transcodage est à
+     * débit constant — mais il décrivait le contenant, pas le contenu.
+     */
+    check('le débit demandé est ramené à ce que la source porte',
+        /clampBitrateToSource\(track, asked\)/.test(PRE));
+
+    check('  … et le repli est dit au journal',
+        /kbps unavailable for/.test(PRE),
+        'un fichier arrivé en 128 au lieu de 320 doit s\'expliquer');
+
+    // Le nom du fichier en cache porte le débit, et l'index n'accepte que les
+    // valeurs du menu : une source à 130 doit donner 128, pas 130.
+    check('la valeur retenue reste un barreau du menu',
+        /VALID_AUDIO_BITRATES\s*\n?\s*\.map\(Number\)/.test(PRE),
+        'le cache n\'indexe que les débits qu\'il connaît');
+
+    check('une source non inventoriable ne change rien',
+        /if \(!found\.known \|\| !found\.audioKbps\) return asked;/.test(PRE),
+        'un fichier local, une plateforme inconnue, un réseau coupé');
+
+    // Le repli change la clé du téléchargement : celle que l'appelant avait
+    // vérifiée n'est plus la bonne.
+    check('le doublon est écarté après le repli',
+        /if \(this\.activeDownloads\.has\(dlKey\)\) return;/.test(PRE),
+        'l\'appelant avait vérifié l\'autre clé');
+
+    const MENU = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'public', 'js', 'qualityMenu.js'), 'utf8');
+
+    check('le menu annonce la définition obtenue, pas celle demandée',
+        /effectiveVideo\(track\.desiredVideoQuality, formats\)/.test(MENU),
+        '« 2160p » sur une source qui plafonne à 1080p était un chiffre creux');
+
+    check('  … et se repeint quand l\'inventaire arrive',
+        /renderMenu\(\);\s*\n\s*if \(!type\) return;/.test(MENU));
+}
+
 // ───────────────────── Le raccordement ─────────────────────
 
 console.log('\nCe qui tient les deux bouts\n');
 
 {
-    check('l\'inventaire n\'est demandé qu\'à l\'ouverture d\'un sous-menu',
-        /askFormats\(track\.url\);/.test(SOURCE)
-        && !/askFormats\([^)]*\)/.test(SOURCE.slice(SOURCE.indexOf('function renderMenu'),
-            SOURCE.indexOf('function openMenu'))),
+    /*
+     * L'inventaire part au clic droit, et nulle part ailleurs.
+     *
+     * Il l'était d'abord à l'ouverture du seul sous-menu, pour n'en payer le
+     * coût que si l'on venait régler quelque chose. Mais le menu lui-même en
+     * dépend depuis qu'il annonce la définition réellement obtenue : la question
+     * est posée dès le clic droit, et c'est là que la réponse doit partir.
+     *
+     * Ce qu'il ne faut surtout pas, c'est qu'il parte d'un chemin emprunté à
+     * chaque diffusion d'état — un appel réseau par piste et par seconde.
+     */
+    check('l\'inventaire est demandé à l\'ouverture du menu',
+        /askFormats\(track\.url\);/.test(SOURCE));
+
+    check('  … et jamais depuis la mise à jour de l\'état',
+        !/askFormats\(/.test(SOURCE.slice(SOURCE.indexOf('function refreshOpenMenu') >= 0
+            ? SOURCE.indexOf('function refreshOpenMenu')
+            : SOURCE.length)),
         'un appel réseau par piste à chaque état serait payé pour rien');
+
 
     check('  … et une seule fois par adresse',
         /if \(!url \|\| formatsByUrl\.has\(url\)\) return;/.test(SOURCE));

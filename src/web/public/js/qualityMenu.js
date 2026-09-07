@@ -64,6 +64,31 @@ function optionAvailable(type, value, formats) {
     return Number(value) <= formats.audioKbps * 1.1;
 }
 
+/**
+ * La définition qu'on obtiendra réellement, pour celle qu'on a demandée.
+ *
+ * Même règle que côté serveur : la meilleure que la source porte sans dépasser
+ * la demande, et à défaut la plus petite qu'elle ait. Tant que l'inventaire
+ * n'est pas connu, la demande fait foi — annoncer autre chose sur une supposition
+ * serait pire que d'annoncer un vœu.
+ *
+ * @param {string|number} requested
+ * @param {object|null|undefined} formats
+ * @returns {number|string}
+ */
+function effectiveVideo(requested, formats) {
+    if (!formats || !formats.known || !Array.isArray(formats.heights)
+        || !formats.heights.length) {
+        return requested;
+    }
+
+    const target = Number(requested);
+    const below = formats.heights.filter((h) => h <= target).sort((a, b) => b - a);
+    if (below.length) return below[0];
+
+    return [...formats.heights].sort((a, b) => a - b)[0];
+}
+
 /** Débits MP3 proposés, du plus élevé au plus faible. */
 const AUDIO_BITRATES = [
     { value: '320', label: '320 kbps' },
@@ -1061,7 +1086,21 @@ function renderMenu(force) {
     ));
 
     if (track.hasVideo) {
-        menuEl.appendChild(buildButton('video', `${track.desiredVideoQuality}p`, false));
+        /*
+         * La définition annoncée est celle qu'on obtiendra, pas celle qu'on a
+         * demandée.
+         *
+         * Une piste réglée sur 2160p dont la source s'arrête à 1080p affichait
+         * « 2160p » — un chiffre que rien ne viendrait honorer, et qui laissait
+         * croire le contraire jusqu'au fichier obtenu. L'inventaire est
+         * demandé ici plutôt qu'à l'ouverture du sous-menu : c'est le clic droit
+         * qui pose la question, et la réponse est gardée dix minutes.
+         */
+        askFormats(track.url);
+        const formats = formatsByUrl.get(track.url);
+        const effective = effectiveVideo(track.desiredVideoQuality, formats);
+
+        menuEl.appendChild(buildButton('video', `${effective}p`, false));
     }
 }
 
@@ -1265,9 +1304,15 @@ window.MusicPlayer.onTrackFormats = function (data) {
     if (!data || !data.url) return;
     formatsByUrl.set(data.url, data);
 
-    if (openedUrl !== data.url || !submenuOpen) return;
+    if (openedUrl !== data.url || !menuEl) return;
+
+    // Le menu lui-même en dépend désormais : son bouton vidéo annonce la
+    // définition qu'on obtiendra, laquelle vient d'être apprise.
     const type = submenuOpen;
-    const bouton = menuEl ? menuEl.querySelector(`[data-quality-type="${type}"]`) : null;
+    renderMenu();
+    if (!type) return;
+
+    const bouton = menuEl.querySelector(`[data-quality-type="${type}"]`);
     if (!bouton) return;
 
     // `toggleSubmenu` referme quand on lui redonne le type ouvert : on remet le

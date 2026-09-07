@@ -110,7 +110,8 @@ async function inventory(url) {
     // plus basse : la même hauteur revient souvent en plusieurs codecs.
     const heights = [...new Set(formats
         .filter((f) => f && f.vcodec && f.vcodec !== 'none' && f.height)
-        .map((f) => Number(f.height)))]
+        .map(definitionOf)
+        .filter((d) => d > 0))]
         .sort((a, b) => b - a);
 
     const debits = formats
@@ -130,6 +131,28 @@ async function inventory(url) {
 /** Les barreaux du menu, du plus haut au plus bas. */
 const VIDEO_LADDER = [2160, 1440, 1080, 720, 480, 360];
 const AUDIO_LADDER = [320, 256, 192, 128, 96];
+
+/**
+ * La définition d'un format, au sens où l'utilisateur l'entend.
+ *
+ * Ce n'est **pas** la hauteur en pixels, et c'est tout le piège. Une vidéo
+ * verticale de 1080 × 1920 s'appelle « 1080p » chez YouTube comme partout
+ * ailleurs : l'étiquette suit le petit côté, jamais la hauteur.
+ *
+ * Lire `height` faisait donc dire 1920 à ce que tout le monde nomme 1080p. Une
+ * demande de 2160p y trouvait un « 1920 » inférieur et s'y arrêtait, si bien
+ * qu'on croyait descendre d'un cran alors qu'on prenait la meilleure définition
+ * existante — et le nombre affiché ne correspondait à aucun barreau du menu.
+ *
+ * @param {object} format
+ * @returns {number} 0 quand le format n'a pas d'image.
+ */
+function definitionOf(format) {
+    const w = Number(format && format.width) || 0;
+    const h = Number(format && format.height) || 0;
+    if (!h) return 0;
+    return w ? Math.min(w, h) : h;
+}
 
 /**
  * Descend jusqu'à ce que la source suive : la meilleure valeur qui ne dépasse
@@ -241,8 +264,8 @@ async function resolveWith(url, height, audioKbps) {
     if (!images.length) return vide;
 
     // ── L'image, pour son compte ──
-    const retenue = stepDown(VIDEO_LADDER, height, images.map((f) => Number(f.height)));
-    const candidates = images.filter((f) => Number(f.height) === retenue);
+    const retenue = stepDown(VIDEO_LADDER, height, images.map(definitionOf));
+    const candidates = images.filter((f) => definitionOf(f) === retenue);
     // À définition égale, le débit le plus élevé : c'est le même nombre de
     // pixels, mieux servis.
     const choisi = candidates.sort((a, b) => (b.tbr || 0) - (a.tbr || 0))[0];
@@ -279,7 +302,7 @@ async function resolveWith(url, height, audioKbps) {
         videoUrl: choisi.url,
         audioUrl,
         audioOnly: false,
-        height: Number(choisi.height) || null,
+        height: definitionOf(choisi) || null,
         audioKbps: sonRetenu,
     };
 }

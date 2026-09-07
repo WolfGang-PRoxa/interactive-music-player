@@ -59,6 +59,50 @@ function resolveAudioBitrate(track) {
 }
 
 /**
+ * Ramène le débit demandé à ce que la source porte réellement.
+ *
+ * Le préchargement transcodait au débit voulu sans jamais regarder ce qu'il
+ * avait sous la main : une piste dont la meilleure source fait 130 kbps
+ * produisait un fichier nommé « 320 », et le menu l'annonçait ainsi. Le nombre
+ * était exact — le transcodage est bien à débit constant — mais il décrivait le
+ * contenant, pas le contenu. Monter en débit ne récupère rien : cela pèse deux
+ * fois plus pour la même musique, et fait croire à une qualité qu'on n'a pas.
+ *
+ * Le résultat doit rester un barreau du menu, et non le débit exact de la
+ * source : c'est lui qui est inscrit dans le nom du fichier en cache, et
+ * l'index n'accepte que les valeurs connues. Une source à 130 devient donc 128.
+ *
+ * Ne touche à rien quand la source ne se laisse pas inventorier — un fichier
+ * local, une plateforme que l'outil ne sait pas lire, un réseau coupé : le
+ * comportement d'avant est alors préservé.
+ *
+ * @param {object} track
+ * @param {string} asked - Débit souhaité, déjà validé.
+ * @returns {Promise<string>}
+ */
+async function clampBitrateToSource(track, asked) {
+    try {
+        const url = track && track.url;
+        if (!url || !/^https?:\/\//i.test(url)) return asked;
+
+        const found = await require('./videoSource').inventory(url);
+        if (!found.known || !found.audioKbps) return asked;
+        if (Number(asked) <= found.audioKbps) return asked;
+
+        const rung = VALID_AUDIO_BITRATES
+            .map(Number)
+            .sort((a, b) => b - a)
+            .find((r) => r <= found.audioKbps);
+
+        // Sous le plus bas barreau, on garde le plus bas : descendre plus n'est
+        // pas proposé, et refuser de précharger serait pire.
+        return String(rung || VALID_AUDIO_BITRATES[VALID_AUDIO_BITRATES.length - 1]);
+    } catch (e) {
+        return asked;
+    }
+}
+
+/**
  * Chemin du fichier que cette piste désigne sur le disque du bot, ou null.
  *
  * Un fichier téléversé n'est local que pour le bot : le navigateur d'un
@@ -1410,8 +1454,18 @@ class PreloadManager {
         // Débit choisi dans la box « Ajouter un fichier » ou dans le menu de la
         // piste. Ne concerne que les sources distantes : un fichier local
         // n'est jamais transcodé.
-        const bitrate = audioBitrate || resolveAudioBitrate(track);
+        const asked = audioBitrate || resolveAudioBitrate(track);
+        // Le débit inscrit dans le cache doit décrire le contenu, pas le vœu.
+        const bitrate = await clampBitrateToSource(track, asked);
+        if (bitrate !== asked) {
+            log.info(`[PreloadManager] ${asked} kbps unavailable for "${track.title}"; `
+                + `falling back to ${bitrate} kbps, the best the source carries.`);
+        }
+
         const dlKey = this._downloadKey(key, bitrate);
+        // Le repli a pu désigner un téléchargement déjà lancé sous ce
+        // débit-là : l'appelant, lui, avait vérifié l'autre clé.
+        if (this.activeDownloads.has(dlKey)) return;
         const tmpPath = this._tempPath(key, bitrate);
         const mp3Path = path.join(this.cacheDir, cacheFileName(key, bitrate));
 
