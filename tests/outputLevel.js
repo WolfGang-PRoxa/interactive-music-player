@@ -251,13 +251,13 @@ console.log('\nCe que les infobulles ajoutent aux deux nombres\n');
 
     // Une adresse reçue il y a une minute peut ne plus rien servir.
     check('  … en gardant un repli sous la main',
-        db.getAttribute('data-tooltip-image-fallback') === 'img/itunes-fallback.png',
+        db.getAttribute('data-tooltip-image-fallback') === '/img/itunes-fallback.png',
         'une vignette distante peut avoir disparu');
 
     // Sans pochette, le repli prend directement la place.
     m.play({ status: 'measured', measured: -14, gainDb: 0 }, { title: 'Un fichier local' });
     check('un fichier sans pochette montre l\'image de repli',
-        db.getAttribute('data-tooltip-image') === 'img/itunes-fallback.png',
+        db.getAttribute('data-tooltip-image') === '/img/itunes-fallback.png',
         db.getAttribute('data-tooltip-image'));
 
     check('le repli est servi par le bot, pas par un site tiers',

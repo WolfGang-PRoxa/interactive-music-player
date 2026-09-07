@@ -20,6 +20,7 @@ const auth = require('./auth');
 const { arePathsOrUrlsEqual } = require('../utils/paths');
 const { readSetAsideQueue } = require('../utils/setAsideQueue');
 const { formatMs, parseDurationToMs } = require('../utils/duration');
+const artwork = require('../utils/artwork');
 const log = require('../utils/logger');
 
 /** Le dashboard n'échange que de petits messages JSON ; les fichiers passent par POST /api/upload. */
@@ -2087,7 +2088,20 @@ function formatTrackWithPreload(t) {
         title: t.title,
         author: t.author || null,
         duration: t.duration,
-        thumbnail: t.thumbnail || null,
+        /*
+         * La pochette de repli des fichiers locaux, ramenée à la maison.
+         *
+         * `@discord-player/extractor` attribue d'office aux pistes du disque une
+         * image hébergée chez Wikimedia. Le tableau de bord s'utilise en réseau
+         * local, parfois sans accès à l'extérieur : la pochette d'un fichier
+         * pourtant posé à un mètre de là manquait alors à l'écran.
+         *
+         * La substitution est faite ici, et ici seulement : c'est le passage
+         * obligé de tout ce que le tableau de bord affiche. Les embeds Discord,
+         * eux, gardent l'adresse distante — Discord ne sait pas joindre le bot,
+         * et lui tendre un chemin local ne lui montrerait rien du tout.
+         */
+        thumbnail: artwork.localise(t.thumbnail),
         url: t.url || null,
         isPreloaded: pInfo.isPreloaded,
         isPreloading: pInfo.isPreloading,
