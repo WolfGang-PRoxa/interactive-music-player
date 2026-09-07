@@ -43,6 +43,7 @@ function fakeElement(classes = [], children = []) {
             },
         },
         removeAttribute: (a) => { delete el._attrs[a]; },
+        remove: () => { el._removed = true; },
         querySelectorAll: () => children,
         getBoundingClientRect: () => ({ left: 100, top: 200, width: 320, height: 64 }),
         cloneNode: () => fakeElement([...el._classes], children.map((c) => c.cloneNode())),
@@ -52,29 +53,33 @@ function fakeElement(classes = [], children = []) {
 }
 
 function load() {
-    let dragstartHandler = null;
+    // Tous les gestionnaires, et non le seul `dragstart` : l'aperçu vivant se
+    // déplace et se retire par quatre autres événements.
+    const handlers = {};
     const fakeBody = { _added: [], appendChild(n) { this._added.push(n); }, };
     const fakeWindow = {};
     const context = {
         window: fakeWindow,
         document: {
             addEventListener: (type, fn, capture) => {
-                if (type === 'dragstart' && capture === true) dragstartHandler = fn;
+                if (capture === true) handlers[type] = fn;
             },
             body: fakeBody,
         },
         console,
         setTimeout: () => {},
+        // Le module en fabrique une pour effacer la vignette du navigateur.
+        Image: function FakeImage() { this.src = ''; },
     };
     context.globalThis = context;
     vm.createContext(context);
     vm.runInContext(SOURCE, context);
-    return { api: fakeWindow.MusicPlayer.dragPreview, dragstartHandler, fakeBody, fakeWindow };
+    return { api: fakeWindow.MusicPlayer.dragPreview, handlers, fakeBody, fakeWindow };
 }
 
 console.log('dragPreview — building the preview\n');
 
-const { api, dragstartHandler, fakeBody, fakeWindow } = load();
+const { api, handlers, fakeBody, fakeWindow } = load();
 
 const child = fakeElement(['queue-index', 'is-dragging']);
 const source = fakeElement(['queue-item', 'is-dragging', 'drag-over'], [child]);
@@ -116,9 +121,15 @@ check('translate applied', t?.value === 'translate(480px, 390px)', t?.value);
 check('  and with !important', t?.priority === 'important',
     'the guarantee that was missing and pinned the preview in a corner');
 
-console.log('\ndragPreview — mouse drag thumbnail\n');
+console.log('\ndragPreview — the live preview on mouse\n');
 
-check('a dragstart handler is installed in capture phase', typeof dragstartHandler === 'function');
+check('a dragstart handler is installed in capture phase', typeof handlers.dragstart === 'function');
+check('the pointer is followed from two sources',
+    typeof handlers.drag === 'function' && typeof handlers.dragover === 'function',
+    'drag runs dry in some browsers, dragover fills the gaps');
+check('the end of the gesture is caught twice as well',
+    typeof handlers.dragend === 'function' && typeof handlers.drop === 'function',
+    'dragend is missing when the gesture ends outside the window');
 
 let imageRequested = null;
 const event = {
@@ -130,22 +141,68 @@ const event = {
     },
 };
 fakeWindow.MusicPlayer.deviceMode = { isTouch: () => false };
-dragstartHandler(event);
+handlers.dragstart(event);
 
-check('setDragImage is called for the mouse', !!imageRequested);
-check('  offset computed from the corner of the element',
-    imageRequested && imageRequested.x === 50 && imageRequested.y === 30,
-    imageRequested ? `${imageRequested.x}, ${imageRequested.y}` : '');
-check('  the clone is inserted so it can be photographed', fakeBody._added.length === 1);
-check('  and rendered off-screen',
-    fakeBody._added[0]?._styles.get('top')?.value === '-10000px');
+/*
+ * La vignette du navigateur est une photographie : prise au départ, figée,
+ * délavée par le système. On l'efface pour lui substituer un nœud vivant, celui
+ * que le doigt déplace déjà sur téléphone.
+ */
+check('the native thumbnail is blanked out', !!imageRequested && imageRequested.x === 0,
+    'a browser will not take null for an answer');
 
+const ghost = fakeBody._added[0];
+check('  a clone is inserted in the document', fakeBody._added.length === 1 && !!ghost);
+check('  laid out fixed and above everything',
+    ghost._styles.get('position')?.value === 'fixed'
+    && ghost._styles.get('z-index')?.value === '99999');
+check('  and transparent to the pointer',
+    ghost._styles.get('pointer-events')?.value === 'none',
+    'otherwise the browser would no longer see where one is dropping');
+
+// Posé sous le pointeur dès le départ, et non dans un coin en attendant le
+// premier mouvement.
+check('  placed under the pointer straight away',
+    ghost._styles.get('transform')?.value === 'translate(100px, 200px)',
+    ghost._styles.get('transform')?.value);
+
+handlers.dragover({ clientX: 400, clientY: 300 });
+check('the preview follows the pointer',
+    ghost._styles.get('transform')?.value === 'translate(350px, 270px)',
+    ghost._styles.get('transform')?.value);
+
+/*
+ * Plusieurs navigateurs rendent (0, 0) sur le dernier `drag` d'un geste :
+ * l'aperçu irait se coller dans le coin de l'écran juste avant de disparaître.
+ */
+handlers.drag({ clientX: 0, clientY: 0 });
+check('  but ignores the null coordinates of the last event',
+    ghost._styles.get('transform')?.value === 'translate(350px, 270px)',
+    'otherwise it jumps into the corner before vanishing');
+
+handlers.dragend({});
+check('the preview leaves at the end of the gesture', ghost._removed === true);
+
+handlers.dragover({ clientX: 700, clientY: 700 });
+check('  and nothing follows a pointer any more',
+    ghost._styles.get('transform')?.value === 'translate(350px, 270px)');
+
+// Un second glisser ne doit pas laisser le premier clone derrière lui.
+fakeBody._added.length = 0;
+handlers.dragstart(event);
+handlers.dragstart(event);
+check('two starts in a row leave a single preview',
+    fakeBody._added.length === 2 && fakeBody._added[0]._removed === true,
+    'the first is cleared before the second is laid down');
+
+handlers.dragend({});
 imageRequested = null;
 fakeBody._added.length = 0;
 fakeWindow.MusicPlayer.deviceMode = { isTouch: () => true };
-dragstartHandler(event);
-check('with a finger, the native thumbnail is left aside', imageRequested === null,
-    'touchDragDrop handles its own preview');
+handlers.dragstart(event);
+check('with a finger, none of this happens',
+    imageRequested === null && fakeBody._added.length === 0,
+    'touchDragDrop handles its own preview, and there is no native drag to fix');
 
 console.log(`\n=== ${passed} passed, ${failed} failed ===`);
 process.exit(failed === 0 ? 0 : 1);
