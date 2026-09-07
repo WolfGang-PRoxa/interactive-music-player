@@ -25,6 +25,7 @@ const preloadManager = require('../../../audio/PreloadManager');
 const { searchLocalAwareTrack } = require('../handlerUtils');
 const downloadDir = require('../../../utils/downloadDir');
 const downloadFormats = require('../../../utils/downloadFormats');
+const videoSource = require('../../../audio/videoSource');
 const log = require('../../../utils/logger');
 
 /** Débits acceptés, repris des réglages d'import de la boîte. */
@@ -92,22 +93,44 @@ function transcodeRemote(input, dir, title, bitrate, container) {
     const finalPath = downloadDir.uniquePath(dir, downloadDir.safeFilename(title, ext));
     const partial = `${finalPath}.incomplete`;
 
+    const args = [];
+
+    // Une URL directe peut se rompre en route : ffmpeg reprend la connexion
+    // plutôt que d'écrire un fichier tronqué.
+    if (input.ffmpegInput && /^https?:\/\//i.test(input.ffmpegInput)) {
+        args.push('-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5');
+    }
+
+    args.push('-i', input.ffmpegInput || 'pipe:0');
+    // `-vn` : la source porte souvent une pochette en flux vidéo, que les
+    // muxers audio ne savent ranger que dans une étiquette. Sans cela ffmpeg
+    // s'arrête sur « nothing was written into output file ». Voir
+    // PreloadManager, où le même écueil a été rencontré.
+    args.push('-vn', ...encoding, '-y', partial);
+
+    return runFfmpeg(args, input.inputStream || null, partial, finalPath, title);
+}
+
+/**
+ * Lance ffmpeg, surveille sa sortie, et ne renomme qu'au succès.
+ *
+ * Partagé par l'audio et la vidéo : les deux ne diffèrent que par les arguments,
+ * et tout ce qui suit — le diagnostic gardé pour le seul cas d'échec, le flux
+ * d'entrée qu'il faut garder d'abattre le bot, le fichier partiel effacé plutôt
+ * que laissé au milieu d'une bibliothèque — leur est commun.
+ *
+ * @param {string[]} args - La ligne de commande, fichier partiel compris.
+ * @param {NodeJS.ReadableStream|null} inputStream - Source à pousser sur stdin.
+ * @param {string} partial
+ * @param {string} finalPath
+ * @param {string} title
+ * @returns {Promise<string>} Chemin écrit.
+ */
+function runFfmpeg(args, inputStream, partial, finalPath, title) {
+    const input = { inputStream };
+
     return new Promise((resolve, reject) => {
         const ffmpeg = require('ffmpeg-static');
-        const args = [];
-
-        // Une URL directe peut se rompre en route : ffmpeg reprend la connexion
-        // plutôt que d'écrire un fichier tronqué.
-        if (input.ffmpegInput && /^https?:\/\//i.test(input.ffmpegInput)) {
-            args.push('-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5');
-        }
-
-        args.push('-i', input.ffmpegInput || 'pipe:0');
-        // `-vn` : la source porte souvent une pochette en flux vidéo, que les
-        // muxers audio ne savent ranger que dans une étiquette. Sans cela ffmpeg
-        // s'arrête sur « nothing was written into output file ». Voir
-        // PreloadManager, où le même écueil a été rencontré.
-        args.push('-vn', ...encoding, '-y', partial);
 
         const child = cp.spawn(ffmpeg, args, {
             stdio: ['pipe', 'ignore', 'pipe'],
@@ -164,6 +187,64 @@ function transcodeRemote(input, dir, title, bitrate, container) {
 }
 
 /**
+ * Télécharge la piste en vidéo, avec ou sans image d'origine.
+ *
+ * Deux cas, décidés par `videoSource`.
+ *
+ * **La source porte une image** : elle est recopiée sans être touchée. Quand le
+ * son arrive séparément — ce que YouTube fait au-delà d'une certaine définition
+ * — les deux entrées sont recousues, et `-map` désigne laquelle donne quoi.
+ * Sans ces `-map`, ffmpeg choisirait la meilleure piste de chaque type toutes
+ * entrées confondues, et pourrait prendre le son muet de la vidéo.
+ *
+ * **La source n'a que du son** : une image noire est fabriquée à la volée. Ce
+ * n'est pas un pis-aller mais la réponse à la demande — un enregistrement mis en
+ * ligne sans clip n'a pas d'image, et l'on veut malgré tout un fichier qui se
+ * range avec les vidéos. `-shortest` cale la durée sur le son, faute de quoi le
+ * noir tournerait indéfiniment.
+ *
+ * @returns {Promise<string>} Chemin écrit.
+ */
+async function transcodeVideo(track, url, dir, title, bitrate, container) {
+    const source = await videoSource.resolve(url);
+
+    const { ext, args: encoding } =
+        downloadFormats.videoEncodeArgs(container, bitrate, { still: source.audioOnly });
+    const finalPath = downloadDir.uniquePath(dir, downloadDir.safeFilename(title, ext));
+    const partial = `${finalPath}.incomplete`;
+
+    const args = [];
+    const distant = (u) => u && /^https?:\/\//i.test(u);
+    const reconnect = ['-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5'];
+
+    if (source.audioOnly) {
+        // Le son d'abord, par le chemin ordinaire : c'est le seul flux dont on
+        // dispose, et il peut arriver autrement qu'en URL directe.
+        const input = await preloadManager.resolveAudioInput(track, url);
+        const audio = input.ffmpegInput;
+        if (!audio) {
+            throw new Error(`Aucune source pour « ${title} »`);
+        }
+
+        args.push('-f', 'lavfi', '-i', 'color=c=black:s=1280x720:r=2');
+        if (distant(audio)) args.push(...reconnect);
+        args.push('-i', audio);
+    } else {
+        if (distant(source.videoUrl)) args.push(...reconnect);
+        args.push('-i', source.videoUrl);
+
+        if (source.audioUrl) {
+            if (distant(source.audioUrl)) args.push(...reconnect);
+            args.push('-i', source.audioUrl);
+            args.push('-map', '0:v:0', '-map', '1:a:0');
+        }
+    }
+
+    args.push(...encoding, '-y', partial);
+    return runFfmpeg(args, null, partial, finalPath, title);
+}
+
+/**
  * Télécharge la piste désignée par une requête vers le dossier choisi.
  *
  * @param {object} ctx Contexte assemblé par wsHandler.
@@ -216,12 +297,31 @@ async function handleDownloadTrack(ctx) {
              * un fichier vide.
              */
             const attempt = async (container) => {
+                // La vidéo a sa propre résolution : celle du son ne rendrait
+                // qu'un flux sonore, et le conteneur promettrait une image
+                // qu'il n'aurait pas.
+                if (downloadFormats.isVideo(container)) {
+                    return transcodeVideo(
+                        playable.track, playable.url, dir, trackTitle, bitrate, container);
+                }
+
                 const input = await preloadManager.resolveAudioInput(playable.track, playable.url);
                 if (!input.ffmpegInput && !input.inputStream) {
                     throw new Error(`Aucune source audio pour « ${trackTitle} »`);
                 }
                 return transcodeRemote(input, dir, trackTitle, bitrate, container);
             };
+
+            /*
+             * Le repli reste dans la famille demandée.
+             *
+             * Rendre un MP3 à qui a demandé une vidéo ne répondrait pas à la
+             * question posée : le fichier n'irait pas se ranger là où on
+             * l'attend, et ne s'ouvrirait pas dans le lecteur visé.
+             */
+            const fallback = downloadFormats.isVideo(wanted)
+                ? downloadFormats.DEFAULT_VIDEO_CONTAINER
+                : downloadFormats.DEFAULT_CONTAINER;
 
             try {
                 written = await attempt(wanted);
@@ -241,15 +341,15 @@ async function handleDownloadTrack(ctx) {
                  * l'erreur est alors ailleurs que dans le format, et réessayer
                  * à l'identique ne ferait que doubler l'attente.
                  */
-                if (wanted === downloadFormats.DEFAULT_CONTAINER) throw err;
+                if (wanted === fallback) throw err;
 
                 log.warn(`[Download] ${wanted} failed for ${trackTitle} (${err.message}); `
-                    + `falling back to ${downloadFormats.DEFAULT_CONTAINER}.`);
+                    + `falling back to ${fallback}.`);
                 webServer._sendError(
                     `Le format ${wanted.toUpperCase()} n'a pas abouti pour « ${trackTitle} » : `
-                    + `écriture en ${downloadFormats.DEFAULT_CONTAINER.toUpperCase()}.`);
+                    + `écriture en ${fallback.toUpperCase()}.`);
 
-                written = await attempt(downloadFormats.DEFAULT_CONTAINER);
+                written = await attempt(fallback);
             }
         }
 

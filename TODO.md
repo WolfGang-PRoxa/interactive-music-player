@@ -1,5 +1,5 @@
-- [ ] Actuellement, on ne propose pas de formats de vidéo, dans le menu déroulant "format" de la box "ajouter un fichier"
+- [x] Actuellement, on ne propose pas de formats de vidéo, dans le menu déroulant "format" de la box "ajouter un fichier". Si un format vidéo est sélectionné et que le lien inséré dans l'input correspond uniquement à un audio, alors on créé une vidéo noire combinée avec l'audio. Sinon, la vidéo se télécharge normalement.
 
 - [ ] Sur téléphone et tablette, on a déjà fait en sorte que lors du drag and drop, les éléments soient réellement drag par la souris (ils sont dessinés dans la souris de l'utilisateur lors du drag), mais pas sur PC. Il faudrait faire la même chose sur PC.
 
-- [ ] 
+- [ ] les indicateurs de décibels dans la box volume et diffusion doivent constitués des boutons qui ouvre la même type de vue (avec slider et LUFS mesuré) que le sous-menu du volume LUFS d'un menu clic droit pour l'élément (le fichier) qui est en cours de lecture.

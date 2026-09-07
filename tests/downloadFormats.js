@@ -89,11 +89,31 @@ check('le menu propose les conteneurs du module, et rien d’autre',
         && options.every((v) => formats.EXTENSIONS.includes(v)),
     options.join(', ') || 'aucune option trouvée');
 
-// Aucun conteneur vidéo : le téléchargement vers le disque passe par le flux
-// audio du préchargeur, et proposer MP4 promettrait une image que rien ne va
-// chercher.
-check('  … tous audio, aucun conteneur vidéo',
-    !options.includes('mp4'), options.join(', '));
+/*
+ * Les deux familles sont séparées dans le menu, et il le faut.
+ *
+ * Elles ne promettent pas la même chose : un conteneur vidéo demande une image,
+ * et en fabrique une noire quand la source n'en porte pas. Mêlés à la même liste,
+ * MP4 et MP3 se choisiraient comme deux variantes d'un même geste.
+ */
+const groupes = [...select.matchAll(/<optgroup label="([^"]+)"[\s\S]*?<\/optgroup>/g)];
+check('  … rangés en deux groupes, audio et vidéo',
+    groupes.length === 2, groupes.map((g) => g[1]).join(' / ') || 'aucun groupe');
+
+const groupeVideo = groupes.find((g) => /vid/i.test(g[1]));
+const optionsVideo = groupeVideo
+    ? [...groupeVideo[0].matchAll(/<option value="([^"]+)"/g)].map((m) => m[1])
+    : [];
+
+check('  … et le groupe vidéo porte exactement les conteneurs vidéo du module',
+    optionsVideo.length === Object.keys(formats.VIDEO_CONTAINERS).length
+        && optionsVideo.every((v) => formats.isVideo(v)),
+    optionsVideo.join(', ') || 'aucun');
+
+check('  … qu\'aucun ne se retrouve du côté audio',
+    !groupes.filter((g) => !/vid/i.test(g[1]))
+        .some((g) => /<option value="(mp4|mkv)"/.test(g[0])),
+    'deux entrées homonymes ne se distinguent pas dans un menu');
 
 // ────────────────────── Le refus côté serveur ──────────────────────
 

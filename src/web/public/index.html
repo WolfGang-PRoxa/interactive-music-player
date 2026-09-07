@@ -632,14 +632,26 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
                             <span data-i18n="import_format_label">Format</span>
                         </label>
+                        <!--
+                             Deux groupes, parce qu'ils ne promettent pas la
+                             même chose : un conteneur vidéo demande une image,
+                             et la fabrique en noir quand la source n'en a pas.
+                             Voir src/utils/downloadFormats.js.
+                        -->
                         <select id="import-format-select" class="styled-select">
-                            <option value="mp3">MP3</option>
-                            <option value="m4a">M4A</option>
-                            <option value="flac">FLAC</option>
-                            <option value="wav">WAV</option>
-                            <option value="ogg">OGG</option>
-                            <option value="opus">OPUS</option>
-                            <option value="webm">WEBM</option>
+                            <optgroup label="Audio" data-i18n-label="import_group_audio">
+                                <option value="mp3">MP3</option>
+                                <option value="m4a">M4A</option>
+                                <option value="flac">FLAC</option>
+                                <option value="wav">WAV</option>
+                                <option value="ogg">OGG</option>
+                                <option value="opus">OPUS</option>
+                                <option value="webm">WEBM</option>
+                            </optgroup>
+                            <optgroup label="Vidéo" data-i18n-label="import_group_video">
+                                <option value="mp4">MP4</option>
+                                <option value="mkv">MKV</option>
+                            </optgroup>
                         </select>
                     </div>
                 </div>
