@@ -810,18 +810,32 @@ function sendLoudness(url, target, immediate) {
  * @param {object} track
  */
 function refreshLoudnessPanel(track) {
-    if (!submenuEl || submenuOpen !== 'loudness' || !submenuEl._slider) return;
+    if (submenuEl && submenuOpen === 'loudness') recalePanel(submenuEl, track);
+}
+
+/**
+ * Recale un panneau donné, d'où qu'il vienne.
+ *
+ * Séparé de ce qui le trouve : le même panneau s'ouvre depuis le menu contextuel
+ * et depuis la carte « Volume et diffusion », et l'un ne doit pas cesser de se
+ * mettre à jour parce que l'autre est fermé.
+ *
+ * @param {HTMLElement} panel
+ * @param {object} track
+ */
+function recalePanel(panel, track) {
+    if (!panel || !panel._slider) return;
 
     const level = loudnessOf(track);
-    submenuEl._peak = level.peak;
-    submenuEl._measured = level.measured;
+    panel._peak = level.peak;
+    panel._measured = level.measured;
 
-    const slider = submenuEl._slider;
+    const slider = panel._slider;
     if (document.activeElement === slider || slider.matches(':active')) return;
     if (parseFloat(slider.value) === level.target) return;
 
     slider.value = String(level.target);
-    paintLoudness(submenuEl, level.target);
+    paintLoudness(panel, level.target);
 }
 
 /** Ouvre (ou referme) le sous-menu de choix rattaché à un bouton. */
@@ -1321,6 +1335,131 @@ window.MusicPlayer.onTrackFormats = function (data) {
     toggleSubmenu(type, bouton);
 };
 
+/* ═════════════ Le même panneau, ouvert hors du menu contextuel ═════════════ */
+
+/**
+ * Panneau de sonie ouvert depuis ailleurs que le clic droit.
+ *
+ * Les deux nombres de la carte « Volume et diffusion » disent la sonie du
+ * morceau et le gain qu'on lui applique. Ils ne faisaient que la dire : pour
+ * changer ce gain, il fallait retrouver la piste dans la file ou l'historique et
+ * l'ouvrir au clic droit — un détour pour régler ce qu'on est justement en train
+ * d'écouter.
+ *
+ * C'est le panneau du menu contextuel qui s'ouvre, pas une copie : le curseur,
+ * la mesure d'origine, le repère d'écrêtage et l'envoi groupé sont les mêmes.
+ * Deux vues du même réglage qui divergeraient seraient pires qu'une seule.
+ */
+let loosePanel = null;
+let looseUrl = null;
+let looseAnchor = null;
+
+/**
+ * Ouvre le panneau de sonie sous un élément quelconque.
+ *
+ * @param {object} track - La piste à régler, telle que l'état la porte.
+ * @param {HTMLElement} anchor - Ce sous quoi le panneau se place.
+ * @returns {boolean} false si la piste n'est pas réglable.
+ */
+window.MusicPlayer.openLoudnessPanel = function (track, anchor) {
+    if (!track || !track.url) return false;
+
+    // Un clic sur le même bouton referme : c'est ce qu'on attend d'un bouton
+    // qui a ouvert quelque chose.
+    if (loosePanel && looseUrl === track.url) {
+        window.MusicPlayer.closeLoudnessPanel();
+        return false;
+    }
+
+    window.MusicPlayer.closeLoudnessPanel();
+    // Le menu contextuel et ce panneau ne cohabitent pas : deux réglages de la
+    // même chose ouverts en même temps, dont un seul recevrait les mises à jour.
+    window.MusicPlayer.hideTrackQualityMenu();
+
+    loosePanel = buildLoudnessPanel(track);
+    looseUrl = track.url;
+    looseAnchor = anchor || null;
+
+    menuContainer().appendChild(loosePanel);
+    raiseToFront(loosePanel);
+    placeLoosePanel();
+
+    if (looseAnchor) looseAnchor.classList.add('is-open');
+    return true;
+};
+
+/** Referme le panneau autonome, s'il y en a un. */
+window.MusicPlayer.closeLoudnessPanel = function () {
+    if (!loosePanel) return;
+    loosePanel.remove();
+    loosePanel = null;
+    looseUrl = null;
+    if (looseAnchor) looseAnchor.classList.remove('is-open');
+    looseAnchor = null;
+};
+
+/**
+ * Place le panneau sous son ancre, sans sortir de la fenêtre.
+ *
+ * Sous et non à côté, contrairement au sous-menu : l'ancre est ici un petit
+ * nombre au milieu d'une ligne, et se poser à sa droite recouvrirait le reste de
+ * la ligne — dont l'autre nombre, qu'on veut garder sous les yeux.
+ */
+function placeLoosePanel() {
+    if (!loosePanel) return;
+
+    const size = loosePanel.getBoundingClientRect();
+    const rect = looseAnchor
+        ? looseAnchor.getBoundingClientRect()
+        : { left: 40, bottom: 40, top: 40 };
+
+    const spot = panelSpot(size, rect,
+        { width: window.innerWidth, height: window.innerHeight });
+
+    loosePanel.style.left = `${spot.left}px`;
+    loosePanel.style.top = `${spot.top}px`;
+}
+
+/**
+ * Où poser le panneau, sur les seules dimensions en jeu.
+ *
+ * Détachée du DOM parce que c'est la seule partie qui décide quelque chose :
+ * autour d'elle, il n'y a que deux mesures à prendre et deux valeurs à écrire
+ * dans un style. Une décision qu'on ne peut atteindre qu'en montant une fenêtre
+ * entière finit par n'être vérifiée nulle part.
+ *
+ * @param {{ width: number, height: number }} size - Le panneau, déjà mesuré.
+ * @param {{ left: number, top: number, bottom: number }} rect - L'ancre.
+ * @param {{ width: number, height: number }} view - La fenêtre visible.
+ * @returns {{ left: number, top: number }}
+ */
+function panelSpot(size, rect, view) {
+    let left = rect.left;
+    if (left + size.width > view.width - 8) left = view.width - size.width - 8;
+    if (left < 8) left = 8;
+
+    let top = rect.bottom + 6;
+    // Pas la place en dessous : au-dessus, plutôt que collé au bord où il
+    // recouvrirait ce qu'on vient de cliquer.
+    if (top + size.height > view.height - 8) top = rect.top - size.height - 6;
+    if (top < 8) top = 8;
+
+    return { left, top };
+}
+
+/**
+ * Recale le panneau autonome sur l'état reçu.
+ *
+ * Appelé à chaque diffusion : c'est ce qui fait apparaître la mesure quand
+ * l'analyse se termine pendant que le panneau est ouvert.
+ */
+window.MusicPlayer.refreshLoudnessPanel = function (track) {
+    if (!loosePanel || !looseUrl) return;
+    if (!track || track.url !== looseUrl) return;
+    recalePanel(loosePanel, track);
+};
+
+
 window.MusicPlayer.attachQualityMenu = function(item, resolveTrack) {
     if (!item) return;
     item.addEventListener('contextmenu', (e) => {
@@ -1329,10 +1468,22 @@ window.MusicPlayer.attachQualityMenu = function(item, resolveTrack) {
     });
 };
 
-document.addEventListener('click', () => window.MusicPlayer.hideTrackQualityMenu());
-window.addEventListener('resize', () => window.MusicPlayer.hideTrackQualityMenu());
+/*
+ * Le panneau autonome se ferme par les mêmes gestes que le menu.
+ *
+ * Il flotte au-dessus de la page comme lui, et n'appartient à aucune carte :
+ * cliquer ailleurs, redimensionner ou appuyer sur Échap doit l'emporter aussi,
+ * sans quoi il resterait posé sur une interface qui a changé sous lui.
+ */
+function closeFloating() {
+    window.MusicPlayer.hideTrackQualityMenu();
+    window.MusicPlayer.closeLoudnessPanel();
+}
+
+document.addEventListener('click', closeFloating);
+window.addEventListener('resize', closeFloating);
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') window.MusicPlayer.hideTrackQualityMenu();
+    if (e.key === 'Escape') closeFloating();
 });
 
 /*
@@ -1347,8 +1498,11 @@ document.addEventListener('keydown', (e) => {
  * ignore celle qui vient du menu lui-même, un sous-menu pouvant déborder.
  */
 window.addEventListener('wheel', (e) => {
-    if (!menuEl) return;
-    if (menuEl.contains(e.target)) return;
+    if (!menuEl && !loosePanel) return;
+    if (menuEl && menuEl.contains(e.target)) return;
     if (submenuEl && submenuEl.contains(e.target)) return;
-    window.MusicPlayer.hideTrackQualityMenu();
+    // Le curseur de sonie se règle aussi à la molette : défiler dessus ne doit
+    // pas emporter le panneau qu'on est en train d'utiliser.
+    if (loosePanel && loosePanel.contains(e.target)) return;
+    closeFloating();
 }, { passive: true, capture: true });

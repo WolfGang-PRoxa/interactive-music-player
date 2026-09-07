@@ -298,6 +298,124 @@ check('le curseur de la boîte Mix borne comme le serveur',
 check('sa position de départ est la référence de diffusion',
     !!syncSlider && syncSlider[0].includes(`value="${loudness.DEFAULT_SYNC_TARGET}"`));
 
+// ────────────────── Le même panneau, ouvert d'ailleurs ──────────────────
+
+/*
+ * Les deux nombres de la carte « Volume et diffusion » ouvrent ce réglage.
+ *
+ * Ils ne faisaient que constater la sonie du morceau : pour la corriger, il
+ * fallait retrouver la piste dans la file ou l'historique et l'ouvrir au clic
+ * droit — un détour pour régler ce qu'on est justement en train d'écouter.
+ *
+ * Ce qui compte ici n'est pas qu'un panneau s'ouvre, c'est que ce soit *le*
+ * panneau : une copie divergerait au premier changement, et l'utilisateur
+ * verrait deux réglages de la même chose ne pas dire la même valeur.
+ */
+console.log('\nCe que la carte du volume ouvre\n');
+
+check('le panneau autonome est bâti par la fonction du menu contextuel',
+    /loosePanel = buildLoudnessPanel\(track\)/.test(menuSource)
+    && (menuSource.match(/function buildLoudnessPanel\(/g) || []).length === 1,
+    'deux vues du même réglage qui divergeraient seraient pires qu\'une seule');
+
+check('  … et ne cohabite pas avec le menu contextuel',
+    /window\.MusicPlayer\.hideTrackQualityMenu\(\);/
+        .test(menuSource.slice(menuSource.indexOf('openLoudnessPanel = function'),
+            menuSource.indexOf('loosePanel = buildLoudnessPanel'))),
+    'deux panneaux ouverts, dont un seul recevrait les mises à jour');
+
+check('rouvrir sur la même piste referme',
+    /if \(loosePanel && looseUrl === track\.url\) \{\s*window\.MusicPlayer\.closeLoudnessPanel\(\);/
+        .test(menuSource),
+    'c\'est ce qu\'on attend d\'un bouton qui a ouvert quelque chose');
+
+check('une piste sans adresse n\'ouvre rien',
+    /if \(!track \|\| !track\.url\) return false;/.test(menuSource),
+    'le panneau se construit autour de l\'adresse : sans elle, un curseur sans destinataire');
+
+check('l\'état ne recale que le panneau qui parle de la piste reçue',
+    /if \(!track \|\| track\.url !== looseUrl\) return;/.test(menuSource),
+    'sinon un changement de morceau réécrirait le panneau ouvert sur l\'ancien');
+
+check('les mêmes gestes le referment que le menu',
+    /document\.addEventListener\('click', closeFloating\)/.test(menuSource)
+    && /window\.addEventListener\('resize', closeFloating\)/.test(menuSource)
+    && /if \(e\.key === 'Escape'\) closeFloating\(\)/.test(menuSource),
+    'il flotte au-dessus de la page comme lui, et n\'appartient à aucune carte');
+
+check('  … mais la molette sur son curseur ne l\'emporte pas',
+    /if \(loosePanel && loosePanel\.contains\(e\.target\)\) return;/.test(menuSource),
+    'le curseur de sonie se règle aussi à la molette');
+
+/*
+ * Le placement, sur les seules dimensions en jeu.
+ *
+ * `panelSpot` est détachée du DOM exprès : c'est la seule partie qui décide
+ * quelque chose, et une décision qu'on ne peut atteindre qu'en montant une
+ * fenêtre entière finit par n'être vérifiée nulle part.
+ */
+const panelSpot = (() => {
+    const vm = require('vm');
+    const start = menuSource.indexOf('function panelSpot(');
+    if (start < 0) throw new Error('panelSpot introuvable');
+    const end = menuSource.indexOf('\n}\n', start) + 3;
+
+    const sandbox = { console };
+    sandbox.globalThis = sandbox;
+    vm.createContext(sandbox);
+    vm.runInContext(`${menuSource.slice(start, end)}\nglobalThis.__f = panelSpot;`, sandbox);
+    return sandbox.__f;
+})();
+
+const PANNEAU = { width: 258, height: 144 };
+const ECRAN = { width: 1280, height: 800 };
+
+{
+    // Le cas ordinaire : sous le nombre cliqué, aligné à son bord gauche.
+    const spot = panelSpot(PANNEAU, { left: 300, top: 50, bottom: 68 }, ECRAN);
+    check('le panneau se pose sous son ancre', spot.top === 74, `top=${spot.top}`);
+    check('  … aligné sur son bord gauche', spot.left === 300, `left=${spot.left}`);
+}
+
+{
+    /*
+     * Sous, et non à côté — contrairement au sous-menu du clic droit.
+     *
+     * L'ancre est ici un petit nombre au milieu d'une ligne de réglage. Se
+     * poser à sa droite recouvrirait le reste de la ligne, dont l'autre
+     * nombre, qu'on veut garder sous les yeux pendant qu'on règle.
+     */
+    const spot = panelSpot(PANNEAU, { left: 300, top: 50, bottom: 68 }, ECRAN);
+    check('il ne se pose pas à côté de l\'ancre', spot.left <= 300,
+        'la ligne porte deux nombres, et l\'autre doit rester lisible');
+}
+
+{
+    // Un nombre près du bord droit : le panneau rentre, il ne déborde pas.
+    const spot = panelSpot(PANNEAU, { left: 1200, top: 50, bottom: 68 }, ECRAN);
+    check('près du bord droit, il rentre dans la fenêtre',
+        spot.left + PANNEAU.width <= ECRAN.width - 8, `left=${spot.left}`);
+}
+
+{
+    // Pas la place en dessous : au-dessus, plutôt que collé au bord où il
+    // recouvrirait ce qu'on vient de cliquer.
+    const spot = panelSpot(PANNEAU, { left: 300, top: 700, bottom: 718 }, ECRAN);
+    check('sans place en dessous, il bascule au-dessus',
+        spot.top === 700 - PANNEAU.height - 6, `top=${spot.top}`);
+    check('  … sans recouvrir l\'ancre', spot.top + PANNEAU.height < 700);
+}
+
+{
+    // Une fenêtre plus petite que le panneau : il reste dans le cadre plutôt
+    // que de partir en négatif, hors de portée du curseur.
+    const spot = panelSpot(PANNEAU, { left: 4, top: 30, bottom: 48 },
+        { width: 200, height: 160 });
+    check('dans une fenêtre trop petite, il ne sort pas par le haut',
+        spot.top >= 8, `top=${spot.top}`);
+    check('  … ni par la gauche', spot.left >= 8, `left=${spot.left}`);
+}
+
 // ────────────────── Les traductions ──────────────────
 
 console.log('\nCe que les quatre langues doivent dire\n');

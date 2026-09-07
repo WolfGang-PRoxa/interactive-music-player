@@ -53,6 +53,7 @@ const check = (label, ok, detail = '') => {
 function makeElement(id) {
     const classes = new Set();
     const attributes = new Map();
+    const listeners = new Map();
     return {
         id,
         hidden: false,
@@ -66,10 +67,37 @@ function makeElement(id) {
         setAttribute: (name, value) => attributes.set(name, value),
         removeAttribute: (name) => attributes.delete(name),
         getAttribute: (name) => (attributes.has(name) ? attributes.get(name) : null),
+        addEventListener(type, fn) {
+            if (!listeners.has(type)) listeners.set(type, []);
+            listeners.get(type).push(fn);
+        },
+        /**
+         * Déclenche le geste, et rapporte ce que le gestionnaire en a fait.
+         *
+         * L'arrêt de propagation compte autant que le reste : le panneau se
+         * referme au premier clic attrapé par le document, et un clic qui
+         * remonte refermerait donc ce qu'il vient d'ouvrir.
+         *
+         * @returns {{ stopped: boolean }}
+         */
+        click() {
+            let stopped = false;
+            const event = { stopPropagation: () => { stopped = true; } };
+            for (const fn of listeners.get('click') || []) fn(event);
+            return { stopped };
+        },
     };
 }
 
-function mount() {
+/**
+ * Monte le module sur un DOM simulé.
+ *
+ * @param {object} [options]
+ * @param {boolean} [options.panel=true] - Faire comme si le menu de sonie était
+ *   chargé. À `false`, il ne l'est pas : les deux nombres restent des boutons,
+ *   et cliquer dessus ne doit rien casser.
+ */
+function mount({ panel = true } = {}) {
     const els = {
         'output-level': makeElement('output-level'),
         'output-level-db': makeElement('output-level-db'),
@@ -79,6 +107,9 @@ function mount() {
 
     // Ce que le module demande au système d'infobulles, et quand.
     const refreshed = [];
+    // Ce qu'il demande au panneau de sonie : ouvertures, puis recalages.
+    const opened = [];
+    const recalled = [];
 
     const sandbox = {
         window: {
@@ -88,6 +119,12 @@ function mount() {
         document: { getElementById: (id) => els[id] || null },
         Number, Math, console,
     };
+    if (panel) {
+        Object.assign(sandbox.window.MusicPlayer, {
+            openLoudnessPanel: (track, anchor) => opened.push({ track, anchor }),
+            refreshLoudnessPanel: (track) => recalled.push(track),
+        });
+    }
     sandbox.globalThis = sandbox;
     vm.createContext(sandbox);
     vm.runInContext(SOURCE, sandbox);
@@ -98,6 +135,8 @@ function mount() {
         els,
         api,
         refreshed,
+        opened,
+        recalled,
         /**
          * Pose un état et repeint, comme le fait `updateUI`.
          *
@@ -111,7 +150,7 @@ function mount() {
                     ? null
                     : Object.assign({ title: 'x' }, track, { loudness }),
             };
-            api.refreshOutputLevel();
+            api.refreshOutputLevel(api.state);
         },
     };
 }
@@ -356,6 +395,126 @@ console.log('\nCe que les infobulles ajoutent aux deux nombres\n');
         /if \(!image\) \{\s*tooltipEl\.textContent = text;/.test(TIPS));
 }
 
+// ───────────────────── Les deux nombres ouvrent le réglage ─────────────────────
+
+console.log('\nCe que le clic ouvre\n');
+
+{
+    const m = mount();
+    const piste = { url: 'https://exemple/a', title: 'Around the World' };
+
+    m.play({ status: 'measured', measured: -14.2, gainDb: 3.2 }, piste);
+
+    m.els['output-level-db'].click();
+    check('cliquer la mesure ouvre le panneau de sonie', m.opened.length === 1);
+    check('  … sur la piste en cours, pas sur une autre',
+        m.opened[0].track && m.opened[0].track.url === 'https://exemple/a');
+    check('  … ancré sous le nombre cliqué',
+        m.opened[0].anchor === m.els['output-level-db'],
+        'le panneau se pose sous ce qu\'on a cliqué');
+
+    m.els['output-level-gain'].click();
+    check('le gain ouvre le même panneau', m.opened.length === 2);
+    check('  … ancré sous lui, et non sous l\'autre nombre',
+        m.opened[1].anchor === m.els['output-level-gain']);
+
+    /*
+     * Le clic ne doit pas remonter jusqu'au document.
+     *
+     * Le panneau se referme au premier clic que le document attrape. Sans cet
+     * arrêt, le clic qui l'ouvre poursuivrait sa route et le refermerait dans
+     * la foulée : le bouton n'aurait tout simplement aucun effet visible.
+     */
+    check('le clic s\'arrête au bouton',
+        m.els['output-level-db'].click().stopped,
+        'sinon il refermerait ce qu\'il vient d\'ouvrir');
+}
+
+{
+    const m = mount();
+
+    // Rien en lecture : il n'y a pas de piste à régler, et l'afficheur est
+    // d'ailleurs masqué. Le bouton existe quand même dans le balisage.
+    m.play(null);
+    m.els['output-level-db'].click();
+    check('sans piste en lecture, rien ne s\'ouvre', m.opened.length === 0);
+
+    // Une piste qu'on ne sait pas régler : le panneau se construit autour de
+    // `track.url`, et l'ouvrir sur rien donnerait un curseur sans destinataire.
+    m.play({ status: 'measured', measured: -14, gainDb: 0 }, { title: 'sans adresse' });
+    m.els['output-level-db'].click();
+    check('  … et une piste sans adresse n\'ouvre rien non plus',
+        m.opened.length === 0 || m.opened[0].track.url === undefined,
+        'le panneau se refuse lui-même sur une piste sans url');
+}
+
+{
+    // Le menu de sonie peut ne pas être chargé — un script de moins, une page
+    // partielle. Les deux nombres restent des boutons, et le clic ne doit pas
+    // faire tomber le reste de l'interface avec lui.
+    const m = mount({ panel: false });
+    m.play({ status: 'measured', measured: -14, gainDb: 0 }, { url: 'https://exemple/a' });
+
+    let crash = null;
+    try { m.els['output-level-db'].click(); } catch (e) { crash = e; }
+    check('sans le menu de sonie chargé, le clic ne casse rien', crash === null,
+        crash ? crash.message : '');
+}
+
+{
+    const m = mount();
+    const piste = { url: 'https://exemple/a', title: 'Around the World' };
+
+    /*
+     * Le panneau ouvert suit l'état.
+     *
+     * C'est ce qui fait apparaître la mesure sous les yeux de celui qui
+     * l'attend : l'analyse se termine, l'état suivant la porte, et le panneau
+     * la reprend sans qu'il faille le refermer et le rouvrir.
+     */
+    m.play({ status: 'analyzing', measured: null, gainDb: 0 }, piste);
+    check('chaque état recale le panneau ouvert', m.recalled.length === 1);
+    check('  … avec la piste que l\'état porte',
+        m.recalled[0] && m.recalled[0].url === 'https://exemple/a');
+
+    m.play({ status: 'measured', measured: -14.2, gainDb: 3.2 }, piste);
+    check('  … y compris quand la mesure arrive enfin',
+        m.recalled.length === 2 && m.recalled[1].loudness.measured === -14.2);
+
+    const avant = m.recalled.length;
+    m.play(null);
+    check('rien en lecture ne recale rien', m.recalled.length === avant,
+        'il n\'y a plus de piste dont parler');
+}
+
+{
+    const row = MARKUP.slice(MARKUP.indexOf('id="output-level"'),
+        MARKUP.indexOf('id="volume-range"'));
+
+    // Un `<span>` cliquable n'est pas un bouton : ni tabulation, ni entrée, ni
+    // annonce au lecteur d'écran. Ce qui ouvre quelque chose au clic doit le
+    // dire dans le balisage.
+    check('les deux indicateurs sont de vrais boutons',
+        (row.match(/<button type="button"/g) || []).length === 2);
+    check('  … et non des boutons d\'envoi de formulaire',
+        !/<button(?![^>]*type=)/.test(row),
+        'sans type explicite, un bouton soumet');
+
+    // Un bouton arrive avec un fond, une bordure et une police à lui. Les deux
+    // nombres se lisent comme du texte dans une ligne de réglage : tout cela
+    // doit être défait, sans quoi deux pastilles grises apparaîtraient.
+    const style = CSS.slice(CSS.indexOf('.output-level-db,'));
+    check('leur apparence de bouton est défaite',
+        /border: none/.test(style.slice(0, 400))
+        && /font: inherit/.test(style.slice(0, 400))
+        && /background: transparent/.test(style.slice(0, 400)));
+    check('  … mais le curseur dit qu\'on peut cliquer',
+        /cursor: pointer/.test(style.slice(0, 400)));
+    check('  … et l\'ouverture se voit sur le nombre cliqué',
+        /\.output-level-db\.is-open/.test(CSS) && /\.output-level-gain\.is-open/.test(CSS),
+        'le panneau ouvert doit se rattacher à l\'œil au nombre qui l\'a ouvert');
+}
+
 // ───────────────────── Le raccordement ─────────────────────
 
 console.log('\nCe qui tient les deux bouts\n');
@@ -376,7 +535,8 @@ console.log('\nCe qui tient les deux bouts\n');
     // La peinture voyage avec l'état : c'est ce qui met la mesure au même
     // instant que le titre affiché au-dessus d'elle.
     check('l\'afficheur est repeint avec le reste de l\'état',
-        /refreshOutputLevel === 'function'[\s\S]{0,80}refreshOutputLevel\(\)/.test(APP));
+        /refreshOutputLevel === 'function'[\s\S]{0,80}refreshOutputLevel\(state\)/.test(APP),
+        'et reçoit l\'état, dont le panneau ouvert a besoin');
 
     /*
      * Le flux dédié a été retiré, et c'est le fond de l'affaire.

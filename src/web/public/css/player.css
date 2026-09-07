@@ -936,6 +936,32 @@ input:checked + .switch-slider:before {
     display: none;
 }
 
+/*
+ * Les deux nombres sont des boutons depuis qu'ils ouvrent le réglage.
+ *
+ * Ils gardent l'allure d'un texte : ce sont d'abord des valeurs qu'on lit,
+ * et les habiller en boutons les ferait passer pour des commandes au milieu
+ * d'une ligne qui n'en porte pas. Le survol suffit à dire qu'on peut cliquer.
+ */
+.output-level-db,
+.output-level-gain {
+    border: none;
+    padding: 0;
+    /* Le fond que les navigateurs donnent d'office à un bouton : la pastille du
+       gain repose le sien juste en dessous. */
+    background: transparent;
+    font: inherit;
+    cursor: pointer;
+    transition: filter 0.15s ease;
+}
+
+.output-level-db:hover,
+.output-level-gain:hover,
+.output-level-db.is-open,
+.output-level-gain.is-open {
+    filter: brightness(1.35);
+}
+
 .output-level-db {
     min-width: 5.8em;
     text-align: right;
