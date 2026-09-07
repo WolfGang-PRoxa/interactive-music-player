@@ -521,6 +521,12 @@
             if (typeof window.MusicPlayer.onControlRevoked === 'function') {
                 window.MusicPlayer.onControlRevoked(data);
             }
+        } else if (type === 'tunnelState') {
+            // Réponse à une demande de la fenêtre de partage : constater le
+            // tunnel lance deux processus, et ne voyage donc pas avec l'état.
+            if (typeof window.MusicPlayer.onTunnelState === 'function') {
+                window.MusicPlayer.onTunnelState(data);
+            }
         } else if (type === 'shareResult') {
             if (typeof window.MusicPlayer.onShareResult === 'function') {
                 window.MusicPlayer.onShareResult(data);

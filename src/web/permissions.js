@@ -129,6 +129,10 @@ const ACTION_GROUPS = {
     // Partage du contrôle : seul le maître distribue les droits, sans quoi un
     // invité s'accorderait les siens.
     admitGuest: MASTER_ONLY,
+    tunnelState: MASTER_ONLY,
+    tunnelLogin: MASTER_ONLY,
+    tunnelMount: MASTER_ONLY,
+    tunnelUnmount: MASTER_ONLY,
     shareControl: MASTER_ONLY,
     revokeControl: MASTER_ONLY,
     sendInviteLink: MASTER_ONLY,

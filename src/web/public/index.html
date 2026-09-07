@@ -1998,6 +1998,26 @@
                     </div>
                 </div>
 
+                <!--
+                     Joindre le tableau de bord depuis l'extérieur.
+
+                     Placée avant l'invitation, parce qu'inviter quelqu'un sur
+                     une adresse injoignable ne mène nulle part. Le contenu est
+                     peint par js/shareTunnel.js : il dépend de l'état de la
+                     machine, que le balisage ne peut pas connaître.
+                -->
+                <div class="settings-section" id="share-tunnel-section">
+                    <h3 class="settings-section-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="2" y1="12" x2="22" y2="12"></line>
+                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                        </svg>
+                        <span data-i18n="share_tunnel_title">Joindre depuis l'extérieur</span>
+                    </h3>
+                    <div class="share-tunnel" id="share-tunnel"></div>
+                </div>
+
                 <div class="settings-section">
                     <h3 class="settings-section-title">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
@@ -2567,6 +2587,7 @@
     <script src="js/playlistTabsScroll.js"></script>
     <script src="js/scrollFade.js"></script>
     <script src="js/account.js"></script>
+    <script src="js/shareTunnel.js"></script>
     <script src="js/scrollLock.js"></script>
     <script src="js/video.js"></script>
     <script src="js/logs.js"></script>

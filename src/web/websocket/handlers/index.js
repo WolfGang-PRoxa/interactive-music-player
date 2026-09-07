@@ -12,6 +12,7 @@ const queueHandlers = require('./queueHandlers');
 const playlistHandlers = require('./playlistHandlers');
 const qualityHandlers = require('./qualityHandlers');
 const shareHandlers = require('./shareHandlers');
+const tunnelHandlers = require('./tunnelHandlers');
 const systemHandlers = require('./systemHandlers');
 const versionHandlers = require('./versionHandlers');
 
@@ -52,6 +53,10 @@ module.exports = {
     setTrackLoudness: qualityHandlers.handleSetTrackLoudness,
     setTrackQuality: qualityHandlers.handleSetTrackQuality,
     admitGuest: shareHandlers.handleAdmitGuest,
+    tunnelState: tunnelHandlers.handleTunnelState,
+    tunnelLogin: tunnelHandlers.handleTunnelLogin,
+    tunnelMount: tunnelHandlers.handleTunnelMount,
+    tunnelUnmount: tunnelHandlers.handleTunnelUnmount,
     shareControl: shareHandlers.handleShareControl,
     downloadTrack: downloadHandlers.handleDownloadTrack,
     shutdownBot: systemHandlers.handleShutdownBot,

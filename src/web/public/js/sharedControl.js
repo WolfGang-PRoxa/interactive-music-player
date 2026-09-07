@@ -558,6 +558,10 @@ window.MusicPlayer = window.MusicPlayer || {};
             openBtn.addEventListener('click', () => {
                 modal.classList.remove('hidden');
                 renderModal();
+                // L'état du tunnel se demande en ouvrant, jamais en continu.
+                if (typeof window.MusicPlayer.refreshTunnel === 'function') {
+                    window.MusicPlayer.refreshTunnel();
+                }
             });
         }
 
