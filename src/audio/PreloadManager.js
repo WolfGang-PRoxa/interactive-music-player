@@ -1039,12 +1039,32 @@ class PreloadManager {
 
                 const entry = (info.entries && info.entries[0]) ? info.entries[0] : info;
                 if (entry && entry.formats) {
-                    const audioFormats = entry.formats.filter(f => f.acodec !== 'none');
-                    const bestAudio = audioFormats.find(f => f.vcodec === 'none') || audioFormats[0];
-                    if (bestAudio && bestAudio.url) {
-                        ffmpegInput = bestAudio.url;
+                    /*
+                     * Le choix se fait dans `videoSource`, avec celui des
+                     * téléchargements.
+                     *
+                     * Ici, on prenait le premier format sonore de la liste. Or
+                     * yt-dlp ordonne du pire au meilleur et place les variantes
+                     * HLS en tête : le premier était un manifeste `.m3u8`, dans
+                     * un doublage automatique tiré au hasard, sans débit
+                     * annoncé. L'adresse était bien « extraite » — le journal
+                     * l'annonçait en succès — et ffmpeg se prenait un 404 sur un
+                     * manifeste signé pour un autre client.
+                     */
+                    const chosen = require('./videoSource').bestAudio(entry);
+                    if (chosen && chosen.url) {
+                        ffmpegInput = chosen.url;
                         inputStream = null;
-                        log.success(`[PreloadManager] Direct URL extracted successfully for: ${track.title}`);
+                        const langue = chosen.language ? `, ${chosen.language}` : '';
+                        log.success(`[PreloadManager] Direct URL extracted successfully for: `
+                            + `${track.title} (${chosen.format_id}, `
+                            + `${Math.round(Number(chosen.abr) || 0) || '?'} kbps${langue})`);
+                    } else if (inputStream) {
+                        // Rien d'utilisable, mais l'extracteur avait fourni un
+                        // flux : on le garde plutôt que de repartir les mains
+                        // vides — c'est lui qui alimentait avant ce détour.
+                        log.info(`[PreloadManager] No direct audio format for ${track.title}: `
+                            + `keeping the extractor stream.`);
                     }
                 } else if (entry && entry.url) {
                     ffmpegInput = entry.url;

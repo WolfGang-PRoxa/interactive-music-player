@@ -114,13 +114,13 @@ async function inventory(url) {
         .filter((d) => d > 0))]
         .sort((a, b) => b - a);
 
-    const debits = formats
-        .filter((f) => f && f.acodec && f.acodec !== 'none' && Number(f.abr) > 0)
-        .map((f) => Number(f.abr));
+    // Le débit annoncé au menu doit être celui qu'on ira chercher : c'est la
+    // piste d'origine qui sera téléchargée, et non le doublage le mieux servi.
+    const debits = audioTracks(entry).map(nominalKbps).filter((v) => v > 0);
 
     const value = {
         heights,
-        audioKbps: debits.length ? Math.round(Math.max(...debits)) : null,
+        audioKbps: debits.length ? Math.max(...debits) : null,
         known: true,
     };
 
@@ -152,6 +152,107 @@ function definitionOf(format) {
     const h = Number(format && format.height) || 0;
     if (!h) return 0;
     return w ? Math.min(w, h) : h;
+}
+
+/**
+ * Les protocoles qu'on sait consommer directement.
+ *
+ * Un `m3u8` n'est pas un flux : c'est une liste de morceaux, servie par une
+ * adresse signée pour le client qui l'a demandée. ffmpeg s'y présente avec
+ * l'en-tête du bot et se fait refuser — 404, zéro octet écrit, et un échec qui
+ * ne dit pas son nom puisque l'adresse, elle, avait bien été « extraite ».
+ */
+const DIRECT_PROTOCOLS = new Set(['https', 'http']);
+
+/**
+ * Les pistes sonores dans la langue d'origine, quand la source le dit.
+ *
+ * YouTube ajoute désormais des doublages automatiques : une même vidéo porte
+ * vingt pistes sonores, toutes annoncées avec le même sérieux. Rien dans leur
+ * ordre ne distingue l'originale, et rien dans leur débit non plus — sur une
+ * vidéo anglaise, le doublage indonésien sort à 124 kbps quand l'original tient
+ * à 110. Choisir au meilleur débit revient donc à tirer une langue au hasard.
+ *
+ * Deux marques, dans cet ordre. `language_preference` vaut 10 sur la piste
+ * d'origine et −1 sur les doublages : c'est la réponse directe. À défaut, la
+ * langue déclarée de la vidéo tranche. Et si la source ne dit rien du tout —
+ * cas de l'immense majorité, qui n'a qu'une piste —, tout est rendu tel quel :
+ * filtrer sur une marque absente ne laisserait rien.
+ *
+ * @param {object[]} formats
+ * @param {object|null} entry - L'entrée complète, qui porte la langue d'origine.
+ * @returns {object[]}
+ */
+function originalLanguage(formats, entry) {
+    const marques = formats.filter((f) => Number(f.language_preference) === 10);
+    if (marques.length) return marques;
+
+    const langue = entry && entry.language;
+    if (langue) {
+        const memeLangue = formats.filter(
+            (f) => f.language && String(f.language).toLowerCase() === String(langue).toLowerCase());
+        if (memeLangue.length) return memeLangue;
+    }
+
+    return formats;
+}
+
+/**
+ * Les flux sonores utilisables d'une entrée, dans la langue d'origine.
+ *
+ * @param {object|null} entry
+ * @returns {object[]} Du meilleur débit au moindre.
+ */
+function audioTracks(entry) {
+    const formats = (entry && Array.isArray(entry.formats)) ? entry.formats : [];
+    const utilisables = formats.filter((f) => f && f.url
+        && f.acodec && f.acodec !== 'none'
+        && DIRECT_PROTOCOLS.has(String(f.protocol)));
+
+    // Le son seul d'abord. Un format complet ferait descendre l'image avec lui,
+    // pour rien quand on n'encode que du son — mais il vaut mieux que rien.
+    const seuls = utilisables.filter((f) => f.vcodec === 'none');
+    const pool = seuls.length ? seuls : utilisables;
+
+    return originalLanguage(pool, entry)
+        .slice()
+        .sort((a, b) => (Number(b.abr) || 0) - (Number(a.abr) || 0));
+}
+
+/**
+ * Le meilleur flux sonore d'une entrée : direct, et dans la langue d'origine.
+ *
+ * @param {object|null} entry
+ * @returns {object|null}
+ */
+function bestAudio(entry) {
+    return audioTracks(entry)[0] || null;
+}
+
+/**
+ * Le débit nominal d'un format, à partir de ce que la source mesure.
+ *
+ * `abr` est une moyenne relevée sur le fichier, pas l'étiquette du flux : un
+ * AAC « 128 kbps » se mesure à 129,5, l'en-tête du conteneur comptant dans le
+ * total. Pris au pied de la lettre, ce kilobit de trop fait qu'une demande de
+ * 128 ne trouve plus rien à sa hauteur et dégringole au barreau du dessous —
+ * 49 kbps pour un fichier qu'on croyait avoir demandé plein.
+ *
+ * Le repli à l'arrondi est essentiel : YouTube sert aussi du 160 et du 70, qui
+ * ne sont les étiquettes de rien. Les ramener de force à un barreau du menu
+ * annoncerait une qualité que la source ne porte pas.
+ *
+ * @param {object} format
+ * @returns {number} 0 quand la source n'annonce aucun débit.
+ */
+function nominalKbps(format) {
+    const mesure = Number(format && format.abr) || 0;
+    if (!(mesure > 0)) return 0;
+
+    // Cinq pour cent : de quoi absorber l'en-tête d'un conteneur, pas de quoi
+    // confondre deux barreaux voisins, le plus resserré allant de 96 à 128.
+    const barreau = AUDIO_LADDER.find((v) => mesure >= v && mesure <= v * 1.05);
+    return barreau || Math.round(mesure);
 }
 
 /**
@@ -210,15 +311,14 @@ async function resolveAudio(url, kbps) {
     if (!url || !/^https?:\/\//i.test(url)) return null;
 
     const entry = await dump(url);
-    const formats = (entry && Array.isArray(entry.formats)) ? entry.formats : [];
-    const sons = formats.filter((f) => f && f.acodec && f.acodec !== 'none' && f.url);
+    const sons = audioTracks(entry);
     if (!sons.length) return null;
 
-    const debits = sons.map((f) => Number(f.abr) || 0).filter((v) => v > 0);
+    const debits = sons.map(nominalKbps).filter((v) => v > 0);
     if (!debits.length) return null;
 
     const retenu = stepDown(AUDIO_LADDER, kbps, debits);
-    const exact = sons.find((f) => Math.round(Number(f.abr) || 0) === retenu);
+    const exact = sons.find((f) => nominalKbps(f) === retenu);
     return exact ? { url: exact.url, kbps: retenu } : null;
 }
 
@@ -276,26 +376,29 @@ async function resolveWith(url, height, audioKbps) {
     let sonRetenu = null;
 
     if (!choisi.acodec || choisi.acodec === 'none') {
-        const sons = formats.filter((f) => f && f.acodec && f.acodec !== 'none' && f.url);
-        const debits = sons.map((f) => Number(f.abr) || 0).filter((v) => v > 0);
+        // Déjà réduits à la langue d'origine, et déjà triés du meilleur débit
+        // au moindre : recoudre l'image avec un doublage passerait inaperçu
+        // jusqu'à la lecture.
+        const sons = audioTracks(entry);
+        const debits = sons.map(nominalKbps).filter((v) => v > 0);
 
         if (debits.length && audioKbps) {
             sonRetenu = stepDown(AUDIO_LADDER, audioKbps, debits);
-            const exact = sons.filter((f) => Math.round(Number(f.abr) || 0) === sonRetenu);
+            const exact = sons.filter((f) => nominalKbps(f) === sonRetenu);
             audioUrl = (exact[0] || null) && exact[0].url;
         }
 
         // Aucun débit annoncé, ou aucune demande : le meilleur disponible, comme
         // avant. Ne rien prendre laisserait une vidéo muette.
         if (!audioUrl) {
-            const meilleur = sons.sort((a, b) => (b.tbr || 0) - (a.tbr || 0))[0];
+            const meilleur = sons[0];
             audioUrl = meilleur ? meilleur.url : null;
-            sonRetenu = meilleur ? Math.round(Number(meilleur.abr) || 0) || null : null;
+            sonRetenu = meilleur ? nominalKbps(meilleur) || null : null;
         }
     } else {
         // Format complet : son et image voyagent ensemble, et les séparer
         // obligerait à réencoder l'image pour les recoudre.
-        sonRetenu = Math.round(Number(choisi.abr) || 0) || null;
+        sonRetenu = nominalKbps(choisi) || null;
     }
 
     return {
@@ -312,6 +415,10 @@ module.exports = {
     resolveAudio,
     inventory,
     stepDown,
+    nominalKbps,
+    bestAudio,
+    audioTracks,
+    originalLanguage,
     VIDEO_LADDER,
     AUDIO_LADDER,
     DEFAULT_HEIGHT,
