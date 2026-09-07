@@ -191,10 +191,23 @@ window.MusicPlayer = window.MusicPlayer || {};
         const state = window.MusicPlayer.state || {};
         const knownMembers = new Map((sharing?.knownUsers || []).map((u) => [u.userId, u]));
         const grants = sharing?.grants || {};
+        const admitted = new Set(sharing?.admitted || []);
         const list = [];
         const seen = new Set();
 
+        /*
+         * Le maître ne figure pas dans sa propre liste.
+         *
+         * Il y apparaissait dès qu'il était dans le salon vocal, avec des cases
+         * à cocher pour s'accorder à lui-même des droits qu'il détient déjà.
+         * Plus trompeur encore en ouvrant le tableau de bord depuis un second
+         * poste : on s'y voit rangé parmi les auditeurs, et l'on croit être
+         * devenu son propre invité alors que rien n'a changé.
+         */
+        const self = state.role === 'master' && state.identity ? state.identity.userId : null;
+
         for (const member of state.members || []) {
+            if (self && member.id === self) continue;
             seen.add(member.id);
             list.push({
                 userId: member.id,
@@ -207,10 +220,12 @@ window.MusicPlayer = window.MusicPlayer || {};
         }
 
         for (const [userId, known] of knownMembers) {
-            if (seen.has(userId)) continue;
-            // Un compte authentifié mais parti : on ne le montre que s'il garde
-            // des droits, sans quoi la liste s'allongerait de tous les passages.
-            if (!grants[userId]) continue;
+            if (seen.has(userId) || (self && userId === self)) continue;
+            // Un compte authentifié mais parti : on ne le montre que s'il a été
+            // admis ou pourvu, sans quoi la liste s'allongerait de tous les
+            // passages. Un admis sans droits doit rester visible — c'est là,
+            // et nulle part ailleurs, qu'on lui en accordera.
+            if (!grants[userId] && !admitted.has(userId)) continue;
             list.push({
                 userId,
                 displayName: known.displayName || userId,
@@ -277,12 +292,13 @@ window.MusicPlayer = window.MusicPlayer || {};
         accept.className = 'share-pending-btn accept';
         accept.textContent = t('share_pending_accept', 'Accepter');
         accept.addEventListener('click', () => {
-            // La lecture seule pour commencer : c'est le droit qu'on vient
-            // chercher, et le moins surprenant à accorder d'un clic. Le reste
-            // s'ajoute ensuite, case par case, dans la ligne qui apparaît.
+            // Accepter répond à la demande, sans rien accorder : l'invité
+            // rejoint la liste ordinaire, où ses droits se cochent ensuite un
+            // par un. Ouvrir des droits d'un clic déciderait à la place de
+            // l'hôte, et c'est précisément ce qu'on lui demande de faire.
             window.MusicPlayer.sendWS({
-                type: 'shareControl',
-                data: { userId: person.userId, permissions: { playback: true } },
+                type: 'admitGuest',
+                data: { userId: person.userId },
             });
         });
         row.appendChild(accept);

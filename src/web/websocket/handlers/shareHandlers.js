@@ -109,6 +109,26 @@ function handleShareControl(ctx) {
 }
 
 /**
+ * Admet un invité sans rien lui accorder.
+ *
+ * Répondre à quelqu'un qui frappe et lui ouvrir des droits sont deux gestes
+ * distincts : celui-ci ne fait que le premier. L'invité quitte la file des
+ * demandes et rejoint la liste ordinaire, où ses droits se cochent ensuite un
+ * par un — et où il reste visible même sans en avoir aucun.
+ */
+function handleAdmitGuest(ctx) {
+    const { ws, data, webServer, currentGuildId } = ctx;
+    const { userId } = data;
+    if (!userId) return;
+
+    database.admitGuest(currentGuildId, userId);
+    log.info(`[Share] Guest ${userId} admitted, with no rights granted.`);
+
+    reply(ws, true, null, { userId });
+    webServer.broadcastState(currentGuildId);
+}
+
+/**
  * Retire tous les droits d'un invité et ferme ses sessions.
  *
  * La session part avec les droits. La garder ne donnerait accès à rien, mais
@@ -121,6 +141,7 @@ function handleRevokeControl(ctx) {
     if (!userId) return;
 
     database.revokeUserPermissions(currentGuildId, userId);
+    database.dismissGuest(currentGuildId, userId);
     const closed = sessions.revokeUser(userId);
 
     log.info(`[Share] Control revoked for ${userId} (${closed} session(s) closed).`);
@@ -153,6 +174,7 @@ function reply(ws, ok, reason, extra = {}) {
 }
 
 module.exports = {
+    handleAdmitGuest,
     handleSendInviteLink,
     handleShareControl,
     handleRevokeControl,

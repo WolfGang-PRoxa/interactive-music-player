@@ -51,6 +51,7 @@ module.exports = {
     setPlayMode: playbackHandlers.handleSetPlayMode,
     setTrackLoudness: qualityHandlers.handleSetTrackLoudness,
     setTrackQuality: qualityHandlers.handleSetTrackQuality,
+    admitGuest: shareHandlers.handleAdmitGuest,
     shareControl: shareHandlers.handleShareControl,
     downloadTrack: downloadHandlers.handleDownloadTrack,
     shutdownBot: systemHandlers.handleShutdownBot,

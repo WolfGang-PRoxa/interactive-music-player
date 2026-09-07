@@ -781,6 +781,59 @@ class GuildDatabase {
     }
 
     /**
+     * Admet un invité, sans rien lui accorder.
+     *
+     * Être admis et avoir des droits sont deux choses, et les confondre coûtait
+     * cher : `setUserPermissions` retire de la table l'invité qui n'a plus aucun
+     * droit — c'est ce qui empêche le fichier de se remplir de « quatre fois
+     * non » —, si bien qu'accepter quelqu'un sans lui accorder quoi que ce soit
+     * le faisait aussitôt disparaître, et retomber dans la file des demandes.
+     *
+     * L'admission dit seulement « je sais qui c'est, et je ne le refuse pas ».
+     * Les droits se cochent ensuite, un par un.
+     *
+     * @param {string} guildId
+     * @param {string} userId
+     */
+    admitGuest(guildId, userId) {
+        const settings = this.getSettings(guildId);
+        const list = Array.isArray(settings.admittedGuests) ? settings.admittedGuests : [];
+        const id = String(userId);
+        if (list.includes(id)) return;
+
+        settings.admittedGuests = [...list, id];
+        this.cache.set(guildId, settings);
+        this._save();
+    }
+
+    /**
+     * Retire une admission. L'invité redevient un inconnu qui frappe.
+     *
+     * @param {string} guildId
+     * @param {string} userId
+     */
+    dismissGuest(guildId, userId) {
+        const settings = this.getSettings(guildId);
+        const list = Array.isArray(settings.admittedGuests) ? settings.admittedGuests : [];
+        const id = String(userId);
+        if (!list.includes(id)) return;
+
+        settings.admittedGuests = list.filter((u) => u !== id);
+        this.cache.set(guildId, settings);
+        this._save();
+    }
+
+    /**
+     * Les invités admis sur ce serveur, droits ou non.
+     * @param {string} guildId
+     * @returns {string[]}
+     */
+    getAdmittedGuests(guildId) {
+        const list = this.getSettings(guildId).admittedGuests;
+        return Array.isArray(list) ? list.map(String) : [];
+    }
+
+    /**
      * Tous les partages en vigueur sur un serveur.
      * @param {string} guildId
      * @returns {Object<string, object>} userId → droits.

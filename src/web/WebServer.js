@@ -744,6 +744,7 @@ class WebServer {
                     grants: database.getSharedControl(guildId),
                     knownUsers: sessions.listUsers(),
                     pending: this._pendingGuests(guildId),
+                    admitted: database.getAdmittedGuests(guildId),
                 },
             };
         }
@@ -783,8 +784,12 @@ class WebServer {
         const owner = require('./owner');
         const grants = database.getSharedControl(guildId) || {};
 
+        const admitted = new Set(database.getAdmittedGuests(guildId));
+
         return sessions.listUsers()
-            .filter((u) => !grants[u.userId] && !owner.isOwner({ userId: u.userId }))
+            .filter((u) => !grants[u.userId]
+                && !admitted.has(String(u.userId))
+                && !owner.isOwner({ userId: u.userId }))
             .map((u) => ({
                 userId: u.userId,
                 displayName: u.displayName || u.userId,
