@@ -228,6 +228,79 @@ window.MusicPlayer = window.MusicPlayer || {};
         return (name || '?').trim().charAt(0).toUpperCase() || '?';
     }
 
+    /**
+     * Les invités qui attendent une réponse, en tête de liste.
+     *
+     * Un invité qui suit le lien se nomme avec Discord, puis n'obtient rien : les
+     * droits ne s'héritent pas d'une authentification. Il disparaissait alors de
+     * l'écran — la liste n'affiche un compte absent du salon vocal que s'il a
+     * déjà des droits — et patientait devant un tableau de bord inerte pendant
+     * que l'hôte ignorait qu'on frappait à la porte.
+     *
+     * Deux boutons, et rien d'autre : ce n'est pas le moment de choisir des
+     * droits un par un, c'est le moment de dire oui ou non. Le réglage fin vient
+     * après, dans la ligne ordinaire où l'invité accepté rejoint les autres.
+     */
+    function pendingRow(person) {
+        const row = document.createElement('div');
+        row.className = 'share-pending-row';
+
+        if (person.avatar) {
+            const img = document.createElement('img');
+            img.className = 'share-person-avatar';
+            img.src = person.avatar;
+            img.alt = '';
+            row.appendChild(img);
+        } else {
+            const circle = document.createElement('div');
+            circle.className = 'share-person-avatar';
+            circle.textContent = initial(person.displayName);
+            row.appendChild(circle);
+        }
+
+        const text = document.createElement('div');
+        text.className = 'share-pending-text';
+
+        const name = document.createElement('span');
+        name.className = 'share-pending-name';
+        name.textContent = person.displayName;
+        text.appendChild(name);
+
+        const hint = document.createElement('span');
+        hint.className = 'share-pending-hint';
+        hint.textContent = t('share_pending_hint', 'demande le contrôle du bot');
+        text.appendChild(hint);
+
+        row.appendChild(text);
+
+        const accept = document.createElement('button');
+        accept.className = 'share-pending-btn accept';
+        accept.textContent = t('share_pending_accept', 'Accepter');
+        accept.addEventListener('click', () => {
+            // La lecture seule pour commencer : c'est le droit qu'on vient
+            // chercher, et le moins surprenant à accorder d'un clic. Le reste
+            // s'ajoute ensuite, case par case, dans la ligne qui apparaît.
+            window.MusicPlayer.sendWS({
+                type: 'shareControl',
+                data: { userId: person.userId, permissions: { playback: true } },
+            });
+        });
+        row.appendChild(accept);
+
+        const refuse = document.createElement('button');
+        refuse.className = 'share-pending-btn refuse';
+        refuse.textContent = t('share_pending_refuse', 'Refuser');
+        refuse.addEventListener('click', () => {
+            // Refuser ferme la session : l'invité retombe sur la porte
+            // d'entrée, qui est explicite, au lieu de rester devant un tableau
+            // de bord qui ne répond à rien.
+            window.MusicPlayer.sendWS({ type: 'revokeControl', data: { userId: person.userId } });
+        });
+        row.appendChild(refuse);
+
+        return row;
+    }
+
     /** Construit la ligne d'un auditeur. */
     function listenerRow(person) {
         const rights = inFlight.get(person.userId) || person.rights || {};
@@ -352,9 +425,29 @@ window.MusicPlayer = window.MusicPlayer || {};
         if (!list) return;
 
         const people = listeners();
+        const waiting = sharing?.pending || [];
         list.innerHTML = '';
 
-        if (!people.length) {
+        /*
+         * Les demandes d'abord, et séparées du reste.
+         *
+         * Elles appellent une réponse, quand la liste en dessous ne fait que
+         * rendre compte. Les mêler ferait passer une question pour un état.
+         */
+        if (waiting.length) {
+            const block = document.createElement('div');
+            block.className = 'share-pending-block';
+
+            const title = document.createElement('div');
+            title.className = 'share-pending-title';
+            title.textContent = t('share_pending_title', 'Demandes en attente');
+            block.appendChild(title);
+
+            waiting.forEach((person) => block.appendChild(pendingRow(person)));
+            list.appendChild(block);
+        }
+
+        if (!people.length && !waiting.length) {
             const empty = document.createElement('div');
             empty.className = 'share-empty';
             empty.textContent = t('share_empty', 'Personne dans le salon vocal.');
@@ -365,14 +458,29 @@ window.MusicPlayer = window.MusicPlayer || {};
         people.forEach((person) => list.appendChild(listenerRow(person)));
     }
 
-    /** Nombre d'invités pourvus, affiché sur le bouton de l'en-tête. */
+    /**
+     * Ce que le bouton de l'en-tête annonce.
+     *
+     * Deux nombres se disputent la place, et l'un des deux appelle un geste :
+     * les invités qui attendent une réponse passent donc devant ceux qui sont
+     * déjà pourvus. Un décompte tranquille peut attendre ; quelqu'un derrière la
+     * porte, non.
+     *
+     * La couleur change avec le sens, sans quoi le nombre passerait de « trois
+     * personnes ont le contrôle » à « trois personnes le demandent » sans que
+     * rien ne le signale.
+     */
     function renderBadge() {
         const badge = el('share-badge');
         if (!badge) return;
 
-        const total = Object.keys(sharing?.grants || {}).length;
+        const waiting = (sharing?.pending || []).length;
+        const granted = Object.keys(sharing?.grants || {}).length;
+        const total = waiting || granted;
+
         badge.textContent = String(total);
         badge.classList.toggle('hidden', total === 0);
+        badge.classList.toggle('is-knocking', waiting > 0);
     }
 
     /* ═════════════════════ Entrées du module ═════════════════════ */

@@ -743,6 +743,7 @@ class WebServer {
                     publicUrl: oauth.publicUrl(),
                     grants: database.getSharedControl(guildId),
                     knownUsers: sessions.listUsers(),
+                    pending: this._pendingGuests(guildId),
                 },
             };
         }
@@ -759,6 +760,37 @@ class WebServer {
                 ? database.getUserPermissions(guildId, userId)
                 : permissions.noPermissions(),
         };
+    }
+
+    /**
+     * Les invités qui se sont nommés et attendent une réponse.
+     *
+     * Un invité qui suit le lien se connecte avec son compte Discord, puis
+     * n'obtient rien : les droits ne s'héritent pas d'une authentification, il
+     * faut que l'hôte les accorde. Jusqu'ici il disparaissait purement — la
+     * fenêtre de partage n'affiche un compte absent du salon vocal que s'il a
+     * déjà des droits, si bien que celui qui attend n'était visible nulle part.
+     * Il patientait devant un tableau de bord inerte, et l'hôte ne savait même
+     * pas qu'on frappait à la porte.
+     *
+     * Le propriétaire est écarté de sa propre file : il ne s'accorde rien.
+     *
+     * @param {string} guildId
+     * @returns {Array<{userId: string, displayName: string, avatar: string|null, since: number}>}
+     */
+    _pendingGuests(guildId) {
+        const sessions = require('./sessions');
+        const owner = require('./owner');
+        const grants = database.getSharedControl(guildId) || {};
+
+        return sessions.listUsers()
+            .filter((u) => !grants[u.userId] && !owner.isOwner({ userId: u.userId }))
+            .map((u) => ({
+                userId: u.userId,
+                displayName: u.displayName || u.userId,
+                avatar: u.avatar || null,
+                since: u.lastSeenAt || 0,
+            }));
     }
 
     /**

@@ -895,6 +895,116 @@
     pointer-events: none;
 }
 
+/*
+ * Quelqu'un frappe à la porte.
+ *
+ * Le badge annonce d'ordinaire un décompte tranquille — le nombre d'invités
+ * pourvus. Quand il annonce une demande, il change de couleur et respire : le
+ * même nombre au même endroit, mais qui appelle un geste plutôt qu'il n'en rend
+ * compte, et rien ne le dirait sans cela.
+ */
+.share-badge.is-knocking {
+    background: var(--c-accent);
+    animation: share-knock 2s ease-in-out infinite;
+}
+
+@keyframes share-knock {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.18); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .share-badge.is-knocking { animation: none; }
+}
+
+/*
+ * Le bloc des demandes, au-dessus de la liste et séparé d'elle.
+ *
+ * Elles appellent une réponse, quand la liste en dessous ne fait que rendre
+ * compte. Les mêler ferait passer une question pour un état.
+ */
+.share-pending-block {
+    margin-bottom: 1rem;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid color-mix(in srgb, var(--c-accent) 35%, transparent);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--c-accent) 8%, transparent);
+}
+
+.share-pending-title {
+    margin-bottom: 0.6rem;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--c-accent);
+}
+
+.share-pending-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.4rem 0;
+}
+
+.share-pending-row + .share-pending-row {
+    border-top: 1px solid var(--border-card);
+}
+
+.share-pending-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+.share-pending-name {
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: var(--text-main);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.share-pending-hint {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+/*
+ * Deux boutons de même poids visuel.
+ *
+ * Accepter n'est pas le choix par défaut : mettre en avant l'un des deux
+ * reviendrait à souffler la réponse à qui doit la donner.
+ */
+.share-pending-btn {
+    flex-shrink: 0;
+    padding: 0.32rem 0.7rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-card);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-main);
+    font-family: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.share-pending-btn.accept:hover {
+    color: #57f287;
+    border-color: rgba(87, 242, 135, 0.45);
+    background: rgba(87, 242, 135, 0.12);
+}
+
+.share-pending-btn.refuse:hover {
+    color: #ff4757;
+    border-color: rgba(255, 71, 87, 0.45);
+    background: rgba(255, 71, 87, 0.12);
+}
+
 .share-modal-box {
     max-width: 720px !important;
     width: 94% !important;
