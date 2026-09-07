@@ -96,6 +96,32 @@ console.log('Ce qui est demandé à Discord\n');
         oauth.consumeState(sans.searchParams.get('state')).claim === false);
 }
 
+{
+    /*
+     * La trace de configuration doit être appelée, pas seulement écrite.
+     *
+     * Elle annonce au démarrage l'URL de rappel à déclarer dans le portail
+     * Discord, et avertit quand PUBLIC_URL manque — donc exactement ce dont on a
+     * besoin en installant le bot sur une machine neuve. Elle a existé plusieurs
+     * semaines sans qu'aucun appelant ne l'invoque : le journal restait muet, et
+     * l'on cherchait une ligne qui ne pouvait pas paraître. Une trace morte est
+     * pire que pas de trace, puisqu'on compte dessus.
+     */
+    check('logConfiguration est exportée', typeof oauth.logConfiguration === 'function');
+
+    const SERVER = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'WebServer.js'), 'utf8');
+    check('  … et réellement appelée au démarrage',
+        /logConfiguration\(\)/.test(SERVER),
+        'écrite sans appelant, elle n\'a jamais rien tracé');
+
+    // Au démarrage : après l'adresse du tableau de bord, avant tout le reste.
+    check('  … depuis l\'ouverture du port',
+        SERVER.indexOf('logConfiguration()') > SERVER.indexOf('this.server.listen(')
+        && SERVER.indexOf('logConfiguration()') < SERVER.indexOf('AUTO_OPEN_DASHBOARD'),
+        'c\'est la ligne qu\'on cherche des yeux au lancement');
+}
+
 // ───────────────────── La sortie ─────────────────────
 
 console.log('\nCe que ferme une déconnexion\n');

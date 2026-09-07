@@ -158,6 +158,20 @@ class WebServer {
                 log.warn(`[WebServer] The dashboard is exposed on every network interface (HOST=${host}).`);
             }
 
+            /*
+             * L'état de la configuration OAuth, ici et pas ailleurs.
+             *
+             * Cette trace existait déjà et n'était appelée de nulle part : elle
+             * annonce l'URL de rappel à déclarer dans le portail Discord, et
+             * avertit quand PUBLIC_URL manque. Autant dire qu'elle sert
+             * précisément au moment où l'on installe le bot sur une machine
+             * neuve — le seul moment où personne ne peut la deviner.
+             *
+             * Elle se lit à la suite de l'adresse du tableau de bord, parce que
+             * c'est la ligne que l'on cherche des yeux au démarrage.
+             */
+            require('./oauth').logConfiguration();
+
             // Ouvrir automatiquement le navigateur après 5 secondes si aucun client n'est connecté
             //
             // Débrayable par AUTO_OPEN_DASHBOARD=false. En diffusion personnelle,
