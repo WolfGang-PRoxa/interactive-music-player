@@ -3,3 +3,5 @@
 - [ ] Sur téléphone et tablette, on a déjà fait en sorte que lors du drag and drop, les éléments soient réellement drag par la souris (ils sont dessinés dans la souris de l'utilisateur lors du drag), mais pas sur PC. Il faudrait faire la même chose sur PC.
 
 - [ ] les indicateurs de décibels dans la box volume et diffusion doivent constitués des boutons qui ouvre la même type de vue (avec slider et LUFS mesuré) que le sous-menu du volume LUFS d'un menu clic droit pour l'élément (le fichier) qui est en cours de lecture.
+
+- [ ] Dans le menu clic droit des éléemnts, on va ajouter 

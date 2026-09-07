@@ -227,9 +227,14 @@ console.log('\nCe que la recherche d\'image répond\n');
         && (HANDLER.match(/runFfmpeg\(/g) || []).length >= 3,
         'la gestion d\'erreur ne se maintient pas en double');
 
-    // La hauteur sert deux fois : à choisir le flux, et à tailler le noir.
+    /*
+     * La hauteur sert deux fois : à choisir le flux, et à tailler le noir.
+     *
+     * Elle voyage désormais avec le débit demandé, les deux étant satisfaits
+     * séparément — une définition absente ne doit pas dégrader le son.
+     */
     check('la définition demandée guide la recherche d\'image',
-        /videoSource\.resolve\(url, height\)/.test(HANDLER));
+        /videoSource\.resolve\(url, \{ height, audioKbps/.test(HANDLER));
     check('  … et dimensionne l\'image fabriquée',
         /blackCanvas\(height\)/.test(HANDLER)
         && /color=c=black:s=\$\{canvas\}/.test(HANDLER),
