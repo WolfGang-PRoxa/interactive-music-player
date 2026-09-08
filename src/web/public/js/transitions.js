@@ -73,6 +73,36 @@ window.MusicPlayer = window.MusicPlayer || {};
         return found ? (found.name || '') : t('transition_target_gone', 'Destination supprimée');
     };
 
+    /**
+     * Ce qui, dans une liste, peut changer l'affichage d'un aiguillage.
+     *
+     * Les deux listes ne se reconstruisent que lorsque leur signature bouge —
+     * titre, adresse, durée, pochette —, sans quoi elles seraient réécrites à
+     * chaque état reçu et perdraient le survol sous le curseur. Or un
+     * aiguillage n'a rien de tout cela : changer sa destination ne bougeait
+     * aucun de ces quatre champs, et la ligne gardait l'ancien nom jusqu'au
+     * prochain rechargement de la page.
+     *
+     * Deux choses sont donc ajoutées à la signature, et seulement lorsqu'un
+     * aiguillage est présent : les destinations visées, et le nom des playlists
+     * — qu'un renommage change sous une ligne qui, elle, n'a pas bougé.
+     *
+     * La restriction compte : le champ de renommage envoie à chaque frappe, et
+     * mêler ces noms à la signature de toutes les listes les ferait reconstruire
+     * lettre après lettre.
+     *
+     * @param {object[]} liste
+     * @returns {string} '' quand aucun aiguillage ne s'y trouve.
+     */
+    window.MusicPlayer.transitionSignature = function (liste) {
+        const aiguillages = (liste || []).filter(window.MusicPlayer.isTransition);
+        if (aiguillages.length === 0) return '';
+
+        const noms = ((window.MusicPlayer.state && window.MusicPlayer.state.playlists) || [])
+            .map(p => `${p.id}:${p.name}`).join(',');
+        return `|${aiguillages.map(t => `${t.id}>${t.target}`).join(',')}|${noms}`;
+    };
+
     const ICON_ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
         + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
         + '<path d="M4 20 L4 12 Q4 8 8 8 L20 8"></path>'

@@ -481,7 +481,8 @@ window.MusicPlayer.updateQueueUI = function() {
         });
     }
 
-    const queueStructJson = JSON.stringify((state.queue || []).map(t => ({ title: t.title, url: t.url, duration: t.duration, thumbnail: t.thumbnail })));
+    const queueStructJson = JSON.stringify((state.queue || []).map(t => ({ title: t.title, url: t.url, duration: t.duration, thumbnail: t.thumbnail })))
+        + window.MusicPlayer.transitionSignature(state.queue || []);
     if (playlistQueueContainer._lastQueueStructJson !== queueStructJson) {
         playlistQueueContainer._lastQueueStructJson = queueStructJson;
         playlistQueueContainer.innerHTML = '';

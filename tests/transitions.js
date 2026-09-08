@@ -522,6 +522,74 @@ console.log('\nCe qu\'un clic droit sur un aiguillage permet\n');
     check('la modification est soumise à un droit', /setTransitionTarget: '/.test(DROITS));
 }
 
+{
+    /*
+     * La ligne doit se redessiner sans rechargement de page.
+     *
+     * Les deux listes ne se reconstruisent que lorsque leur signature bouge —
+     * titre, adresse, durée, pochette —, sans quoi elles seraient réécrites à
+     * chaque état reçu et perdraient le survol sous le curseur. Or un
+     * aiguillage n'a rien de tout cela : changer sa destination ne bougeait
+     * aucun de ces quatre champs, et la ligne gardait son ancien nom jusqu'au
+     * prochain rechargement.
+     */
+    const vm = require('vm');
+    const SRC = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'public', 'js', 'transitions.js'), 'utf8');
+
+    const bac = { window: {}, console, Number };
+    bac.globalThis = bac;
+    vm.createContext(bac);
+    vm.runInContext(SRC, bac);
+    const MP = bac.window.MusicPlayer;
+
+    MP.state = { playlists: [{ id: 'p_a', name: 'Soirée' }, { id: 'p_b', name: 'Calme' }] };
+    const T = { isTransition: true, id: 'x', target: 'p_b', url: 'transition:x' };
+    const avec = [piste('A'), T];
+
+    const depart = MP.transitionSignature(avec);
+
+    T.target = 'queue';
+    check('changer de destination réveille la liste',
+        MP.transitionSignature(avec) !== depart,
+        'sans quoi la ligne garderait son ancien nom jusqu\'au rechargement');
+
+    // Le nom affiché vient des playlists, pas de l'aiguillage : le renommer
+    // change la ligne sans que l'aiguillage, lui, ait bougé.
+    T.target = 'p_b';
+    MP.state.playlists[1].name = 'Calme du soir';
+    check('  … et renommer la playlist visée aussi',
+        MP.transitionSignature(avec) !== depart);
+
+    /*
+     * Mais seulement quand un aiguillage est en vue.
+     *
+     * Le champ de renommage envoie à chaque frappe : mêler ces noms à la
+     * signature de toutes les listes les ferait reconstruire lettre après
+     * lettre, et perdre le survol sous le curseur à chaque caractère.
+     */
+    check('une liste sans aiguillage n\'y gagne aucune signature',
+        MP.transitionSignature([piste('A'), piste('B')]) === '',
+        'le renommage envoie à chaque frappe : tout reconstruire serait pire');
+
+    const LISTES = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'public', 'js', 'playlists.js'), 'utf8');
+    const FILE = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'public', 'js', 'queue.js'), 'utf8');
+
+    check('les deux listes consultent la même signature',
+        /transitionSignature\(playlist\.tracks \|\| \[\]\)/.test(LISTES)
+        && /transitionSignature\(state\.queue \|\| \[\]\)/.test(FILE),
+        'deux calculs séparés finiraient par ne pas réveiller les mêmes lignes');
+
+    // L'état doit porter la destination, sinon rien de tout cela n'arrive.
+    const SERVER = fs.readFileSync(path.join(ROOT, 'src', 'web', 'WebServer.js'), 'utf8');
+    check('l\'état diffusé porte la destination',
+        /return \{ isTransition: true, id: t\.id, target: t\.target, url: t\.url \};/.test(SERVER));
+    check('  … et les playlists passent par le même formateur',
+        /tracks: \(p\.tracks \|\| \[\]\)\.map\(formatTrackWithPreload\)/.test(SERVER));
+}
+
 // ───────────────────── Les traductions ─────────────────────
 
 console.log('\nCe que les quatre langues doivent dire\n');

@@ -604,7 +604,8 @@ window.MusicPlayer.updatePlaylistsUI = function() {
     const tracksStructJson = JSON.stringify((playlist.tracks || []).map(t => ({ title: t.title, url: t.url, duration: t.duration, thumbnail: t.thumbnail })));
     const activePlayingSource = state.activePlaybackSource;
     const currentIdx = state.playlistCurrentIndex;
-    const tracksStateKey = `${tracksStructJson}|${activePlayingSource}|${currentIdx}`;
+    const tracksStateKey = `${tracksStructJson}|${activePlayingSource}|${currentIdx}`
+        + window.MusicPlayer.transitionSignature(playlist.tracks || []);
 
     if (tracksListDiv && tracksListDiv._lastTracksStateKey !== tracksStateKey) {
         tracksListDiv._lastTracksStateKey = tracksStateKey;
