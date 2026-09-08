@@ -130,7 +130,7 @@ window.MusicPlayer = window.MusicPlayer || {};
              * la même, suivie de « /auth/discord/callback ». Copier ce qui est
              * affiché serait copier une adresse que le portail refusera.
              */
-            copy(current.redirectUri);
+            window.MusicPlayer.copyToClipboard(current.redirectUri);
 
             /*
              * La page de l'application, pas la liste.
@@ -157,30 +157,44 @@ window.MusicPlayer = window.MusicPlayer || {};
     }
 
     /**
-     * Copie sans dépendre du presse-papiers moderne.
+     * Le bouton qui copie l'adresse de partage.
      *
-     * `navigator.clipboard` exige une origine sûre. Le tableau de bord en est
-     * une lorsqu'il est publié — c'est du HTTPS —, mais pas toujours en local :
-     * `http://127.0.0.1` y passe, un nom de machine en clair non. Le repli par
-     * `execCommand` couvre ces cas-là, où le bouton serait sinon muet.
+     * Elle était posée là en simple paragraphe, sélectionnable d'un triple clic
+     * — un geste que personne ne devine, et que le moindre glissement rate. Elle
+     * garde son allure de champ, en chasse fixe : c'est encore une adresse qu'on
+     * lit, et non un bouton de plus dans une fenêtre qui en compte déjà.
+     *
+     * La copie confirme sur place, et non par un message qui passe : le regard
+     * est sur l'adresse au moment du clic, et c'est là qu'il faut lui répondre.
+     *
+     * @param {string} adresse
+     * @returns {HTMLElement}
      */
-    function copy(text) {
-        if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
-            return;
-        }
-        fallbackCopy(text);
-    }
+    function urlButton(adresse) {
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.className = 'tunnel-url';
+        el.textContent = adresse;
+        el.setAttribute('data-tooltip', t('tunnel_url_copy_tip', 'Copier cette adresse'));
+        el.setAttribute('data-i18n-tooltip', 'tunnel_url_copy_tip');
 
-    function fallbackCopy(text) {
-        const zone = document.createElement('textarea');
-        zone.value = text;
-        zone.setAttribute('readonly', '');
-        zone.style.cssText = 'position:fixed;top:-1000px;opacity:0';
-        document.body.appendChild(zone);
-        zone.select();
-        try { document.execCommand('copy'); } catch (e) {}
-        document.body.removeChild(zone);
+        el.addEventListener('click', async () => {
+            const ok = await window.MusicPlayer.copyToClipboard(adresse);
+            if (!ok) return;
+
+            el.textContent = t('tunnel_url_copied', 'Adresse copiée');
+            el.classList.add('is-copied');
+
+            // Le temps de le lire, puis l'adresse revient : c'est elle qu'on
+            // vient consulter, pas la confirmation.
+            clearTimeout(el._back);
+            el._back = setTimeout(() => {
+                el.textContent = adresse;
+                el.classList.remove('is-copied');
+            }, 1600);
+        });
+
+        return el;
     }
 
     /**
@@ -424,10 +438,7 @@ window.MusicPlayer = window.MusicPlayer || {};
                 zone.appendChild(row);
             }
 
-            const url = document.createElement('p');
-            url.className = 'tunnel-url';
-            url.textContent = step.url;
-            zone.appendChild(url);
+            zone.appendChild(urlButton(step.url));
 
             // Ce qu'il reste à faire dans l'onglet qui vient de s'ouvrir. Il ne
             // paraît qu'après le clic : avant, il décrirait un onglet qui

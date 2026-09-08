@@ -525,5 +525,7 @@
     "tunnel_declare_step1": "Section « Redirects », bouton « Add Redirect »",
     "tunnel_declare_step2": "Collez l'adresse dans le champ",
     "tunnel_declare_step3": "Enregistrez avec « Save Changes » en bas de page",
-    "tunnel_declare_uri_tip": "L'adresse à coller, si le presse-papiers a servi entre-temps"
+    "tunnel_declare_uri_tip": "L'adresse à coller, si le presse-papiers a servi entre-temps",
+    "tunnel_url_copy_tip": "Copier cette adresse",
+    "tunnel_url_copied": "Adresse copiée"
 }

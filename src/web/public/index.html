@@ -2036,7 +2036,13 @@
                         <span data-i18n="share_invite_title">Inviter les auditeurs</span>
                     </h3>
                     <div class="setting-item-row">
-                        <span data-i18n="share_invite_hint">Poster le lien de connexion dans le tchat du salon vocal</span>
+                        <span class="share-invite-hint">
+                            <span data-i18n="share_invite_hint">Poster le lien de connexion dans le tchat du salon vocal</span>
+                            <!-- Rempli à chaque état : dire « le salon vocal » sans le
+                                 nommer laisse envoyer un lien dans un salon qu'on croyait
+                                 être un autre. Vide tant qu'aucun salon n'est actif. -->
+                            <span class="share-invite-channel" id="share-invite-channel"></span>
+                        </span>
                         <button id="btn-send-invite" class="maint-btn primary share-invite-btn">
                             <span data-i18n="share_invite_send">Envoyer le lien</span>
                         </button>

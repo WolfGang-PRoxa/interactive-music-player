@@ -1068,6 +1068,13 @@
     flex-shrink: 0;
 }
 
+/* Le nom du salon se détache de la phrase qui l'introduit : c'est la seule
+   chose qu'on relit avant de cliquer, et le bot en fréquente plusieurs. */
+.share-invite-channel {
+    color: var(--c-primary);
+    font-weight: 600;
+}
+
 /* La liste des auditeurs */
 .share-people {
     display: flex;
@@ -2894,8 +2901,15 @@ html[data-theme="light"] .login-gate-warning code {
 }
 
 /* L'adresse est faite pour être lue et recopiée : chiffres et lettres s'y
-   distinguent mieux dans une chasse fixe. */
+   distinguent mieux dans une chasse fixe.
+ *
+ * C'est un bouton, et elle n'en prend pas l'allure : elle reste ce qu'on vient
+ * lire. Un vrai bouton de plus, dans une fenêtre qui en compte déjà trois,
+ * disperserait le regard là où il n'y a qu'un geste d'appoint. */
 .tunnel-url {
+    display: block;
+    width: 100%;
+    text-align: left;
     padding: 0.45rem 0.6rem;
     border: 1px solid color-mix(in srgb, var(--c-primary) 30%, transparent);
     border-radius: 8px;
@@ -2904,7 +2918,21 @@ html[data-theme="light"] .login-gate-warning code {
     font-family: var(--font-mono, ui-monospace, monospace);
     font-size: 0.78rem;
     word-break: break-all;
-    user-select: all;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.tunnel-url:hover {
+    background: color-mix(in srgb, var(--c-primary) 16%, transparent);
+    border-color: color-mix(in srgb, var(--c-primary) 55%, transparent);
+}
+
+/* La confirmation prend la place de l'adresse une seconde et demie : le regard
+   est sur elle au moment du clic, et c'est là qu'il faut lui répondre. */
+.tunnel-url.is-copied {
+    color: var(--c-success, #43b581);
+    border-color: color-mix(in srgb, var(--c-success, #43b581) 45%, transparent);
+    background: color-mix(in srgb, var(--c-success, #43b581) 12%, transparent);
 }
 
 /* Le geste au-dessus de l'adresse.

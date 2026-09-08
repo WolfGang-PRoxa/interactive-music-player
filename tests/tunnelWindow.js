@@ -352,7 +352,7 @@ console.log('\nCe que le bouton de déclaration copie, et où il mène\n');
      * signalait, et qu'il fallait deviner en lisant un journal.
      */
     check('c\'est l\'URL de rappel qui est copiée, pas l\'adresse affichée',
-        /copy\(current\.redirectUri\);/.test(CLIENT),
+        /copyToClipboard\(current\.redirectUri\);/.test(CLIENT),
         'le portail attend l\'adresse suivie de « /auth/discord/callback »');
 
     /*
@@ -404,8 +404,19 @@ console.log('\nCe que le bouton de déclaration copie, et où il mène\n');
      * mais en local un nom de machine en clair n'en est pas une : le bouton y
      * serait muet.
      */
+    /*
+     * Le repli vit dans la copie commune, et non ici.
+     *
+     * `navigator.clipboard` exige une origine sûre. Le tableau de bord publié en
+     * est une, mais un nom de machine en clair sur le réseau local, non : le
+     * bouton y serait muet. `copyToClipboard` porte ce repli pour toute
+     * l'interface — le réécrire ici en aurait fait deux versions.
+     */
+    const ETAT = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'public', 'js', 'state.js'), 'utf8');
     check('la copie a un repli hors origine sûre',
-        /window\.isSecureContext/.test(CLIENT) && /execCommand\('copy'\)/.test(CLIENT));
+        /window\.isSecureContext/.test(ETAT) && /execCommand\('copy'\)/.test(ETAT),
+        'porté une fois, pour toute l\'interface');
 
     /*
      * L'étiquette nomme ce qui est copié, et cela commande la disposition.
@@ -443,7 +454,7 @@ console.log('\nCe que le bouton de déclaration copie, et où il mène\n');
     const bloc = CLIENT.slice(CLIENT.indexOf('if (step.url) {'),
         CLIENT.indexOf('if (step.saisie) {'));
     check('  … et il précède l\'adresse dans le document',
-        bloc.indexOf('tunnel-declare-row') < bloc.indexOf("url.className = 'tunnel-url'"),
+        bloc.indexOf('tunnel-declare-row') < bloc.indexOf('urlButton(step.url)'),
         'd\'abord ce qu\'on va faire, ensuite l\'adresse dont il ne s\'agit pas');
 
     const CLES = ['tunnel_declare_action', 'tunnel_declare_tip', 'tunnel_declare_copied',
@@ -456,6 +467,110 @@ console.log('\nCe que le bouton de déclaration copie, et où il mène\n');
         check(`${lang} : les ${CLES.length} libellés de la déclaration sont traduits`,
             manquantes.length === 0, manquantes.join(', '));
     }
+}
+
+// ───────────────────── L'adresse, qui se copie ─────────────────────
+
+console.log('\nCe que l\'adresse elle-même permet\n');
+
+{
+    const CLIENT = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'public', 'js', 'shareTunnel.js'), 'utf8');
+    const CSS = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'public', 'css', 'modals.css'), 'utf8');
+
+    /*
+     * Elle était posée là en simple paragraphe, sélectionnable d'un triple clic
+     * — un geste que personne ne devine, et que le moindre glissement rate.
+     */
+    check('l\'adresse est un bouton, plus un paragraphe',
+        /function urlButton\(adresse\)/.test(CLIENT)
+        && /zone\.appendChild\(urlButton\(step\.url\)\);/.test(CLIENT)
+        && !/const url = document\.createElement\('p'\)/.test(CLIENT));
+
+    /*
+     * Une seule façon de copier dans tout le tableau de bord.
+     *
+     * `copyToClipboard` existait déjà, avec son repli hors origine sûre et son
+     * compte rendu de réussite. En écrire une seconde ici, c'était deux
+     * comportements pour un même geste — et un jour l'un des deux aurait perdu
+     * son repli.
+     */
+    check('  … et elle passe par la copie commune du tableau de bord',
+        /window\.MusicPlayer\.copyToClipboard\(/.test(CLIENT)
+        && !/execCommand\('copy'\)/.test(CLIENT),
+        'une seconde version aurait un jour perdu son repli');
+
+    check('la copie se confirme sur l\'adresse même',
+        /el\.classList\.add\('is-copied'\)/.test(CLIENT)
+        && /tunnel_url_copied/.test(CLIENT),
+        'le regard est là au moment du clic');
+    check('  … puis l\'adresse revient',
+        /el\.textContent = adresse;\s*\n\s*el\.classList\.remove\('is-copied'\);/.test(CLIENT),
+        'c\'est elle qu\'on vient consulter, pas la confirmation');
+    check('  … et deux clics rapides ne laissent pas un minuteur derrière',
+        /clearTimeout\(el\._back\);/.test(CLIENT));
+
+    // Elle garde son allure de champ : un bouton de plus, dans une fenêtre qui
+    // en compte déjà trois, disperserait le regard.
+    {
+        const regle = CSS.slice(CSS.indexOf('.tunnel-url {'), CSS.indexOf('}', CSS.indexOf('.tunnel-url {')));
+        check('elle ne prend pas l\'allure d\'un bouton',
+            /font-family: var\(--font-mono/.test(regle) && /cursor: pointer/.test(regle),
+            'la chasse fixe d\'une adresse, et le curseur d\'un geste');
+    }
+    check('  … mais répond au survol', /\.tunnel-url:hover \{/.test(CSS));
+
+    const CLES = ['tunnel_url_copy_tip', 'tunnel_url_copied'];
+    for (const lang of ['fr', 'en', 'es', 'de']) {
+        const dict = JSON.parse(fs.readFileSync(
+            path.join(ROOT, 'src', 'web', 'public', 'locales', `${lang}.json`), 'utf8'));
+        check(`${lang} : les ${CLES.length} libellés de la copie sont traduits`,
+            CLES.every(k => dict[k] && String(dict[k]).trim()));
+    }
+}
+
+// ───────────────────── Le salon qui recevra le lien ─────────────────────
+
+console.log('\nCe que « le salon vocal » désigne\n');
+
+{
+    const SHARED = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'public', 'js', 'sharedControl.js'), 'utf8');
+    const MARKUP = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'public', 'index.html'), 'utf8');
+
+    /*
+     * « Dans le tchat du salon vocal » désigne un salon sans le dire, et le bot
+     * en fréquente plusieurs : on envoyait donc un lien en croyant savoir où.
+     */
+    check('le nom du salon suit la phrase',
+        /id="share-invite-channel"/.test(MARKUP)
+        && /function writeInviteChannel\(\)/.test(SHARED));
+
+    check('  … et il vient de l\'état, qui le porte déjà',
+        /state\.selectedVoiceChannelId/.test(SHARED)
+        && /\(serveur\?\.voiceChannels \|\| \[\]\)\.find/.test(SHARED),
+        'aucun message de plus à inventer');
+
+    /*
+     * Sans salon actif, la phrase s'arrête plutôt que d'inventer un nom — et le
+     * bouton d'envoi échouerait de toute façon.
+     */
+    check('  … et reste vide faute de salon actif',
+        /cible\.textContent = salon\?\.name \? ` « \$\{salon\.name\} »` : '';/.test(SHARED));
+
+    // Écrit à chaque rendu de la fenêtre, elle-même redessinée à chaque état :
+    // le salon change sous une fenêtre ouverte, le nom doit suivre.
+    check('il se réécrit à chaque état reçu',
+        /writeInviteChannel\(\);/.test(SHARED)
+        && SHARED.indexOf('writeInviteChannel();') > SHARED.indexOf('function renderModal()'),
+        'le salon peut changer sous une fenêtre ouverte');
+
+    check('le nom se détache de la phrase',
+        /\.share-invite-channel \{[\s\S]{0,120}font-weight: 600/.test(
+            fs.readFileSync(path.join(ROOT, 'src', 'web', 'public', 'css', 'modals.css'), 'utf8')),
+        'c\'est la seule chose qu\'on relit avant de cliquer');
 }
 
 console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);

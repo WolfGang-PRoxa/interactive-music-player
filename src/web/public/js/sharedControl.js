@@ -420,6 +420,31 @@ window.MusicPlayer = window.MusicPlayer || {};
     }
 
     /** Redessine la fenêtre de partage. */
+    /**
+     * Nomme le salon qui recevra le lien.
+     *
+     * « Dans le tchat du salon vocal » désigne un salon sans le dire, et le bot
+     * en fréquente plusieurs : on envoyait donc un lien en croyant savoir où.
+     * Le nom vient de l'état, où le salon actif et la liste des salons du
+     * serveur voyagent déjà — aucun message de plus à inventer.
+     *
+     * Vide lorsqu'aucun salon n'est actif : mieux vaut une phrase qui s'arrête
+     * qu'un nom inventé, et le bouton d'envoi échouerait de toute façon.
+     */
+    function writeInviteChannel() {
+        const cible = el('share-invite-channel');
+        if (!cible) return;
+
+        const state = window.MusicPlayer.state || {};
+        const salonId = state.selectedVoiceChannelId;
+        const serveur = (state.guilds || []).find(g => g.id === state.guildId);
+        const salon = salonId
+            ? (serveur?.voiceChannels || []).find(c => c.id === salonId)
+            : null;
+
+        cible.textContent = salon?.name ? ` « ${salon.name} »` : '';
+    }
+
     function renderModal() {
         const modal = el('share-modal');
         if (!modal || modal.classList.contains('hidden')) return;
@@ -433,6 +458,8 @@ window.MusicPlayer = window.MusicPlayer || {};
                 reminder.textContent = `${sharing.publicUrl}/auth/discord/callback`;
             }
         }
+
+        writeInviteChannel();
 
         const send = el('btn-send-invite');
         if (send) send.disabled = !sharing?.oauthReady;
