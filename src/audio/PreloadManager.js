@@ -1053,8 +1053,28 @@ class PreloadManager {
                      */
                     const chosen = require('./videoSource').bestAudio(entry);
                     if (chosen && chosen.url) {
-                        ffmpegInput = chosen.url;
-                        inputStream = null;
+                        /*
+                         * L'adresse est téléchargée par tranches, et non tendue
+                         * telle quelle à ffmpeg.
+                         *
+                         * YouTube bride un téléchargement progressif continu au
+                         * débit de lecture : ffmpeg, qui ouvre une requête et la
+                         * garde ouverte, écrivait 32 Ko/s — deux fois le temps
+                         * réel, douze minutes pour un morceau de vingt-cinq. La
+                         * même adresse demandée par tranches se sert à 38 Mo/s.
+                         * Voir `rangeStream`.
+                         */
+                        if (inputStream && typeof inputStream.destroy === 'function') {
+                            // Le flux de l'extracteur ne sera pas lu : le laisser
+                            // ouvert retiendrait sa connexion et ses tampons
+                            // jusqu'à la fin du préchargement.
+                            inputStream.destroy();
+                        }
+                        inputStream = require('./rangeStream').chunkedFetch(chosen.url, {
+                            headers: { referer: 'youtube.com', 'user-agent': 'googlebot' },
+                        });
+                        ffmpegInput = null;
+
                         const langue = chosen.language ? `, ${chosen.language}` : '';
                         log.success(`[PreloadManager] Direct URL extracted successfully for: `
                             + `${track.title} (${chosen.format_id}, `
@@ -1595,6 +1615,13 @@ class PreloadManager {
             const resolved = await this.resolveAudioInput(targetTrack, targetUrl);
             const ffmpegInput = resolved.ffmpegInput;
             const inputStream = resolved.inputStream;
+
+            // Confié au nettoyage, qui l'attendait depuis toujours sans que rien
+            // ne le lui donne. Une annulation tuait ffmpeg et laissait la source
+            // tourner : anodin pour un flux que la rupture du tuyau finissait par
+            // faire tomber, mais le téléchargement par tranches, lui, continue de
+            // remplir un tampon que plus personne ne vide.
+            stream = inputStream;
 
             if (isCancelled) return;
 
