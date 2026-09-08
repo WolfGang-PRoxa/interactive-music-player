@@ -2907,30 +2907,20 @@ html[data-theme="light"] .login-gate-warning code {
     user-select: all;
 }
 
-/* L'adresse et le geste qu'elle appelle, sur la même ligne : l'espace à droite
-   du champ ne servait à rien, et le bouton s'y lit comme une suite. */
-.tunnel-url-row {
+/* Le geste au-dessus de l'adresse.
+ *
+ * Son étiquette nomme ce qu'elle copie — l'URL de rappel —, sans quoi on croit
+ * qu'il s'agit de l'adresse affichée. Nommée, elle ne tient plus à droite du
+ * champ : elle a donc sa ligne, et l'ordre de lecture dit la même chose que le
+ * geste — d'abord ce qu'on va faire, ensuite l'adresse dont il ne s'agit pas. */
+.tunnel-declare-row {
     display: flex;
-    align-items: stretch;
-    gap: 0.5rem;
 }
 
-/* L'adresse prend ce qui reste, le bouton garde sa largeur. */
-.tunnel-url-row .tunnel-url {
+.tunnel-declare-row .tunnel-btn {
     flex: 1 1 auto;
-    min-width: 0;
-    margin: 0;
-}
-
-.tunnel-url-row .tunnel-btn {
-    flex: 0 0 auto;
-    white-space: nowrap;
-}
-
-/* Au-dessous d'une certaine largeur, le bouton passerait à trois lettres par
-   ligne : la ligne se replie plutôt en deux. */
-@media (max-width: 480px) {
-    .tunnel-url-row { flex-direction: column; }
+    justify-content: center;
+    text-align: center;
 }
 
 /* La marche à suivre, qui ne paraît qu'après le clic. */

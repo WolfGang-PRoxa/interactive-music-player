@@ -407,11 +407,44 @@ console.log('\nCe que le bouton de déclaration copie, et où il mène\n');
     check('la copie a un repli hors origine sûre',
         /window\.isSecureContext/.test(CLIENT) && /execCommand\('copy'\)/.test(CLIENT));
 
-    check('le bouton occupe l\'espace laissé à droite de l\'adresse',
-        /\.tunnel-url-row \{[\s\S]{0,120}display: flex/.test(CSS)
-        && /\.tunnel-url-row \.tunnel-url \{[\s\S]{0,80}flex: 1 1 auto/.test(CSS));
-    check('  … et se replie sous elle sur un écran étroit',
-        /@media \(max-width: 480px\) \{\s*\n\s*\.tunnel-url-row \{ flex-direction: column; \}/.test(CSS));
+    /*
+     * L'étiquette nomme ce qui est copié, et cela commande la disposition.
+     *
+     * « Déclarer chez Discord », posé à côté d'une adresse, laisse croire que
+     * c'est celle-là qu'on emporte — et ce n'est pas une nuance : collée dans
+     * les redirections, l'adresse de partage donne une déclaration que Discord
+     * accepte et qui ne sert jamais, l'aller-retour cherchant le chemin de
+     * rappel qu'elle n'a pas.
+     *
+     * Nommée, l'étiquette ne tient plus à droite du champ. Le bouton passe donc
+     * au-dessus, où l'ordre de lecture dit la même chose que le geste : d'abord
+     * ce qu'on va faire, ensuite l'adresse dont il ne s'agit pas.
+     */
+    for (const lang of ['fr', 'en', 'es', 'de']) {
+        const dict = JSON.parse(fs.readFileSync(
+            path.join(ROOT, 'src', 'web', 'public', 'locales', `${lang}.json`), 'utf8'));
+        const label = dict.tunnel_declare_action || '';
+        check(`${lang} : l'étiquette nomme l'URL de rappel`,
+            /rappel|callback|retorno|R.ckruf/i.test(label), label);
+        check(`  … et l'infobulle écarte l'adresse affichée`,
+            /ci-dessous|below|de abajo|unten/i.test(dict.tunnel_declare_tip || ''),
+            'sans quoi on colle l\'adresse de partage, que Discord accepte sans jamais s\'en servir');
+    }
+
+    check('le bouton est au-dessus de l\'adresse, sur toute la largeur',
+        /\.tunnel-declare-row \{\s*\n\s*display: flex;/.test(CSS)
+        && /\.tunnel-declare-row \.tunnel-btn \{[\s\S]{0,60}flex: 1 1 auto/.test(CSS));
+    check('  … et non plus serré à sa droite',
+        !/\.tunnel-url-row/.test(CSS) && !/tunnel-url-row/.test(CLIENT),
+        'l\'étiquette nommée n\'y tenait plus');
+
+    // L'ordre du DOM porte le sens : le geste, puis l'adresse dont il ne
+    // s'agit pas.
+    const bloc = CLIENT.slice(CLIENT.indexOf('if (step.url) {'),
+        CLIENT.indexOf('if (step.saisie) {'));
+    check('  … et il précède l\'adresse dans le document',
+        bloc.indexOf('tunnel-declare-row') < bloc.indexOf("url.className = 'tunnel-url'"),
+        'd\'abord ce qu\'on va faire, ensuite l\'adresse dont il ne s\'agit pas');
 
     const CLES = ['tunnel_declare_action', 'tunnel_declare_tip', 'tunnel_declare_copied',
         'tunnel_declare_step1', 'tunnel_declare_step2', 'tunnel_declare_step3',

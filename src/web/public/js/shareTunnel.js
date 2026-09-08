@@ -111,7 +111,17 @@ window.MusicPlayer = window.MusicPlayer || {};
     function declareButton() {
         if (!current || !current.redirectUri) return null;
 
-        return button(t('tunnel_declare_action', 'Déclarer chez Discord'), () => {
+        /*
+         * L'étiquette nomme ce qui est copié.
+         *
+         * « Déclarer chez Discord », posé à côté d'une adresse, laisse croire
+         * que c'est celle-là qu'on emporte. Ce n'en est pas une nuance : coller
+         * l'adresse de partage dans les redirections donne une déclaration que
+         * Discord acceptera et qui ne servira jamais — l'aller-retour cherche le
+         * chemin de rappel, qu'elle n'a pas.
+         */
+        return button(t('tunnel_declare_action',
+            'Copier l\'URL de rappel et ouvrir Discord'), () => {
             /*
              * L'URL de rappel, et non l'adresse affichée juste à côté.
              *
@@ -139,7 +149,9 @@ window.MusicPlayer = window.MusicPlayer || {};
         }, {
             variant: 'primary',
             tooltip: t('tunnel_declare_tip',
-                'Copie l\'URL de rappel et ouvre la page OAuth2 de votre application Discord'),
+                'Ce n\'est pas l\'adresse ci-dessous : l\'URL de rappel est la même, '
+                + 'suivie du chemin où Discord renvoie. Ouvre la page OAuth2 de votre '
+                + 'application.'),
             i18nTooltip: 'tunnel_declare_tip',
         });
     }
@@ -393,18 +405,29 @@ window.MusicPlayer = window.MusicPlayer || {};
         zone.appendChild(line('tunnel-body', step.body));
 
         if (step.url) {
-            const row = document.createElement('div');
-            row.className = 'tunnel-url-row';
+            /*
+             * Le bouton au-dessus de l'adresse, et non à côté.
+             *
+             * Son étiquette doit nommer ce qu'il copie — l'URL de rappel —,
+             * faute de quoi on croit qu'il copie l'adresse affichée juste là.
+             * Nommée, elle ne tient plus dans la place laissée à droite du
+             * champ : elle s'y serrerait sur deux lignes ou tronquerait le
+             * champ. Au-dessus, elle a toute la largeur, et l'ordre de lecture
+             * dit la même chose que le geste — d'abord ce qu'on va faire,
+             * ensuite l'adresse dont il ne s'agit pas.
+             */
+            const declare = declareButton();
+            if (declare) {
+                const row = document.createElement('div');
+                row.className = 'tunnel-declare-row';
+                row.appendChild(declare);
+                zone.appendChild(row);
+            }
 
             const url = document.createElement('p');
             url.className = 'tunnel-url';
             url.textContent = step.url;
-            row.appendChild(url);
-
-            const declare = declareButton();
-            if (declare) row.appendChild(declare);
-
-            zone.appendChild(row);
+            zone.appendChild(url);
 
             // Ce qu'il reste à faire dans l'onglet qui vient de s'ouvrir. Il ne
             // paraît qu'après le clic : avant, il décrirait un onglet qui
