@@ -5,6 +5,7 @@ const path = require('path');
 const database = require('../../database/Database');
 const preloadManager = require('../../audio/PreloadManager');
 const loudnessAnalyzer = require('../../audio/LoudnessAnalyzer');
+const videoSource = require('../../audio/videoSource');
 const { resolveMediaPath, isAllowedMediaFilename } = require('../../utils/mediaPaths');
 const { arePathsOrUrlsEqual } = require('../../utils/paths');
 const downloadDir = require('../../utils/downloadDir');
@@ -936,23 +937,28 @@ function createApiRouter(webServer) {
                     if (reqFormat && (reqFormat.toLowerCase() === 'mp4' || reqFormat.toLowerCase().startsWith('mp4_'))) {
                         const targetRes = reqFormat.toLowerCase() === 'mp4_1080' ? 1080 : (reqFormat.toLowerCase() === 'mp4_720' ? 720 : (reqFormat.toLowerCase() === 'mp4_480' ? 480 : 1080));
                         
-                        const videoFormats = entry.formats.filter(f => f.vcodec && f.vcodec !== 'none' && f.height);
-                        const suitableVideo = videoFormats.filter(f => f.height <= targetRes).sort((a, b) => b.height - a.height)[0] 
+                        // Les manifestes sont écartés en amont : leur adresse est
+                        // signée pour le client qui l'a demandée, et ffmpeg s'y
+                        // voit refuser l'entrée. Voir `videoSource`.
+                        const videoFormats = videoSource.videoTracks(entry);
+                        const suitableVideo = videoFormats.filter(f => f.height <= targetRes).sort((a, b) => b.height - a.height)[0]
                                            || videoFormats.sort((a, b) => a.height - b.height)[0];
 
                         if (suitableVideo) {
                             ffmpegVideoUrl = suitableVideo.url;
                             if (!suitableVideo.acodec || suitableVideo.acodec === 'none') {
-                                const audioFormats = entry.formats.filter(f => f.acodec && f.acodec !== 'none').sort((a, b) => (b.tbr || 0) - (a.tbr || 0));
-                                if (audioFormats[0]) {
-                                    ffmpegAudioUrl = audioFormats[0].url;
+                                // Direct, et dans la langue d'origine : un tri au
+                                // meilleur débit prenait le doublage automatique
+                                // le mieux servi, langue au hasard.
+                                const son = videoSource.bestAudio(entry);
+                                if (son) {
+                                    ffmpegAudioUrl = son.url;
                                 }
                             }
                         }
                     }
                     if (!ffmpegVideoUrl) {
-                        const audioFormats = entry.formats.filter(f => f.acodec && f.acodec !== 'none');
-                        const bestAudio = audioFormats.find(f => f.vcodec === 'none') || audioFormats[0];
+                        const bestAudio = videoSource.bestAudio(entry);
                         if (bestAudio && bestAudio.url) {
                             ffmpegInput = bestAudio.url;
                         }
@@ -1107,9 +1113,22 @@ function createApiRouter(webServer) {
                 return { status: 404, error: 'Aucun format vidéo disponible' };
             }
 
-            const videoFormats = entry.formats.filter(f => f.vcodec !== 'none' && f.acodec === 'none' && (f.ext === 'mp4' || f.container === 'mp4'));
-            const fallbackVideoFormats = entry.formats.filter(f => f.vcodec !== 'none' && f.acodec === 'none');
-            const anyVideoFormats = entry.formats.filter(f => f.vcodec !== 'none');
+            /*
+             * Les manifestes sont écartés avant tout le reste.
+             *
+             * Un `.m3u8` n'est pas un flux mais une liste de morceaux, et une
+             * balise <video> ne sait pas la lire hors de Safari. Pire : son
+             * adresse est signée pour le client qui l'a demandée et répond 404 à
+             * tout autre. Or les manifestes annoncent le plus haut débit de la
+             * liste — 4107 contre 1666 en 720p —, si bien que le classement par
+             * débit de `pickVideoFormat` les retenait à tout coup. La vidéo ne
+             * se chargeait alors jamais, et le navigateur redemandait dix fois
+             * la même adresse morte.
+             */
+            const jouables = videoSource.videoTracks(entry);
+            const videoFormats = jouables.filter(f => f.acodec === 'none' && (f.ext === 'mp4' || f.container === 'mp4'));
+            const fallbackVideoFormats = jouables.filter(f => f.acodec === 'none');
+            const anyVideoFormats = jouables;
 
             const formats = videoFormats.length > 0 ? videoFormats : (fallbackVideoFormats.length > 0 ? fallbackVideoFormats : anyVideoFormats);
             if (formats.length === 0) {

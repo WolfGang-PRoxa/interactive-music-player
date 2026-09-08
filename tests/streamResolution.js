@@ -290,6 +290,70 @@ const LOCAL_URL = 'file://morceau-de-test.opus';
         }
     }
 
+    // 11. La vidéo servie au navigateur n'est jamais un manifeste.
+    //
+    // Une vidéo refusait de se charger, et le tableau de bord redemandait dix
+    // fois la même adresse : un `.m3u8`. Ce n'est pas un flux mais une liste de
+    // morceaux, qu'une balise <video> ne sait pas lire hors de Safari, et dont
+    // l'adresse — signée pour le client qui l'a demandée — répond 404 à tout
+    // autre.
+    //
+    // Le piège tient au classement. `pickVideoFormat` départage à définition
+    // égale par le débit, et les manifestes annoncent le plus haut de la liste :
+    // 4107 contre 1666 en 720p sur la vidéo du signalement. Ils gagnaient donc
+    // à tout coup, et il ne suffit pas de mieux trier — il faut les écarter
+    // avant.
+    {
+        const vm = require('vm');
+        const source = fs.readFileSync(
+            path.join(__dirname, '..', 'src', 'web', 'routes', 'api.js'), 'utf8');
+        const videoSource = require(path.join(__dirname, '..', 'src', 'audio', 'videoSource.js'));
+
+        // Le choix est extrait du fichier livré : le recopier ici laisserait le
+        // test passer pendant que la route, elle, aurait changé d'avis.
+        const debut = source.indexOf('function codecRank(');
+        const fin = source.indexOf('\n}\n', source.indexOf('function pickVideoFormat(')) + 3;
+        const bac = { console };
+        bac.globalThis = bac;
+        vm.createContext(bac);
+        vm.runInContext(`${source.slice(debut, fin)}\nglobalThis.__f = pickVideoFormat;`, bac);
+        const choisir = bac.__f;
+
+        const image = (o) => Object.assign({
+            vcodec: 'avc1.640020', acodec: 'none', protocol: 'https', ext: 'mp4',
+            url: `https://exemple/${o.format_id}`, width: 1280, height: 720,
+        }, o);
+        const entry = {
+            formats: [
+                image({ format_id: '311', protocol: 'm3u8_native', tbr: 4107.6 }),
+                image({ format_id: '298', tbr: 1666.2 }),
+                image({ format_id: '302', vcodec: 'vp9', tbr: 1081.3 }),
+            ],
+        };
+
+        // Le comportement d'avant, reproduit : c'est lui qui a cassé la lecture.
+        check('unfiltered, the manifest wins on bitrate alone',
+            choisir(entry.formats, 720).format_id === '311',
+            'sorting better would not help: it has to be excluded first');
+
+        const jouables = videoSource.videoTracks(entry)
+            .filter(f => f.acodec === 'none' && (f.ext === 'mp4' || f.container === 'mp4'));
+        check('  … filtered, a real stream is served', choisir(jouables, 720).format_id === '298',
+            'https, playable by a <video> tag');
+
+        check('the route funnels every bucket through the filter',
+            /const jouables = videoSource\.videoTracks\(entry\);/.test(source)
+            && /const anyVideoFormats = jouables;/.test(source),
+            'one bucket left unfiltered would bring the manifest back as a fallback');
+
+        // La même route sert aussi le son, et tombait sur les deux mêmes
+        // écueils : un manifeste, et un doublage automatique pris au hasard.
+        check('the audio it serves goes through the shared choice',
+            (source.match(/videoSource\.bestAudio\(entry\)/g) || []).length === 2
+            && !/audioFormats\.find\(f => f\.vcodec === 'none'\)/.test(source),
+            'first in the list is a manifest in a language nobody asked for');
+    }
+
     console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
     process.exit(failed > 0 ? 1 : 0);
 })();
