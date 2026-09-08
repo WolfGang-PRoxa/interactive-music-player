@@ -2388,10 +2388,30 @@ html[data-theme="light"] .settings-section {
     align-items: flex-start;
 }
 
+/* Un groupe s'ouvrait sans se refermer.
+ *
+ * Le trait pointillé, la marge et le remplissage le détachaient de ce qui le
+ * précède ; en dessous, rien — le réglage suivant venait se coller au dernier
+ * élément du groupe, et les deux sections se lisaient comme une seule. Le cas
+ * le plus visible était la liste des serveurs, dont l'encadré touchait presque
+ * la ligne d'après.
+ *
+ * L'espace de fermeture est plus large que celui qui sépare deux réglages
+ * ordinaires (0,8 rem) : en haut, le trait dit déjà la coupure, alors qu'en bas
+ * il n'y a que le vide pour la dire. */
 .setting-item-group {
     border-top: 1px dashed var(--border-card);
     padding-top: 0.8rem;
     margin-top: 0.8rem;
+    margin-bottom: 1.4rem;
+}
+
+/* C'est le groupe qui décide de l'espace après lui, et non ce qu'il contient :
+   son dernier élément est tantôt une ligne de réglage — qui porte sa propre
+   marge — tantôt un encadré qui n'en a aucune. Les sept groupes se fermeraient
+   sinon de deux façons. */
+.setting-item-group > :last-child {
+    margin-bottom: 0;
 }
 
 .setting-checkbox-label {

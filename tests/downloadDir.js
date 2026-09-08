@@ -300,6 +300,47 @@ console.log('\nLe pied du sélecteur\n');
         `spécificité : ${outranks} — player.css en dernier : ${playerImportedLast}`);
 }
 
+// ────────────────────── Les groupes de réglages ──────────────────────
+
+/*
+ * Un groupe s'ouvrait sans se refermer.
+ *
+ * Le trait pointillé, la marge et le remplissage détachaient `.setting-item-group`
+ * de ce qui le précède ; en dessous, rien. Le réglage suivant venait se coller
+ * au dernier élément du groupe, et les deux sections se lisaient comme une
+ * seule — la liste des serveurs et le fondu d'extinction se touchaient
+ * presque.
+ *
+ * Deux choses tiennent la correction, et la seconde est celle qu'on oublie :
+ * l'espace de fermeture appartient au groupe, pas à ce qu'il contient. Son
+ * dernier élément est tantôt une ligne de réglage — qui porte sa propre marge —
+ * tantôt un encadré qui n'en a aucune, et les sept groupes se fermeraient sinon
+ * de deux façons.
+ */
+console.log('\nLes groupes de réglages\n');
+
+{
+    const modals = fs.readFileSync(
+        path.join(__dirname, '..', 'src', 'web', 'public', 'css', 'modals.css'), 'utf8');
+
+    const at = modals.indexOf('\n.setting-item-group {');
+    const regle = at === -1 ? '' : modals.slice(at, modals.indexOf('}', at));
+
+    check('un groupe de réglages se referme', /margin-bottom:\s*1\.4rem/.test(regle),
+        'rien ne le séparait de la section suivante');
+
+    // Plus large que l'espace entre deux réglages ordinaires : en haut, le
+    // trait dit déjà la coupure ; en bas, il n'y a que le vide pour la dire.
+    const entreLignes = /\.setting-item-row \{[^}]*margin-bottom:\s*([\d.]+)rem/s.exec(modals);
+    check('  … plus nettement que deux réglages voisins',
+        !!entreLignes && 1.4 > parseFloat(entreLignes[1]),
+        entreLignes ? `1.4rem contre ${entreLignes[1]}rem` : 'règle introuvable');
+
+    check('  … et c\'est lui qui décide, non son dernier élément',
+        /\.setting-item-group > :last-child \{\s*\n\s*margin-bottom: 0;/.test(modals),
+        'ligne de réglage ou encadré, les sept se ferment pareil');
+}
+
 // ────────────────────── La route, de bout en bout ──────────────────────
 
 console.log('\nLa route /api/browse-dirs\n');
