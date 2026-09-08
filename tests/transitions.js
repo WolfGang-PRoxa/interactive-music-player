@@ -431,6 +431,97 @@ console.log('\nLa file, qui se lit autrement qu\'une playlist\n');
         /buildTransitionRow\(track, \{ id: 'queue' \}, index\)/.test(FILE));
 }
 
+// ───────────────────── Changer la destination ─────────────────────
+
+console.log('\nCe qu\'un clic droit sur un aiguillage permet\n');
+
+{
+    const pl = database.createPlaylist('g1', 'Soirée');
+    database.addTrackToPlaylist('g1', pl.id, piste('A'));
+    const marker = database.insertPlaylistTransition(pl.id, 1, 'queue');
+
+    check('la destination se change',
+        database.setPlaylistTransitionTarget(pl.id, marker.id, 'playlist_autre'));
+    const relu = database.getGlobalPlaylists().find(p => p.id === pl.id);
+    check('  … et c\'est bien la nouvelle qui est rangée',
+        relu.tracks[1].target === 'playlist_autre');
+    check('  … l\'aiguillage restant le même', relu.tracks[1].id === marker.id,
+        'changer de destination ne le déplace ni ne le remplace');
+
+    // Par l'identifiant, comme le retrait : la ligne a pu bouger depuis
+    // l'ouverture du menu.
+    database.addTrackToPlaylist('g1', pl.id, piste('Z'), 0);
+    check('  … désigné par son identifiant, quoi qu\'ait bougé la liste',
+        database.setPlaylistTransitionTarget(pl.id, marker.id, 'queue')
+        && database.getGlobalPlaylists().find(p => p.id === pl.id).tracks[2].target === 'queue');
+
+    check('un aiguillage inconnu ne change rien',
+        database.setPlaylistTransitionTarget(pl.id, 'jamais_vu', 'queue') === false);
+}
+
+{
+    const MENU = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'public', 'js', 'qualityMenu.js'), 'utf8');
+    const CLIENT = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'public', 'js', 'transitions.js'), 'utf8');
+    const HANDLER = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'websocket', 'handlers', 'playlistHandlers.js'), 'utf8');
+    const DROITS = fs.readFileSync(path.join(ROOT, 'src', 'web', 'permissions.js'), 'utf8');
+
+    check('la ligne d\'aiguillage écoute le clic droit',
+        /item\.addEventListener\('contextmenu'/.test(CLIENT)
+        && /showTransitionMenu\(e, transition/.test(CLIENT));
+
+    /*
+     * Un menu à part, mais la même mécanique flottante.
+     *
+     * Un aiguillage n'a ni débit, ni définition, ni sonie, ni source à copier :
+     * lui présenter ces réglages désactivés ferait une liste morte à quatre
+     * lignes pour un seul choix. Il emprunte en revanche `menuEl`, et donc le
+     * placement et tous les gestes de fermeture — un quatrième panneau flottant
+     * avec ses propres écouteurs finirait par se fermer autrement que les trois
+     * autres.
+     */
+    check('le menu emprunte la mécanique du menu de qualité',
+        /menuEl = document\.createElement\('div'\);[\s\S]{0,200}transition-menu/.test(MENU)
+        && /placeMenu\(e\.clientX, e\.clientY\);/.test(MENU));
+
+    check('  … mais ne se laisse pas reconstruire comme lui',
+        /if \(menuKind !== 'quality'\) return;/.test(MENU),
+        'renderMenu chercherait une piste à l\'adresse d\'un aiguillage, et refermerait le menu');
+
+    check('  … et le drapeau revient à sa valeur ordinaire à la fermeture',
+        /openedContext = null;\s*\n\s*menuKind = 'quality';/.test(MENU));
+
+    // La liste des destinations est écrite une fois pour les deux usages.
+    check('création et modification partagent la même liste',
+        /function buildTargetList\(cibles, courante, choisir\)/.test(MENU)
+        && (MENU.match(/buildTargetList\(/g) || []).length === 3,
+        'sa définition, et ses deux emplois');
+    check('  … et le même calcul des destinations possibles',
+        /function transitionTargets\(containerId\)/.test(MENU)
+        && (MENU.match(/transitionTargets\(/g) || []).length === 3);
+
+    check('la destination courante porte la coche',
+        /if \(cible\.id === courante\) opt\.classList\.add\('is-current'\);/.test(MENU));
+    check('  … et la recliquer n\'envoie rien',
+        /if \(id !== transition\.target\) \{/.test(MENU),
+        'un message pour un réglage inchangé ferait clignoter la liste pour rien');
+
+    check('le serveur sait changer une destination dans les deux contenants',
+        /function handleSetTransitionTarget\(ctx\)/.test(HANDLER)
+        && /if \(container === 'queue'\)/.test(HANDLER)
+        && /database\.setPlaylistTransitionTarget\(container, id, target\)/.test(HANDLER));
+    check('  … refuse une destination qui n\'existe pas',
+        /if \(target !== 'queue' && !\(database\.getGlobalPlaylists\(\) \|\| \[\]\)\.some/.test(HANDLER),
+        'elle ne mènerait qu\'à un aiguillage consommé sans effet');
+    check('  … et refuse de pointer sur sa propre liste',
+        (HANDLER.match(/if \(container === target\) return;/g) || []).length === 2,
+        'à la pose comme à la modification');
+
+    check('la modification est soumise à un droit', /setTransitionTarget: '/.test(DROITS));
+}
+
 // ───────────────────── Les traductions ─────────────────────
 
 console.log('\nCe que les quatre langues doivent dire\n');
@@ -440,7 +531,7 @@ console.log('\nCe que les quatre langues doivent dire\n');
         'transition_menu_label', 'transition_target_label', 'transition_target_queue',
         'transition_target_gone', 'transition_no_target', 'transition_insert_before',
         'transition_insert_after', 'transition_row_label', 'transition_row_tooltip',
-        'transition_remove',
+        'transition_remove', 'transition_edit_title',
     ];
 
     for (const lang of ['fr', 'en', 'es', 'de']) {

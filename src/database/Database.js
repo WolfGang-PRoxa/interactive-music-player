@@ -733,6 +733,28 @@ class GuildDatabase {
      *
      * @returns {boolean} true si elle était encore là.
      */
+    /**
+     * Change la destination d'un aiguillage déjà posé.
+     *
+     * Par l'identifiant, comme le retrait : la ligne a pu se déplacer depuis
+     * l'ouverture du menu, et un indice désignerait alors sa voisine.
+     *
+     * @returns {boolean} true si l'aiguillage était encore là.
+     */
+    setPlaylistTransitionTarget(playlistId, transitionId, target) {
+        const playlist = this.globalData.playlists.find(p => p.id === playlistId);
+        if (!playlist || !Array.isArray(playlist.tracks)) return false;
+
+        const transitions = require('../audio/transitions');
+        const marker = playlist.tracks.find(t => t && t.id === transitionId
+            && transitions.isTransition(t));
+        if (!marker) return false;
+
+        marker.target = target;
+        this._save();
+        return true;
+    }
+
     removePlaylistTransition(playlistId, transitionId) {
         const playlist = this.globalData.playlists.find(p => p.id === playlistId);
         if (!playlist || !Array.isArray(playlist.tracks)) return false;

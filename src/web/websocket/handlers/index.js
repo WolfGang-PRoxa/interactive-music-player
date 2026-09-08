@@ -31,6 +31,7 @@ module.exports = {
     moveOrInsertTrack: queueHandlers.handleMoveOrInsertTrack,
     movePlaylistTrack: playlistHandlers.handleMovePlaylistTrack,
     insertTransition: playlistHandlers.handleInsertTransition,
+    setTransitionTarget: playlistHandlers.handleSetTransitionTarget,
     pause: playbackHandlers.handlePause,
     play: playbackHandlers.handlePlay,
     playNow: queueHandlers.handlePlayNow,

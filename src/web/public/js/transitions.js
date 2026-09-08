@@ -141,6 +141,20 @@ window.MusicPlayer = window.MusicPlayer || {};
         });
         right.appendChild(remove);
 
+        /*
+         * Le clic droit ouvre le seul réglage qu'un aiguillage possède.
+         *
+         * Le contexte est relu ici et non retenu à la construction : la ligne
+         * garde son gestionnaire pendant que la liste bouge sous elle, et un
+         * indice figé finirait par désigner sa voisine.
+         */
+        item.addEventListener('contextmenu', (e) => {
+            window.MusicPlayer.showTransitionMenu(e, transition, {
+                container: playlist.id,
+                index: Number(item.getAttribute('data-index')),
+            });
+        });
+
         item.addEventListener('dragstart', (e) => {
             item.classList.add('is-dragging');
             document.body.classList.add('is-dragging-active');

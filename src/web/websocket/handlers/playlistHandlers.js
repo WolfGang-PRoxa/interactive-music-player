@@ -222,6 +222,42 @@ async function handleInsertTransition(ctx) {
     webServer.broadcastState(currentGuildId);
 }
 
+/**
+ * Change la destination d'un aiguillage déjà posé.
+ *
+ * Rien à redonner au lecteur : la destination ne déplace pas l'aiguillage, et
+ * ce qu'il a reçu — la liste jusqu'à lui — n'a donc pas bougé d'un titre.
+ *
+ * @param {object} ctx
+ */
+function handleSetTransitionTarget(ctx) {
+    const { data, webServer, currentGuildId } = ctx;
+    const { container, id, target } = data || {};
+
+    if (!container || !id || !target) return;
+    if (container === target) return;   // un aiguillage sur place ne mène nulle part
+
+    // Une destination qui n'existe pas : l'inscrire ne mènerait qu'à un
+    // aiguillage consommé sans effet, le jour où on l'atteindrait.
+    if (target !== 'queue' && !(database.getGlobalPlaylists() || []).some(p => p.id === target)) {
+        return;
+    }
+
+    if (container === 'queue') {
+        const settings = database.getSettings(currentGuildId);
+        const liste = channelQueue.read(settings);
+        const marker = liste.find(t => t && t.id === id && transitions.isTransition(t));
+        if (!marker) return;
+
+        marker.target = target;
+        channelQueue.write(currentGuildId, liste, settings);
+    } else if (!database.setPlaylistTransitionTarget(container, id, target)) {
+        return;
+    }
+
+    webServer.broadcastState(currentGuildId);
+}
+
 async function handleSetActivePlaybackSource(ctx) {
     const { data, webServer, player, currentGuildId } = ctx;
     let queue = ctx.queue;
@@ -333,5 +369,6 @@ module.exports = {
     handleRemoveTrackFromPlaylist,
     handleMovePlaylistTrack,
     handleInsertTransition,
+    handleSetTransitionTarget,
     handleSetActivePlaybackSource,
 };

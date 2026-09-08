@@ -107,6 +107,9 @@ const ACTION_GROUPS = {
     movePlaylistTrack: 'playlists',
     // Poser un aiguillage revient à réécrire une playlist : même droit.
     insertTransition: 'playlists',
+    // Modifier une transition relève du même droit que la poser, dans une
+    // playlist comme dans la file : c'est une seule fonctionnalité.
+    setTransitionTarget: 'playlists',
     reorderPlaylists: 'playlists',
 
     // Réparti champ par champ — voir SETTINGS_FIELDS

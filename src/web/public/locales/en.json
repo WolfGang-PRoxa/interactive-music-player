@@ -517,5 +517,6 @@
     "transition_insert_after": "After",
     "transition_row_label": "Transition to",
     "transition_row_tooltip": "Playback switches to that source here, then this row disappears.",
-    "transition_remove": "Remove this transition"
+    "transition_remove": "Remove this transition",
+    "transition_edit_title": "Transition destination"
 }

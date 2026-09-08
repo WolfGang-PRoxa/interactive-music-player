@@ -517,5 +517,6 @@
     "transition_insert_after": "Après",
     "transition_row_label": "Transition vers",
     "transition_row_tooltip": "La lecture bascule ici vers cette source, puis cette ligne disparaît.",
-    "transition_remove": "Retirer cette transition"
+    "transition_remove": "Retirer cette transition",
+    "transition_edit_title": "Destination de la transition"
 }

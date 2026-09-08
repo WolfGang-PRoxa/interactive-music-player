@@ -517,5 +517,6 @@
     "transition_insert_after": "Danach",
     "transition_row_label": "Übergang zu",
     "transition_row_tooltip": "Die Wiedergabe wechselt hier zu dieser Quelle, danach verschwindet diese Zeile.",
-    "transition_remove": "Diesen Übergang entfernen"
+    "transition_remove": "Diesen Übergang entfernen",
+    "transition_edit_title": "Ziel des Übergangs"
 }
