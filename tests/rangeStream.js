@@ -41,7 +41,8 @@ const path = require('path');
 const crypto = require('crypto');
 
 const ROOT = path.join(__dirname, '..');
-const { chunkedFetch } = require(path.join(ROOT, 'src', 'audio', 'rangeStream.js'));
+const rangeStream = require(path.join(ROOT, 'src', 'audio', 'rangeStream.js'));
+const { chunkedFetch } = rangeStream;
 
 let failed = 0;
 let passed = 0;
@@ -301,6 +302,48 @@ function recueillir(flux) {
         check('un flux détruit cesse de demander',
             s.demandes.length === apresDestruction,
             `${s.demandes.length} requêtes, stables`);
+    }
+
+    // ───────────────────── Vers un fichier ─────────────────────
+
+    console.log('\nLe même téléchargement, posé sur le disque\n');
+
+    {
+        /*
+         * ffmpeg n'a qu'une entrée standard, et il en faut deux quand la source
+         * sert l'image et le son séparément. L'un des deux doit donc être posé
+         * quelque part — et un fichier a de surcroît ce que le tuyau n'a pas :
+         * ffmpeg peut s'y déplacer, ce qu'exige la recopie d'une piste vidéo
+         * dont l'index vit à la fin du conteneur.
+         */
+        const s = await servir(parPlages);
+        const dest = path.join(__dirname, '..', `range-test-${process.pid}.bin`);
+
+        await rangeStream.fetchToFile(s.url, dest, { chunkBytes: 64 * 1024 });
+        const ecrit = fs.readFileSync(dest);
+        fs.unlinkSync(dest);
+        await s.close();
+
+        check('le fichier écrit est celui qui a été servi',
+            digest(ecrit) === EMPREINTE, `${ecrit.length} octets`);
+        check('  … et il a bien été demandé par tranches', s.demandes.length >= 4,
+            `${s.demandes.length} requêtes`);
+    }
+
+    {
+        // Une source en panne ne doit pas laisser croire au succès : l'échec
+        // remonte, et l'appelant sait qu'il n'a rien à transcoder.
+        const s = await servir((req, res) => { res.writeHead(500); res.end(); });
+        const dest = path.join(__dirname, '..', `range-fail-${process.pid}.bin`);
+
+        let erreur = null;
+        try { await rangeStream.fetchToFile(s.url, dest, { chunkBytes: 64 * 1024 }); }
+        catch (e) { erreur = e; }
+        try { fs.unlinkSync(dest); } catch (e) {}
+        await s.close();
+
+        check('une source en panne fait échouer l\'écriture', !!erreur,
+            erreur ? erreur.message : 'aucune erreur');
     }
 
     // ───────────────────── Le raccordement ─────────────────────

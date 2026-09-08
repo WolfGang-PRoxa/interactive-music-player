@@ -107,9 +107,10 @@ async function inventory(url) {
     if (!formats.length) return inconnu;
 
     // Les définitions réellement présentes, sans doublon, de la plus haute à la
-    // plus basse : la même hauteur revient souvent en plusieurs codecs.
-    const heights = [...new Set(formats
-        .filter((f) => f && f.vcodec && f.vcodec !== 'none' && f.height)
+    // plus basse : la même hauteur revient souvent en plusieurs codecs. Celles
+    // qui n'existent qu'en manifeste ne sont pas proposées — les offrir serait
+    // promettre un fichier qu'on ne saurait pas aller chercher.
+    const heights = [...new Set(videoTracks(entry)
         .map(definitionOf)
         .filter((d) => d > 0))]
         .sort((a, b) => b - a);
@@ -227,6 +228,25 @@ function audioTracks(entry) {
  */
 function bestAudio(entry) {
     return audioTracks(entry)[0] || null;
+}
+
+/**
+ * Les flux d'image utilisables : directs, et porteurs d'une définition.
+ *
+ * Le même piège que pour le son, en plus discret. Les manifestes annoncent le
+ * plus haut débit de la liste — 4107 contre 1666 en 720p — si bien qu'un tri
+ * au mieux-disant les choisit systématiquement. Leur adresse est signée pour
+ * le client qui l'a demandée : ffmpeg s'y voyait refuser l'entrée par un 404,
+ * et le téléchargement échouait à toute définition où la source en propose un.
+ *
+ * @param {object|null} entry
+ * @returns {object[]}
+ */
+function videoTracks(entry) {
+    const formats = (entry && Array.isArray(entry.formats)) ? entry.formats : [];
+    return formats.filter((f) => f && f.url
+        && f.vcodec && f.vcodec !== 'none' && f.height
+        && DIRECT_PROTOCOLS.has(String(f.protocol)));
 }
 
 /**
@@ -357,10 +377,9 @@ async function resolveWith(url, height, audioKbps) {
     // n'a pas d'image, et l'appelant en fabriquera une plutôt que d'échouer.
     const entry = await dump(url);
 
-    const formats = (entry && Array.isArray(entry.formats)) ? entry.formats : [];
-    if (!formats.length) return vide;
-
-    const images = formats.filter((f) => f && f.vcodec && f.vcodec !== 'none' && f.height);
+    // Rien qu'on sache aller chercher : l'appelant fabriquera une image noire
+    // autour du son, plutôt que d'échouer sur une adresse qui refusera l'entrée.
+    const images = videoTracks(entry);
     if (!images.length) return vide;
 
     // ── L'image, pour son compte ──
@@ -417,6 +436,7 @@ module.exports = {
     stepDown,
     nominalKbps,
     bestAudio,
+    videoTracks,
     audioTracks,
     originalLanguage,
     VIDEO_LADDER,

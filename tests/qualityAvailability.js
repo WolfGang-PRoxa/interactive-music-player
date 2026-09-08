@@ -349,8 +349,19 @@ console.log('\nCe qui tient les deux bouts\n');
         'une à trois secondes par ouverture serait insupportable');
 
     check('les définitions sont dédoublonnées et ordonnées',
-        /\[\.\.\.new Set\(formats/.test(SRC) && /sort\(\(a, b\) => b - a\)/.test(SRC),
+        /\[\.\.\.new Set\(videoTracks\(entry\)/.test(SRC) && /sort\(\(a, b\) => b - a\)/.test(SRC),
         'la même hauteur revient en plusieurs codecs');
+
+    /*
+     * Et elles ne viennent que des flux qu'on saura aller chercher.
+     *
+     * Les manifestes annoncent des définitions comme les autres, mais leur
+     * adresse refuse l'entrée à ffmpeg. En offrir une qui n'existe que sous
+     * cette forme serait promettre un fichier qu'on ne sait pas obtenir.
+     */
+    check('  … et ne comptent que les flux directs',
+        /DIRECT_PROTOCOLS\.has\(String\(f\.protocol\)\)/.test(SRC),
+        'le menu ne promet que ce qui se télécharge');
 }
 
 console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);

@@ -202,6 +202,58 @@ console.log('\nCe que la recherche d\'image répond\n');
     const vide = await videoSource.resolve('');
     check('une adresse vide non plus', vide.audioOnly === true);
 
+    // ───────────────────── Le manifeste, côté image ─────────────────────
+
+    console.log('\nCe qui n\'est pas un flux d\'image\n');
+
+    {
+        /*
+         * Le même piège que pour le son, en plus discret.
+         *
+         * Les manifestes annoncent le plus haut débit de la liste — 4107 contre
+         * 1666 en 720p — si bien qu'un tri au mieux-disant les choisit
+         * systématiquement. Leur adresse est signée pour le client qui l'a
+         * demandée : ffmpeg s'y voyait refuser l'entrée par un 404, et le
+         * téléchargement échouait à toute définition où la source en propose un.
+         */
+        const image = (o) => Object.assign({
+            vcodec: 'avc1.640020', acodec: 'none', protocol: 'https',
+            url: `https://exemple/${o.format_id}`, width: 1280, height: 720,
+        }, o);
+
+        const entry = {
+            formats: [
+                image({ format_id: '311', protocol: 'm3u8_native', tbr: 4107.6 }),
+                image({ format_id: '612', protocol: 'm3u8_native', tbr: 2149.4 }),
+                image({ format_id: '298', tbr: 1666.2 }),
+                image({ format_id: '302', tbr: 1081.3 }),
+            ],
+        };
+
+        const gardes = videoSource.videoTracks(entry);
+        check('les manifestes sont écartés',
+            gardes.every((f) => f.protocol === 'https'), `${gardes.length} sur 4`);
+        check('  … alors même qu\'ils annoncent le meilleur débit',
+            entry.formats[0].tbr > gardes[0].tbr,
+            `${entry.formats[0].tbr} en manifeste contre ${gardes[0].tbr} en direct`);
+
+        // Une définition qui n'existe qu'en manifeste ne doit pas être offerte :
+        // la proposer serait promettre un fichier qu'on ne sait pas chercher.
+        const quEnManifeste = {
+            formats: [
+                image({ format_id: '701', protocol: 'm3u8_native', width: 3840, height: 2160 }),
+                image({ format_id: '298', tbr: 1666.2 }),
+            ],
+        };
+        check('une définition qui n\'existe qu\'en manifeste n\'est pas offerte',
+            videoSource.videoTracks(quEnManifeste).every((f) => f.height === 720),
+            'le menu ne promet que ce qui se télécharge');
+
+        // Un format sans adresse ne mène nulle part, comme pour le son.
+        check('un format sans adresse est écarté',
+            videoSource.videoTracks({ formats: [image({ format_id: 'x', url: null })] }).length === 0);
+    }
+
     // ───────────────────── Le raccordement ─────────────────────
 
     console.log('\nCe qui tient les deux bouts\n');
@@ -226,6 +278,44 @@ console.log('\nCe que la recherche d\'image répond\n');
         /function runFfmpeg\(/.test(HANDLER)
         && (HANDLER.match(/runFfmpeg\(/g) || []).length >= 3,
         'la gestion d\'erreur ne se maintient pas en double');
+
+    /*
+     * Les octets ne passent plus par une URL tendue à ffmpeg.
+     *
+     * Une requête continue est bridée par YouTube au débit de lecture : une
+     * vidéo de dix minutes mettait dix minutes à se télécharger. Deux stratégies
+     * selon le nombre d'entrées distantes, parce que ffmpeg n'a qu'une entrée
+     * standard.
+     */
+    check('une seule entrée distante passe par le tuyau',
+        /function pipeRemote\(/.test(HANDLER)
+        && /rangeStream\.chunkedFetch\(url, \{ headers: FETCH_HEADERS \}\)/.test(HANDLER),
+        'rien à poser sur le disque quand une entrée suffit');
+
+    check('  … et le téléchargement audio l\'emprunte',
+        /const source = pipeRemote\(input\);/.test(HANDLER));
+
+    check('  … la vidéo noire aussi, son seul flux étant le son',
+        /const input = pipeRemote\(await preloadManager\.resolveAudioInput\(track, url\)\)/
+            .test(HANDLER),
+        'sinon le flux monté par le préchargeur ne serait poussé nulle part');
+
+    check('image et son séparés passent par des fichiers',
+        /rangeStream\.fetchToFile\(adresse, chemin/.test(HANDLER)
+        && /await rapatrier\(source\.videoUrl, 'video'\)/.test(HANDLER),
+        'ffmpeg n\'a qu\'une entrée standard, et il en faudrait deux');
+
+    check('  … posés là où le fichier final ira',
+        /const chemin = `\$\{partial\}\.\$\{role\}`/.test(HANDLER),
+        'le dossier système n\'a pas forcément la place d\'une vidéo en 2160p');
+
+    check('  … et retirés quoi qu\'il arrive',
+        /\} finally \{[\s\S]{0,300}fs\.unlinkSync\(chemin\)/.test(HANDLER),
+        'un échec ne doit pas laisser 300 Mo au milieu d\'un dossier de musique');
+
+    check('plus aucune reconnexion HTTP ne subsiste',
+        !/'-reconnect'/.test(HANDLER),
+        'elle ne servait qu\'aux URL tendues à ffmpeg, qu\'il n\'y a plus');
 
     /*
      * La hauteur sert deux fois : à choisir le flux, et à tailler le noir.

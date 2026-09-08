@@ -234,4 +234,28 @@ function chunkedFetch(url, { headers = {}, chunkBytes = CHUNK_BYTES } = {}) {
     return out;
 }
 
-module.exports = { chunkedFetch, CHUNK_BYTES };
+/**
+ * Le même téléchargement, mais vers un fichier.
+ *
+ * Pour les appelants qui ne peuvent pas se contenter d'un flux. ffmpeg n'a
+ * qu'une entrée standard : quand une commande recoud une image et un son venus
+ * chacun de leur adresse, l'un des deux doit être posé quelque part d'abord.
+ *
+ * Un fichier a par ailleurs un mérite que le tuyau n'a pas : ffmpeg peut s'y
+ * déplacer. Recopier une piste vidéo sans la réencoder demande de lire l'index
+ * du conteneur, qui vit parfois à la fin.
+ *
+ * @param {string} url
+ * @param {string} dest - Chemin à écrire.
+ * @param {object} [options] - Comme `chunkedFetch`.
+ * @returns {Promise<string>} `dest`.
+ */
+async function fetchToFile(url, dest, options) {
+    const fs = require('fs');
+    const { pipeline } = require('stream/promises');
+
+    await pipeline(chunkedFetch(url, options), fs.createWriteStream(dest));
+    return dest;
+}
+
+module.exports = { chunkedFetch, fetchToFile, CHUNK_BYTES };

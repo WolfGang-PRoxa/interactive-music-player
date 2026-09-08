@@ -26,6 +26,7 @@ const { searchLocalAwareTrack } = require('../handlerUtils');
 const downloadDir = require('../../../utils/downloadDir');
 const downloadFormats = require('../../../utils/downloadFormats');
 const videoSource = require('../../../audio/videoSource');
+const rangeStream = require('../../../audio/rangeStream');
 const log = require('../../../utils/logger');
 
 /** Débits acceptés, repris des réglages d'import de la boîte. */
@@ -95,6 +96,43 @@ function copyLocal(source, dir) {
 }
 
 /**
+ * En-têtes des tranches, ceux-là mêmes qui ont servi à signer les adresses.
+ */
+const FETCH_HEADERS = { referer: 'youtube.com', 'user-agent': 'googlebot' };
+
+/**
+ * Ramène une entrée distante à un flux poussé dans l'entrée standard.
+ *
+ * Tendre une URL à ffmpeg le fait ouvrir une requête et la garder ouverte du
+ * début à la fin : YouTube bride alors ce téléchargement au débit de lecture —
+ * 32 Ko/s là où la même adresse, demandée par tranches, se sert à 38 Mo/s. Voir
+ * `rangeStream`, où la mesure est détaillée.
+ *
+ * Ne convient qu'aux commandes à une seule entrée distante : ffmpeg n'a qu'une
+ * entrée standard. Pour les autres, `fetchToFile`.
+ *
+ * @param {{ ffmpegInput: string|null, inputStream: object|null }} input
+ * @returns {{ ffmpegInput: string, inputStream: object|null }}
+ */
+function pipeRemote(input) {
+    const url = input.ffmpegInput;
+
+    if (url && /^https?:\/\//i.test(url)) {
+        return {
+            ffmpegInput: 'pipe:0',
+            inputStream: rangeStream.chunkedFetch(url, { headers: FETCH_HEADERS }),
+        };
+    }
+
+    // Déjà un flux — celui d'un extracteur, ou les tranches que le préchargeur
+    // a montées lui-même —, ou bien un fichier du disque.
+    return {
+        ffmpegInput: url || 'pipe:0',
+        inputStream: input.inputStream || null,
+    };
+}
+
+/**
  * Transcode une source distante vers un MP3 du dossier.
  *
  * L'écriture se fait sous un nom provisoire, renommé une fois seulement le
@@ -112,20 +150,18 @@ function transcodeRemote(input, dir, title, bitrate, container) {
 
     const args = [];
 
-    // Une URL directe peut se rompre en route : ffmpeg reprend la connexion
-    // plutôt que d'écrire un fichier tronqué.
-    if (input.ffmpegInput && /^https?:\/\//i.test(input.ffmpegInput)) {
-        args.push('-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5');
-    }
+    // Une seule entrée à alimenter : les tranches passent par l'entrée standard,
+    // et il n'y a pas de fichier intermédiaire à ranger ensuite.
+    const source = pipeRemote(input);
 
-    args.push('-i', input.ffmpegInput || 'pipe:0');
+    args.push('-i', source.ffmpegInput);
     // `-vn` : la source porte souvent une pochette en flux vidéo, que les
     // muxers audio ne savent ranger que dans une étiquette. Sans cela ffmpeg
     // s'arrête sur « nothing was written into output file ». Voir
     // PreloadManager, où le même écueil a été rencontré.
     args.push('-vn', ...encoding, '-y', partial);
 
-    return runFfmpeg(args, input.inputStream || null, partial, finalPath, title);
+    return runFfmpeg(args, source.inputStream, partial, finalPath, title);
 }
 
 /**
@@ -233,37 +269,72 @@ async function transcodeVideo(track, url, dir, title, bitrate, container, height
     const partial = `${finalPath}.incomplete`;
 
     const args = [];
-    const distant = (u) => u && /^https?:\/\//i.test(u);
-    const reconnect = ['-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5'];
+    let stdin = null;
+    const temporaires = [];
 
-    if (source.audioOnly) {
-        // Le son d'abord, par le chemin ordinaire : c'est le seul flux dont on
-        // dispose, et il peut arriver autrement qu'en URL directe.
-        const input = await preloadManager.resolveAudioInput(track, url);
-        const audio = input.ffmpegInput;
-        if (!audio) {
-            throw new Error(`Aucune source pour « ${title} »`);
+    /**
+     * Rapatrie une adresse dans un fichier voisin du fichier final.
+     *
+     * Le dossier de destination plutôt que celui du système : c'est le seul
+     * dont on sait qu'il existe, qu'on peut y écrire et qu'il a la place — une
+     * vidéo en 2160p ne tient pas partout.
+     */
+    const rapatrier = async (adresse, role) => {
+        const chemin = `${partial}.${role}`;
+        temporaires.push(chemin);
+        await rangeStream.fetchToFile(adresse, chemin, { headers: FETCH_HEADERS });
+        return chemin;
+    };
+
+    try {
+        if (source.audioOnly) {
+            // Le son d'abord, par le chemin ordinaire : c'est le seul flux dont
+            // on dispose, et il peut arriver autrement qu'en URL directe.
+            const input = pipeRemote(await preloadManager.resolveAudioInput(track, url));
+            if (input.ffmpegInput === 'pipe:0' && !input.inputStream) {
+                throw new Error(`Aucune source pour « ${title} »`);
+            }
+
+            // Une seule entrée distante : l'entrée standard suffit, et rien
+            // n'a besoin d'être posé sur le disque au passage.
+            stdin = input.inputStream;
+
+            // La définition demandée, et non une taille fixe : le menu la
+            // propose, elle doit donc se retrouver dans le fichier écrit.
+            const canvas = downloadFormats.blackCanvas(height);
+            args.push('-f', 'lavfi', '-i', `color=c=black:s=${canvas}:r=2`);
+            args.push('-i', input.ffmpegInput);
+        } else {
+            /*
+             * Image et son passent par des fichiers, et non par des URL.
+             *
+             * Deux raisons, dont la seconde suffirait. ffmpeg n'a qu'une entrée
+             * standard, et il en faudrait deux quand la source sert l'image et
+             * le son séparément. Et une URL tendue telle quelle est bridée au
+             * débit de lecture : une vidéo de dix minutes mettrait dix minutes
+             * à se télécharger, deux fois plutôt qu'une.
+             *
+             * Le fichier a de surcroît ce que le tuyau n'a pas : ffmpeg peut
+             * s'y déplacer. Recopier une piste vidéo sans la réencoder demande
+             * de lire l'index du conteneur, qui vit parfois à la fin.
+             */
+            args.push('-i', await rapatrier(source.videoUrl, 'video'));
+
+            if (source.audioUrl) {
+                args.push('-i', await rapatrier(source.audioUrl, 'audio'));
+                args.push('-map', '0:v:0', '-map', '1:a:0');
+            }
         }
 
-        // La définition demandée, et non une taille fixe : le menu la
-        // propose, elle doit donc se retrouver dans le fichier écrit.
-        const canvas = downloadFormats.blackCanvas(height);
-        args.push('-f', 'lavfi', '-i', `color=c=black:s=${canvas}:r=2`);
-        if (distant(audio)) args.push(...reconnect);
-        args.push('-i', audio);
-    } else {
-        if (distant(source.videoUrl)) args.push(...reconnect);
-        args.push('-i', source.videoUrl);
-
-        if (source.audioUrl) {
-            if (distant(source.audioUrl)) args.push(...reconnect);
-            args.push('-i', source.audioUrl);
-            args.push('-map', '0:v:0', '-map', '1:a:0');
+        args.push(...encoding, '-y', partial);
+        return await runFfmpeg(args, stdin, partial, finalPath, title);
+    } finally {
+        // Réussite ou échec, ces fichiers-là n'ont plus rien à faire dans un
+        // dossier de musique.
+        for (const chemin of temporaires) {
+            try { fs.unlinkSync(chemin); } catch (e) {}
         }
     }
-
-    args.push(...encoding, '-y', partial);
-    return runFfmpeg(args, null, partial, finalPath, title);
 }
 
 /**
