@@ -249,22 +249,67 @@ window.MusicPlayer.nextTrackOf = function(state) {
     const snapshot = state || window.MusicPlayer.state || {};
     const source = snapshot.activePlaybackSource;
 
+    let candidate = null;
+
     if (source && source !== 'queue') {
         const playlist = (snapshot.playlists || []).find(p => p.id === source);
         const tracks = (playlist && playlist.tracks) || [];
         if (tracks.length === 0) return null;
 
         const index = typeof snapshot.playlistCurrentIndex === 'number' ? snapshot.playlistCurrentIndex : 0;
-        if (index + 1 < tracks.length) return tracks[index + 1];
+        if (index + 1 < tracks.length) candidate = tracks[index + 1];
 
         // Dernier titre : la lecture en boucle enchaîne sur le premier. Sinon
         // la playlist est finie, et la file d'attente prend le relais — le
-        // serveur bascule alors la source (WebServer.enchainerSurLaFile), si
-        // bien que le titre préparé ici est bien celui qu'il jouera.
-        if (snapshot.loopPlaylist) return tracks[0];
+        // serveur bascule alors la source (WebServer.advanceToQueue), si bien
+        // que le titre préparé ici est bien celui qu'il jouera.
+        else if (snapshot.loopPlaylist) candidate = tracks[0];
     }
 
-    return (snapshot.queue && snapshot.queue[0]) || null;
+    if (!candidate) candidate = (snapshot.queue && snapshot.queue[0]) || null;
+
+    /*
+     * Un aiguillage n'est pas un morceau, et le préparer comme tel était un
+     * fondu vers rien.
+     *
+     * Le navigateur monte le titre suivant en fond pour le croiser avec celui
+     * qui s'achève. Rendu l'aiguillage lui-même, il en prenait l'adresse
+     * `transition:` pour une source à charger : l'élément restait muet, le
+     * fondu se faisait vers du silence, et l'on entendait le morceau sortant se
+     * prolonger seul. Le journal en gardait la trace — « entrant « — » », un
+     * titre vide, celui qu'un aiguillage porte.
+     *
+     * Ce qui suit vraiment est le premier titre de la source vers laquelle il
+     * mène. C'est la même chose que fera le serveur en atteignant l'aiguillage :
+     * les deux prédisent donc le même morceau, et le croisement se fait vers le
+     * bon fichier.
+     */
+    if (window.MusicPlayer.isTransition(candidate)) {
+        return window.MusicPlayer.firstOfSource(snapshot, candidate.target);
+    }
+    return candidate;
+};
+
+/**
+ * Le premier morceau qu'une source donnera, s'il est prévisible.
+ *
+ * `null` quand elle commence elle-même par un aiguillage : le serveur le
+ * consommerait aussitôt et partirait ailleurs encore. Préparer alors le titre
+ * d'après reviendrait à parier sur un enchaînement qui n'aura pas lieu, et le
+ * fondu croiserait un morceau qu'on n'entendra pas — mieux vaut ne rien
+ * préparer, comme en lecture aléatoire.
+ *
+ * @param {object} snapshot - L'état courant.
+ * @param {string} target - `queue`, ou l'identifiant d'une playlist.
+ * @returns {object|null}
+ */
+window.MusicPlayer.firstOfSource = function(snapshot, target) {
+    const list = target === 'queue'
+        ? (snapshot.queue || [])
+        : (((snapshot.playlists || []).find(p => p.id === target) || {}).tracks || []);
+
+    const first = list[0] || null;
+    return window.MusicPlayer.isTransition(first) ? null : first;
 };
 
 /**

@@ -249,12 +249,19 @@ function testClearQueue() {
 
 // ────────────────────────── Côté navigateur ──────────────────────────
 
-/** Charge state.js dans un environnement minimal et rend son API. */
+/**
+ * Charge state.js dans un environnement minimal et rend son API.
+ *
+ * `transitions.js` l'accompagne, comme sur la page : `nextTrackOf` lui demande
+ * si le titre qu'il s'apprête à préparer n'est pas un aiguillage — auquel cas
+ * ce qui suit vraiment est le premier titre de la source visée. Charger l'un
+ * sans l'autre monterait un tableau de bord qui n'existe pas.
+ */
 function loadState() {
-    const source = fs.readFileSync(
-        path.join(__dirname, '..', 'src', 'web', 'public', 'js', 'state.js'),
-        'utf8'
-    );
+    const source = ['transitions', 'state']
+        .map(f => fs.readFileSync(
+            path.join(__dirname, '..', 'src', 'web', 'public', 'js', `${f}.js`), 'utf8'))
+        .join('\n;\n');
 
     const fakeWindow = { addEventListener() {} };
     const context = {

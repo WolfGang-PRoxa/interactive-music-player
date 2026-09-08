@@ -590,6 +590,118 @@ console.log('\nCe qu\'un clic droit sur un aiguillage permet\n');
         /tracks: \(p\.tracks \|\| \[\]\)\.map\(formatTrackWithPreload\)/.test(SERVER));
 }
 
+// ───────────────────── Le fondu enchaîné ─────────────────────
+
+console.log('\nVers quoi le mix croise quand un aiguillage suit\n');
+
+{
+    /*
+     * Le navigateur monte le titre suivant en fond pour le croiser avec celui
+     * qui s'achève. Rendu l'aiguillage lui-même, il prenait son adresse
+     * `transition:` pour une source à charger : l'élément restait muet, le
+     * fondu se faisait vers du silence, et l'on entendait le morceau sortant se
+     * prolonger seul.
+     *
+     * Le journal en gardait la trace, et c'est elle qui a désigné le coupable :
+     *
+     *     [Mix] FIN fondu #1 | envoi du saut | entrant « — » a 7.76s
+     *
+     * Un titre vide — celui qu'un aiguillage porte —, dans un bloc qui ne
+     * s'exécute que lorsqu'un suivant a bel et bien été trouvé.
+     */
+    const vm = require('vm');
+    const bac = {
+        window: {}, console, Number, JSON, Date,
+        document: { createElement: () => ({ style: {}, classList: { add() {}, toggle() {} },
+            dataset: {}, appendChild() {}, addEventListener() {}, setAttribute() {},
+            getAttribute: () => '0' }) },
+        localStorage: { getItem: () => null, setItem() {} },
+    };
+    bac.globalThis = bac;
+    vm.createContext(bac);
+    for (const f of ['transitions', 'state']) {
+        vm.runInContext(fs.readFileSync(
+            path.join(ROOT, 'src', 'web', 'public', 'js', `${f}.js`), 'utf8'), bac);
+    }
+    const MP = bac.window.MusicPlayer;
+
+    const T = (cible) => ({ isTransition: true, id: 't', target: cible, url: 'transition:t' });
+    const etat = () => ({
+        activePlaybackSource: 'playlist_a',
+        playlistCurrentIndex: 0,
+        loopPlaylist: false,
+        playlists: [
+            { id: 'playlist_a', tracks: [piste('A1'), T('queue'), piste('A2')] },
+            { id: 'playlist_b', tracks: [piste('B1'), piste('B2')] },
+            { id: 'playlist_c', tracks: [T('queue'), piste('C1')] },
+        ],
+        queue: [piste('Q1'), piste('Q2')],
+    });
+
+    const suivant = (e) => MP.nextTrackOf(e);
+
+    check('un aiguillage n\'est jamais préparé comme un morceau',
+        !transitions.isTransition(suivant(etat())),
+        'son adresse « transition: » ne charge rien, et le fondu se ferait vers du silence');
+
+    check('  … c\'est la destination qui est croisée',
+        suivant(etat()).title === 'Q1',
+        'le serveur y basculera : les deux prédisent le même morceau');
+
+    {
+        const e = etat();
+        e.playlists[0].tracks[1] = T('playlist_b');
+        check('  … playlist visée comprise', suivant(e).title === 'B1');
+    }
+
+    {
+        // Une destination qui commence elle-même par un aiguillage : le serveur
+        // le consommerait aussitôt et partirait ailleurs encore. Parier serait
+        // croiser un morceau qu'on n'entendra pas.
+        const e = etat();
+        e.playlists[0].tracks[1] = T('playlist_c');
+        check('une destination qui s\'aiguille à son tour n\'est pas devinée',
+            suivant(e) === null,
+            'mieux vaut ne rien préparer, comme en lecture aléatoire');
+    }
+
+    {
+        const e = etat();
+        e.activePlaybackSource = 'queue';
+        e.queue = [T('playlist_b'), piste('Q2')];
+        check('la file dont la tête est un aiguillage croise sa destination',
+            suivant(e).title === 'B1');
+    }
+
+    // Ce qui marchait avant doit continuer de marcher.
+    {
+        const e = etat();
+        e.playlists[0].tracks[1] = piste('A1bis');
+        check('sans aiguillage, le titre suivant reste le titre suivant',
+            suivant(e).title === 'A1bis');
+    }
+    {
+        const e = etat();
+        e.activePlaybackSource = 'playlist_b';
+        e.playlistCurrentIndex = 1;
+        check('  … et une playlist finie passe toujours le relais à la file',
+            suivant(e).title === 'Q1');
+    }
+    {
+        const e = etat();
+        e.activePlaybackSource = 'playlist_b';
+        e.playlistCurrentIndex = 1;
+        e.loopPlaylist = true;
+        check('  … une playlist en boucle repartant de son premier titre',
+            suivant(e).title === 'B1');
+    }
+    {
+        const e = etat();
+        e.playlists[0].tracks = [];
+        check('  … et une playlist vide ne prépare rien', suivant(e) === null);
+    }
+}
+
 // ───────────────────── Les traductions ─────────────────────
 
 console.log('\nCe que les quatre langues doivent dire\n');
