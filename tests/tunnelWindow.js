@@ -679,18 +679,68 @@ console.log('\nCe que le bouton d\'envoi répond\n');
     check('  … et ne laisse pas un minuteur derrière elle',
         /clearTimeout\(btn\._sentBack\);/.test(SHARED));
 
-    check('le mouvement dit le départ : l\'étiquette monte, la coche prend sa place',
-        /\.is-sent \.share-invite-label \{[\s\S]{0,80}translateY\(-120%\)/.test(CSS)
-        && /\.is-sent \.share-invite-done \{[\s\S]{0,80}translateY\(0\)/.test(CSS));
+    /*
+     * Trois temps, et c'est leur enchaînement qui raconte : l'élan, le départ,
+     * l'arrivée. Chacun a ses images clés, et le nom de chacune dit ce qu'elle
+     * fait — un mouvement dont on ne peut plus nommer les morceaux ne se relit
+     * pas.
+     */
+    for (const [temps, image] of [
+        ['l\'élan', 'share-invite-press'],
+        ['le départ de l\'étiquette', 'share-invite-leave'],
+        ['le vol', 'share-invite-fly'],
+        ['son sillage', 'share-invite-trail'],
+        ['le balayage', 'share-invite-sweep'],
+        ['l\'arrivée', 'share-invite-land'],
+        ['le tracé de la coche', 'share-invite-draw'],
+    ]) {
+        check(`${temps} a ses images clés`, new RegExp(`@keyframes ${image} \\{`).test(CSS));
+    }
+
+    /*
+     * Tout est animation, rien n'est transition pendant la séquence.
+     *
+     * Les deux modèles mêlés donnaient des instants qu'on ne pouvait plus caler
+     * les uns sur les autres — ni figer pour les relire. C'est ainsi qu'un creux
+     * s'était glissé au milieu : l'étiquette partie, l'avion éteint, et la coche
+     * pas encore là.
+     */
+    const joue = CSS.slice(CSS.indexOf('.share-invite-btn.is-sent {'),
+        CSS.indexOf('@keyframes share-invite-leave'));
+    check('la séquence entière est jouée en animations',
+        !/transition:/.test(joue) && (joue.match(/animation:/g) || []).length >= 5,
+        'deux modèles mêlés ne se calent pas l\'un sur l\'autre');
+
+    // La coche se trace : le trait est masqué sur toute sa longueur, et le
+    // masque recule.
+    check('  … et la coche se dessine au lieu de paraître',
+        /stroke-dasharray: 24;/.test(CSS)
+        && /@keyframes share-invite-draw \{\s*\n\s*to \{ stroke-dashoffset: 0; \}/.test(CSS));
+
+    // L'arrivée recouvre la fin du vol : deux gestes qui s'attendent poliment
+    // donnent une saynète, deux gestes qui se recouvrent donnent un mouvement.
+    const retard = (nom) => {
+        const m = new RegExp(`animation: ${nom} [\\d.]+s [^;]*?([\\d.]+)s both`).exec(CSS);
+        return m ? parseFloat(m[1]) : NaN;
+    };
+    check('  … et l\'arrivée commence avant la fin du vol',
+        retard('share-invite-land') < 0.1 + 0.5,
+        `l'arrivée à ${retard('share-invite-land')}s, le vol jusqu'à 0.6s`);
 
     /*
      * Le mouvement est un agrément, jamais le message : réduit, la couleur, la
-     * coche et le mot disent encore tout.
+     * coche et le mot disent encore tout — seul ce qui n'était que déplacement
+     * s'efface.
      */
+    const reduit = CSS.slice(CSS.lastIndexOf('@media (prefers-reduced-motion: reduce) {'));
     check('  … et se tait quand le mouvement est refusé',
-        /@media \(prefers-reduced-motion: reduce\) \{[\s\S]{0,400}share-invite-done \{ transition: none/
-            .test(CSS),
-        'la couleur, la coche et le mot restent');
+        /\.is-sent \.share-invite-plane,\s*\n\s*\.share-invite-btn\.is-sent \.plane-trail \{ animation: none; opacity: 0; \}/
+            .test(reduit),
+        'le vol et son sillage ne portaient rien à eux seuls');
+    check('  … sans emporter ce qui porte le message',
+        /\.is-sent \.share-invite-done \{[\s\S]{0,120}opacity: 1;/.test(reduit)
+        && /\.share-invite-check \{ stroke-dashoffset: 0; \}/.test(reduit),
+        'la coche entière, le mot, le fond vert');
 
     for (const lang of ['fr', 'en', 'es', 'de']) {
         const dict = JSON.parse(fs.readFileSync(

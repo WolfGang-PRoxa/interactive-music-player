@@ -2049,8 +2049,20 @@
                              ne saute pas de largeur en pleine animation. -->
                         <button id="btn-send-invite" class="maint-btn primary share-invite-btn">
                             <span class="share-invite-label" data-i18n="share_invite_send">Envoyer le lien</span>
+                            <!-- L'avion traverse le bouton et en sort : c'est le départ.
+                                 Les deux traits derrière lui sont son sillage, qu'il
+                                 laisse en s'éloignant. -->
+                            <span class="share-invite-plane" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path class="plane-trail" d="M1 12h4M2 16h3"></path>
+                                    <path class="plane-body" d="M21.5 3.5 11 14M21.5 3.5 15 21l-4-7-7-4z"></path>
+                                </svg>
+                            </span>
+                            <!-- La coche se trace au lieu d'apparaître : c'est ce trait
+                                 qui se dessine, plus que la couleur, qui dit que quelque
+                                 chose vient d'aboutir. -->
                             <span class="share-invite-done" aria-hidden="true">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline class="share-invite-check" points="20 6 9 17 4 12"></polyline></svg>
                                 <span data-i18n="share_invite_done">Envoyé</span>
                             </span>
                         </button>

@@ -1082,11 +1082,30 @@
  * seulement pris ? —, et l'on reclique. Le bouton répond donc sur place, et le
  * toast reste pour dire dans quel salon.
  *
- * Les deux étiquettes sont empilées et le bouton garde sa taille : rien ne
- * saute autour de lui pendant l'animation. */
+ * ## La mise en scène
+ *
+ * Trois temps, et c'est leur enchaînement qui raconte, non chacun pris à part :
+ *
+ *  1. **L'élan** (0 → 120 ms). Le bouton se tasse légèrement. Un mouvement qui
+ *     part sans se ramasser d'abord paraît subi ; celui-ci paraît décidé.
+ *  2. **Le départ** (120 → 560 ms). L'étiquette s'efface vers la gauche pendant
+ *     qu'un avion traverse le bouton et en sort par la droite, sillage derrière
+ *     lui. Le fond vert le suit en balayage, comme une trace qu'il laisserait.
+ *  3. **L'arrivée** (à partir de 460 ms). La coche se trace d'un trait — elle ne
+ *     paraît pas d'un coup —, puis le mot monte à sa place.
+ *
+ * Le chevauchement du deuxième et du troisième temps est voulu : la coche
+ * commence avant que l'avion ait fini de sortir. Deux gestes qui s'attendent
+ * poliment donnent une saynète ; deux gestes qui se recouvrent donnent un
+ * mouvement.
+ *
+ * Les trois étiquettes sont empilées et le bouton garde sa taille : rien ne
+ * saute autour de lui pendant que cela se joue.
+ */
 .share-invite-btn {
     position: relative;
     overflow: hidden;
+    transition: transform 0.12s ease-out, background 0.3s ease, border-color 0.3s ease;
 }
 
 .share-invite-btn .share-invite-label,
@@ -1095,15 +1114,42 @@
     align-items: center;
     justify-content: center;
     gap: 0.4rem;
-    transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
 }
 
-/* Posée par-dessus, hors champ vers le bas, jusqu'à ce qu'on l'appelle. */
+.share-invite-btn .share-invite-label {
+    transition: transform 0.34s cubic-bezier(0.5, 0, 0.75, 0), opacity 0.22s ease;
+}
+
+/* Posées par-dessus, hors champ, jusqu'à ce qu'on les appelle. */
+.share-invite-btn .share-invite-plane,
 .share-invite-btn .share-invite-done {
     position: absolute;
     inset: 0;
-    transform: translateY(110%);
     opacity: 0;
+    pointer-events: none;
+}
+
+.share-invite-btn .share-invite-plane {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.share-invite-btn .share-invite-plane svg {
+    width: 17px;
+    height: 17px;
+}
+
+/* Le sillage n'existe qu'au vol : au repos il traînerait derrière un avion
+   immobile. */
+.share-invite-btn .plane-trail {
+    opacity: 0;
+    stroke-width: 1.5;
+}
+
+.share-invite-btn .share-invite-done {
+    transform: translateY(65%);
+    transition: transform 0.4s cubic-bezier(0.22, 1.4, 0.4, 1), opacity 0.24s ease 0.12s;
 }
 
 .share-invite-btn .share-invite-done svg {
@@ -1111,48 +1157,138 @@
     height: 15px;
 }
 
-/* L'étiquette part par le haut — le sens du départ —, la confirmation monte
-   à sa place. */
-.share-invite-btn.is-sent .share-invite-label {
-    transform: translateY(-120%);
-    opacity: 0;
+/* La coche se trace : le trait est masqué sur toute sa longueur, et le masque
+   recule. C'est ce dessin en train de se faire, plus que la couleur, qui dit
+   que quelque chose vient d'aboutir. */
+.share-invite-btn .share-invite-check {
+    stroke-dasharray: 24;
+    stroke-dashoffset: 24;
 }
 
-.share-invite-btn.is-sent .share-invite-done {
-    transform: translateY(0);
-    opacity: 1;
-}
+/* ── L'envoi ── */
 
-/* Le fond vire au vert le temps de la confirmation, puis revient. */
 .share-invite-btn.is-sent {
     background: var(--c-success, #43b581) !important;
     border-color: var(--c-success, #43b581) !important;
     color: #fff !important;
+    /* Le tassement de l'élan, puis le retour : la courbe rebondit une fois. */
+    animation: share-invite-press 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* Une onde brève part du bouton : ce qui s'en va, s'en va vraiment. */
-.share-invite-btn.is-sent::after {
+/* En animation comme le reste de la séquence : un seul modèle, des instants
+   qui se calent au dixième près, et une mise en scène qu'on peut figer pour la
+   relire. Le retour reste porté par la transition de la règle de base. */
+.share-invite-btn.is-sent .share-invite-label {
+    animation: share-invite-leave 0.32s cubic-bezier(0.5, 0, 0.75, 0) both;
+}
+
+.share-invite-btn.is-sent .share-invite-plane {
+    opacity: 1;
+    animation: share-invite-fly 0.5s cubic-bezier(0.6, 0, 0.9, 0.3) 0.1s both;
+}
+
+.share-invite-btn.is-sent .plane-trail {
+    animation: share-invite-trail 0.5s ease-out 0.1s both;
+}
+
+/* En animation et non en transition, pour deux raisons : elle se cale au
+   dixième près sur le vol qu'elle recouvre, et l'on peut la figer pour la
+   vérifier. Le retour, lui, reste une transition — c'est la règle de base qui
+   le porte, une fois la classe retirée. */
+.share-invite-btn.is-sent .share-invite-done {
+    animation: share-invite-land 0.42s cubic-bezier(0.22, 1.4, 0.4, 1) 0.36s both;
+}
+
+.share-invite-btn.is-sent .share-invite-check {
+    animation: share-invite-draw 0.34s cubic-bezier(0.65, 0, 0.35, 1) 0.44s both;
+}
+
+/* Le balayage vert suit l'avion, comme la trace qu'il laisserait. Sous le
+   contenu — il colore, il ne masque pas. */
+.share-invite-btn.is-sent::before {
     content: '';
     position: absolute;
     inset: 0;
-    border-radius: inherit;
-    background: radial-gradient(circle at 50% 50%,
-        rgba(255, 255, 255, 0.55), transparent 60%);
-    animation: share-invite-wave 0.55s ease-out;
+    background: linear-gradient(100deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.38) 45%,
+        transparent 70%);
+    animation: share-invite-sweep 0.6s ease-out 0.1s both;
     pointer-events: none;
 }
 
-@keyframes share-invite-wave {
-    from { transform: scale(0.2); opacity: 0.9; }
-    to { transform: scale(1.6); opacity: 0; }
+/* L'étiquette s'en va par où l'avion s'en ira : elle lui cède la place plutôt
+   que de s'évanouir sur place. */
+@keyframes share-invite-leave {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(-140%); opacity: 0; }
+}
+
+@keyframes share-invite-press {
+    0% { transform: scale(1); }
+    28% { transform: scale(0.955); }
+    100% { transform: scale(1); }
+}
+
+/* L'avion part de la gauche, monte un peu en s'éloignant, et sort. Le léger
+   grandissement au départ le fait décoller plutôt que glisser. */
+@keyframes share-invite-fly {
+    0% { transform: translate(-46%, 6%) scale(0.75); opacity: 0; }
+    18% { opacity: 1; }
+    /* Il reste franc presque jusqu'au bout : le laisser pâlir dès le milieu du
+       vol ouvrait un instant où le bouton n'avait plus rien à montrer — ni
+       l'étiquette, partie, ni la coche, pas encore là. */
+    72% { opacity: 1; }
+    100% { transform: translate(150%, -34%) scale(1.05); opacity: 0; }
+}
+
+/* L'arrivée recouvre la fin du vol : deux gestes qui s'attendent poliment
+   donnent une saynète, deux gestes qui se recouvrent donnent un mouvement. */
+@keyframes share-invite-land {
+    from { transform: translateY(65%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* Le sillage ne paraît qu'en plein vol, et s'éteint avant la sortie : un trait
+   qui accompagne l'avion jusqu'au bord donnerait une flèche, pas un départ. */
+@keyframes share-invite-trail {
+    0%, 15% { opacity: 0; }
+    45% { opacity: 0.75; }
+    100% { opacity: 0; }
+}
+
+@keyframes share-invite-draw {
+    to { stroke-dashoffset: 0; }
+}
+
+@keyframes share-invite-sweep {
+    from { transform: translateX(-105%); }
+    to { transform: translateX(105%); }
 }
 
 /* Le mouvement est un agrément, jamais le message : réduit, tout se dit
-   encore — la couleur, la coche, le mot. */
+   encore — la couleur, la coche, le mot. La coche est alors rendue d'un bloc,
+   son tracé étant lui-même un mouvement. */
 @media (prefers-reduced-motion: reduce) {
-    .share-invite-btn .share-invite-label,
-    .share-invite-btn .share-invite-done { transition: none; }
-    .share-invite-btn.is-sent::after { animation: none; }
+    .share-invite-btn,
+    .share-invite-btn .share-invite-label { transition: none; animation: none; }
+
+    /* Ce qui n'était que du mouvement s'efface : le vol, son sillage, le
+       balayage. Ils ne portaient aucune information à eux seuls. */
+    .share-invite-btn.is-sent::before,
+    .share-invite-btn.is-sent .share-invite-plane,
+    .share-invite-btn.is-sent .plane-trail { animation: none; opacity: 0; }
+
+    /* Ce qui porte le message reste, posé d'un bloc : le fond vert, la coche
+       entière, le mot. */
+    .share-invite-btn.is-sent .share-invite-done {
+        animation: none;
+        transform: none;
+        opacity: 1;
+    }
+
+    .share-invite-btn .share-invite-check { stroke-dashoffset: 0; }
+    .share-invite-btn.is-sent .share-invite-check { animation: none; }
 }
 
 /* La liste des auditeurs */
