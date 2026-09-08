@@ -96,6 +96,28 @@ console.log('Ce qui est posé dans la liste\n');
     // fond sombre du menu.
     check('  … avec un liseré, faute de quoi les clairs se fondent',
         /stroke="rgba\(0,0,0,0\.35\)"/.test(drapeau.innerHTML));
+
+    /*
+     * Les coins sont arrondis par la feuille de style : un `<svg>` masque ce
+     * qui déborde de sa boîte, et l'arrondi rogne donc le dessin lui-même —
+     * les bandes s'adoucissent jusqu'aux angles sans qu'on touche au tracé.
+     *
+     * Mais la découpe rogne aussi le liseré. Sans le même rayon sur lui, il
+     * s'interromprait aux quatre coins. Les deux valeurs se comptent dans la
+     * même monnaie — la boîte fait 20 × 14 unités pour 20 × 14 pixels — et
+     * doivent rester égales.
+     */
+    const rxDessin = /rx="([\d.]+)"/.exec(drapeau.innerHTML);
+    const rxFeuille = /\.option-flag svg[\s\S]{0,200}?border-radius: ([\d.]+)px;/.exec(CSS);
+
+    check('les coins sont arrondis', !!rxFeuille && parseFloat(rxFeuille[1]) > 0,
+        rxFeuille ? `${rxFeuille[1]}px` : 'aucun arrondi');
+    check('  … légèrement, non en pastille',
+        !!rxFeuille && parseFloat(rxFeuille[1]) <= 5,
+        'au-delà, la vignette cesse de se lire comme un drapeau');
+    check('  … et le liseré épouse la même courbe',
+        !!rxDessin && !!rxFeuille && parseFloat(rxDessin[1]) === parseFloat(rxFeuille[1]),
+        rxDessin && rxFeuille ? `rx ${rxDessin[1]} / radius ${rxFeuille[1]}px` : 'valeur absente');
 }
 
 {

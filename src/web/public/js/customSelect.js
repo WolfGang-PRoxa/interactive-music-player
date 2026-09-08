@@ -57,11 +57,19 @@ function buildFlag(option) {
 
     const span = document.createElement('span');
     span.className = 'option-flag';
-    // Le liseré évite qu'un drapeau clair — le jaune espagnol, l'or allemand —
-    // ne se fonde dans le fond du menu.
+    /*
+     * Le liseré évite qu'un drapeau clair — le jaune espagnol, l'or allemand —
+     * ne se fonde dans le fond du menu.
+     *
+     * Son `rx` répond à l'arrondi que la feuille de style applique au dessin :
+     * la découpe rogne aussi ce trait, et un liseré à angles droits sous une
+     * découpe arrondie s'interromprait aux quatre coins. Les deux valeurs
+     * doivent donc rester égales — la boîte fait 20 × 14 unités pour 20 × 14
+     * pixels, elles se comptent dans la même monnaie.
+     */
     span.innerHTML = `<svg viewBox="0 0 20 14" role="img" aria-hidden="true">`
         + SELECT_FLAGS[code]
-        + '<rect width="20" height="14" fill="none" stroke="rgba(0,0,0,0.35)" stroke-width="1"/>'
+        + '<rect width="20" height="14" rx="3" fill="none" stroke="rgba(0,0,0,0.35)" stroke-width="1"/>'
         + '</svg>';
     return span;
 }

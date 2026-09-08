@@ -435,12 +435,16 @@
     margin-right: 0.55rem;
 }
 
+/* L'arrondi rogne le dessin lui-même — un <svg> masque ce qui déborde de sa
+   boîte. C'est ce qui adoucit les bandes jusqu'aux coins, sans rien découper
+   dans le tracé. Le liseré porte le même rayon, sinon il s'interromprait aux
+   quatre angles ; les deux valeurs vont de pair. */
 .custom-select-option .option-flag svg,
 .custom-select-trigger .option-flag svg {
     width: 20px;
     height: 14px;
     display: block;
-    border-radius: 2px;
+    border-radius: 3px;
 }
 
 .custom-select-option .option-flag + .option-text,
