@@ -105,6 +105,8 @@ const ACTION_GROUPS = {
     addTrackToPlaylist: 'playlists',
     removeTrackFromPlaylist: 'playlists',
     movePlaylistTrack: 'playlists',
+    // Poser un aiguillage revient à réécrire une playlist : même droit.
+    insertTransition: 'playlists',
     reorderPlaylists: 'playlists',
 
     // Réparti champ par champ — voir SETTINGS_FIELDS

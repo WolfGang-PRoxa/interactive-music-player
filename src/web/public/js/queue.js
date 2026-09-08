@@ -267,6 +267,9 @@ window.MusicPlayer.initCardsDragAndDrop = function() {
                     try { dragData = JSON.parse(dragDataStr); } catch (err) {}
                 }
                 if (!dragData) dragData = window.MusicPlayer.activeDragData;
+                // Un aiguillage ne quitte pas la playlist qui le porte : il y
+                // désigne une position entre deux titres, et n'en a aucune ici.
+                if (window.MusicPlayer.transitionLeavingHome(dragData, 'queue')) return;
                 if (dragData && dragData.url) {
                     window.MusicPlayer.sendWS({ type: 'playNow', data: { url: dragData.url } });
                 }
@@ -339,6 +342,9 @@ window.MusicPlayer.initCardsDragAndDrop = function() {
                     try { dragData = JSON.parse(dragDataStr); } catch (err) {}
                 }
                 if (!dragData) dragData = window.MusicPlayer.activeDragData;
+                // Un aiguillage ne quitte pas la playlist qui le porte : il y
+                // désigne une position entre deux titres, et n'en a aucune ici.
+                if (window.MusicPlayer.transitionLeavingHome(dragData, 'queue')) return;
 
                 const logMsg = `[DragDrop QueueCard] Drop received on the pending queue card. Track: "${dragData ? dragData.title : 'unknown'}"`;
                 console.log(logMsg);
@@ -427,6 +433,9 @@ window.MusicPlayer.updateQueueUI = function() {
                     try { dragData = JSON.parse(dragDataStr); } catch (err) {}
                 }
                 if (!dragData) dragData = window.MusicPlayer.activeDragData;
+                // Un aiguillage ne quitte pas la playlist qui le porte : il y
+                // désigne une position entre deux titres, et n'en a aucune ici.
+                if (window.MusicPlayer.transitionLeavingHome(dragData, 'queue')) return;
 
                 const logMsg = `[DragDrop Queue] Drop received on the pending queue. Track: "${dragData ? dragData.title : 'unknown'}" (source: ${dragData ? dragData.source : 'none'})`;
                 console.log(logMsg);

@@ -30,6 +30,7 @@ module.exports = {
     memoryStream: systemHandlers.handleMemoryStream,
     moveOrInsertTrack: queueHandlers.handleMoveOrInsertTrack,
     movePlaylistTrack: playlistHandlers.handleMovePlaylistTrack,
+    insertTransition: playlistHandlers.handleInsertTransition,
     pause: playbackHandlers.handlePause,
     play: playbackHandlers.handlePlay,
     playNow: queueHandlers.handlePlayNow,

@@ -51,6 +51,12 @@ window.MusicPlayer.handleTrackDropOnPlaylist = function(playlistId, dragData, ta
 
     if (!dragData) return;
 
+    // Un aiguillage ne se déplace que dans la playlist qui le porte : ailleurs,
+    // il désignerait une position entre deux titres qui ne le concernent pas.
+    // Le refus se fait ici, au dépôt, et non au départ — un `dragstart` bloqué
+    // interdirait aussi le déplacement légitime, à l'intérieur de sa liste.
+    if (window.MusicPlayer.transitionLeavingHome(dragData, playlistId)) return;
+
     if (dragData.source === 'nowplaying') {
         if (state.currentTrack && (areUrlsEqual(state.currentTrack.url, dragData.url) || !dragData.url)) {
             trackInfo = state.currentTrack;
@@ -606,9 +612,15 @@ window.MusicPlayer.updatePlaylistsUI = function() {
 
         if (playlist.tracks && playlist.tracks.length > 0) {
             playlist.tracks.forEach((track, index) => {
+                if (window.MusicPlayer.isTransition(track)) {
+                    tracksListDiv.appendChild(
+                        window.MusicPlayer.buildTransitionRow(track, playlist, index));
+                    return;
+                }
+
                 const item = document.createElement('div');
                 item.className = 'playlist-track-item';
-                
+
                 const fillBar = document.createElement('div');
                 fillBar.className = 'preload-fill-bar';
                 fillBar.style.width = '100%';
@@ -625,7 +637,7 @@ window.MusicPlayer.updatePlaylistsUI = function() {
                 window.MusicPlayer.attachQualityMenu(item, () => {
                     const pl = (window.MusicPlayer.state.playlists || []).find(p => p.id === playlist.id);
                     return pl && (pl.tracks || [])[index];
-                });
+                }, () => ({ container: playlist.id, index }));
 
                 const isCurrentPlayingSource = state.activePlaybackSource === playlist.id && state.playlistCurrentIndex === index;
                 if (isCurrentPlayingSource) {

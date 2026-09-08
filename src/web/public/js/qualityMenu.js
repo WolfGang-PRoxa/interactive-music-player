@@ -143,6 +143,17 @@ let menuEl = null;
 let submenuEl = null;
 /** URL de la piste ouverte : sert à retrouver son état frais à chaque diffusion. */
 let openedUrl = null;
+
+/**
+ * D'où vient la ligne sur laquelle on a fait un clic droit.
+ *
+ * `{ container, index }` — `container` vaut `queue` ou l'identifiant d'une
+ * playlist. La piste seule ne suffirait pas : le même morceau peut figurer dans
+ * trois playlists et dans la file, et un aiguillage se pose à un endroit, pas
+ * sur un titre. `null` pour l'historique et la fenêtre vidéo, où rien ne
+ * s'insère.
+ */
+let openedContext = null;
 /** 'audio' | 'video' | 'loudness' | null — sous-menu actuellement déplié. */
 let submenuOpen = null;
 
@@ -344,6 +355,159 @@ function buildButton(type, displayedValue, isReal) {
  */
 function sourceIsLink(track) {
     return /^[a-z][a-z0-9+.-]*:\/\//i.test(track?.url || '');
+}
+
+/** Aiguillage : deux voies qui divergent. */
+const ICON_TRANSITION = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+    + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M4 20 L4 12 Q4 8 8 8 L20 8"></path>'
+    + '<polyline points="16 4 20 8 16 12"></polyline>'
+    + '<path d="M4 12 L4 8"></path></svg>';
+
+/**
+ * Construit le bouton qui ouvre le choix d'un aiguillage.
+ *
+ * @returns {HTMLElement}
+ */
+function buildTransitionButton() {
+    const btn = document.createElement('button');
+    btn.className = 'quality-menu-item';
+    btn.dataset.qualityType = 'transition';
+
+    const icon = document.createElement('span');
+    icon.className = 'quality-menu-icon';
+    icon.innerHTML = ICON_TRANSITION;
+
+    const label = document.createElement('span');
+    label.className = 'quality-menu-label';
+    label.textContent = t('transition_menu_label', 'Insérer une transition');
+
+    const chevron = document.createElement('span');
+    chevron.className = 'quality-menu-arrow';
+    chevron.innerHTML = ICON_CHEVRON;
+
+    btn.appendChild(icon);
+    btn.appendChild(label);
+    btn.appendChild(chevron);
+
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleSubmenu('transition', btn);
+    });
+
+    return btn;
+}
+
+/**
+ * Le panneau de création d'un aiguillage : où l'on va, puis de quel côté.
+ *
+ * Deux gestes, et dans cet ordre. La destination d'abord, parce qu'un
+ * aiguillage sans elle ne veut rien dire ; le côté ensuite, par deux boutons
+ * plutôt qu'une liste — il n'y a que deux réponses, et les faire choisir dans
+ * un menu déroulant coûterait un clic de plus pour rien.
+ *
+ * Les deux boutons restent éteints tant qu'aucune destination n'est retenue :
+ * c'est ce qui dit, sans phrase, qu'il manque quelque chose.
+ *
+ * @returns {HTMLElement}
+ */
+function buildTransitionPanel() {
+    const panel = document.createElement('div');
+    panel.className = 'quality-submenu glass-card transition-panel';
+    panel.addEventListener('click', (e) => e.stopPropagation());
+    panel.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    const state = window.MusicPlayer.state || {};
+    const context = openedContext;
+
+    // Sa propre liste est exclue : un aiguillage vers l'endroit où l'on se
+    // trouve déjà ne mènerait nulle part.
+    const cibles = [];
+    if (context.container !== 'queue') {
+        cibles.push({ id: 'queue', name: t('transition_target_queue', 'File d\'attente') });
+    }
+    for (const p of state.playlists || []) {
+        if (!p || p.id === context.container) continue;
+        cibles.push({ id: p.id, name: p.name || '' });
+    }
+
+    if (cibles.length === 0) {
+        const vide = document.createElement('div');
+        vide.className = 'quality-submenu-pending';
+        vide.textContent = t('transition_no_target', 'Aucune autre source où aller.');
+        panel.appendChild(vide);
+        return panel;
+    }
+
+    const titre = document.createElement('div');
+    titre.className = 'transition-panel-title';
+    titre.textContent = t('transition_target_label', 'Aller vers');
+    panel.appendChild(titre);
+
+    const liste = document.createElement('div');
+    liste.className = 'transition-target-list';
+    panel.appendChild(liste);
+
+    let retenue = null;
+    const boutons = [];
+
+    for (const cible of cibles) {
+        const opt = document.createElement('button');
+        opt.className = 'quality-submenu-item';
+        opt.dataset.targetId = cible.id;
+
+        const check = document.createElement('span');
+        check.className = 'quality-submenu-check';
+        check.innerHTML = ICON_CHECK;
+
+        const nom = document.createElement('span');
+        nom.className = 'quality-submenu-text';
+        nom.textContent = cible.name;
+
+        opt.appendChild(check);
+        opt.appendChild(nom);
+        opt.addEventListener('click', (e) => {
+            e.stopPropagation();
+            retenue = cible.id;
+            for (const b of boutons) b.classList.toggle('is-current', b === opt);
+            panel.classList.add('has-target');
+        });
+
+        boutons.push(opt);
+        liste.appendChild(opt);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'transition-actions';
+
+    const poser = (avant) => {
+        if (!retenue) return;
+        window.MusicPlayer.sendWS({
+            type: 'insertTransition',
+            data: {
+                container: context.container,
+                // L'aiguillage se range devant la ligne cliquée, ou juste
+                // derrière : c'est la seule différence entre les deux boutons.
+                index: avant ? context.index : context.index + 1,
+                target: retenue,
+            },
+        });
+        closeFloating();
+    };
+
+    for (const [cle, defaut, avant] of [
+        ['transition_insert_before', 'Avant', true],
+        ['transition_insert_after', 'Après', false],
+    ]) {
+        const btn = document.createElement('button');
+        btn.className = 'transition-action';
+        btn.textContent = t(cle, defaut);
+        btn.addEventListener('click', (e) => { e.stopPropagation(); poser(avant); });
+        actions.appendChild(btn);
+    }
+
+    panel.appendChild(actions);
+    return panel;
 }
 
 /**
@@ -851,6 +1015,14 @@ function toggleSubmenu(type, btn) {
     const track = findTrack(openedUrl);
     if (!track) return;
 
+    if (type === 'transition') {
+        submenuEl = buildTransitionPanel();
+        menuContainer().appendChild(submenuEl);
+        raiseToFront(submenuEl);
+        positionSubmenu(btn);
+        return;
+    }
+
     if (type === 'loudness') {
         submenuEl = buildLoudnessPanel(track);
         menuContainer().appendChild(submenuEl);
@@ -1090,6 +1262,12 @@ function renderMenu(force) {
     // traversé aucune normalisation de plateforme.
     menuEl.appendChild(buildLoudnessButton(track));
 
+    // L'aiguillage se pose entre deux titres d'une liste rangée : la file
+    // d'attente et les playlists. L'historique n'en accueille pas — on ne
+    // bascule pas la lecture vers ce qui est déjà joué —, ni la fenêtre vidéo,
+    // qui ne désigne aucune position.
+    if (openedContext) menuEl.appendChild(buildTransitionButton());
+
     if (track.isLocal) return;
 
     const realAudio = !!track.cachedAudioQuality;
@@ -1123,11 +1301,12 @@ function renderMenu(force) {
  * @param {object} track
  * @returns {boolean} false si la piste n'est pas exploitable
  */
-function openMenu(track) {
+function openMenu(track, context) {
     if (!track || !track.url) return false;
     window.MusicPlayer.hideTrackQualityMenu();
 
     openedUrl = track.url;
+    openedContext = context || null;
     menuEl = document.createElement('div');
     menuEl.className = 'quality-menu glass-card';
     // Un clic à l'intérieur ne doit pas déclencher la fermeture globale
@@ -1154,12 +1333,12 @@ function placeMenu(left, top) {
  * @param {MouseEvent} e - Événement contextmenu, pour le positionnement
  * @param {object} track - Piste telle que reçue dans l'état
  */
-window.MusicPlayer.showTrackQualityMenu = function(e, track) {
+window.MusicPlayer.showTrackQualityMenu = function(e, track, context) {
     if (!track || !track.url) return;
     e.preventDefault();
     e.stopPropagation();
 
-    if (openMenu(track)) placeMenu(e.clientX, e.clientY);
+    if (openMenu(track, context)) placeMenu(e.clientX, e.clientY);
 };
 
 /**
@@ -1212,6 +1391,7 @@ window.MusicPlayer.hideTrackQualityMenu = function() {
         menuEl = null;
     }
     openedUrl = null;
+    openedContext = null;
 };
 
 /**
@@ -1460,11 +1640,15 @@ window.MusicPlayer.refreshLoudnessPanel = function (track) {
 };
 
 
-window.MusicPlayer.attachQualityMenu = function(item, resolveTrack) {
+window.MusicPlayer.attachQualityMenu = function(item, resolveTrack, resolveContext) {
     if (!item) return;
     item.addEventListener('contextmenu', (e) => {
         const track = typeof resolveTrack === 'function' ? resolveTrack() : null;
-        if (track) window.MusicPlayer.showTrackQualityMenu(e, track);
+        // Relu au clic droit, et non retenu à l'accrochage : la ligne garde son
+        // gestionnaire pendant que la liste bouge sous elle, et un indice figé
+        // finirait par désigner le voisin.
+        const context = typeof resolveContext === 'function' ? resolveContext() : null;
+        if (track) window.MusicPlayer.showTrackQualityMenu(e, track, context);
     });
 };
 

@@ -160,6 +160,50 @@ async function handleMovePlaylistTrack(ctx) {
         webServer.broadcastState(currentGuildId);
 }
 
+/**
+ * Pose un aiguillage dans une playlist, avant ou après une ligne.
+ *
+ * La file d'attente n'en accueille pas encore : elle n'a pas de forme rangée où
+ * l'inscrire — ses titres vivent dans le lecteur, et n'y sont recopiés que le
+ * temps qu'une playlist lui prenne la place. La demande est donc refusée plutôt
+ * qu'à moitié honorée.
+ *
+ * @param {object} ctx
+ */
+async function handleInsertTransition(ctx) {
+    const { data, webServer, currentGuildId } = ctx;
+    const { container, index, target } = data || {};
+
+    if (!container || !target || typeof index !== 'number') return;
+    if (container === target) return;   // un aiguillage sur place ne mène nulle part
+
+    if (!String(container).startsWith('playlist_')) {
+        webServer._sendError('Les transitions ne se posent pour l\'instant que dans les playlists.');
+        return;
+    }
+
+    // Une destination qui n'existe pas : la poser mènerait à un aiguillage
+    // qu'on ne pourrait que consommer sans effet, le jour où on l'atteindrait.
+    if (target !== 'queue' && !(database.getGlobalPlaylists() || []).some(p => p.id === target)) {
+        return;
+    }
+
+    const marker = database.insertPlaylistTransition(container, index, target);
+    if (!marker) return;
+
+    const settings = database.getSettings(currentGuildId);
+    // La playlist qui joue vient de changer sous le lecteur : il a reçu ses
+    // titres jusqu'à l'ancien premier aiguillage, et il en existe peut-être un
+    // plus tôt désormais. On la lui redonne, sans le couper — `forceRestart`
+    // resterait faux, la piste en cours étant la même.
+    if (settings.activePlaybackSource === container) {
+        await webServer._syncPlaylistToPlayer(currentGuildId, container,
+            settings.playlistCurrentIndex || 0);
+    }
+
+    webServer.broadcastState(currentGuildId);
+}
+
 async function handleSetActivePlaybackSource(ctx) {
     const { data, webServer, player, currentGuildId } = ctx;
     let queue = ctx.queue;
@@ -270,5 +314,6 @@ module.exports = {
     handleAddTrackToPlaylist,
     handleRemoveTrackFromPlaylist,
     handleMovePlaylistTrack,
+    handleInsertTransition,
     handleSetActivePlaybackSource,
 };

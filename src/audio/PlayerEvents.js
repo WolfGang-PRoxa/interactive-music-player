@@ -333,6 +333,11 @@ function registerPlayerEvents(player, client) {
         // Playlist en boucle : la file vide signe la fin de la playlist, pas
         // la fin de la lecture. On la recharge depuis son premier titre avant
         // de démonter le ducking et la connexion vocale.
+        // Un aiguillage posé dans la playlist : la lecture continue ailleurs.
+        // Avant les deux suivantes — une playlist qui s'aiguille n'est ni une
+        // playlist qui reboucle, ni une playlist terminée.
+        if (webServer.consumeTransition(queue.guild.id)) return;
+
         if (webServer.restartLoopedPlaylist(queue.guild.id)) return;
 
         // Playlist achevée sans bouclage : ce que la file d'attente gardait de

@@ -507,5 +507,15 @@
     "perm_denied_tooltip": "Permiso no concedido por el maestro de la sesión",
     "perm_master_only_tooltip": "Reservado al maestro de la sesión",
     "perm_denied_toast": "El maestro de la sesión no le ha concedido este permiso.",
-    "perm_revoked_toast": "Se le ha retirado el acceso al reproductor."
+    "perm_revoked_toast": "Se le ha retirado el acceso al reproductor.",
+    "transition_menu_label": "Insertar una transición",
+    "transition_target_label": "Ir a",
+    "transition_target_queue": "Cola de espera",
+    "transition_target_gone": "Destino eliminado",
+    "transition_no_target": "No hay otra fuente a la que ir.",
+    "transition_insert_before": "Antes",
+    "transition_insert_after": "Después",
+    "transition_row_label": "Transición a",
+    "transition_row_tooltip": "La reproducción cambia aquí a esa fuente, y luego esta fila desaparece.",
+    "transition_remove": "Quitar esta transición"
 }

@@ -507,5 +507,15 @@
     "perm_denied_tooltip": "Not granted by the session master",
     "perm_master_only_tooltip": "Session master only",
     "perm_denied_toast": "The session master has not granted you this right.",
-    "perm_revoked_toast": "Your access to the player has been revoked."
+    "perm_revoked_toast": "Your access to the player has been revoked.",
+    "transition_menu_label": "Insert a transition",
+    "transition_target_label": "Go to",
+    "transition_target_queue": "Pending queue",
+    "transition_target_gone": "Destination deleted",
+    "transition_no_target": "No other source to go to.",
+    "transition_insert_before": "Before",
+    "transition_insert_after": "After",
+    "transition_row_label": "Transition to",
+    "transition_row_tooltip": "Playback switches to that source here, then this row disappears.",
+    "transition_remove": "Remove this transition"
 }

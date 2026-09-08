@@ -672,6 +672,58 @@ class GuildDatabase {
         }
     }
 
+    /**
+     * Insère un aiguillage dans une playlist.
+     *
+     * Une méthode à part parce qu'`addTrackToPlaylist` recopie champ par champ
+     * ce qu'elle sait d'une piste : passée par elle, une transition perdrait
+     * en chemin sa cible et son drapeau, et se rangerait dans la playlist comme
+     * un morceau sans titre ni adresse.
+     *
+     * @param {string} playlistId
+     * @param {number} index - Position d'insertion ; en fin de liste au-delà.
+     * @param {string} target - `queue`, ou l'identifiant d'une playlist.
+     * @returns {object|null} La transition posée.
+     */
+    insertPlaylistTransition(playlistId, index, target) {
+        const playlist = this.globalData.playlists.find(p => p.id === playlistId);
+        if (!playlist) return null;
+
+        const transitions = require('../audio/transitions');
+        const marker = transitions.create(target);
+
+        if (!Array.isArray(playlist.tracks)) playlist.tracks = [];
+        const at = (typeof index === 'number' && index >= 0 && index <= playlist.tracks.length)
+            ? index
+            : playlist.tracks.length;
+
+        playlist.tracks.splice(at, 0, marker);
+        this._save();
+        return marker;
+    }
+
+    /**
+     * Retire un aiguillage, désigné par son identifiant.
+     *
+     * Par l'identifiant et non par l'indice : une transition est consommée
+     * depuis le moteur de lecture, à un moment où la liste a pu bouger sous
+     * elle — un titre ajouté, un autre supprimé depuis le tableau de bord.
+     *
+     * @returns {boolean} true si elle était encore là.
+     */
+    removePlaylistTransition(playlistId, transitionId) {
+        const playlist = this.globalData.playlists.find(p => p.id === playlistId);
+        if (!playlist || !Array.isArray(playlist.tracks)) return false;
+
+        const at = playlist.tracks.findIndex(t => t && t.id === transitionId
+            && require('../audio/transitions').isTransition(t));
+        if (at === -1) return false;
+
+        playlist.tracks.splice(at, 1);
+        this._save();
+        return true;
+    }
+
     removeTrackFromPlaylist(_guildId, playlistId, index) {
         const playlist = this.globalData.playlists.find(p => p.id === playlistId);
         if (playlist && index >= 0 && index < playlist.tracks.length) {

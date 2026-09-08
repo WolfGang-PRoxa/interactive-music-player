@@ -507,5 +507,15 @@
     "perm_denied_tooltip": "Droit non accordé par le maître de la session",
     "perm_master_only_tooltip": "Réservé au maître de la session",
     "perm_denied_toast": "Le maître de la session ne vous a pas accordé ce droit.",
-    "perm_revoked_toast": "Votre accès au lecteur a été retiré."
+    "perm_revoked_toast": "Votre accès au lecteur a été retiré.",
+    "transition_menu_label": "Insérer une transition",
+    "transition_target_label": "Aller vers",
+    "transition_target_queue": "File d'attente",
+    "transition_target_gone": "Destination supprimée",
+    "transition_no_target": "Aucune autre source où aller.",
+    "transition_insert_before": "Avant",
+    "transition_insert_after": "Après",
+    "transition_row_label": "Transition vers",
+    "transition_row_tooltip": "La lecture bascule ici vers cette source, puis cette ligne disparaît.",
+    "transition_remove": "Retirer cette transition"
 }

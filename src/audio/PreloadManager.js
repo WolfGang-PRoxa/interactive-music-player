@@ -1232,7 +1232,19 @@ class PreloadManager {
             }
         }
 
-        return targets;
+        /*
+         * Les aiguillages ne se préchargent pas.
+         *
+         * Ils voyagent dans les playlists comme des éléments ordinaires, et
+         * c'est ce qui leur permet de se déplacer et de se supprimer comme les
+         * titres. Mais ils ne désignent aucun flux : les laisser passer ici
+         * lancerait un ffmpeg sur une adresse `transition:` à chaque
+         * recalcul des cibles, pour un échec chaque fois.
+         *
+         * Filtré une fois en sortie plutôt qu'à chacune des trois provenances :
+         * une quatrième oublierait le filtre.
+         */
+        return require('./transitions').withoutTransitions(targets);
     }
 
     /**

@@ -19,6 +19,7 @@ const { foldVirtualElapsed } = require('../audio/PlaybackSession');
 const auth = require('./auth');
 const { arePathsOrUrlsEqual } = require('../utils/paths');
 const { readSetAsideQueue } = require('../utils/setAsideQueue');
+const transitions = require('../audio/transitions');
 const { formatMs, parseDurationToMs } = require('../utils/duration');
 const artwork = require('../utils/artwork');
 const log = require('../utils/logger');
@@ -1419,7 +1420,21 @@ class WebServer {
 
         const settings = database.getSettings(guildId);
         const isPersonal = settings.broadcastMode === 'personal';
-        const tracks = playlist.tracks || [];
+
+        /*
+         * Le lecteur ne reçoit la playlist que jusqu'à son premier aiguillage.
+         *
+         * Rien au-delà, et c'est ce qui fait tenir la fonctionnalité : il tombe
+         * en panne sèche exactement sur la transition, et le chemin qui traite
+         * déjà les fins de playlist décide alors de la suite. Lui laisser la
+         * liste entière obligerait à l'arrêter en vol, entre l'annonce de fin
+         * d'un titre et l'attaque du suivant — course qu'on ne gagnerait pas
+         * toujours. Voir `transitions`.
+         *
+         * La liste rendue commence au titre demandé : les indices qui suivent
+         * sont donc relatifs à elle, et non plus à la playlist rangée.
+         */
+        const tracks = transitions.upTo(playlist.tracks || [], startIndex).tracks;
 
         if (isPersonal) {
             if (tracks.length === 0) {
@@ -1429,11 +1444,11 @@ class WebServer {
                 queue.virtualIsPaused = false;
                 queue.virtualProgressMs = 0;
             } else {
-                const targetTrack = tracks[startIndex] || null;
+                const targetTrack = tracks[0] || null;
                 const isSameTrack = !forceRestart && queue.virtualCurrentTrack && targetTrack && arePathsOrUrlsEqual(queue.virtualCurrentTrack.url, targetTrack.url);
 
                 if (isSameTrack) {
-                    queue.virtualTracks = tracks.slice(startIndex + 1).map(t => ({
+                    queue.virtualTracks = tracks.slice(1).map(t => ({
                         title: t.title,
                         author: t.author || 'Inconnu',
                         duration: t.duration || '0:00',
@@ -1454,7 +1469,7 @@ class WebServer {
                         raw: {},
                         extractorName: targetTrack.extractorName || null
                     } : null;
-                    queue.virtualTracks = tracks.slice(startIndex + 1).map(t => ({
+                    queue.virtualTracks = tracks.slice(1).map(t => ({
                         title: t.title,
                         author: t.author || 'Inconnu',
                         duration: t.duration || '0:00',
@@ -1471,13 +1486,13 @@ class WebServer {
                 }
             }
         } else {
-            const targetTrackData = tracks[startIndex];
+            const targetTrackData = tracks[0];
             const hasCurrentTrack = queue.currentTrack;
             const isSameTrack = !forceRestart && hasCurrentTrack && targetTrackData && arePathsOrUrlsEqual(hasCurrentTrack.url, targetTrackData.url);
 
             if (isSameTrack) {
                 queue.tracks.clear();
-                const subsequentTracksData = tracks.slice(startIndex + 1);
+                const subsequentTracksData = tracks.slice(1);
                 if (subsequentTracksData.length > 0) {
                     const resolvedSubsequent = subsequentTracksData.map(t => {
                         const track = new Track(player, {
@@ -1515,7 +1530,7 @@ class WebServer {
                         return track;
                     });
 
-                    const targetTrack = resolvedTracks[startIndex];
+                    const targetTrack = resolvedTracks[0];
 
                     // Lecture figée : aucun lecteur où lancer la piste. Elle est
                     // posée comme piste courante, et démarrera vraiment quand
@@ -1523,7 +1538,7 @@ class WebServer {
                     if (queue.session.isFrozen()) {
                         queue.__current = targetTrack;
                         queue.frozenPositionMs = 0;
-                        const rest = resolvedTracks.slice(startIndex + 1);
+                        const rest = resolvedTracks.slice(1);
                         if (rest.length > 0) queue.addTrack(rest);
                         this.broadcastState(guildId);
                         playbackStateManager.saveState(player);
@@ -1549,7 +1564,7 @@ class WebServer {
                         try { queue.node.setVolume(oldVol); } catch (e) {}
                     }, 100);
 
-                    const subsequent = resolvedTracks.slice(startIndex + 1);
+                    const subsequent = resolvedTracks.slice(1);
                     if (subsequent.length > 0) {
                         queue.addTrack(subsequent);
                     }
@@ -1795,6 +1810,11 @@ class WebServer {
                     }
                 }
             }
+        } else if (this.consumeTransition(guildId, startProgressMs)) {
+            // Un aiguillage attendait là : la lecture continue ailleurs. Avant
+            // les deux suivantes — une playlist qui s'aiguille n'est ni une
+            // playlist qui reboucle, ni une playlist terminée.
+            return;
         } else if (this.restartLoopedPlaylist(guildId, startProgressMs)) {
             // La playlist a été rechargée depuis son premier titre : rien à
             // arrêter, la lecture se poursuit.
@@ -1813,6 +1833,116 @@ class WebServer {
         this.broadcastState(guildId);
         const { useMainPlayer } = require('discord-player');
         playbackStateManager.saveState(useMainPlayer());
+    }
+
+    /**
+     * Bascule vers la destination d'un aiguillage, si la lecture vient d'en
+     * atteindre un.
+     *
+     * Appelée aux deux points d'épuisement — la file virtuelle du mode
+     * personnel et l'événement `emptyQueue` du mode commun — et **avant**
+     * `restartLoopedPlaylist` comme `advanceToQueue` : une playlist qui
+     * s'aiguille n'est ni une playlist qui reboucle, ni une playlist terminée.
+     * C'est cet ordre qui porte la règle.
+     *
+     * La transition est retirée avant la bascule, et non après. La bascule
+     * relit la playlist pour la nourrir au lecteur ; l'aiguillage encore en
+     * place s'y retrouverait, et une transition vers la playlist où l'on est
+     * déjà se redéclencherait aussitôt.
+     *
+     * @param {string} guildId
+     * @param {number} [_startProgressMs=0] - Reçu comme ses deux voisines, et
+     *   sans emploi ici : la destination repart de son début, et aucun
+     *   enchaînement mix n'a pu prendre d'avance puisque rien ne suivait la
+     *   transition dans ce que le lecteur avait reçu.
+     * @returns {boolean} true si un aiguillage a pris la main
+     */
+    consumeTransition(guildId, _startProgressMs = 0) {
+        const settings = database.getSettings(guildId);
+
+        const source = settings.activePlaybackSource;
+        if (!source || !source.startsWith('playlist_')) return false;
+
+        const playlist = (database.getGlobalPlaylists() || []).find(p => p.id === source);
+        if (!playlist) return false;
+
+        const found = transitions.nextAfter(playlist.tracks || [],
+            typeof settings.playlistCurrentIndex === 'number' ? settings.playlistCurrentIndex : 0);
+        if (!found) return false;
+
+        const { transition } = found;
+        const nom = transitions.targetName(transition, database.getGlobalPlaylists());
+        log.info(`[WebServer] Transition reached in « ${playlist.name} »: `
+            + `switching to ${transition.target === 'queue' ? 'the pending queue' : `« ${nom} »`}.`);
+
+        // Consommée : elle a servi, et ne doit pas se retrouver dans la liste
+        // que la bascule va relire.
+        database.removePlaylistTransition(source, transition.id);
+
+        /*
+         * Une destination vide n'annule pas l'aiguillage.
+         *
+         * Elle a bel et bien été atteinte, et la laisser en place la ferait se
+         * redéclencher indéfiniment. On la consomme donc, on le dit, et la
+         * lecture suit le cours qu'elle aurait eu sans elle — bouclage de la
+         * playlist, ou reprise de la file.
+         */
+        if (!this._transitionHasSomethingToPlay(guildId, transition, settings)) {
+            log.warn('[WebServer] The transition destination is empty or gone: '
+                + 'consumed all the same, playback carries on where it was.');
+            this.broadcastState(guildId);
+            return false;
+        }
+
+        this.applyPlaybackSource(guildId, transition.target)
+            .catch(err => log.error('[WebServer] Transition switch error:', err.message));
+
+        return true;
+    }
+
+    /**
+     * Bascule la lecture vers une source, par le chemin du tableau de bord.
+     *
+     * Le même code, et non une seconde version : cette bascule range la file
+     * d'attente de côté, distingue les deux modes de diffusion, et rattrape la
+     * piste qu'une playlist interrompt. En réécrire l'équivalent ici garantirait
+     * qu'un jour l'un des deux sache faire ce que l'autre ne sait plus — ce que
+     * ce dépôt a déjà payé quatre fois avec le choix des flux.
+     *
+     * @param {string} guildId
+     * @param {string} source - `queue`, ou l'identifiant d'une playlist.
+     * @param {number} [index=0]
+     */
+    async applyPlaybackSource(guildId, source, index = 0) {
+        const { useMainPlayer } = require('discord-player');
+        const player = useMainPlayer();
+        const { handleSetActivePlaybackSource } = require('./websocket/handlers/playlistHandlers');
+
+        await handleSetActivePlaybackSource({
+            data: { source, index },
+            webServer: this,
+            player,
+            queue: player.queues.get(guildId) || null,
+            currentGuildId: guildId,
+        });
+    }
+
+    /**
+     * La destination d'un aiguillage a-t-elle de quoi jouer ?
+     *
+     * Une playlist supprimée entre-temps, ou vidée de ses titres, ne peut pas
+     * prendre la main : basculer dessus laisserait un silence que rien
+     * n'expliquerait.
+     *
+     * @returns {boolean}
+     */
+    _transitionHasSomethingToPlay(guildId, transition, settings) {
+        if (transition.target === 'queue') {
+            return readSetAsideQueue(settings).length > 0;
+        }
+        const cible = (database.getGlobalPlaylists() || []).find(p => p.id === transition.target);
+        if (!cible) return false;
+        return transitions.withoutTransitions(cible.tracks).length > 0;
     }
 
     /**

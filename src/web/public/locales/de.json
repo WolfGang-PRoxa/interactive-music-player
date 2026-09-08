@@ -507,5 +507,15 @@
     "perm_denied_tooltip": "Vom Sitzungsleiter nicht gewährt",
     "perm_master_only_tooltip": "Nur für den Sitzungsleiter",
     "perm_denied_toast": "Der Sitzungsleiter hat Ihnen dieses Recht nicht gewährt.",
-    "perm_revoked_toast": "Ihr Zugang zum Player wurde entzogen."
+    "perm_revoked_toast": "Ihr Zugang zum Player wurde entzogen.",
+    "transition_menu_label": "Übergang einfügen",
+    "transition_target_label": "Wechseln zu",
+    "transition_target_queue": "Warteschlange",
+    "transition_target_gone": "Ziel gelöscht",
+    "transition_no_target": "Keine andere Quelle verfügbar.",
+    "transition_insert_before": "Davor",
+    "transition_insert_after": "Danach",
+    "transition_row_label": "Übergang zu",
+    "transition_row_tooltip": "Die Wiedergabe wechselt hier zu dieser Quelle, danach verschwindet diese Zeile.",
+    "transition_remove": "Diesen Übergang entfernen"
 }
