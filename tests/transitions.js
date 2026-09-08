@@ -702,6 +702,86 @@ console.log('\nVers quoi le mix croise quand un aiguillage suit\n');
     }
 }
 
+// ───────────────────── La place déjà jouée ─────────────────────
+
+console.log('\nCe que le fondu a déjà entamé de la destination\n');
+
+{
+    const SERVER = fs.readFileSync(path.join(ROOT, 'src', 'web', 'WebServer.js'), 'utf8');
+    const HANDLER = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'websocket', 'handlers', 'playlistHandlers.js'), 'utf8');
+
+    /*
+     * Le titre de destination joue déjà quand l'aiguillage se consomme.
+     *
+     * On pourrait croire le contraire : le lecteur n'a rien reçu au-delà de
+     * l'aiguillage, donc rien n'a pu prendre d'avance. Mais c'est le navigateur
+     * qui enchaîne, et il sait franchir un aiguillage pour deviner ce qui vient
+     * après. Quand il annonce la fin du fondu, il joue ce titre depuis
+     * plusieurs secondes — lui répondre zéro le fait repartir du début sous
+     * l'oreille de l'auditeur.
+     */
+    check('la position atteinte traverse la consommation',
+        /consumeTransition\(guildId, startProgressMs = 0\)/.test(SERVER)
+        && /applyPlaybackSource\(guildId, transition\.target, 0, startProgressMs\)/.test(SERVER),
+        'sinon le titre entrant repart de zéro à la fin du fondu');
+
+    check('  … et la bascule sait quoi en faire',
+        /const startProgressMs = Number\(data\.startProgressMs\) \|\| 0;/.test(HANDLER)
+        && /queue\.virtualProgressMs = startProgressMs;/.test(HANDLER)
+        && /_syncPlaylistToPlayer\(currentGuildId, source, targetIndex, true,\s*\n\s*startProgressMs\)/
+            .test(HANDLER),
+        'vers la file comme vers une playlist');
+
+    /*
+     * La bascule ne range plus la file.
+     *
+     * Elle la recopiait depuis le lecteur avant qu'une playlist ne lui prenne
+     * la place. Or le lecteur ne porte rien au-delà du premier aiguillage, et
+     * il est tout à fait vide quand c'est un aiguillage de la file qui provoque
+     * la bascule : la recopie effaçait alors les titres placés après lui.
+     */
+    check('la bascule ne réécrit plus la file depuis le lecteur',
+        !/writeSetAsideQueue\(currentGuildId, rest\.map\(toData\), settings\);/.test(HANDLER),
+        'le lecteur vide effaçait les titres placés après l\'aiguillage');
+    check('  … le rangement faisant foi de lui-même',
+        /Rien n'est rangé ici/.test(HANDLER));
+}
+
+{
+    // De bout en bout : un aiguillage au milieu d'une file, et ce qui le suit
+    // doit survivre à la bascule qu'il déclenche.
+    const channelQueue = require(path.join(ROOT, 'src', 'audio', 'channelQueue.js'));
+    const G = 'guilde_fondu';
+
+    database.setLastVoiceChannel(G, 'salon');
+    database.updateSettings(G, { activePlaybackSource: 'queue', broadcastMode: 'personal' });
+
+    const cible = database.createPlaylist(G, 'Destination');
+    database.addTrackToPlaylist(G, cible.id, piste('D1'));
+
+    channelQueue.write(G, [piste('A'), transitions.create(cible.id), piste('B')],
+        database.getSettings(G));
+
+    check('le lecteur ne reçoit que ce qui précède l\'aiguillage',
+        channelQueue.playable(database.getSettings(G)).map(t => t.title).join(',') === 'A');
+
+    // A s'achève : le miroir enregistre un lecteur vide, la queue est gardée.
+    channelQueue.mirror(G, [], database.getSettings(G));
+    const [tete] = channelQueue.read(database.getSettings(G));
+    check('l\'aiguillage se retrouve en tête une fois A joué',
+        transitions.isTransition(tete));
+
+    // Consommé, puis la bascule — qui n'écrit plus rien.
+    channelQueue.write(G,
+        channelQueue.read(database.getSettings(G)).filter(t => t.id !== tete.id),
+        database.getSettings(G));
+
+    check('  … et ce qui le suivait survit à la bascule',
+        channelQueue.read(database.getSettings(G)).map(t => t.title).join(',') === 'B',
+        'le retour à la file doit y retrouver ses titres');
+}
+
 // ───────────────────── Les traductions ─────────────────────
 
 console.log('\nCe que les quatre langues doivent dire\n');

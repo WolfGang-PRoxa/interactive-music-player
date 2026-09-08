@@ -263,6 +263,17 @@ async function handleSetActivePlaybackSource(ctx) {
     let queue = ctx.queue;
 
         const { source, index } = data;
+
+        /*
+         * Position déjà atteinte dans le premier titre de la nouvelle source.
+         *
+         * Nulle quand un utilisateur bascule depuis le tableau de bord — il
+         * demande un début. Non nulle quand un aiguillage a déclenché la
+         * bascule pendant un enchaînement mix : le navigateur joue déjà ce
+         * titre depuis plusieurs secondes, et lui répondre zéro le ferait
+         * repartir du début sous l'oreille de l'auditeur.
+         */
+        const startProgressMs = Number(data.startProgressMs) || 0;
         const settings = database.getSettings(currentGuildId);
         const oldSource = settings.activePlaybackSource || 'queue';
         const targetIndex = typeof index === 'number' ? index : 0;
@@ -289,15 +300,26 @@ async function handleSetActivePlaybackSource(ctx) {
         // si la nouvelle source a réellement pris la main.
         const trackBefore = currentTrackOf();
 
-        if (oldSource === 'queue') {
-            // La piste en cours n'entre pas dans la file mise de côté : elle
-            // poursuit sa lecture par-dessus le changement de source, et l'y
-            // ranger la ferait apparaître deux fois — une fois comme morceau
-            // joué, une fois comme titre en attente. Elle n'y rejoindra sa
-            // place que si la nouvelle source l'interrompt (voir plus bas).
-            const rest = isPersonal ? (queue?.virtualTracks || []) : (queue ? queue.tracks.toArray() : []);
-            writeSetAsideQueue(currentGuildId, rest.map(toData), settings);
-        }
+        /*
+         * Rien n'est rangé ici, et c'est un changement.
+         *
+         * Ce bloc recopiait la file du lecteur dans les réglages avant qu'une
+         * playlist ne lui prenne la place. Elle y est désormais rangée en
+         * permanence, salon par salon, et remise à jour à chaque diffusion
+         * d'état — donc après chaque geste qui la touche. À cet instant, le
+         * rangement dit déjà exactement ce qu'il faut.
+         *
+         * Le réécrire depuis le lecteur ne pourrait que perdre : celui-ci ne
+         * reçoit rien au-delà du premier aiguillage, et il est même tout à fait
+         * vide quand c'est un aiguillage de la file qui provoque cette
+         * bascule — ce qui effaçait les titres placés après lui.
+         *
+         * La piste en cours n'entre pas non plus dans ce rangement, et n'y
+         * entrait pas davantage avant : elle poursuit sa lecture par-dessus le
+         * changement de source, et l'y ranger la ferait apparaître deux fois.
+         * Elle n'y rejoindra sa place que si la nouvelle source l'interrompt
+         * (voir plus bas).
+         */
 
         database.updateSettings(currentGuildId, {
             activePlaybackSource: source,
@@ -314,7 +336,7 @@ async function handleSetActivePlaybackSource(ctx) {
                     const [first, ...rest] = setAside;
                     queue.virtualCurrentTrack = first;
                     queue.virtualTracks = rest;
-                    queue.virtualProgressMs = 0;
+                    queue.virtualProgressMs = startProgressMs;
                     queue.virtualIsPlaying = true;
                     queue.virtualIsPaused = false;
                     queue.virtualLastUpdated = Date.now();
@@ -334,7 +356,8 @@ async function handleSetActivePlaybackSource(ctx) {
                 }
             }
         } else {
-            await webServer._syncPlaylistToPlayer(currentGuildId, source, targetIndex, true);
+            await webServer._syncPlaylistToPlayer(currentGuildId, source, targetIndex, true,
+                startProgressMs);
 
             // La playlist n'interrompt pas toujours ce qui joue : le lecteur
             // range le titre demandé derrière le morceau en cours plutôt que de

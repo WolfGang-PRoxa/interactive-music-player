@@ -1951,13 +1951,19 @@ class WebServer {
      * déjà se redéclencherait aussitôt.
      *
      * @param {string} guildId
-     * @param {number} [_startProgressMs=0] - Reçu comme ses deux voisines, et
-     *   sans emploi ici : la destination repart de son début, et aucun
-     *   enchaînement mix n'a pu prendre d'avance puisque rien ne suivait la
-     *   transition dans ce que le lecteur avait reçu.
+     * @param {number} [startProgressMs=0] - Position déjà atteinte dans le
+     *   premier titre de la destination.
+     *
+     *   Elle n'est pas nulle, contrairement à ce qu'on pourrait croire du fait
+     *   que le lecteur n'a rien reçu au-delà de l'aiguillage. C'est le
+     *   navigateur qui enchaîne, et il sait franchir un aiguillage pour
+     *   deviner ce qui vient après (voir `nextTrackOf`) : quand il annonce la
+     *   fin du fondu, il joue déjà ce titre depuis plusieurs secondes. Lui
+     *   répondre zéro le ferait repartir du début sous l'oreille de
+     *   l'auditeur — ce qu'il faisait.
      * @returns {boolean} true si un aiguillage a pris la main
      */
-    consumeTransition(guildId, _startProgressMs = 0) {
+    consumeTransition(guildId, startProgressMs = 0) {
         const settings = database.getSettings(guildId);
         const source = settings.activePlaybackSource || 'queue';
 
@@ -2007,7 +2013,7 @@ class WebServer {
             return false;
         }
 
-        this.applyPlaybackSource(guildId, transition.target)
+        this.applyPlaybackSource(guildId, transition.target, 0, startProgressMs)
             .catch(err => log.error('[WebServer] Transition switch error:', err.message));
 
         return true;
@@ -2025,14 +2031,16 @@ class WebServer {
      * @param {string} guildId
      * @param {string} source - `queue`, ou l'identifiant d'une playlist.
      * @param {number} [index=0]
+     * @param {number} [startProgressMs=0] - Position déjà atteinte dans le
+     *   premier titre, quand un enchaînement l'a lancé en avance.
      */
-    async applyPlaybackSource(guildId, source, index = 0) {
+    async applyPlaybackSource(guildId, source, index = 0, startProgressMs = 0) {
         const { useMainPlayer } = require('discord-player');
         const player = useMainPlayer();
         const { handleSetActivePlaybackSource } = require('./websocket/handlers/playlistHandlers');
 
         await handleSetActivePlaybackSource({
-            data: { source, index },
+            data: { source, index, startProgressMs },
             webServer: this,
             player,
             queue: player.queues.get(guildId) || null,
