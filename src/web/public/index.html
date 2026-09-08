@@ -1616,11 +1616,20 @@
                         <div class="setting-item-label">
                             <span data-i18n="select_language">Choix de la langue du dashboard :</span>
                         </div>
+                        <!--
+                            `data-flag` plutôt qu'un émoji dans le libellé.
+                            Les drapeaux Unicode sont des paires d'indicateurs
+                            régionaux, que Windows ne sait pas dessiner : la
+                            liste y affichait « FR Français », « GB English ».
+                            Sur téléphone la même page montrait de vrais
+                            drapeaux, d'où l'écart. CustomSelect pose ici un
+                            dessin, qui ne dépend d'aucune police.
+                        -->
                         <select id="setting-language-select" class="styled-select header-select">
-                            <option value="fr" selected>🇫🇷 Français</option>
-                            <option value="en">🇬🇧 English</option>
-                            <option value="es">🇪🇸 Español</option>
-                            <option value="de">🇩🇪 Deutsch</option>
+                            <option value="fr" data-flag="fr" selected>Français</option>
+                            <option value="en" data-flag="gb">English</option>
+                            <option value="es" data-flag="es">Español</option>
+                            <option value="de" data-flag="de">Deutsch</option>
                         </select>
                     </div>
 

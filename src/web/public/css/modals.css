@@ -419,6 +419,35 @@
     justify-content: space-between;
 }
 
+/* ── Le drapeau d'une option, quand elle en déclare un ──
+ *
+ * Dessiné plutôt qu'écrit en émoji : un drapeau Unicode est une paire
+ * d'indicateurs régionaux que Windows ne sait pas rendre, et le menu de langue
+ * y affichait « FR Français ». Voir `buildFlag` dans js/customSelect.js.
+ *
+ * La ligne est en `space-between` — elle réserve sa droite à l'étoile du salon
+ * favori. La marge automatique sur le libellé ramène donc le drapeau et le
+ * texte l'un contre l'autre, à gauche, sans toucher à ce qui suit. */
+.custom-select-option .option-flag,
+.custom-select-trigger .option-flag {
+    flex: 0 0 auto;
+    display: flex;
+    margin-right: 0.55rem;
+}
+
+.custom-select-option .option-flag svg,
+.custom-select-trigger .option-flag svg {
+    width: 20px;
+    height: 14px;
+    display: block;
+    border-radius: 2px;
+}
+
+.custom-select-option .option-flag + .option-text,
+.custom-select-trigger .option-flag + span {
+    margin-right: auto;
+}
+
 .option-pin-btn {
     position: absolute;
     right: 8px;

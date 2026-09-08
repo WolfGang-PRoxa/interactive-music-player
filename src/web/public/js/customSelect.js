@@ -4,6 +4,68 @@
 
 window.MusicPlayer = window.MusicPlayer || {};
 
+/**
+ * Drapeaux dessinés, pour les options qui portent `data-flag`.
+ *
+ * ## Pourquoi pas les émojis
+ *
+ * Un drapeau Unicode est une paire d'indicateurs régionaux — « FR » écrit dans
+ * un alphabet à part —, que chaque système est libre de dessiner ou non.
+ * Windows ne le fait pas : sa police d'émojis n'embarque aucun drapeau, et le
+ * navigateur retombe alors sur les deux lettres. Le menu de langue y affichait
+ * donc « FR Français », « GB English », là où le même code montrait de vrais
+ * drapeaux sur téléphone.
+ *
+ * Un dessin ne dépend d'aucune police, et se voit partout de la même façon.
+ *
+ * ## Ce qui est dessiné, et ce qui ne l'est pas
+ *
+ * Le nécessaire pour reconnaître, pas pour blasonner : des bandes, une croix.
+ * Tous dans la même boîte de 20 × 14, faute de quoi les proportions réelles —
+ * du 2:3 français au 1:2 britannique — donneraient une colonne en dents de scie.
+ */
+const SELECT_FLAGS = {
+    fr: '<rect width="20" height="14" fill="#fff"/>'
+        + '<rect width="6.67" height="14" fill="#002654"/>'
+        + '<rect x="13.33" width="6.67" height="14" fill="#ED2939"/>',
+
+    de: '<rect width="20" height="14" fill="#DD0000"/>'
+        + '<rect width="20" height="4.67" fill="#000"/>'
+        + '<rect y="9.33" width="20" height="4.67" fill="#FFCE00"/>',
+
+    // La bande centrale vaut la moitié de la hauteur, les deux autres un quart.
+    es: '<rect width="20" height="14" fill="#AA151B"/>'
+        + '<rect y="3.5" width="20" height="7" fill="#F1BF00"/>',
+
+    // Les deux croix superposées : les diagonales d'abord, la droite par-dessus.
+    gb: '<rect width="20" height="14" fill="#012169"/>'
+        + '<path d="M0 0 20 14M20 0 0 14" stroke="#fff" stroke-width="2.8"/>'
+        + '<path d="M0 0 20 14M20 0 0 14" stroke="#C8102E" stroke-width="1.6"/>'
+        + '<path d="M10 0V14M0 7H20" stroke="#fff" stroke-width="4.6"/>'
+        + '<path d="M10 0V14M0 7H20" stroke="#C8102E" stroke-width="2.8"/>',
+};
+
+/**
+ * Le drapeau d'une option, s'il en déclare un.
+ *
+ * @param {HTMLOptionElement} option
+ * @returns {HTMLElement|null}
+ */
+function buildFlag(option) {
+    const code = option && option.dataset && option.dataset.flag;
+    if (!code || !SELECT_FLAGS[code]) return null;
+
+    const span = document.createElement('span');
+    span.className = 'option-flag';
+    // Le liseré évite qu'un drapeau clair — le jaune espagnol, l'or allemand —
+    // ne se fonde dans le fond du menu.
+    span.innerHTML = `<svg viewBox="0 0 20 14" role="img" aria-hidden="true">`
+        + SELECT_FLAGS[code]
+        + '<rect width="20" height="14" fill="none" stroke="rgba(0,0,0,0.35)" stroke-width="1"/>'
+        + '</svg>';
+    return span;
+}
+
 class CustomSelect {
     constructor(nativeSelect) {
         this.nativeSelect = nativeSelect;
@@ -123,6 +185,7 @@ class CustomSelect {
         this.optionsContainer.innerHTML = '';
         let selectedText = 'Sélectionner...';
         let selectedIsDefault = false;
+        let selectedFlag = null;
 
         children.forEach(child => {
             if (child.tagName === 'OPTGROUP') {
@@ -141,6 +204,7 @@ class CustomSelect {
                     const optDiv = this._createOptionElement(option);
                     if (option.selected) {
                         selectedText = option.textContent;
+                        selectedFlag = option;
                         if (this.nativeSelect.id === 'guild-select' && option.value) {
                             const parts = option.value.split(':');
                             if (parts.length === 2 && parts[1]) {
@@ -161,6 +225,10 @@ class CustomSelect {
                 const optDiv = this._createOptionElement(child);
                 if (child.selected) {
                     selectedText = child.textContent;
+                    // Le choix retenu se montre comme il se montrait dans la
+                    // liste : sans son drapeau, le déclencheur dirait autre
+                    // chose que la ligne qu'on vient de cliquer.
+                    selectedFlag = child;
                     if (this.nativeSelect.id === 'guild-select' && child.value) {
                         const parts = child.value.split(':');
                         if (parts.length === 2 && parts[1]) {
@@ -176,6 +244,10 @@ class CustomSelect {
         });
 
         this.trigger.innerHTML = '';
+
+        const triggerFlag = buildFlag(selectedFlag);
+        if (triggerFlag) this.trigger.appendChild(triggerFlag);
+
         const textSpan = document.createElement('span');
         textSpan.textContent = selectedText;
         this.trigger.appendChild(textSpan);
@@ -198,6 +270,9 @@ class CustomSelect {
         if (option.selected) optDiv.classList.add('selected');
         if (option.disabled) optDiv.classList.add('disabled');
         
+        const flag = buildFlag(option);
+        if (flag) optDiv.appendChild(flag);
+
         const textSpan = document.createElement('span');
         textSpan.className = 'option-text';
         textSpan.textContent = option.textContent;
@@ -378,7 +453,13 @@ class CustomSelect {
 
             this.nativeSelect.value = option.value;
             this.trigger.innerHTML = '';
-            
+
+            // Le drapeau aussi, et pas seulement dans `sync()` : le déclencheur
+            // est reconstruit ici au clic, et l'oublier le faisait disparaître
+            // dès qu'on changeait de langue — jusqu'au prochain rendu complet.
+            const clickedFlag = buildFlag(option);
+            if (clickedFlag) this.trigger.appendChild(clickedFlag);
+
             const triggerText = document.createElement('span');
             triggerText.textContent = option.textContent;
             this.trigger.appendChild(triggerText);
