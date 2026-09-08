@@ -527,5 +527,6 @@
     "tunnel_declare_step3": "Enregistrez avec « Save Changes » en bas de page",
     "tunnel_declare_uri_tip": "L'adresse à coller, si le presse-papiers a servi entre-temps",
     "tunnel_url_copy_tip": "Copier cette adresse",
-    "tunnel_url_copied": "Adresse copiée"
+    "tunnel_url_copied": "Adresse copiée",
+    "share_invite_done": "Envoyé"
 }

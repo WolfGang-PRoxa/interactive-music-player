@@ -527,5 +527,6 @@
     "tunnel_declare_step3": "Mit „Save Changes“ am Seitenende speichern",
     "tunnel_declare_uri_tip": "Die einzufügende Adresse, falls die Zwischenablage zwischenzeitlich benutzt wurde",
     "tunnel_url_copy_tip": "Diese Adresse kopieren",
-    "tunnel_url_copied": "Adresse kopiert"
+    "tunnel_url_copied": "Adresse kopiert",
+    "share_invite_done": "Gesendet"
 }

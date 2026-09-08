@@ -527,5 +527,6 @@
     "tunnel_declare_step3": "Save with “Save Changes” at the bottom of the page",
     "tunnel_declare_uri_tip": "The address to paste, in case the clipboard has been used since",
     "tunnel_url_copy_tip": "Copy this address",
-    "tunnel_url_copied": "Address copied"
+    "tunnel_url_copied": "Address copied",
+    "share_invite_done": "Sent"
 }

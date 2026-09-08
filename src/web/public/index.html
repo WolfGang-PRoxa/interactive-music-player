@@ -2043,8 +2043,16 @@
                                  être un autre. Vide tant qu'aucun salon n'est actif. -->
                             <span class="share-invite-channel" id="share-invite-channel"></span>
                         </span>
+                        <!-- Les deux étiquettes coexistent, empilées : c'est la classe
+                             `is-sent` qui décide laquelle se montre. Écrire la seconde au
+                             moment de l'envoi obligerait à mesurer le bouton pour qu'il
+                             ne saute pas de largeur en pleine animation. -->
                         <button id="btn-send-invite" class="maint-btn primary share-invite-btn">
-                            <span data-i18n="share_invite_send">Envoyer le lien</span>
+                            <span class="share-invite-label" data-i18n="share_invite_send">Envoyer le lien</span>
+                            <span class="share-invite-done" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                <span data-i18n="share_invite_done">Envoyé</span>
+                            </span>
                         </button>
                     </div>
                 </div>

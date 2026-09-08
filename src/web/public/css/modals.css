@@ -1075,6 +1075,86 @@
     font-weight: 600;
 }
 
+/* ── L'envoi, dit par le bouton lui-même ──
+ *
+ * Le toast répond ailleurs, en haut de l'écran, alors que le regard vient de
+ * cliquer ici. Un message qui paraît loin du geste laisse un doute — a-t-il
+ * seulement pris ? —, et l'on reclique. Le bouton répond donc sur place, et le
+ * toast reste pour dire dans quel salon.
+ *
+ * Les deux étiquettes sont empilées et le bouton garde sa taille : rien ne
+ * saute autour de lui pendant l'animation. */
+.share-invite-btn {
+    position: relative;
+    overflow: hidden;
+}
+
+.share-invite-btn .share-invite-label,
+.share-invite-btn .share-invite-done {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
+}
+
+/* Posée par-dessus, hors champ vers le bas, jusqu'à ce qu'on l'appelle. */
+.share-invite-btn .share-invite-done {
+    position: absolute;
+    inset: 0;
+    transform: translateY(110%);
+    opacity: 0;
+}
+
+.share-invite-btn .share-invite-done svg {
+    width: 15px;
+    height: 15px;
+}
+
+/* L'étiquette part par le haut — le sens du départ —, la confirmation monte
+   à sa place. */
+.share-invite-btn.is-sent .share-invite-label {
+    transform: translateY(-120%);
+    opacity: 0;
+}
+
+.share-invite-btn.is-sent .share-invite-done {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+/* Le fond vire au vert le temps de la confirmation, puis revient. */
+.share-invite-btn.is-sent {
+    background: var(--c-success, #43b581) !important;
+    border-color: var(--c-success, #43b581) !important;
+    color: #fff !important;
+}
+
+/* Une onde brève part du bouton : ce qui s'en va, s'en va vraiment. */
+.share-invite-btn.is-sent::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(circle at 50% 50%,
+        rgba(255, 255, 255, 0.55), transparent 60%);
+    animation: share-invite-wave 0.55s ease-out;
+    pointer-events: none;
+}
+
+@keyframes share-invite-wave {
+    from { transform: scale(0.2); opacity: 0.9; }
+    to { transform: scale(1.6); opacity: 0; }
+}
+
+/* Le mouvement est un agrément, jamais le message : réduit, tout se dit
+   encore — la couleur, la coche, le mot. */
+@media (prefers-reduced-motion: reduce) {
+    .share-invite-btn .share-invite-label,
+    .share-invite-btn .share-invite-done { transition: none; }
+    .share-invite-btn.is-sent::after { animation: none; }
+}
+
 /* La liste des auditeurs */
 .share-people {
     display: flex;
@@ -2910,13 +2990,20 @@ html[data-theme="light"] .login-gate-warning code {
     display: block;
     width: 100%;
     text-align: left;
-    padding: 0.45rem 0.6rem;
+    padding: 0.55rem 1.1rem;
     border: 1px solid color-mix(in srgb, var(--c-primary) 30%, transparent);
-    border-radius: 8px;
+    border-radius: 12px;
     background: color-mix(in srgb, var(--c-primary) 8%, transparent);
     color: var(--c-primary);
     font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 0.78rem;
+    /* Un peu en deçà des autres, et c'est voulu : à taille égale une chasse
+       fixe paraît plus grosse qu'une proportionnelle, et l'adresse écraserait
+       les deux boutons qui l'encadrent. */
+    font-size: 0.85rem;
+    /* Cale sa hauteur sur celle des boutons voisins. Le modèle flex de
+       `.tunnel-btn` ne conviendrait pas ici : une adresse longue doit pouvoir
+       revenir à la ligne, ce qu'un centrage vertical empêcherait. */
+    line-height: 1.28;
     word-break: break-all;
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease;
@@ -2995,14 +3082,32 @@ html[data-theme="light"] .login-gate-warning code {
     flex-wrap: wrap;
 }
 
+/* À la taille du bouton d'invitation, deux sections plus bas.
+ *
+ * Ils étaient sensiblement plus petits, et cela se voyait : la même fenêtre
+ * proposait des gestes de deux tailles selon la section où ils tombaient, alors
+ * qu'ils ont tous le même poids. Les valeurs sont celles de `.maint-btn` une
+ * fois l'ajustement de `.share-invite-btn` appliqué. */
 .tunnel-btn {
-    padding: 0.4rem 0.85rem;
+    /* Le même modèle d'affichage que `.maint-btn`, et pas seulement les mêmes
+       marges : c'est lui qui fixe la hauteur du contenu, et trois pixels
+       d'écart se voyaient sur deux boutons voisins. */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    /* Le voisin porte son étiquette dans un `<span>` en `inline-flex`, ce qui
+       resserre sa boîte de ligne ; ici le texte est nu, et sa boîte reprenait
+       les trois pixels d'interlignage que le modèle par défaut ajoute. Réglée,
+       plutôt que d'emballer le texte pour rien. */
+    line-height: 1.15;
+    padding: 0.55rem 1.1rem;
     border: 1px solid var(--border-card);
-    border-radius: 8px;
+    border-radius: 12px;
     background: rgba(255, 255, 255, 0.04);
     color: var(--text-main);
     font-family: inherit;
-    font-size: 0.78rem;
+    font-size: 0.95rem;
     font-weight: 600;
     text-decoration: none;
     cursor: pointer;

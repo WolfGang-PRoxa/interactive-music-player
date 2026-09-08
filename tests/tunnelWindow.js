@@ -573,5 +573,133 @@ console.log('\nCe que « le salon vocal » désigne\n');
         'c\'est la seule chose qu\'on relit avant de cliquer');
 }
 
+// ───────────────────── Une seule taille de geste ─────────────────────
+
+console.log('\nCe que les boutons de la fenêtre ont en commun\n');
+
+{
+    const CSS = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'public', 'css', 'modals.css'), 'utf8');
+
+    // Ancré en début de ligne : « .tunnel-btn { » se retrouve aussi dans
+    // « .tunnel-declare-row .tunnel-btn { », et l'on lirait la mauvaise règle.
+    const regle = (selecteur) => {
+        const at = CSS.indexOf('\n' + selecteur + ' {');
+        return at === -1 ? '' : CSS.slice(at, CSS.indexOf('}', at));
+    };
+
+    /*
+     * La même fenêtre proposait des gestes de deux tailles selon la section où
+     * ils tombaient, alors qu'ils ont tous le même poids. Les valeurs sont
+     * celles de `.maint-btn` une fois l'ajustement de `.share-invite-btn`
+     * appliqué — l'envoi du lien sert d'étalon.
+     */
+    const etalon = { padding: '0.55rem 1.1rem', rayon: '12px', police: '0.95rem' };
+
+    check('le bouton d\'envoi garde ses marges d\'origine',
+        regle('.share-invite-btn').includes(`padding: ${etalon.padding} !important`),
+        'c\'est lui l\'étalon');
+
+    for (const cible of ['.tunnel-btn', '.tunnel-url']) {
+        const bloc = regle(cible);
+        check(`${cible} a les marges de l'étalon`,
+            bloc.includes(`padding: ${etalon.padding}`), etalon.padding);
+        check(`  … et son arrondi`, bloc.includes(`border-radius: ${etalon.rayon}`));
+    }
+
+    check('.tunnel-btn a aussi sa police',
+        regle('.tunnel-btn').includes(`font-size: ${etalon.police}`));
+
+    /*
+     * La hauteur ne suit pas des marges égales.
+     *
+     * L'étiquette du voisin vit dans un `<span>` en `inline-flex`, ce qui
+     * resserre sa boîte de ligne ; un texte nu reprend les trois pixels
+     * d'interlignage du modèle par défaut. Deux boutons voisins de 40 et 37
+     * pixels, cela se voit.
+     */
+    check('  … et une interligne réglée, faute de quoi elle dépasse de trois pixels',
+        /line-height: 1\.15/.test(regle('.tunnel-btn')),
+        'des marges égales ne suffisent pas à égaliser la hauteur');
+    check('  … l\'adresse aussi, sans passer au modèle flex',
+        /line-height: 1\.28/.test(regle('.tunnel-url'))
+        && /display: block/.test(regle('.tunnel-url')),
+        'une adresse longue doit pouvoir revenir à la ligne');
+
+    // L'adresse reste un peu en deçà : à taille égale, une chasse fixe paraît
+    // plus grosse qu'une proportionnelle.
+    check('l\'adresse est en chasse fixe, un cran en dessous',
+        /font-size: 0\.85rem/.test(regle('.tunnel-url'))
+        && /font-family: var\(--font-mono/.test(regle('.tunnel-url')));
+}
+
+// ───────────────────── L'envoi, dit par le bouton ─────────────────────
+
+console.log('\nCe que le bouton d\'envoi répond\n');
+
+{
+    const SHARED = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'public', 'js', 'sharedControl.js'), 'utf8');
+    const MARKUP = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'public', 'index.html'), 'utf8');
+    const CSS = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'public', 'css', 'modals.css'), 'utf8');
+
+    /*
+     * Le toast répond en haut de l'écran, alors que le regard vient de cliquer
+     * sur le bouton : un message qui paraît loin du geste laisse un doute — a-t-il
+     * seulement pris ? —, et l'on reclique.
+     */
+    check('le bouton confirme sur place, en plus du toast',
+        /function flashInviteSent\(\)/.test(SHARED)
+        && /flashInviteSent\(\);\s*\n\s*toast\(/.test(SHARED),
+        'le toast garde son rôle : dire dans quel salon');
+
+    /*
+     * Sur la réponse du serveur, jamais sur le clic : c'est l'envoi qu'on
+     * annonce, et il peut échouer — le bot n'a pas toujours le droit d'écrire
+     * dans le salon.
+     */
+    const bloc = SHARED.slice(SHARED.indexOf('onShareResult'), SHARED.indexOf('const reasons'));
+    check('  … seulement quand l\'envoi a réellement abouti',
+        /if \(data\.ok && data\.channelName\) \{\s*\n\s*flashInviteSent\(\);/.test(bloc),
+        'une confirmation posée au clic mentirait quand le bot ne peut pas écrire');
+
+    // Les deux étiquettes sont écrites d'avance : en fabriquer une au moment de
+    // l'envoi ferait sauter la largeur du bouton en pleine animation.
+    check('les deux étiquettes coexistent dans le balisage',
+        /class="share-invite-label"/.test(MARKUP) && /class="share-invite-done"/.test(MARKUP));
+    check('  … et la confirmation ne se lit qu\'à l\'œil',
+        /class="share-invite-done" aria-hidden="true"/.test(MARKUP),
+        'le lecteur d\'écran a déjà le toast, et l\'entendrait deux fois');
+
+    check('l\'animation se rejoue si l\'on renvoie aussitôt',
+        /classList\.remove\('is-sent'\);\s*\n\s*void btn\.offsetWidth;/.test(SHARED),
+        'une classe déjà posée ne rejouerait rien');
+    check('  … et ne laisse pas un minuteur derrière elle',
+        /clearTimeout\(btn\._sentBack\);/.test(SHARED));
+
+    check('le mouvement dit le départ : l\'étiquette monte, la coche prend sa place',
+        /\.is-sent \.share-invite-label \{[\s\S]{0,80}translateY\(-120%\)/.test(CSS)
+        && /\.is-sent \.share-invite-done \{[\s\S]{0,80}translateY\(0\)/.test(CSS));
+
+    /*
+     * Le mouvement est un agrément, jamais le message : réduit, la couleur, la
+     * coche et le mot disent encore tout.
+     */
+    check('  … et se tait quand le mouvement est refusé',
+        /@media \(prefers-reduced-motion: reduce\) \{[\s\S]{0,400}share-invite-done \{ transition: none/
+            .test(CSS),
+        'la couleur, la coche et le mot restent');
+
+    for (const lang of ['fr', 'en', 'es', 'de']) {
+        const dict = JSON.parse(fs.readFileSync(
+            path.join(ROOT, 'src', 'web', 'public', 'locales', `${lang}.json`), 'utf8'));
+        check(`${lang} : la confirmation du bouton est traduite`,
+            !!(dict.share_invite_done && dict.share_invite_done.trim()),
+            dict.share_invite_done || '');
+    }
+}
+
 console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
 process.exit(failed > 0 ? 1 : 0);

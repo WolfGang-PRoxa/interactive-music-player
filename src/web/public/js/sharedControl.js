@@ -556,11 +556,38 @@ window.MusicPlayer = window.MusicPlayer || {};
         applyRights();
     };
 
+    /**
+     * Le bouton dit lui-même que le lien est parti.
+     *
+     * Le toast répond en haut de l'écran, alors que le regard vient de cliquer
+     * ici : un message qui paraît loin du geste laisse un doute — a-t-il
+     * seulement pris ? —, et l'on reclique. Le bouton confirme donc sur place,
+     * et le toast garde son rôle, dire dans quel salon.
+     *
+     * Déclenché sur la réponse du serveur, jamais sur le clic : c'est l'envoi
+     * qu'on annonce, et il peut échouer. Une confirmation posée au clic
+     * mentirait une fois sur deux quand le bot n'a pas le droit d'écrire.
+     */
+    function flashInviteSent() {
+        const btn = el('btn-send-invite');
+        if (!btn) return;
+
+        // Relancé alors qu'il s'affiche encore : on repart de zéro, sinon la
+        // classe déjà posée ne rejouerait aucune animation.
+        btn.classList.remove('is-sent');
+        void btn.offsetWidth;
+        btn.classList.add('is-sent');
+
+        clearTimeout(btn._sentBack);
+        btn._sentBack = setTimeout(() => btn.classList.remove('is-sent'), 1800);
+    }
+
     /** Réponse à une action de partage. */
     window.MusicPlayer.onShareResult = function (data) {
         if (!data) return;
 
         if (data.ok && data.channelName) {
+            flashInviteSent();
             toast(t('share_invite_sent', 'Lien envoyé dans le tchat du salon vocal.'));
             return;
         }

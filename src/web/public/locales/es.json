@@ -527,5 +527,6 @@
     "tunnel_declare_step3": "Guarda con «Save Changes» al final de la página",
     "tunnel_declare_uri_tip": "La dirección que hay que pegar, si el portapapeles se ha usado mientras tanto",
     "tunnel_url_copy_tip": "Copiar esta dirección",
-    "tunnel_url_copied": "Dirección copiada"
+    "tunnel_url_copied": "Dirección copiada",
+    "share_invite_done": "Enviado"
 }
