@@ -333,5 +333,97 @@ console.log('\nCe que le serveur refuse de faire\n');
     }
 }
 
+// ───────────────────── Déclarer l'adresse chez Discord ─────────────────────
+
+console.log('\nCe que le bouton de déclaration copie, et où il mène\n');
+
+{
+    const CLIENT = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'public', 'js', 'shareTunnel.js'), 'utf8');
+    const HANDLER = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'websocket', 'handlers', 'tunnelHandlers.js'), 'utf8');
+    const CSS = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'public', 'css', 'modals.css'), 'utf8');
+
+    /*
+     * Une adresse publiée ne sert à rien tant que Discord ne la connaît pas :
+     * l'aller-retour de connexion revient dessus, et le portail refuse toute
+     * redirection qu'on ne lui a pas déclarée. C'était l'étape que rien ne
+     * signalait, et qu'il fallait deviner en lisant un journal.
+     */
+    check('c\'est l\'URL de rappel qui est copiée, pas l\'adresse affichée',
+        /copy\(current\.redirectUri\);/.test(CLIENT),
+        'le portail attend l\'adresse suivie de « /auth/discord/callback »');
+
+    /*
+     * Et elle vient du serveur.
+     *
+     * La recomposer côté navigateur ferait deux versions d'une même règle, et
+     * un jour l'une des deux aurait tort — ce que ce dépôt a déjà payé quatre
+     * fois avec le choix des flux.
+     */
+    // Le chemin ne doit apparaître dans aucune chaîne du client : l'y écrire
+    // serait le reconstruire. Le commentaire qui l'explique, lui, a le droit
+    // de le nommer.
+    check('  … et elle vient du serveur, qui la construit déjà',
+        /redirectUri: oauth\.redirectUri\(\)/.test(HANDLER)
+        && !/['"`][^'"`\n]*auth\/discord\/callback/.test(CLIENT),
+        'une seconde version de la règle finirait par diverger');
+
+    check('le portail s\'ouvre sur l\'application, pas sur la liste',
+        /applications\/\$\{current\.clientId\}\/oauth2/.test(CLIENT));
+    check('  … et sur la liste faute d\'identifiant',
+        /'https:\/\/discord\.com\/developers\/applications'/.test(CLIENT),
+        'sans lui, on ne peut qu\'ouvrir l\'index');
+
+    /*
+     * L'identifiant d'application n'est pas un secret : il voyage déjà dans
+     * l'adresse d'autorisation que le navigateur visite. Le secret, lui, ne
+     * doit jamais descendre.
+     */
+    check('l\'identifiant descend, jamais le secret',
+        /clientId: oauth\.clientId\(\)/.test(HANDLER)
+        && !/clientSecret/.test(HANDLER));
+
+    check('le bouton disparaît sans application configurée',
+        /if \(!current \|\| !current\.redirectUri\) return null;/.test(CLIENT),
+        'il n\'y a alors aucun portail où aller');
+
+    // La marche à suivre ne paraît qu'après le clic : avant, elle décrirait un
+    // onglet qui n'existe pas.
+    check('la marche à suivre ne paraît qu\'après le clic',
+        /if \(declared\) zone\.appendChild\(declareSteps\(\)\);/.test(CLIENT));
+    check('  … et ne survit pas à la fermeture de la fenêtre',
+        /declared = false;\s*\n\s*ask\('tunnelState'\);/.test(CLIENT),
+        'elle décrirait un onglet refermé depuis longtemps');
+
+    /*
+     * La copie doit marcher hors origine sûre.
+     *
+     * `navigator.clipboard` l'exige. Le tableau de bord publié est en HTTPS,
+     * mais en local un nom de machine en clair n'en est pas une : le bouton y
+     * serait muet.
+     */
+    check('la copie a un repli hors origine sûre',
+        /window\.isSecureContext/.test(CLIENT) && /execCommand\('copy'\)/.test(CLIENT));
+
+    check('le bouton occupe l\'espace laissé à droite de l\'adresse',
+        /\.tunnel-url-row \{[\s\S]{0,120}display: flex/.test(CSS)
+        && /\.tunnel-url-row \.tunnel-url \{[\s\S]{0,80}flex: 1 1 auto/.test(CSS));
+    check('  … et se replie sous elle sur un écran étroit',
+        /@media \(max-width: 480px\) \{\s*\n\s*\.tunnel-url-row \{ flex-direction: column; \}/.test(CSS));
+
+    const CLES = ['tunnel_declare_action', 'tunnel_declare_tip', 'tunnel_declare_copied',
+        'tunnel_declare_step1', 'tunnel_declare_step2', 'tunnel_declare_step3',
+        'tunnel_declare_uri_tip'];
+    for (const lang of ['fr', 'en', 'es', 'de']) {
+        const dict = JSON.parse(fs.readFileSync(
+            path.join(ROOT, 'src', 'web', 'public', 'locales', `${lang}.json`), 'utf8'));
+        const manquantes = CLES.filter(k => !dict[k] || !String(dict[k]).trim());
+        check(`${lang} : les ${CLES.length} libellés de la déclaration sont traduits`,
+            manquantes.length === 0, manquantes.join(', '));
+    }
+}
+
 console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
 process.exit(failed > 0 ? 1 : 0);

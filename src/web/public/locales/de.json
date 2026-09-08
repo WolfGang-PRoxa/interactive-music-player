@@ -518,5 +518,12 @@
     "transition_row_label": "Übergang zu",
     "transition_row_tooltip": "Die Wiedergabe wechselt hier zu dieser Quelle, danach verschwindet diese Zeile.",
     "transition_remove": "Diesen Übergang entfernen",
-    "transition_edit_title": "Ziel des Übergangs"
+    "transition_edit_title": "Ziel des Übergangs",
+    "tunnel_declare_action": "Bei Discord eintragen",
+    "tunnel_declare_tip": "Kopiert die Rückruf-URL und öffnet die OAuth2-Seite deiner Discord-Anwendung",
+    "tunnel_declare_copied": "Rückruf-URL kopiert. Im soeben geöffneten Tab:",
+    "tunnel_declare_step1": "Abschnitt „Redirects“, Schaltfläche „Add Redirect“",
+    "tunnel_declare_step2": "Die Adresse in das Feld einfügen",
+    "tunnel_declare_step3": "Mit „Save Changes“ am Seitenende speichern",
+    "tunnel_declare_uri_tip": "Die einzufügende Adresse, falls die Zwischenablage zwischenzeitlich benutzt wurde"
 }

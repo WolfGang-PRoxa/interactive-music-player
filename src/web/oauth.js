@@ -249,6 +249,7 @@ function logConfiguration() {
 
 module.exports = {
     isConfigured,
+    clientId,
     publicUrl,
     redirectUri,
     buildAuthorizeUrl,

@@ -518,5 +518,12 @@
     "transition_row_label": "Transition vers",
     "transition_row_tooltip": "La lecture bascule ici vers cette source, puis cette ligne disparaît.",
     "transition_remove": "Retirer cette transition",
-    "transition_edit_title": "Destination de la transition"
+    "transition_edit_title": "Destination de la transition",
+    "tunnel_declare_action": "Déclarer chez Discord",
+    "tunnel_declare_tip": "Copie l'URL de rappel et ouvre la page OAuth2 de votre application Discord",
+    "tunnel_declare_copied": "URL de rappel copiée. Dans l'onglet qui vient de s'ouvrir :",
+    "tunnel_declare_step1": "Section « Redirects », bouton « Add Redirect »",
+    "tunnel_declare_step2": "Collez l'adresse dans le champ",
+    "tunnel_declare_step3": "Enregistrez avec « Save Changes » en bas de page",
+    "tunnel_declare_uri_tip": "L'adresse à coller, si le presse-papiers a servi entre-temps"
 }

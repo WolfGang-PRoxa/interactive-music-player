@@ -2907,6 +2907,69 @@ html[data-theme="light"] .login-gate-warning code {
     user-select: all;
 }
 
+/* L'adresse et le geste qu'elle appelle, sur la même ligne : l'espace à droite
+   du champ ne servait à rien, et le bouton s'y lit comme une suite. */
+.tunnel-url-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0.5rem;
+}
+
+/* L'adresse prend ce qui reste, le bouton garde sa largeur. */
+.tunnel-url-row .tunnel-url {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+}
+
+.tunnel-url-row .tunnel-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+/* Au-dessous d'une certaine largeur, le bouton passerait à trois lettres par
+   ligne : la ligne se replie plutôt en deux. */
+@media (max-width: 480px) {
+    .tunnel-url-row { flex-direction: column; }
+}
+
+/* La marche à suivre, qui ne paraît qu'après le clic. */
+.tunnel-declare-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.6rem 0.7rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-card);
+    background: color-mix(in srgb, var(--c-primary) 5%, transparent);
+}
+
+.tunnel-declare-lead {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+.tunnel-declare-steps ol {
+    margin: 0;
+    padding-left: 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.78rem;
+    line-height: 1.4;
+}
+
+/* L'adresse répétée : le presse-papiers a pu servir entre-temps. */
+.tunnel-declare-uri {
+    margin: 0;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.72rem;
+    color: var(--c-primary);
+    word-break: break-all;
+    user-select: all;
+}
+
 .tunnel-actions {
     display: flex;
     align-items: center;

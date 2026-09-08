@@ -518,5 +518,12 @@
     "transition_row_label": "Transición a",
     "transition_row_tooltip": "La reproducción cambia aquí a esa fuente, y luego esta fila desaparece.",
     "transition_remove": "Quitar esta transición",
-    "transition_edit_title": "Destino de la transición"
+    "transition_edit_title": "Destino de la transición",
+    "tunnel_declare_action": "Declararla en Discord",
+    "tunnel_declare_tip": "Copia la URL de retorno y abre la página OAuth2 de tu aplicación de Discord",
+    "tunnel_declare_copied": "URL de retorno copiada. En la pestaña que acaba de abrirse:",
+    "tunnel_declare_step1": "Sección «Redirects», botón «Add Redirect»",
+    "tunnel_declare_step2": "Pega la dirección en el campo",
+    "tunnel_declare_step3": "Guarda con «Save Changes» al final de la página",
+    "tunnel_declare_uri_tip": "La dirección que hay que pegar, si el portapapeles se ha usado mientras tanto"
 }

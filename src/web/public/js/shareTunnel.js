@@ -85,6 +85,131 @@ window.MusicPlayer = window.MusicPlayer || {};
         return el;
     }
 
+    /* ═════════════════════ Déclarer l'adresse chez Discord ═════════════════════ */
+
+    /**
+     * Le geste a-t-il été fait ? Porte la marche à suivre, une fois l'onglet
+     * du portail ouvert.
+     */
+    let declared = false;
+
+    /**
+     * Le bouton qui prépare la déclaration.
+     *
+     * Une adresse publiée ne sert à rien tant que Discord ne la connaît pas :
+     * l'aller-retour de connexion revient dessus, et le portail refuse toute
+     * redirection qu'on ne lui a pas déclarée. C'est l'étape que rien ne
+     * signalait, et qu'il fallait deviner en lisant un journal.
+     *
+     * Deux choses en un clic, parce qu'elles ne valent rien séparément : le
+     * presse-papiers reçoit l'URL de rappel, et le portail s'ouvre à l'endroit
+     * où la coller.
+     *
+     * @returns {HTMLElement|null} null si l'application n'est pas configurée —
+     *   il n'y a alors aucun portail où aller.
+     */
+    function declareButton() {
+        if (!current || !current.redirectUri) return null;
+
+        return button(t('tunnel_declare_action', 'Déclarer chez Discord'), () => {
+            /*
+             * L'URL de rappel, et non l'adresse affichée juste à côté.
+             *
+             * Celle-ci mène au tableau de bord et sert de lien d'invitation ;
+             * le portail, lui, attend l'adresse à laquelle Discord renverra —
+             * la même, suivie de « /auth/discord/callback ». Copier ce qui est
+             * affiché serait copier une adresse que le portail refusera.
+             */
+            copy(current.redirectUri);
+
+            /*
+             * La page de l'application, pas la liste.
+             *
+             * L'identifiant vient du serveur : sans lui, on ne peut qu'ouvrir
+             * l'index et laisser l'utilisateur retrouver son application parmi
+             * les autres.
+             */
+            const portal = current.clientId
+                ? `https://discord.com/developers/applications/${current.clientId}/oauth2`
+                : 'https://discord.com/developers/applications';
+            window.open(portal, '_blank', 'noreferrer,noopener');
+
+            declared = true;
+            render();
+        }, {
+            variant: 'primary',
+            tooltip: t('tunnel_declare_tip',
+                'Copie l\'URL de rappel et ouvre la page OAuth2 de votre application Discord'),
+            i18nTooltip: 'tunnel_declare_tip',
+        });
+    }
+
+    /**
+     * Copie sans dépendre du presse-papiers moderne.
+     *
+     * `navigator.clipboard` exige une origine sûre. Le tableau de bord en est
+     * une lorsqu'il est publié — c'est du HTTPS —, mais pas toujours en local :
+     * `http://127.0.0.1` y passe, un nom de machine en clair non. Le repli par
+     * `execCommand` couvre ces cas-là, où le bouton serait sinon muet.
+     */
+    function copy(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+            return;
+        }
+        fallbackCopy(text);
+    }
+
+    function fallbackCopy(text) {
+        const zone = document.createElement('textarea');
+        zone.value = text;
+        zone.setAttribute('readonly', '');
+        zone.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+        document.body.appendChild(zone);
+        zone.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(zone);
+    }
+
+    /**
+     * La marche à suivre, une fois le portail ouvert.
+     *
+     * Trois gestes, dans l'ordre où le portail les présente. Sans eux, on
+     * arrive sur une page dense et l'on cherche « Redirects » parmi une dizaine
+     * de réglages — et surtout, rien ne dit qu'il faut enregistrer à la fin,
+     * ce que le portail ne fait pas tout seul.
+     *
+     * L'adresse copiée est répétée : le presse-papiers a pu servir entre-temps,
+     * et l'on doit pouvoir la relire sans revenir ici.
+     */
+    function declareSteps() {
+        const bloc = document.createElement('div');
+        bloc.className = 'tunnel-declare-steps';
+
+        bloc.appendChild(line('tunnel-declare-lead',
+            t('tunnel_declare_copied', 'URL de rappel copiée. Dans l\'onglet qui vient de '
+                + 's\'ouvrir :')));
+
+        const list = document.createElement('ol');
+        for (const [key, fallback] of [
+            ['tunnel_declare_step1', 'Section « Redirects », bouton « Add Redirect »'],
+            ['tunnel_declare_step2', 'Collez l\'adresse dans le champ'],
+            ['tunnel_declare_step3', 'Enregistrez avec « Save Changes » en bas de page'],
+        ]) {
+            const li = document.createElement('li');
+            li.textContent = t(key, fallback);
+            list.appendChild(li);
+        }
+        bloc.appendChild(list);
+
+        const rappel = line('tunnel-declare-uri', current.redirectUri);
+        rappel.setAttribute('data-tooltip', t('tunnel_declare_uri_tip',
+            'L\'adresse à coller, si le presse-papiers a servi entre-temps'));
+        bloc.appendChild(rappel);
+
+        return bloc;
+    }
+
     /**
      * Vérifie avant de télécharger.
      *
@@ -268,10 +393,23 @@ window.MusicPlayer = window.MusicPlayer || {};
         zone.appendChild(line('tunnel-body', step.body));
 
         if (step.url) {
+            const row = document.createElement('div');
+            row.className = 'tunnel-url-row';
+
             const url = document.createElement('p');
             url.className = 'tunnel-url';
             url.textContent = step.url;
-            zone.appendChild(url);
+            row.appendChild(url);
+
+            const declare = declareButton();
+            if (declare) row.appendChild(declare);
+
+            zone.appendChild(row);
+
+            // Ce qu'il reste à faire dans l'onglet qui vient de s'ouvrir. Il ne
+            // paraît qu'après le clic : avant, il décrirait un onglet qui
+            // n'existe pas.
+            if (declared) zone.appendChild(declareSteps());
         }
 
         if (step.saisie) {
@@ -347,6 +485,9 @@ window.MusicPlayer = window.MusicPlayer || {};
      * cher pour une valeur qui ne bouge qu'au geste de quelqu'un.
      */
     window.MusicPlayer.refreshTunnel = function () {
+        // La marche à suivre ne survit pas à la fermeture de la fenêtre : elle
+        // décrit un onglet du portail qu'on a depuis longtemps refermé.
+        declared = false;
         ask('tunnelState');
     };
 

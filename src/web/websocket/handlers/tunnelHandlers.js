@@ -24,10 +24,33 @@ const log = require('../../../utils/logger');
  */
 function send(ws, state, error = null) {
     try {
-        ws.send(JSON.stringify({ type: 'tunnelState', data: { ...state, error } }));
+        ws.send(JSON.stringify({ type: 'tunnelState', data: { ...state, ...discord(), error } }));
     } catch (e) {
         // Socket fermée entre-temps : rien à sauver.
     }
+}
+
+/**
+ * De quoi aller déclarer l'adresse chez Discord.
+ *
+ * Deux valeurs que le tableau de bord ne peut pas fabriquer lui-même, et qu'il
+ * aurait tort d'essayer.
+ *
+ *  - **L'URL de rappel**, telle que le serveur la construit. C'est elle, et non
+ *    l'adresse publique affichée, que le portail attend dans ses redirections —
+ *    elle porte en plus `/auth/discord/callback`. La recomposer côté navigateur
+ *    ferait deux versions d'une même règle, et un jour l'une des deux aurait
+ *    tort.
+ *
+ *  - **L'identifiant de l'application**, qui permet d'ouvrir directement la
+ *    page de cette application-là plutôt que la liste. Il n'a rien d'un secret :
+ *    il voyage déjà dans l'adresse d'autorisation que le navigateur visite.
+ *
+ * @returns {{ redirectUri: string, clientId: string }}
+ */
+function discord() {
+    const oauth = require('../../oauth');
+    return { redirectUri: oauth.redirectUri(), clientId: oauth.clientId() };
 }
 
 /** Le port réellement servi, seul repère fiable de ce qu'il faut publier. */

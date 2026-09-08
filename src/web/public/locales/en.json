@@ -518,5 +518,12 @@
     "transition_row_label": "Transition to",
     "transition_row_tooltip": "Playback switches to that source here, then this row disappears.",
     "transition_remove": "Remove this transition",
-    "transition_edit_title": "Transition destination"
+    "transition_edit_title": "Transition destination",
+    "tunnel_declare_action": "Declare it on Discord",
+    "tunnel_declare_tip": "Copies the callback URL and opens your Discord application's OAuth2 page",
+    "tunnel_declare_copied": "Callback URL copied. In the tab that just opened:",
+    "tunnel_declare_step1": "The “Redirects” section, “Add Redirect” button",
+    "tunnel_declare_step2": "Paste the address into the field",
+    "tunnel_declare_step3": "Save with “Save Changes” at the bottom of the page",
+    "tunnel_declare_uri_tip": "The address to paste, in case the clipboard has been used since"
 }
