@@ -8,6 +8,7 @@ const database = require('../../../database/Database');
 const playbackStateManager = require('../../../database/PlaybackStateManager');
 const { searchLocalAwareTrack, switchToQueueSourceIfNeeded } = require('../handlerUtils');
 const { readSetAsideQueue, writeSetAsideQueue } = require('../../../utils/setAsideQueue');
+const channelQueue = require('../../../audio/channelQueue');
 const log = require('../../../utils/logger');
 
 function handleRemoveTrack(ctx) {
@@ -21,34 +22,29 @@ function handleRemoveTrack(ctx) {
                 const isPersonal = settings.broadcastMode === 'personal';
                 const isPlaylistPlaying = settings.activePlaybackSource && settings.activePlaybackSource !== 'queue';
 
-                if (isPlaylistPlaying) {
-                    // Même liste et mêmes index dans les deux modes : la file
-                    // mise de côté ne dépend pas du mode de diffusion.
-                    const stored = readSetAsideQueue(settings);
-                    if (index >= 0 && index < stored.length) {
-                        stored.splice(index, 1);
-                        writeSetAsideQueue(currentGuildId, stored, settings);
-                        webServer.broadcastState(currentGuildId);
-                        playbackStateManager.saveState(player);
-                    }
-                } else if (queue) {
-                    if (isPersonal) {
-                        if (index >= 0 && index < queue.virtualTracks.length) {
-                            queue.virtualTracks.splice(index, 1);
-                            webServer.broadcastState(currentGuildId);
-                            playbackStateManager.saveState(player);
-                        }
-                    } else {
-                        const tracks = queue.tracks.toArray();
-                        if (index >= 0 && index < tracks.length) {
-                            const trackToRemove = tracks[index];
-                            if (trackToRemove) {
-                                queue.node.remove(trackToRemove);
-                                webServer.broadcastState(currentGuildId);
-                                playbackStateManager.saveState(player);
-                            }
-                        }
-                    }
+                /*
+                 * Le retrait porte sur le rangement, dans tous les cas.
+                 *
+                 * L'indice reçu est celui de la ligne cliquée, et cette ligne
+                 * vient du rangement — le seul à connaître les aiguillages et
+                 * les titres qui les suivent. Le lecteur, lui, n'a jamais que
+                 * la tête de liste : compter dedans désignerait le mauvais
+                 * titre dès qu'une transition attend quelque part.
+                 *
+                 * Les deux modes de diffusion se traitent donc pareil, ce que
+                 * trois branches séparées ne garantissaient pas.
+                 */
+                const stored = channelQueue.read(settings);
+                if (index >= 0 && index < stored.length) {
+                    stored.splice(index, 1);
+                    channelQueue.write(currentGuildId, stored, settings);
+
+                    // La file joue : le lecteur doit suivre. Sinon c'est une
+                    // playlist qui l'occupe, et la file attend son tour.
+                    if (!isPlaylistPlaying) webServer.loadChannelQueue(currentGuildId);
+
+                    webServer.broadcastState(currentGuildId);
+                    playbackStateManager.saveState(player);
                 }
             } catch (removeErr) {
                 log.error('[WebServer] Track removal error:', removeErr.message);
@@ -147,28 +143,17 @@ async function handleMoveOrInsertTrack(ctx) {
 
         if (source === 'queue') {
             if (typeof fromIndex === 'number' && typeof toIndex === 'number') {
-                if (isPlaylistPlaying) {
-                    const stored = readSetAsideQueue(settings);
-                    if (fromIndex >= 0 && fromIndex < stored.length) {
-                        const [moved] = stored.splice(fromIndex, 1);
-                        if (moved) stored.splice(toIndex, 0, moved);
-                        writeSetAsideQueue(currentGuildId, stored, settings);
-                        webServer.broadcastState(currentGuildId);
-                    }
-                } else if (isPersonal) {
-                    if (queue) {
-                        if (fromIndex >= 0 && fromIndex < queue.virtualTracks.length) {
-                            const track = queue.virtualTracks.splice(fromIndex, 1)[0];
-                            queue.virtualTracks.splice(toIndex, 0, track);
-                            webServer.broadcastState(currentGuildId);
-                        }
-                    }
-                } else if (queue && queue.tracks) {
-                    const tracksArr = queue.tracks.toArray();
-                    if (fromIndex >= 0 && fromIndex < tracksArr.length) {
-                        queue.node.move(fromIndex, toIndex);
-                        webServer.broadcastState(currentGuildId);
-                    }
+                // Le déplacement porte sur le rangement, comme le retrait : les
+                // indices reçus sont ceux des lignes affichées, que le lecteur
+                // ne connaît qu'en partie dès qu'un aiguillage attend.
+                const stored = channelQueue.read(settings);
+                if (fromIndex >= 0 && fromIndex < stored.length) {
+                    const [moved] = stored.splice(fromIndex, 1);
+                    if (moved) stored.splice(toIndex, 0, moved);
+                    channelQueue.write(currentGuildId, stored, settings);
+
+                    if (!isPlaylistPlaying) webServer.loadChannelQueue(currentGuildId);
+                    webServer.broadcastState(currentGuildId);
                 }
             }
         } else if ((source === 'history' || source === 'nowplaying' || source === 'playlist_track') && url) {
@@ -301,16 +286,16 @@ function handleClearQueue(ctx) {
         const isPlaylistPlaying = settings.activePlaybackSource
             && settings.activePlaybackSource !== 'queue';
 
-        if (isPlaylistPlaying) {
-            writeSetAsideQueue(currentGuildId, [], settings);
-        } else if (queue) {
+        // Vider la file, c'est vider son rangement : aiguillages compris, et
+        // dans les deux modes de diffusion. Le lecteur suit ensuite.
+        channelQueue.write(currentGuildId, [], settings);
+
+        if (!isPlaylistPlaying && queue) {
             if (settings.broadcastMode === 'personal') {
                 queue.virtualTracks = [];
             } else if (queue.tracks) {
                 queue.tracks.clear();
             }
-        } else {
-            return;
         }
 
         webServer.broadcastState(currentGuildId);

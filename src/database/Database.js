@@ -283,6 +283,28 @@ class GuildDatabase {
              * même si la lecture avait démarré en plein milieu.
              */
             loopPlaylist: false,
+
+            /**
+             * La file d'attente, rangée salon vocal par salon vocal.
+             *
+             * `{ "<channelId>": [piste | aiguillage, ...] }`. Un salon
+             * « soirée » et un salon « calme » ont chacun la leur et la
+             * retrouvent au retour, là où une file unique par serveur suivait le
+             * bot partout.
+             *
+             * C'est aussi le seul endroit où une transition peut attendre son
+             * tour : elle a besoin d'une liste rangée pour désigner une
+             * position, ce que le lecteur ne lui offrait pas. Voir
+             * [channelQueue](../audio/channelQueue.js).
+             */
+            channelQueues: {},
+
+            /**
+             * Sauvegardes d'avant le rangement par salon.
+             *
+             * Gardées à `null` : `channelQueue` les relit une fois pour reverser
+             * ce qu'une version antérieure y avait laissé, puis les efface.
+             */
             queueBackupPersonal: null,
             queueBackupEveryone: null,
         };

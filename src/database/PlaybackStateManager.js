@@ -515,6 +515,20 @@ class PlaybackStateManager {
 
                     const activeChannelState = channels[activeChannelId];
                     if (activeChannelState) {
+                        /*
+                         * La file en attente vient du rangement, pas de
+                         * l'instantané.
+                         *
+                         * L'instantané recopie les pistes champ par champ, et un
+                         * aiguillage y perdrait sa destination en chemin. Le
+                         * rangement, lui, est rangé par salon et garde la liste
+                         * telle qu'elle a été composée. Le reste de l'instantané
+                         * — piste en cours, position, historique — n'a pas
+                         * d'équivalent ailleurs et garde tout son rôle.
+                         */
+                        activeChannelState.queue = require('../audio/channelQueue')
+                            .playable(settings);
+
                         if (activeChannelState.repeatMode !== undefined) {
                             try {
                                 queue.setRepeatMode(activeChannelState.repeatMode);

@@ -9,6 +9,8 @@ const playbackStateManager = require('../../../database/PlaybackStateManager');
 const { searchLocalAwareTrack } = require('../handlerUtils');
 const { readSetAsideQueue, writeSetAsideQueue } = require('../../../utils/setAsideQueue');
 const { arePathsOrUrlsEqual } = require('../../../utils/paths');
+const channelQueue = require('../../../audio/channelQueue');
+const transitions = require('../../../audio/transitions');
 const log = require('../../../utils/logger');
 
 function handleReorderPlaylists(ctx) {
@@ -161,12 +163,13 @@ async function handleMovePlaylistTrack(ctx) {
 }
 
 /**
- * Pose un aiguillage dans une playlist, avant ou après une ligne.
+ * Pose un aiguillage, avant ou après une ligne — dans une playlist ou dans la
+ * file d'attente.
  *
- * La file d'attente n'en accueille pas encore : elle n'a pas de forme rangée où
- * l'inscrire — ses titres vivent dans le lecteur, et n'y sont recopiés que le
- * temps qu'une playlist lui prenne la place. La demande est donc refusée plutôt
- * qu'à moitié honorée.
+ * Les deux se rangent désormais pareil : une playlist dans le stockage global,
+ * la file dans celui de son salon vocal. C'est ce rangement, et lui seul, qui
+ * permet à un aiguillage de désigner une position — le lecteur, lui, ne connaît
+ * jamais que la tête de liste.
  *
  * @param {object} ctx
  */
@@ -177,10 +180,8 @@ async function handleInsertTransition(ctx) {
     if (!container || !target || typeof index !== 'number') return;
     if (container === target) return;   // un aiguillage sur place ne mène nulle part
 
-    if (!String(container).startsWith('playlist_')) {
-        webServer._sendError('Les transitions ne se posent pour l\'instant que dans les playlists.');
-        return;
-    }
+    const versPlaylist = String(container).startsWith('playlist_');
+    if (!versPlaylist && container !== 'queue') return;
 
     // Une destination qui n'existe pas : la poser mènerait à un aiguillage
     // qu'on ne pourrait que consommer sans effet, le jour où on l'atteindrait.
@@ -188,10 +189,27 @@ async function handleInsertTransition(ctx) {
         return;
     }
 
-    const marker = database.insertPlaylistTransition(container, index, target);
-    if (!marker) return;
-
     const settings = database.getSettings(currentGuildId);
+
+    if (!versPlaylist) {
+        const liste = channelQueue.read(settings);
+        const at = Math.max(0, Math.min(index, liste.length));
+        liste.splice(at, 0, transitions.create(target));
+        channelQueue.write(currentGuildId, liste, settings);
+
+        /*
+         * Le lecteur porte peut-être des titres qui suivent désormais un
+         * aiguillage : il faut les lui reprendre, sans quoi il les jouerait
+         * par-dessus la bascule. `loadChannelQueue` le renourrit depuis le
+         * rangement, c'est-à-dire jusqu'au premier aiguillage — et pas au-delà.
+         */
+        webServer.loadChannelQueue(currentGuildId);
+        webServer.broadcastState(currentGuildId);
+        return;
+    }
+
+    if (!database.insertPlaylistTransition(container, index, target)) return;
+
     // La playlist qui joue vient de changer sous le lecteur : il a reçu ses
     // titres jusqu'à l'ancien premier aiguillage, et il en existe peut-être un
     // plus tôt désormais. On la lui redonne, sans le couper — `forceRestart`

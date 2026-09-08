@@ -13,6 +13,7 @@ const { ensureEngine } = require('../../../audio/mix');
 const { applySpeed, cancelMixEffects, applyLoudness } = require('../../../audio/playbackSettings');
 const loudness = require('../../../audio/loudness');
 const downloadFormats = require('../../../utils/downloadFormats');
+const channelQueue = require('../../../audio/channelQueue');
 const log = require('../../../utils/logger');
 
 /**
@@ -32,7 +33,25 @@ async function handleSelectChannel(ctx) {
             const previousGuildId = ws.selectedGuildId;
             ws.selectedGuildId = targetGuildId;
             ws.selectedVoiceChannelId = channelId;
+
+            /*
+             * Chaque salon garde sa file : on range celle qu'on quitte avant de
+             * charger celle qu'on rejoint.
+             *
+             * L'ordre est tout : le rangement se fait sous la clé du salon
+             * courant, si bien que ranger après le changement écrirait la file
+             * de l'ancien salon dans le nouveau — et l'écraserait.
+             */
+            if (database.getSettings(targetGuildId).lastVoiceChannelId !== channelId) {
+                webServer.stowChannelQueue(targetGuildId);
+            }
+
             database.setLastVoiceChannel(targetGuildId, channelId);
+
+            // Le chargement de la file du salon rejoint n'a pas lieu ici : la
+            // restauration plus bas s'en charge, au même endroit que la piste
+            // en cours et l'historique. Deux chemins concurrents se seraient
+            // écrasés l'un l'autre selon leur ordre.
 
             /*
              * L'élection du pilote suit le tableau de bord.
@@ -166,6 +185,11 @@ async function handleSelectChannel(ctx) {
                             const isPersonal = settings.broadcastMode === 'personal';
                             if (isPersonal) {
                                 const savedState = queue.channelStates[channelId];
+                                // La file en attente vient du rangement, et non de l'instantané : celui-ci
+                                // recopie les pistes champ par champ, et un aiguillage y perdrait sa
+                                // destination en chemin. Le reste de l'instantané — piste en cours,
+                                // position, historique — garde tout son rôle.
+                                if (savedState) savedState.queue = channelQueue.playable(database.getSettings(targetGuildId));
                                 queue.virtualCurrentTrack = savedState?.currentTrack || null;
                                 queue.virtualProgressMs = savedState?.currentProgress || 0;
                                 queue.virtualIsPlaying = !!savedState?.isPlaying;
@@ -188,6 +212,11 @@ async function handleSelectChannel(ctx) {
 
                         // 2. Charger le nouvel état du salon cible s'il existe
                         const savedState = queue.channelStates[channelId];
+                        // La file en attente vient du rangement, et non de l'instantané : celui-ci
+                        // recopie les pistes champ par champ, et un aiguillage y perdrait sa
+                        // destination en chemin. Le reste de l'instantané — piste en cours,
+                        // position, historique — garde tout son rôle.
+                        if (savedState) savedState.queue = channelQueue.playable(database.getSettings(targetGuildId));
                         if (savedState) {
                             const isPersonal = settings.broadcastMode === 'personal';
                             if (savedState.repeatMode !== undefined) {

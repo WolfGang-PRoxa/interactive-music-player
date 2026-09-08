@@ -20,6 +20,7 @@ const auth = require('./auth');
 const { arePathsOrUrlsEqual } = require('../utils/paths');
 const { readSetAsideQueue } = require('../utils/setAsideQueue');
 const transitions = require('../audio/transitions');
+const channelQueue = require('../audio/channelQueue');
 const { formatMs, parseDurationToMs } = require('../utils/duration');
 const artwork = require('../utils/artwork');
 const log = require('../utils/logger');
@@ -1187,6 +1188,23 @@ class WebServer {
         const position = this.getPlaybackPosition(queue, channelId, settings);
 
         if (queue && channelId && channelId === activeChannelId) {
+            /*
+             * Le lecteur vient d'avancer : le rangement s'aligne sur lui.
+             *
+             * Ici plutôt qu'aux dix endroits qui touchent la file — ajout,
+             * retrait, déplacement, vidage, passage au titre suivant. Un
+             * onzième oublierait la recopie, et le rangement mentirait sans
+             * que rien ne le dise. L'écriture de la base est différée : ces
+             * appels répétés se fondent en une seule.
+             *
+             * Le miroir ne photographie pas : il recolle ce que le lecteur
+             * porte avec ce que le rangement gardait après son premier
+             * aiguillage, que le lecteur n'a jamais reçu. Voir `channelQueue`.
+             */
+            channelQueue.mirror(queue.guild.id, isPersonal
+                ? (queue.virtualTracks || [])
+                : (queue.tracks ? queue.tracks.toArray() : []), settings);
+
             // Salon actif : renvoyer l'état en direct du lecteur
             return {
                 currentTrack: isPersonal
@@ -1195,13 +1213,22 @@ class WebServer {
                         ? formatTrackWithPreload(queue.transitionTrack)
                         : formatTrackWithPreload(queue.currentTrack)),
                 ...position,
-                // Une playlist occupe le lecteur : le panneau montre la file
-                // mise de côté, la même liste dans les deux modes.
-                queue: (settings.activePlaybackSource && settings.activePlaybackSource !== 'queue')
-                    ? readSetAsideQueue(settings).map(formatTrackWithPreload)
-                    : (isPersonal
-                        ? (queue.virtualTracks || []).map(formatTrackWithPreload)
-                        : (queue.tracks.map(formatTrackWithPreload).filter(t => !t || !queue.transitioningToEveryone || !queue.transitionTrack || t.url !== queue.transitionTrack.url))),
+                /*
+                 * Le panneau montre le rangement, et non le lecteur.
+                 *
+                 * Les deux disent la même chose de la tête de file — le miroir
+                 * vient de les aligner —, mais le lecteur ignore tout de ce qui
+                 * suit le premier aiguillage. Le lire directement escamoterait
+                 * la transition et les titres d'après, qui existent pourtant.
+                 *
+                 * Une playlist occupe-t-elle le lecteur ? Alors ce rangement est
+                 * exactement ce que la file gardait en attendant son tour : le
+                 * même chemin sert les deux cas.
+                 */
+                queue: channelQueue.read(settings)
+                    .map(formatTrackWithPreload)
+                    .filter(t => !t || !queue.transitioningToEveryone || !queue.transitionTrack
+                        || t.url !== queue.transitionTrack.url),
                 // Historique : la piste la plus récente en tête, dans les deux modes.
                 // C'est l'ordre naturel de `history.tracks`, une file LIFO — et celui
                 // que `virtualHistory` respecte désormais aussi.
@@ -1836,6 +1863,79 @@ class WebServer {
     }
 
     /**
+     * Range la file du salon qu'on s'apprête à quitter.
+     *
+     * À appeler **avant** que `lastVoiceChannelId` ne change : le rangement se
+     * fait sous la clé du salon courant, et l'ordre est donc tout ce qui
+     * distingue « ranger ce qu'on quitte » de « écraser ce qu'on rejoint ».
+     *
+     * @param {string} guildId
+     */
+    stowChannelQueue(guildId) {
+        const settings = database.getSettings(guildId);
+        if ((settings.activePlaybackSource || 'queue') !== 'queue') return;
+
+        const { useMainPlayer } = require('discord-player');
+        const queue = useMainPlayer().queues.get(guildId);
+        if (!queue) return;
+
+        const isPersonal = settings.broadcastMode === 'personal';
+        channelQueue.mirror(guildId, isPersonal
+            ? (queue.virtualTracks || [])
+            : (queue.tracks ? queue.tracks.toArray() : []), settings);
+    }
+
+    /**
+     * Charge dans le lecteur la file du salon qu'on vient de rejoindre.
+     *
+     * Chaque salon garde la sienne : un salon « soirée » et un salon « calme »
+     * ne se disputent plus la même liste, et la retrouvent au retour. Le lecteur
+     * n'en reçoit que la tête, jusqu'au premier aiguillage — le reste vit dans
+     * le rangement, et c'est ce qui permet à une transition d'y attendre son
+     * tour sans que le lecteur ne l'enjambe.
+     *
+     * Rien n'est fait si une playlist occupe le lecteur : la file du nouveau
+     * salon attendra son tour, comme celle de l'ancien l'attendait.
+     *
+     * @param {string} guildId
+     */
+    loadChannelQueue(guildId) {
+        const settings = database.getSettings(guildId);
+        if ((settings.activePlaybackSource || 'queue') !== 'queue') return;
+
+        const { useMainPlayer, Track } = require('discord-player');
+        const player = useMainPlayer();
+        const queue = player.queues.get(guildId);
+        if (!queue) return;
+
+        const attendus = channelQueue.playable(settings);
+
+        if (settings.broadcastMode === 'personal') {
+            queue.virtualTracks = attendus;
+            return;
+        }
+
+        queue.tracks.clear();
+        if (!attendus.length) return;
+
+        queue.addTrack(attendus.map((t) => {
+            const track = new Track(player, {
+                title: t.title,
+                author: t.author || 'Inconnu',
+                duration: t.duration || '0:00',
+                thumbnail: t.thumbnail || null,
+                url: t.url,
+                queryType: t.queryType || (t.url && t.url.startsWith('http') ? 'youtube' : 'file'),
+                raw: t.raw || {},
+            });
+            if (t.extractorName) {
+                track.extractor = player.extractors.store.get(t.extractorName) || null;
+            }
+            return track;
+        }));
+    }
+
+    /**
      * Bascule vers la destination d'un aiguillage, si la lecture vient d'en
      * atteindre un.
      *
@@ -1859,25 +1959,38 @@ class WebServer {
      */
     consumeTransition(guildId, _startProgressMs = 0) {
         const settings = database.getSettings(guildId);
+        const source = settings.activePlaybackSource || 'queue';
 
-        const source = settings.activePlaybackSource;
-        if (!source || !source.startsWith('playlist_')) return false;
-
-        const playlist = (database.getGlobalPlaylists() || []).find(p => p.id === source);
-        if (!playlist) return false;
-
-        const found = transitions.nextAfter(playlist.tracks || [],
-            typeof settings.playlistCurrentIndex === 'number' ? settings.playlistCurrentIndex : 0);
+        /*
+         * Les deux sources se lisent différemment, et pour une bonne raison.
+         *
+         * Une playlist est une liste fixe où la lecture avance un curseur :
+         * l'aiguillage à consulter est celui qui suit ce curseur. La file, elle,
+         * se consomme par la tête — ses titres joués la quittent —, si bien
+         * qu'un aiguillage atteint est simplement celui qui s'y trouve en
+         * premier.
+         */
+        const found = source === 'queue'
+            ? this._queueTransition(settings)
+            : this._playlistTransition(settings, source);
         if (!found) return false;
 
         const { transition } = found;
+        const playlist = source === 'queue'
+            ? { name: 'the pending queue' }
+            : (database.getGlobalPlaylists() || []).find(p => p.id === source);
         const nom = transitions.targetName(transition, database.getGlobalPlaylists());
         log.info(`[WebServer] Transition reached in « ${playlist.name} »: `
             + `switching to ${transition.target === 'queue' ? 'the pending queue' : `« ${nom} »`}.`);
 
         // Consommée : elle a servi, et ne doit pas se retrouver dans la liste
         // que la bascule va relire.
-        database.removePlaylistTransition(source, transition.id);
+        if (source === 'queue') {
+            channelQueue.write(guildId,
+                channelQueue.read(settings).filter(t => t.id !== transition.id), settings);
+        } else {
+            database.removePlaylistTransition(source, transition.id);
+        }
 
         /*
          * Une destination vide n'annule pas l'aiguillage.
@@ -1925,6 +2038,40 @@ class WebServer {
             queue: player.queues.get(guildId) || null,
             currentGuildId: guildId,
         });
+    }
+
+    /**
+     * L'aiguillage qu'une playlist épuisée vient d'atteindre.
+     *
+     * Le curseur de lecture désigne le dernier titre joué ; l'aiguillage est
+     * celui qui le suit immédiatement, et pas plus loin — voir `nextAfter`.
+     *
+     * @returns {{ transition: object, at: number }|null}
+     */
+    _playlistTransition(settings, source) {
+        if (!source.startsWith('playlist_')) return null;
+
+        const playlist = (database.getGlobalPlaylists() || []).find(p => p.id === source);
+        if (!playlist) return null;
+
+        return transitions.nextAfter(playlist.tracks || [],
+            typeof settings.playlistCurrentIndex === 'number' ? settings.playlistCurrentIndex : 0);
+    }
+
+    /**
+     * L'aiguillage qu'une file épuisée vient d'atteindre.
+     *
+     * Aucun curseur ici : la file se consomme par la tête, ses titres joués la
+     * quittent. Le lecteur n'ayant reçu que ce qui précédait l'aiguillage, une
+     * file épuisée est une file dont l'aiguillage est désormais en première
+     * position — et s'il ne l'est pas, il n'y en avait pas.
+     *
+     * @returns {{ transition: object, at: number }|null}
+     */
+    _queueTransition(settings) {
+        const [premier] = channelQueue.read(settings);
+        if (!transitions.isTransition(premier)) return null;
+        return { transition: premier, at: 0 };
     }
 
     /**
@@ -2199,6 +2346,19 @@ function trackHasVideo(t) {
 
 function formatTrackWithPreload(t) {
     if (!t) return null;
+
+    /*
+     * Un aiguillage traverse tel quel.
+     *
+     * Il n'a ni pochette, ni durée, ni qualité à figer — et `ensureTrackQuality`
+     * inscrirait une entrée dans la base pour chaque adresse `transition:`,
+     * qui s'y accumuleraient sans que rien ne les relise jamais. L'interface,
+     * elle, le reconnaît à son adresse et lui dessine sa propre ligne.
+     */
+    if (transitions.isTransition(t)) {
+        return { isTransition: true, id: t.id, target: t.target, url: t.url };
+    }
+
     const pInfo = getTrackPreloadInfo(t);
 
     // Qualité figée à la première rencontre de la piste, sur la base des

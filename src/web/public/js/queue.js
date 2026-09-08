@@ -487,6 +487,12 @@ window.MusicPlayer.updateQueueUI = function() {
         playlistQueueContainer.innerHTML = '';
         if (state.queue && state.queue.length > 0) {
             state.queue.forEach((track, index) => {
+                if (window.MusicPlayer.isTransition(track)) {
+                    playlistQueueContainer.appendChild(
+                        window.MusicPlayer.buildTransitionRow(track, { id: 'queue' }, index));
+                    return;
+                }
+
                 const item = document.createElement('div');
                 item.className = 'queue-item';
                 item.setAttribute('draggable', 'true');
@@ -505,7 +511,9 @@ window.MusicPlayer.updateQueueUI = function() {
                 item.appendChild(playbackBar);
 
                 window.MusicPlayer.setupRequalifyLayer(item);
-                window.MusicPlayer.attachQualityMenu(item, () => (window.MusicPlayer.state.queue || [])[index]);
+                window.MusicPlayer.attachQualityMenu(item,
+                    () => (window.MusicPlayer.state.queue || [])[index],
+                    () => ({ container: 'queue', index }));
 
                 item.addEventListener('dragstart', (e) => {
                     item.classList.add('is-dragging');

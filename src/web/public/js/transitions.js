@@ -93,6 +93,10 @@ window.MusicPlayer = window.MusicPlayer || {};
      * @returns {HTMLElement}
      */
     window.MusicPlayer.buildTransitionRow = function (transition, playlist, index) {
+        // Playlist ou file d'attente : la ligne est la même, seuls diffèrent le
+        // message de suppression et l'étiquette que le glissement emporte.
+        const dansLaFile = playlist.id === 'queue';
+
         const item = document.createElement('div');
         item.className = 'playlist-transition-item';
         item.setAttribute('draggable', 'true');
@@ -131,10 +135,9 @@ window.MusicPlayer = window.MusicPlayer || {};
         remove.dataset.i18nTooltip = 'transition_remove';
         remove.innerHTML = ICON_TRASH;
         remove.addEventListener('click', () => {
-            window.MusicPlayer.sendWS({
-                type: 'removeTrackFromPlaylist',
-                data: { playlistId: playlist.id, index },
-            });
+            window.MusicPlayer.sendWS(dansLaFile
+                ? { type: 'removeTrack', data: { index } }
+                : { type: 'removeTrackFromPlaylist', data: { playlistId: playlist.id, index } });
         });
         right.appendChild(remove);
 
@@ -142,9 +145,11 @@ window.MusicPlayer = window.MusicPlayer || {};
             item.classList.add('is-dragging');
             document.body.classList.add('is-dragging-active');
             window.MusicPlayer.activeDragData = {
-                sourceContainerId: 'playlist-tracks-list',
-                source: 'playlist_track',
+                sourceContainerId: dansLaFile ? 'queue-list' : 'playlist-tracks-list',
+                source: dansLaFile ? 'queue' : 'playlist_track',
                 isTransition: true,
+                // La liste d'origine, sous le nom que les zones de dépôt
+                // comparent : `queue` pour la file, l'identifiant sinon.
                 playlistId: playlist.id,
                 fromIndex: index,
                 url: transition.url,

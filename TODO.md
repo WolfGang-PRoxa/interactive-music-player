@@ -8,4 +8,4 @@
 
 - [x] Dans le menu clic droit des éléments, sous-menu « insérer une transition » : fait pour les playlists — destination au choix (autre playlist ou file d attente), insertion avant ou après la ligne cliquée, déplaçable seulement dans sa playlist, consommée à la lecture.
 
-- [ ] La même chose dans la file d attente. Elle n a pas de forme rangée où inscrire un aiguillage : ses titres vivent dans le lecteur, et n y sont recopiés que le temps qu une playlist lui prenne la place. Il lui faut donc d abord une liste persistante, comme en ont les playlists.
+- [x] La même chose dans la file d attente. Elle a désormais une liste persistante par salon vocal, comme les playlists ont la leur : chaque salon garde sa file et la retrouve au retour, et un aiguillage peut y désigner une position.

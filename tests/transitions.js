@@ -377,6 +377,60 @@ console.log('\nCe que l\'interface en montre, et interdit\n');
         'la carte du lecteur, celle de la file, et la liste elle-même');
 }
 
+// ───────────────────── L'aiguillage dans la file ─────────────────────
+
+console.log('\nLa file, qui se lit autrement qu\'une playlist\n');
+
+{
+    const SERVER = fs.readFileSync(path.join(ROOT, 'src', 'web', 'WebServer.js'), 'utf8');
+    const HANDLER = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'websocket', 'handlers', 'playlistHandlers.js'), 'utf8');
+    const FILE = fs.readFileSync(
+        path.join(ROOT, 'src', 'web', 'public', 'js', 'queue.js'), 'utf8');
+
+    /*
+     * Les deux sources ne se lisent pas pareil, et pour une bonne raison.
+     *
+     * Une playlist est une liste fixe où la lecture avance un curseur :
+     * l'aiguillage à consulter est celui qui suit ce curseur. La file, elle, se
+     * consomme par la tête — ses titres joués la quittent —, si bien qu'un
+     * aiguillage atteint est simplement celui qui s'y trouve en premier.
+     */
+    check('la file et la playlist ont chacune leur lecture',
+        /_queueTransition\(settings\)/.test(SERVER)
+        && /_playlistTransition\(settings, source\)/.test(SERVER));
+    check('  … la file regarde sa tête',
+        /const \[premier\] = channelQueue\.read\(settings\);/.test(SERVER),
+        'ses titres joués l\'ont quittée : l\'aiguillage atteint est le premier');
+    check('  … la playlist suit son curseur',
+        /transitions\.nextAfter\(playlist\.tracks \|\| \[\],/.test(SERVER),
+        'sa liste ne bouge pas : c\'est la position de lecture qui avance');
+
+    check('la file accepte désormais un aiguillage',
+        /const versPlaylist = String\(container\)\.startsWith\('playlist_'\);/.test(HANDLER)
+        && /if \(!versPlaylist && container !== 'queue'\) return;/.test(HANDLER));
+
+    /*
+     * Poser un aiguillage reprend au lecteur ce qui le suit.
+     *
+     * Il porte peut-être déjà des titres qui se trouvent désormais derrière la
+     * transition : sans cette reprise, il les jouerait par-dessus la bascule,
+     * et l'aiguillage n'arriverait jamais.
+     */
+    check('  … et le lecteur est renourri jusqu\'à lui',
+        /webServer\.loadChannelQueue\(currentGuildId\);/.test(HANDLER),
+        'sinon il jouerait par-dessus la bascule ce qu\'il avait déjà reçu');
+
+    check('l\'aiguillage consommé quitte le rangement de la file',
+        /channelQueue\.write\(guildId,\s*\n\s*channelQueue\.read\(settings\)\.filter/.test(SERVER),
+        'laissé en place, il se redéclencherait au titre suivant');
+
+    check('la file offre le sous-menu comme une playlist',
+        /\(\) => \(\{ container: 'queue', index \}\)/.test(FILE));
+    check('  … et sait dessiner la ligne',
+        /buildTransitionRow\(track, \{ id: 'queue' \}, index\)/.test(FILE));
+}
+
 // ───────────────────── Les traductions ─────────────────────
 
 console.log('\nCe que les quatre langues doivent dire\n');
