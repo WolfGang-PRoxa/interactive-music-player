@@ -1167,9 +1167,20 @@
 
 /* ── L'envoi ── */
 
+/* Le vert de la réussite, assombri pour porter du texte blanc.
+ *
+ * `--c-success` est un vert de pastille : il signale un état sur un fond
+ * sombre, où il doit trancher. Employé en aplat sous un libellé blanc, il ne
+ * donnait que 1,45 de contraste — le mot se lisait mal, et le bouton paraissait
+ * délavé au milieu d'une fenêtre par ailleurs sombre.
+ *
+ * Assombri de moitié, il monte à 4,6 : le seuil AA du texte courant, quelle que
+ * soit la taille. Le mélange plutôt qu'une teinte écrite en dur, pour que les
+ * sept thèmes gardent chacun son vert — c'est le leur qu'on fonce, pas un autre
+ * qu'on impose. */
 .share-invite-btn.is-sent {
-    background: var(--c-success, #43b581) !important;
-    border-color: var(--c-success, #43b581) !important;
+    background: color-mix(in srgb, var(--c-success, #57F287) 55%, #000) !important;
+    border-color: color-mix(in srgb, var(--c-success, #57F287) 55%, #000) !important;
     color: #fff !important;
     /* Le tassement de l'élan, puis le retour : la courbe rebondit une fois. */
     animation: share-invite-press 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);

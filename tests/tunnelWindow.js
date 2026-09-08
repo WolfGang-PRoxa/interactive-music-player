@@ -680,6 +680,49 @@ console.log('\nCe que le bouton d\'envoi répond\n');
         /clearTimeout\(btn\._sentBack\);/.test(SHARED));
 
     /*
+     * Le vert de réussite est un vert de pastille : il signale un état sur un
+     * fond sombre, où il doit trancher. En aplat sous un libellé blanc il ne
+     * donnait que 1,45 de contraste — le mot se lisait mal, et le bouton
+     * paraissait délavé au milieu d'une fenêtre par ailleurs sombre.
+     *
+     * Assombri de moitié, il passe à 4,6 : le seuil AA du texte courant, quelle
+     * que soit la taille. Mélangé plutôt qu'écrit en dur, pour que les sept
+     * thèmes gardent chacun le leur.
+     */
+    check('le vert du bouton est assombri pour porter du blanc',
+        /background: color-mix\(in srgb, var\(--c-success[^)]*\) 55%, #000\) !important/.test(CSS),
+        'le vert de pastille sous du blanc ne donne que 1,45 de contraste');
+    check('  … en partant du vert du thème, pas d\'une teinte imposée',
+        !/background: #[0-9a-f]{6} !important/i.test(
+            CSS.slice(CSS.indexOf('.share-invite-btn.is-sent {'),
+                CSS.indexOf('@keyframes share-invite-leave'))),
+        'les sept thèmes redéfinissent --c-success');
+
+    {
+        // Le calcul, refait ici : une valeur qui dérive doit faire échouer le
+        // test, pas seulement changer d'aspect.
+        const hex = (h) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+        const lum = (rgb) => {
+            const c = rgb.map((v) => {
+                const x = v / 255;
+                return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+            });
+            return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+        };
+        const contraste = (a, b) => {
+            const [h, l] = lum(a) > lum(b) ? [lum(a), lum(b)] : [lum(b), lum(a)];
+            return (h + 0.05) / (l + 0.05);
+        };
+
+        const base = hex('#57F287');   // --c-success du thème par défaut
+        const fondu = base.map((v) => Math.round(v * 0.55));
+        const ratio = contraste(fondu, [255, 255, 255]);
+
+        check('  … et le blanc y passe le seuil AA du texte courant',
+            ratio >= 4.5, `${ratio.toFixed(2)} contre 1,45 auparavant`);
+    }
+
+    /*
      * Trois temps, et c'est leur enchaînement qui raconte : l'élan, le départ,
      * l'arrivée. Chacun a ses images clés, et le nom de chacune dit ce qu'elle
      * fait — un mouvement dont on ne peut plus nommer les morceaux ne se relit
