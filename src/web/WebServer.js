@@ -156,7 +156,29 @@ class WebServer {
 
         this.server.listen(port, host, () => {
             const displayHost = (host === '0.0.0.0' || host === '::') ? 'localhost' : host;
-            log.success(`[WebServer] Dashboard reachable at: http://${displayHost}:${port}/?token=${token}`);
+
+            log.info(`[WebServer] Listening on http://${displayHost}:${port}.`);
+
+            /**
+             * Annonce l'adresse par laquelle entrer.
+             *
+             * Elle donnait l'interface d'écoute, qui sert bien la page mais ne
+             * portera jamais de session : l'aller-retour Discord revient sur
+             * `PUBLIC_URL`, et le cookie s'y pose. Suivre la trace menait donc à
+             * une porte de connexion qu'aucun clic ne franchit.
+             *
+             * Dite après le relevé de partage, et non avant : `PUBLIC_URL` peut
+             * se déduire de la machine à cet instant-là, et l'annoncer plus tôt
+             * reviendrait à donner l'adresse d'avant la déduction.
+             */
+            const announceEntry = () => {
+                const entry = require('./oauth').publicUrl();
+                log.success(`[WebServer] Dashboard reachable at: ${entry}/?token=${token}`);
+                if (entry !== `http://${displayHost}:${port}`) {
+                    log.info('[WebServer] The listening address serves the page too, '
+                        + 'but holds no sign-in session: use the address above.');
+                }
+            };
             if (host === '0.0.0.0' || host === '::') {
                 log.warn(`[WebServer] The dashboard is exposed on every network interface (HOST=${host}).`);
             }
@@ -195,11 +217,13 @@ class WebServer {
                         + shared.publicUrl);
                 }
                 require('./oauth').logConfiguration();
+                announceEntry();
             }).catch((err) => {
                 // Le partage est un confort : son diagnostic ne doit jamais
                 // empêcher la trace qui suit, ni le démarrage.
                 log.warn(`[Tailscale] Sharing state unknown: ${err.message}`);
                 require('./oauth').logConfiguration();
+                announceEntry();
             });
 
             // Ouvrir automatiquement le navigateur après 5 secondes si aucun client n'est connecté
@@ -217,8 +241,26 @@ class WebServer {
                 if (this.wss.clients.size === 0) {
                     log.success(`[WebServer] No connected client detected. Opening the dashboard automatically.`);
                     const { exec } = require('child_process');
-                    // Le jeton est passé en query : le middleware pose le cookie puis nettoie l'URL.
-                    const url = `http://${displayHost}:${port}/?token=${token}`;
+                    /*
+                     * Sur l'origine où Discord renvoie, et nulle part ailleurs.
+                     *
+                     * Une session vit dans un cookie, et un cookie appartient à
+                     * une origine. L'aller-retour de connexion revient toujours
+                     * sur `PUBLIC_URL` — ou sur `localhost` à défaut : c'est
+                     * donc la seule adresse où une session puisse exister.
+                     *
+                     * Cette fenêtre s'ouvrait sur l'interface d'écoute,
+                     * `127.0.0.1`, qui n'en porte aucune et n'en portera jamais.
+                     * Elle affichait donc la porte de connexion à chaque
+                     * lancement, et s'y connecter n'y changeait rien : le retour
+                     * de Discord posait le cookie sur l'autre origine. Même sans
+                     * PUBLIC_URL le piège tenait, `localhost` et `127.0.0.1`
+                     * étant deux origines distinctes pour un navigateur.
+                     *
+                     * Le jeton reste passé en query : le middleware pose le
+                     * cookie puis nettoie l'URL.
+                     */
+                    const url = `${require('./oauth').publicUrl()}/?token=${token}`;
                     let cmd;
                     if (process.platform === 'win32') {
                         cmd = `start "" "${url}"`;

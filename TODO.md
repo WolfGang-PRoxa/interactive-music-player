@@ -1,1 +1,1 @@
-- [ ] A chaque fois que je lance le bot (pas relancer, mais lancer), il me redemande de m'authentifier avec mon compte Discord. Alors qu'il s'agit de la fenêtre ouverte automatiquement par le bot.
+- [x] A chaque fois que je lance le bot (pas relancer, mais lancer), il me redemande de m authentifier avec mon compte Discord : la fenêtre s ouvrait sur l interface d écoute (127.0.0.1), qui ne porte aucune session — Discord renvoie sur PUBLIC_URL. Elle s ouvre désormais sur cette origine-là.

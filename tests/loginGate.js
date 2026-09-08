@@ -275,6 +275,67 @@ server.listen(0, '127.0.0.1', async () => {
     check('seule la portée « identify » est demandée',
         /scope[^\n]*identify/.test(OAUTH) && !/guilds\.join|email/.test(OAUTH));
 
+    // ───────── L'origine sur laquelle la fenêtre s'ouvre ─────────
+
+    console.log('\nOù le bot ouvre le tableau de bord\n');
+
+    {
+        /*
+         * Une session vit dans un cookie, et un cookie appartient à une
+         * origine. L'aller-retour de connexion revient toujours sur
+         * `PUBLIC_URL` — ou sur `localhost` à défaut : c'est donc la seule
+         * adresse où une session puisse exister.
+         *
+         * La fenêtre s'ouvrait sur l'interface d'écoute, `127.0.0.1`, qui n'en
+         * porte aucune et n'en portera jamais. Elle montrait donc la porte de
+         * connexion à chaque lancement, et s'y connecter n'y changeait rien :
+         * le retour de Discord posait le cookie sur l'autre origine.
+         *
+         * Le piège tenait même sans PUBLIC_URL, `localhost` et `127.0.0.1`
+         * étant deux origines distinctes pour un navigateur.
+         */
+        const oauthPath = path.join(ROOT, 'src', 'web', 'oauth.js');
+        const origine = (u) => new URL(u).origin;
+        const avant = process.env.PUBLIC_URL;
+        process.env.PORT = process.env.PORT || '3000';
+
+        for (const [nom, valeur] of [
+            ['avec PUBLIC_URL', 'https://exemple.ts.net'],
+            ['sans PUBLIC_URL', ''],
+        ]) {
+            delete require.cache[require.resolve(oauthPath)];
+            if (valeur) process.env.PUBLIC_URL = valeur; else delete process.env.PUBLIC_URL;
+            const oauth = require(oauthPath);
+
+            check(`${nom} : la fenêtre s'ouvre là où Discord renvoie`,
+                origine(`${oauth.publicUrl()}/?token=x`) === origine(oauth.redirectUri()),
+                oauth.publicUrl());
+            check(`  … et l'interface d'écoute n'y menait pas`,
+                origine('http://127.0.0.1:3000/') !== origine(oauth.redirectUri()),
+                'deux origines distinctes ne partagent aucun cookie');
+        }
+
+        delete require.cache[require.resolve(oauthPath)];
+        if (avant) process.env.PUBLIC_URL = avant; else delete process.env.PUBLIC_URL;
+
+        const SERVER = fs.readFileSync(path.join(ROOT, 'src', 'web', 'WebServer.js'), 'utf8');
+        check('l\'ouverture automatique suit cette origine',
+            /const url = `\$\{require\('\.\/oauth'\)\.publicUrl\(\)\}\/\?token=\$\{token\}`;/.test(SERVER)
+            && !/const url = `http:\/\/\$\{displayHost\}/.test(SERVER));
+        check('  … et la trace de démarrage annonce la même',
+            /Dashboard reachable at: \$\{entry\}/.test(SERVER));
+
+        /*
+         * Dite après le relevé de partage : `PUBLIC_URL` peut se déduire de la
+         * machine à cet instant-là, et l'annoncer plus tôt donnerait l'adresse
+         * d'avant la déduction.
+         */
+        check('  … une fois l\'adresse publique déduite',
+            SERVER.indexOf('const announceEntry') < SERVER.indexOf('announceEntry();')
+            && (SERVER.match(/\n\s*announceEntry\(\);/g) || []).length === 2,
+            'les deux issues du relevé de partage');
+    }
+
     // ───────── Les traductions ─────────
 
     console.log('\nCe que les quatre langues doivent dire\n');
