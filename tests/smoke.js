@@ -156,8 +156,39 @@ async function stageIntegration() {
         check('the commands are loaded', /commands loaded/.test(output));
         check('no extractor error at startup', !/\[ERROR\s*\].*[Ee]xtractor/.test(output));
 
+        /*
+         * Sans jeton ni session, le tableau de bord ne part pas. Deux réponses
+         * le disent, et il faut les accepter toutes deux.
+         *
+         * La porte tente d'abord de reconnaître son visiteur sans le déranger —
+         * voir `shouldTrySilentLogin` dans web/auth.js : un invité déjà accepté
+         * n'a pas à recliquer « Se connecter » à chaque venue. Elle ne sert sa
+         * page de refus qu'une fois cet essai manqué. Une installation dont
+         * l'application Discord n'est pas configurée n'a rien à tenter et refuse
+         * tout de suite.
+         *
+         * Ce qui ne doit jamais arriver, dans un cas comme dans l'autre, c'est
+         * que la page du tableau de bord soit servie. C'est cela, le contrat —
+         * le code de retour n'en est que la forme.
+         */
         const withoutToken = await request('/', { Accept: 'text/html' });
-        check('access denied without a token', withoutToken.code === 401, `HTTP ${withoutToken.code}`);
+        const bounced = withoutToken.code === 302
+            && /^\/auth\/discord\?silent=1/.test(withoutToken.headers.location || '');
+        check('no dashboard without a token',
+            (withoutToken.code === 401 || bounced)
+            && !withoutToken.fakeBody.includes('id="dashboard-grid"'),
+            `HTTP ${withoutToken.code}`
+            + (bounced ? ` → ${withoutToken.headers.location}` : ''));
+
+        /*
+         * Et l'essai muet ne se retente pas. Le rappel revient marqué de
+         * `login=manual` après un refus de Discord ; cette marque doit donner la
+         * page de refus, et non une seconde redirection — sans quoi le
+         * navigateur tournerait en rond entre les deux.
+         */
+        const retried = await request('/?login=manual', { Accept: 'text/html' });
+        check('  … and a failed silent attempt lands on the refusal page',
+            retried.code === 401, `HTTP ${retried.code}`);
 
         const t = token();
         const withToken = await request(`/?token=${encodeURIComponent(t)}`, { Accept: 'text/html' });

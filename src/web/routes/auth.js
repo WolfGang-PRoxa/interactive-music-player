@@ -18,6 +18,7 @@
 const express = require('express');
 const oauth = require('../oauth');
 const sessions = require('../sessions');
+const guests = require('../guests');
 const owner = require('../owner');
 const auth = require('../auth');
 const log = require('../../utils/logger');
@@ -167,16 +168,65 @@ function createAuthRouter(webServer) {
          */
         const switching = req.query.switch === '1';
 
+        /*
+         * L'essai muet, celui que la porte tente d'elle-même.
+         *
+         * Un invité déjà admis ne devrait pas avoir à cliquer « Se connecter »
+         * chaque fois qu'il revient : son cookie de session ne dure que trente
+         * jours, et se perd d'un navigateur à l'autre. La porte demande donc
+         * d'abord à Discord, en silence, s'il reconnaît le visiteur — voir
+         * `js/loginGate.js`. Le drapeau dit au rappel de rendre la main sans
+         * page d'erreur si la réponse est non.
+         */
+        const silent = req.query.silent === '1';
+
         res.redirect(302, oauth.buildAuthorizeUrl(safeReturnTo, {
             holdsToken: auth.identify(req).holdsToken,
             claim: switching,
+            silent,
         }));
     });
+
+    /**
+     * Rend la main à la porte du tableau de bord après un essai muet manqué.
+     *
+     * Le visiteur n'a rien demandé et ne doit rien voir : ni page d'erreur, ni
+     * explication. Le paramètre dit seulement à `loginGate.js` de ne pas
+     * retenter — sans quoi la porte relancerait l'essai, qui échouerait de
+     * nouveau, indéfiniment.
+     */
+    function giveUpSilently(res, returnTo) {
+        const url = new URL(returnTo || '/', 'http://localhost');
+        url.searchParams.set('login', 'manual');
+        return res.redirect(302, url.pathname + url.search);
+    }
 
     router.get('/discord/callback', async (req, res) => {
         const { code, state, error } = req.query;
 
+        /*
+         * Le `state` est consommé avant toute chose, y compris avant l'examen
+         * d'une erreur.
+         *
+         * Discord renvoie `error` et `state` ensemble quand il refuse, et c'est
+         * le `state` qui dit si quelqu'un a cliqué ou si la porte tentait sa
+         * chance. Dans l'ordre inverse — l'erreur d'abord — un essai muet
+         * s'achevait sur « Autorisation refusée » en pleine page, alors que
+         * personne n'avait rien demandé.
+         */
+        const route = oauth.consumeState(typeof state === 'string' ? state : '');
+
         if (error) {
+            /*
+             * `login_required`, `consent_required`, `interaction_required` : la
+             * réponse normale de Discord à une demande muette quand le visiteur
+             * n'a pas de session chez lui, ou n'a jamais autorisé cette
+             * application. Ce n'est pas un incident, c'est un « non ».
+             */
+            if (route && route.silent) {
+                log.info(`[OAuth] Silent reconnection declined by Discord (${error}).`);
+                return giveUpSilently(res, route.returnTo);
+            }
             return res.status(400).type('html').send(errorPage(
                 'Autorisation refusée',
                 'Vous avez refusé l\'accès, ou Discord l\'a interrompu.',
@@ -184,7 +234,6 @@ function createAuthRouter(webServer) {
             ));
         }
 
-        const route = oauth.consumeState(typeof state === 'string' ? state : '');
         if (!route) {
             // Rappel sans `state` valable : lien périmé, rejoué, ou forgé.
             return res.status(400).type('html').send(errorPage(
@@ -194,6 +243,7 @@ function createAuthRouter(webServer) {
         }
 
         if (typeof code !== 'string' || !code) {
+            if (route.silent) return giveUpSilently(res, route.returnTo);
             return res.status(400).type('html').send(errorPage(
                 'Réponse incomplète',
                 'Discord n\'a pas renvoyé de code d\'autorisation.'
@@ -205,6 +255,7 @@ function createAuthRouter(webServer) {
             user = await oauth.identifyFromCode(code);
         } catch (err) {
             log.error(`[OAuth] Authentication failed: ${err.message}`);
+            if (route.silent) return giveUpSilently(res, route.returnTo);
             return res.status(502).type('html').send(errorPage(
                 'Authentification impossible',
                 'Discord a refusé la demande. L\'URL de rappel déclarée dans le portail '
@@ -215,6 +266,10 @@ function createAuthRouter(webServer) {
 
         if (!(await isKnownMember(webServer?.client, user.id))) {
             log.warn(`[OAuth] Access denied to ${user.username} (${user.id}): member of no guild the bot is in.`);
+            // Le refus se dit, même au terme d'un essai muet : celui-ci portait
+            // sur « qui êtes-vous », pas sur « avez-vous le droit d'entrer ». Le
+            // taire laisserait le visiteur devant une porte qui se rouvre sans
+            // jamais dire pourquoi elle ne cède pas.
             return res.status(403).type('html').send(errorPage(
                 'Accès refusé',
                 'Votre compte Discord ne fait partie d\'aucun serveur où ce bot est présent.'
@@ -249,6 +304,17 @@ function createAuthRouter(webServer) {
              */
             owner.transfer(user);
         }
+
+        /*
+         * Le carnet, avant la session.
+         *
+         * La session dit « cet onglet est à Paul » et s'éteint au bout de trente
+         * jours ; le carnet dit « Paul est déjà venu » et ne s'éteint pas. Sans
+         * lui, un invité pourvu de droits mais dont le cookie a expiré
+         * disparaissait de la fenêtre de partage, nom et avatar compris, alors
+         * que ses droits étaient toujours inscrits dans les réglages.
+         */
+        guests.remember(user);
 
         const { id } = sessions.create(user);
         res.cookie(sessions.COOKIE_NAME, id, {

@@ -466,7 +466,6 @@ console.log('\nCe qu\'un clic droit sur un aiguillage permet\n');
         path.join(ROOT, 'src', 'web', 'public', 'js', 'transitions.js'), 'utf8');
     const HANDLER = fs.readFileSync(
         path.join(ROOT, 'src', 'web', 'websocket', 'handlers', 'playlistHandlers.js'), 'utf8');
-    const DROITS = fs.readFileSync(path.join(ROOT, 'src', 'web', 'permissions.js'), 'utf8');
 
     check('la ligne d\'aiguillage écoute le clic droit',
         /item\.addEventListener\('contextmenu'/.test(CLIENT)
@@ -519,7 +518,21 @@ console.log('\nCe qu\'un clic droit sur un aiguillage permet\n');
         (HANDLER.match(/if \(container === target\) return;/g) || []).length === 2,
         'à la pose comme à la modification');
 
-    check('la modification est soumise à un droit', /setTransitionTarget: '/.test(DROITS));
+    /*
+     * Interrogé sur le module plutôt que sur son texte.
+     *
+     * La table des droits s'écrivait « type: 'groupe' », et un simple grep
+     * suffisait. Depuis qu'un droit se déclare avec les messages qu'il ouvre,
+     * ce nom-là vit dans un tableau, et le grep échouait alors que le droit
+     * était bel et bien exigé. Poser la question au module ne peut pas mentir.
+     */
+    const droits = require(path.join(ROOT, 'src', 'web', 'permissions.js'));
+    check('la modification est soumise à un droit',
+        droits.MESSAGE_RIGHTS.setTransitionTarget === 'playlists.transitions',
+        String(droits.MESSAGE_RIGHTS.setTransitionTarget));
+    check('  … le même que celui de la pose',
+        droits.MESSAGE_RIGHTS.insertTransition === droits.MESSAGE_RIGHTS.setTransitionTarget,
+        'poser un aiguillage et le modifier sont une seule fonctionnalité');
 }
 
 {

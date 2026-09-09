@@ -33,6 +33,15 @@
  * manquant dans un fichier. Le jeton y reprend son ancien rôle, et l'interface
  * le dit au lieu de le taire.
  *
+ * **On demande son nom au visiteur avant de lui fermer la porte.** Un invité
+ * qui revient n'a ni jeton ni session : il n'est donc pas autorisé, et tombait
+ * sur la page de refus — où il devait recliquer « Se connecter avec Discord » à
+ * chaque venue, son cookie ne durant que trente jours. Le middleware tente
+ * d'abord une reconnaissance muette (voir `shouldTrySilentLogin`), qui ne
+ * dérange personne : Discord répond sans rien afficher, ou refuse, auquel cas
+ * la page de refus est servie comme avant. Le trajet n'accorde aucun droit — il
+ * répond à « qui êtes-vous », jamais à « pouvez-vous entrer ».
+ *
  * Ce module ne tranche pas les droits. Il répond seulement à « qui frappe ? »,
  * et refuse ceux qui ne sont ni l'un ni l'autre.
  */
@@ -272,6 +281,41 @@ function oauthConfigured() {
     }
 }
 
+/**
+ * Faut-il tenter de reconnaître ce visiteur sans rien lui demander ?
+ *
+ * Quatre conditions, et chacune écarte un cas où le détour nuirait :
+ *
+ *  - **une navigation, pas une ressource.** Une balise `<audio src>` ou un appel
+ *    de l'interface qui recevrait une redirection vers discord.com n'en ferait
+ *    rien de bon ; seule une page que le navigateur affiche peut suivre le
+ *    trajet. D'où la méthode `GET` et l'entête `Accept` porteur de `text/html`.
+ *  - **l'application Discord configurée.** Sans elle, la redirection ne mènerait
+ *    qu'à une page d'erreur, là où la page de refus explique au moins quoi faire.
+ *  - **un seul essai.** `login=manual` est posé par le rappel après un échec :
+ *    sans cette marque, un refus de Discord renverrait ici, qui redemanderait,
+ *    et le navigateur tournerait en rond jusqu'à ce qu'il s'en plaigne.
+ *
+ * @param {import('http').IncomingMessage} req
+ * @returns {boolean}
+ */
+function shouldTrySilentLogin(req) {
+    if (req.method !== 'GET') return false;
+    if (!(req.headers.accept || '').includes('text/html')) return false;
+    if (!oauthConfigured()) return false;
+
+    try {
+        const url = new URL(req.originalUrl || req.url, 'http://localhost');
+        if (url.searchParams.get('login') === 'manual') return false;
+    } catch (e) {
+        // URL illisible : mieux vaut la page de refus qu'une redirection bâtie
+        // sur une adresse qu'on n'a pas su lire.
+        return false;
+    }
+
+    return true;
+}
+
 function unauthorizedPage() {
     // Chargé ici et non en tête de fichier : oauth.js ne sert qu'au moment du
     // refus, et l'exiger au chargement ferait dépendre l'authentification de
@@ -326,6 +370,34 @@ function middleware(req, res, next) {
     const identity = identify(req);
 
     if (!identity.authorized) {
+        /*
+         * La reconnaissance muette, avant la porte close.
+         *
+         * C'est ici que passe l'invité qui revient, et nulle part ailleurs : il
+         * n'a ni jeton ni session, donc `pendingLogin` est faux et la fenêtre de
+         * connexion du tableau de bord ne le verra jamais — il tombe sur cette
+         * page-ci. Sans ce détour, quelqu'un d'accepté la semaine dernière
+         * devait recliquer « Se connecter avec Discord » à chaque venue, son
+         * cookie de session ne durant que trente jours et ne franchissant pas la
+         * frontière entre deux navigateurs.
+         *
+         * On lui demande donc son nom sans le déranger : `silent=1` pose
+         * `prompt=none` sur la demande, ce qui interdit à Discord d'afficher
+         * quoi que ce soit. Ou bien il reconnaît le visiteur et le renvoie
+         * identifié — la page s'ouvre, ses droits retrouvés —, ou bien il répond
+         * « je ne peux pas sans lui parler », et le rappel revient ici avec
+         * `login=manual`, qui fait servir la page ci-dessous comme avant.
+         *
+         * Rien n'est accordé au passage : l'essai répond à « qui êtes-vous »,
+         * jamais à « pouvez-vous entrer ». Un compte membre d'aucun serveur du
+         * bot est refusé au rappel, comme il l'a toujours été.
+         */
+        if (shouldTrySilentLogin(req)) {
+            const returnTo = req.originalUrl || req.url || '/';
+            return res.redirect(302,
+                `/auth/discord?silent=1&returnTo=${encodeURIComponent(returnTo)}`);
+        }
+
         res.status(401);
         if ((req.headers.accept || '').includes('text/html')) {
             return res.type('html').send(unauthorizedPage());

@@ -14,6 +14,9 @@ cache mémoire faisant autorité pendant l'exécution.
 | `data/settings.json` | Réglages par serveur + playlists globales | À chaque modification, regroupées sur 120 ms |
 | `data/playback_state.json` | Dernier état de lecture connu | Toutes les 5 s et sur événement |
 | `data/dashboard-token` | Jeton d'accès | Une fois, au premier démarrage |
+| `data/sessions.json` | Sessions Discord ouvertes | À l'ouverture, puis regroupées sur 5 s |
+| `data/guests.json` | Carnet des invités déjà venus | À chaque venue, regroupées sur 5 s |
+| `data/owner.json` | Compte propriétaire de l'installation | Une fois, à la revendication |
 
 > `better-sqlite3` figure en `optionalDependencies` mais **n'est jamais
 > importé**. C'est un reliquat d'une approche abandonnée : la compilation native

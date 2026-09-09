@@ -73,6 +73,46 @@ Socket gilt als Gast ohne Rechte, nie als Master. Solange das Token den Master
 machte, war dieser Rückfall folgenlos; jetzt öffnete er bei einem Zwischenfall
 alles.
 
+### Sich an einen Gast erinnern
+
+Eine Discord-Sitzung dauert dreißig Tage und überschreitet die Grenze zwischen
+zwei Browsern nicht. Ein angenommener Gast musste daher bei jedem Besuch erneut
+auf „Anmelden“ klicken und — schlimmer — *verschwand aus dem Fenster des
+Meisters*, sobald seine Sitzung ablief: die Gästeliste wurde aus den offenen
+Sitzungen gelesen, während seine Rechte in den Einstellungen eingetragen
+blieben.
+
+Zwei Fragen waren vermengt, und sie zu trennen genügt:
+
+- **wer ist diese Person?** — das Gästebuch
+  ([`guests.js`](../../../src/web/guests.js)), nach `data/guests.json`
+  geschrieben, das mindestens so lange hält wie die Rechte, die es begleitet;
+- **gehört dieser Tab ihr?** — die Sitzung
+  ([`sessions.js`](../../../src/web/sessions.js)), mit der kurzen Lebensdauer,
+  die das verdient.
+
+Das Buch enthält **kein Geheimnis**: kein Token, kein Discord-Zugangstoken,
+nichts, womit man sich für jemanden ausgeben könnte. Darin zu stehen bedeutet
+„dieses Konto hat sich mindestens einmal angemeldet“, nie „dieses Konto darf…“.
+Ein entlassener Gast fällt heraus, sonst wäre die Ablehnung keine.
+
+Die Tür versucht dann, ihren Besucher zu erkennen, bevor sie ihm eine
+Schaltfläche zeigt. Der Versuch läuft über `prompt=none`, was Discord verbietet,
+irgendetwas anzuzeigen: entweder es erkennt das Konto und schickt es
+identifiziert zurück, oder es antwortet `login_required` — eine normale Antwort,
+kein Zwischenfall — und die Tür zeigt ihre Schaltfläche wie zuvor.
+
+Der Versuch wird nicht wiederholt: der Rückruf kehrt mit `?login=manual` zurück,
+zusätzlich zu einer Markierung im `sessionStorage`. Ohne dieses Gedächtnis
+löste ein Fehlschlag einen weiteren Versuch aus, endlos. Beide Spuren sind
+nötig — der Parameter überlebt den Herkunftswechsel des Rückrufs, der Speicher
+überlebt das Aufräumen der URL.
+
+**Unterwegs wird kein Recht erteilt.** Das stille Erkennen beantwortet „wer bist
+du“, nie „darfst du herein“: ein Konto, das keinem Server des Bots angehört,
+wird dort wie überall abgewiesen, und ein erkannter Gast erhält genau die
+Rechte zurück, die man ihm gelassen hatte, kein einziges mehr.
+
 ### Herkunft des Tokens
 
 `DASHBOARD_TOKEN`, sofern gesetzt, sonst ein beim ersten Start erzeugtes Token

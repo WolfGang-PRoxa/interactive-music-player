@@ -1349,12 +1349,20 @@
     padding: 0.8rem 0;
 }
 
+/*
+ * Une personne, repliée par défaut.
+ *
+ * La fenêtre montre vingt-neuf droits par invité : tout déplier d'emblée
+ * donnerait un mur de plusieurs écrans où l'on ne trouverait plus personne.
+ * L'en-tête suffit à répondre aux questions courantes — qui est là, combien de
+ * droits a-t-il — et le détail ne s'ouvre que pour celui qu'on vient régler.
+ */
 .share-person {
     border: 1px solid var(--border-card);
     border-radius: 14px;
-    padding: 0.85rem 1rem;
     background: var(--bg-select);
     transition: border-color 0.2s ease, background 0.2s ease;
+    overflow: hidden;
 }
 
 /* Un invité pourvu se distingue au premier coup d'oeil dans la liste. */
@@ -1363,11 +1371,15 @@
     background: color-mix(in srgb, var(--c-violet) 7%, transparent);
 }
 
+.share-person.is-open {
+    border-color: color-mix(in srgb, var(--c-violet) 60%, transparent);
+}
+
 .share-person-head {
     display: flex;
     align-items: center;
     gap: 0.7rem;
-    margin-bottom: 0.7rem;
+    padding: 0.7rem 0.9rem;
 }
 
 .share-person-avatar {
@@ -1384,10 +1396,36 @@
     color: var(--text-main);
 }
 
+/*
+ * La présence se lit sur l'avatar, pas seulement dans le texte.
+ *
+ * Un liseré vert autour du portrait est reconnu sans être lu : c'est la
+ * convention de toutes les messageries, et elle épargne au regard de parcourir
+ * une colonne d'étiquettes pour trouver qui est joignable. Le hors-ligne
+ * s'éteint plutôt qu'il ne se marque — il est l'état ordinaire, il n'a pas à
+ * réclamer l'attention.
+ */
+.share-person-avatar.is-online {
+    box-shadow: 0 0 0 2px var(--bg-select), 0 0 0 4px var(--c-success);
+}
+
+.share-person-avatar.is-offline {
+    filter: saturate(0.55);
+    opacity: 0.75;
+}
+
+.share-person-identity {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.15rem 0.5rem;
+    flex: 1;
+    min-width: 0;
+}
+
 .share-person-name {
     font-weight: 600;
     color: var(--text-main);
-    flex: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1395,24 +1433,54 @@
 }
 
 /*
- * État d'authentification. Un auditeur qui n'a pas encore suivi le lien ne peut
- * rien recevoir : ses cases restent inertes, et cette mention dit pourquoi.
+ * Une seule ligne d'état, trois teintes.
+ *
+ * Vert : présent maintenant. Neutre : connu, mais parti — c'est le cas que
+ * l'ancienne fenêtre ne savait pas dire, l'invité y disparaissait avec sa
+ * session. Ambre : jamais venu, donc rien à lui accorder pour l'instant.
  */
 .share-person-state {
     font-size: 0.72rem;
-    padding: 0.2em 0.6em;
-    border-radius: 20px;
-    flex-shrink: 0;
-    background: var(--bg-hover);
+    white-space: nowrap;
     color: var(--text-muted);
 }
 
-.share-person-state.connected {
-    background: color-mix(in srgb, var(--c-success) 15%, transparent);
+.share-person-state.is-online {
     color: var(--c-success);
+    font-weight: 600;
 }
 
-.btn-share-revoke {
+.share-person-state.is-stranger {
+    color: var(--c-accent);
+}
+
+.share-person-here {
+    font-size: 0.68rem;
+    padding: 0.15em 0.5em;
+    border-radius: 20px;
+    background: var(--bg-hover);
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+/* Le compte des droits, lisible sans déplier. */
+.share-person-tally {
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+    padding: 0.2em 0.55em;
+    border-radius: 20px;
+    background: var(--bg-hover);
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.share-person-tally.has-grants {
+    background: color-mix(in srgb, var(--c-violet) 18%, transparent);
+    color: var(--c-violet);
+    font-weight: 600;
+}
+
+.share-person-fold {
     background: none;
     border: 1px solid transparent;
     color: var(--text-muted);
@@ -1423,55 +1491,288 @@
     place-items: center;
     cursor: pointer;
     flex-shrink: 0;
-    transition: all 0.2s ease;
+    transition: transform 0.2s ease, color 0.2s ease, background 0.2s ease;
 }
 
-.btn-share-revoke svg {
-    width: 15px;
-    height: 15px;
+.share-person-fold svg {
+    width: 16px;
+    height: 16px;
 }
 
-.btn-share-revoke:hover {
-    color: var(--c-error);
-    border-color: color-mix(in srgb, var(--c-error) 40%, transparent);
-    background: color-mix(in srgb, var(--c-error) 10%, transparent);
+.share-person-fold:hover {
+    color: var(--text-main);
+    background: var(--bg-hover);
+}
+
+.share-person.is-open .share-person-fold {
+    transform: rotate(180deg);
+    color: var(--c-violet);
+}
+
+/* ── Le détail, une fois déplié ─────────────────────────────────── */
+
+.share-person-panel {
+    padding: 0 0.9rem 0.85rem;
+    border-top: 1px solid var(--border-card);
+    padding-top: 0.8rem;
+}
+
+.share-person-note {
+    margin: 0 0 0.7rem;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: var(--text-muted);
+    padding: 0.55rem 0.7rem;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--c-accent) 10%, transparent);
 }
 
 /*
- * Deux colonnes fixes, et chaque paire sur son propre fond.
+ * Les rôles tout faits, en tête du détail.
  *
- * En colonnes automatiques, les quatre paires se rangeaient sur trois colonnes
- * puis une seule : le libelle d'une paire se retrouvait cote a cote avec
- * l'interrupteur de la precedente, et la lecture se faisait en diagonale. Rien
- * ne disait plus quel interrupteur allait avec quel droit.
+ * Ils ne sont pas un niveau de plus dans le modèle : un rôle pose une poignée
+ * de cases d'un coup, et décocher l'une d'elles fait aussitôt passer la ligne
+ * en « personnalisé ». La mention est donc un état, pas un quatrième bouton —
+ * d'où le texte plutôt que la pastille cliquable.
  */
-.share-grants {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.4rem 0.8rem;
+.share-presets {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.75rem;
 }
 
-.share-grant {
+.share-preset {
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.35em 0.85em;
+    border-radius: 20px;
+    border: 1px solid var(--border-card);
+    background: var(--bg-hover);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.18s ease;
+}
+
+.share-preset:hover:not(:disabled) {
+    color: var(--text-main);
+    border-color: color-mix(in srgb, var(--c-violet) 50%, transparent);
+}
+
+.share-preset.is-current {
+    background: color-mix(in srgb, var(--c-violet) 22%, transparent);
+    border-color: var(--c-violet);
+    color: var(--text-main);
+}
+
+.share-preset:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.share-preset-custom {
+    font-size: 0.74rem;
+    font-style: italic;
+    color: var(--text-muted);
+    opacity: 0.5;
+}
+
+.share-preset-custom.is-current {
+    opacity: 1;
+    color: var(--c-violet);
+    font-style: normal;
+    font-weight: 600;
+}
+
+/* ── Les rubriques et leurs droits ──────────────────────────────── */
+
+.share-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.share-group {
+    border: 1px solid var(--border-card);
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.02);
+    overflow: hidden;
+}
+
+.share-group-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.6rem 0.35rem 0.35rem;
+}
+
+/*
+ * L'en-tête entier est le bouton de dépliage.
+ *
+ * Viser un chevron de douze pixels au doigt est un exercice ; le titre et son
+ * compteur forment une cible de toute la largeur, ce qui ne coûte rien puisque
+ * l'interrupteur d'ensemble est à part, à droite.
+ */
+.share-group-fold {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex: 1;
+    min-width: 0;
+    background: none;
+    border: none;
+    padding: 0.3rem 0.25rem;
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--text-main);
+    font: inherit;
+    text-align: left;
+    transition: background 0.18s ease;
+}
+
+.share-group-fold:hover {
+    background: var(--bg-hover);
+}
+
+.share-group-chevron {
+    width: 0;
+    height: 0;
+    flex-shrink: 0;
+    border-left: 5px solid currentColor;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    color: var(--text-muted);
+    transition: transform 0.2s ease;
+    transform-origin: 30% 50%;
+}
+
+.share-group.is-open .share-group-chevron {
+    transform: rotate(90deg);
+    color: var(--c-violet);
+}
+
+.share-group-name {
+    font-size: 0.84rem;
+    font-weight: 600;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.share-group-count {
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.share-group-count.is-partial {
+    color: var(--c-violet);
+}
+
+.share-group-count.is-all {
+    color: var(--c-success);
+    font-weight: 600;
+}
+
+/*
+ * L'interrupteur d'ensemble à moitié rempli.
+ *
+ * Ni allumé ni éteint : une rubrique dont trois droits sur huit sont accordés
+ * n'est ni l'un ni l'autre, et choisir l'un des deux ferait croire à un état
+ * qui n'existe pas. Le rail prend donc la teinte de l'accord sans que le
+ * curseur se déplace, ce qui se lit comme un « en partie ».
+ */
+.share-group-bulk.is-partial .switch-slider {
+    background: color-mix(in srgb, var(--c-violet) 40%, transparent);
+}
+
+.share-group-bulk.is-partial .switch-slider::before {
+    transform: translateX(7px);
+    opacity: 0.8;
+}
+
+.share-group-body {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.3rem 0.7rem;
+    padding: 0.15rem 0.6rem 0.6rem;
+}
+
+.share-action {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.6rem;
-    padding: 0.35rem 0.55rem;
+    padding: 0.3rem 0.5rem;
     border-radius: 9px;
     background: rgba(255, 255, 255, 0.035);
-    font-size: 0.83rem;
+    font-size: 0.8rem;
     color: var(--text-main);
 }
 
-/* Sous cette largeur, deux colonnes ecrasent les libelles. */
-@media (max-width: 560px) {
-    .share-grants {
+.share-action-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/*
+ * Sous cette largeur, deux colonnes écrasent les libellés — et ceux-ci sont
+ * désormais des phrases entières, pas des mots isolés.
+ */
+@media (max-width: 640px) {
+    .share-group-body {
         grid-template-columns: 1fr;
     }
 }
 
+/* ── Retirer les droits, ou retirer la personne ─────────────────── */
+
+.share-person-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.share-person-btn {
+    font: inherit;
+    font-size: 0.78rem;
+    padding: 0.4em 0.9em;
+    border-radius: 9px;
+    border: 1px solid var(--border-card);
+    background: var(--bg-hover);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.18s ease;
+}
+
+.share-person-btn:hover:not(:disabled) {
+    color: var(--text-main);
+    border-color: color-mix(in srgb, var(--text-main) 25%, transparent);
+}
+
+.share-person-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+/* Congédier est le geste qu'on ne fait pas par mégarde : il est le seul rouge. */
+.share-person-btn.dismiss:hover {
+    color: var(--c-error);
+    border-color: color-mix(in srgb, var(--c-error) 45%, transparent);
+    background: color-mix(in srgb, var(--c-error) 10%, transparent);
+}
+
 /* Tant que l'auditeur ne s'est pas authentifié, il n'y a rien à lui accorder. */
-.share-person.pending .share-grants {
+.share-person.pending .share-groups,
+.share-person.pending .share-presets {
     opacity: 0.4;
     pointer-events: none;
 }

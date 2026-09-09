@@ -1,23 +1,40 @@
 /**
  * shareHandlers — Partage du contrôle du bot par le maître de session.
  *
- * Trois messages, tous réservés au maître (voir permissions.js, où ils sont
+ * Quatre messages, tous réservés au maître (voir permissions.js, où ils sont
  * marqués comme tels — un invité qui s'accorderait ses propres droits n'aurait
  * plus grand intérêt) :
  *
  *   - `sendInviteLink`  — poste le lien d'authentification dans le tchat du salon vocal ;
- *   - `shareControl`    — accorde ou retire des droits à un compte Discord ;
- *   - `revokeControl`   — retire tout, et ferme les sessions ouvertes.
+ *   - `admitGuest`      — répond « oui » à qui frappe, sans rien accorder ;
+ *   - `shareControl`    — accorde ou retire des droits, un geste à la fois ;
+ *   - `revokeControl`   — congédie : plus de droits, plus d'admission, plus de fiche.
+ *
+ * ## Retirer les droits, ou retirer la personne
+ *
+ * Les deux derniers se ressemblent et ne disent pas la même chose, et les
+ * confondre coûtait cher.
+ *
+ * `shareControl` avec un jeu vide décoche tout : l'invité reste dans la liste,
+ * admis, reconnu, simplement sans pouvoir. C'est le geste courant — « plus
+ * maintenant » — et c'est celui qu'il faut pour rendre les droits l'instant
+ * d'après.
+ *
+ * `revokeControl` congédie pour de bon : droits effacés, admission retirée,
+ * sessions fermées, fiche du carnet supprimée. L'invité redevient un inconnu
+ * qui devra frapper de nouveau. C'est le refus, et le renvoi.
  *
  * Les droits vivent dans les réglages du serveur (Database.setUserPermissions),
- * l'identité dans web/sessions.js. Révoquer touche les deux : sans quoi l'onglet
- * de l'invité garderait une identité valable, sans droits — ce qui reviendrait
- * au même, mais laisserait une session ouverte pour rien.
+ * l'identité dans web/sessions.js, et le souvenir des personnes dans
+ * web/guests.js. Congédier touche les trois : sans quoi l'onglet de l'invité
+ * garderait une identité valable et son nom resterait dans la fenêtre, ce qui
+ * reviendrait à ne l'avoir renvoyé qu'à moitié.
  */
 
 const database = require('../../../database/Database');
 const permissions = require('../../permissions');
 const sessions = require('../../sessions');
+const guests = require('../../guests');
 const oauth = require('../../oauth');
 const log = require('../../../utils/logger');
 
@@ -87,20 +104,30 @@ async function handleSendInviteLink(ctx) {
 /**
  * Accorde ou retire des droits à un compte Discord.
  *
- * L'appelant envoie l'état complet des quatre cases, pas une différence : c'est
+ * L'appelant envoie l'état complet du jeu de droits, pas une différence : c'est
  * ce que produit une fenêtre à interrupteurs, et cela évite qu'un message perdu
- * laisse les deux côtés en désaccord.
+ * laisse les deux côtés en désaccord. Un jeu vide décoche donc tout, sans pour
+ * autant congédier l'invité — voir l'en-tête du module.
  */
 function handleShareControl(ctx) {
     const { ws, data, webServer, currentGuildId } = ctx;
     const { userId } = data;
     if (!userId) return;
 
+    /*
+     * Accorder des droits, c'est admettre.
+     *
+     * Sans cela, cocher une case pour quelqu'un qui figurait encore dans la
+     * file des demandes l'y laissait : il devenait un invité pourvu de droits
+     * *et* une demande en attente, deux lignes pour une personne. Le maître qui
+     * coche a répondu à la question, il n'a plus à cliquer « Accepter ».
+     */
+    database.admitGuest(currentGuildId, userId);
+
     const granted = database.setUserPermissions(currentGuildId, userId, data.permissions);
+    const names = permissions.granted(granted);
     log.info(`[Share] Rights of ${userId}: `
-        + (permissions.hasAny(granted)
-            ? permissions.GROUPS.filter((g) => granted[g]).join(', ')
-            : 'aucun'));
+        + (names.length ? `${names.length} — ${names.join(', ')}` : 'none'));
 
     reply(ws, true, null, { userId, permissions: granted });
     // L'invité concerné doit voir son tableau de bord s'ouvrir ou se fermer sans
@@ -129,11 +156,14 @@ function handleAdmitGuest(ctx) {
 }
 
 /**
- * Retire tous les droits d'un invité et ferme ses sessions.
+ * Congédie un invité : droits, admission, sessions et fiche du carnet.
  *
  * La session part avec les droits. La garder ne donnerait accès à rien, mais
  * laisserait l'invité devant un tableau de bord inerte sans lui dire pourquoi ;
  * fermée, il retombe sur la page d'authentification, qui est explicite.
+ *
+ * À ne pas confondre avec un `shareControl` vide, qui décoche tout sans
+ * renvoyer personne — voir l'en-tête du module.
  */
 function handleRevokeControl(ctx) {
     const { ws, data, webServer, currentGuildId } = ctx;
@@ -143,6 +173,18 @@ function handleRevokeControl(ctx) {
     database.revokeUserPermissions(currentGuildId, userId);
     database.dismissGuest(currentGuildId, userId);
     const closed = sessions.revokeUser(userId);
+    /*
+     * Le carnet oublie aussi.
+     *
+     * Il retient les personnes qu'on veut retrouver — c'est ce qui évite à un
+     * invité admis de se reconnecter à chaque venue. Y laisser celui qu'on
+     * vient de refuser le ferait réapparaître à la ligne suivante, hors ligne
+     * mais toujours là : exactement le contraire du geste qu'on vient de faire.
+     *
+     * Rien ne lui interdit de revenir. Il frappera de nouveau à la porte, ce
+     * qui est la situation d'un inconnu, et c'est bien ce qu'il est redevenu.
+     */
+    guests.forget(userId);
 
     log.info(`[Share] Control revoked for ${userId} (${closed} session(s) closed).`);
 

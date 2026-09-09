@@ -3,8 +3,9 @@
  *
  * Deux rôles, deux moitiés de ce module :
  *
- *   - **le maître** — celui qui détient le jeton — voit un bouton dans l'en-tête
- *     et une fenêtre où il coche, auditeur par auditeur, ce qu'il lui confie ;
+ *   - **le maître** — le compte propriétaire de l'installation — voit un bouton
+ *     dans l'en-tête et une fenêtre où il confie, auditeur par auditeur et geste
+ *     par geste, ce qu'il veut bien laisser faire ;
  *   - **l'invité** — reconnu par son compte Discord — ne voit pas ce bouton, et
  *     trouve grisé ce qu'on ne lui a pas accordé.
  *
@@ -14,8 +15,17 @@
  * navigateur contourne l'une, jamais l'autre.
  *
  * L'état reçu du serveur porte `role`, `permissions`, et pour le maître seul un
- * bloc `sharing` — configuration OAuth, partages en vigueur, comptes déjà
- * authentifiés. Voir `_shareStateFor` dans src/web/WebServer.js.
+ * bloc `sharing` — configuration OAuth, partages en vigueur, carnet des invités
+ * avec leur présence, et le catalogue des droits lui-même. Voir `_shareStateFor`
+ * dans src/web/WebServer.js.
+ *
+ * ## Le catalogue ne vit pas ici
+ *
+ * La liste des droits et leur rangement arrivent du serveur. Les recopier ici
+ * ferait deux tables à tenir d'accord, dont une seule refuse réellement : le
+ * jour où elles divergeraient, la fenêtre montrerait des cases sans effet, ou
+ * tairait des droits bel et bien accordés. Seuls restent en dur les sélecteurs
+ * des commandes à griser — eux ne décrivent pas les droits, mais cette page-ci.
  */
 
 window.MusicPlayer = window.MusicPlayer || {};
@@ -24,7 +34,7 @@ window.MusicPlayer = window.MusicPlayer || {};
     'use strict';
 
     /**
-     * Commandes du tableau de bord, rangées par groupe de droits.
+     * Commandes du tableau de bord, rangées par droit.
      *
      * Volontairement limitée aux commandes principales : ce qui reste joignable
      * malgré le grisage — un menu contextuel, un glisser-déposer — se heurte au
@@ -32,35 +42,45 @@ window.MusicPlayer = window.MusicPlayer || {};
      * cette carte améliore le confort, jamais la sécurité.
      */
     const CONTROLS = {
-        playback: [
-            '#btn-play-pause', '#btn-skip', '#btn-previous', '#btn-stop',
-            '#progress-bar-wrapper', '.play-mode-switch', '#speed-pad-container',
-            '#playback-source-select', '#mix-enable-toggle', '#mix-options-container',
-            '#lufs-sync-toggle', '#lufs-sync-options',
-        ],
-        queue: [
-            '#search-form', '#add-target-select', '#btn-clear-queue', '#btn-clear-history',
-        ],
-        playlists: [
-            '#btn-add-playlist',
-        ],
-        volume: [
-            '#volume-range', '#guild-select', '#broadcast-mode-select',
-            '#ducking-enable-toggle', '#ducking-options-container',
+        'playback.transport': ['#btn-play-pause', '#btn-stop'],
+        'playback.skip': ['#btn-skip', '#btn-previous'],
+        'playback.seek': ['#progress-bar-wrapper'],
+        'playback.mode': ['.play-mode-switch'],
+        'playback.source': ['#playback-source-select'],
+        'playback.speed': ['#speed-pad-container'],
+        'playback.mix': ['#mix-enable-toggle', '#mix-options-container'],
+        'playback.loudness': ['#lufs-sync-toggle', '#lufs-sync-options'],
+
+        'queue.add': ['#search-form', '#add-target-select'],
+        'queue.clear': ['#btn-clear-queue'],
+        'queue.history': ['#btn-clear-history'],
+
+        'playlists.create': ['#btn-add-playlist'],
+
+        'volume.level': ['#volume-range'],
+        'volume.ducking': ['#ducking-enable-toggle', '#ducking-options-container'],
+        'volume.quality': [
             '#import-audio-quality-select', '#import-video-quality-select',
             '#btn-player-quality', '#btn-video-quality',
         ],
-        /*
-         * Réservé au maître. Ces commandes-là ne sont jamais partagées : elles
-         * éteignent le bot, changent sa version, ou le font quitter un serveur.
-         */
-        master: [
-            '#btn-restart-bot',
-        ],
+        'volume.broadcast': ['#broadcast-mode-select'],
+        'volume.channel': ['#guild-select'],
     };
 
-    /** Groupes réglables, dans l'ordre d'affichage de la fenêtre. */
-    const GROUPS = ['playback', 'queue', 'playlists', 'volume'];
+    /**
+     * Réservé au maître. Ces commandes-là ne sont jamais partagées : elles
+     * éteignent le bot, changent sa version, ou le font quitter un serveur.
+     */
+    const MASTER_CONTROLS = ['#btn-restart-bot'];
+
+    /**
+     * Rangement de repli, quand l'état n'est pas encore arrivé.
+     *
+     * Le catalogue vient du serveur — voir l'en-tête. Celui-ci ne sert qu'à
+     * l'instant où la page s'ouvre et où rien n'a encore été reçu : il donne aux
+     * rubriques leur ordre, et rien de plus.
+     */
+    const FALLBACK_GROUPS = ['playback', 'queue', 'playlists', 'volume'];
 
     /** Libellés de repli, quand la traduction n'est pas encore chargée. */
     const GROUP_FALLBACK = {
@@ -70,11 +90,71 @@ window.MusicPlayer = window.MusicPlayer || {};
         volume: 'Volume et diffusion',
     };
 
+    /** Libellés de repli des droits, dans la langue du fichier source. */
+    const ACTION_FALLBACK = {
+        'playback.transport': 'Lire, mettre en pause, arrêter',
+        'playback.skip': 'Piste suivante et précédente',
+        'playback.seek': 'Se déplacer dans la piste',
+        'playback.mode': 'Mode de lecture (boucle, aléatoire)',
+        'playback.source': 'Choisir la source à jouer',
+        'playback.speed': 'Vitesse de lecture',
+        'playback.mix': 'Enchaînements et transitions',
+        'playback.loudness': 'Harmonisation du volume',
+
+        'queue.add': 'Ajouter une piste',
+        'queue.playNow': 'Lire immédiatement',
+        'queue.remove': 'Retirer une piste',
+        'queue.reorder': 'Réordonner la file',
+        'queue.history': 'Effacer l\'historique',
+        'queue.download': 'Télécharger sur le disque du bot',
+        'queue.clear': 'Vider la file',
+
+        'playlists.create': 'Créer une playlist',
+        'playlists.addTrack': 'Ajouter une piste à une playlist',
+        'playlists.removeTrack': 'Retirer une piste d\'une playlist',
+        'playlists.reorderTracks': 'Réordonner les pistes',
+        'playlists.rename': 'Renommer une playlist',
+        'playlists.organise': 'Réordonner les playlists',
+        'playlists.transitions': 'Aiguillages et transitions',
+        'playlists.delete': 'Supprimer une playlist',
+
+        'volume.level': 'Volume principal',
+        'volume.ducking': 'Atténuation vocale',
+        'volume.quality': 'Qualité audio et vidéo',
+        'volume.trackGain': 'Gain par piste',
+        'volume.broadcast': 'Mode de diffusion',
+        'volume.channel': 'Changer de salon vocal',
+    };
+
+    /** Libellés de repli des rôles tout faits. */
+    const PRESET_FALLBACK = {
+        listener: 'Auditeur',
+        dj: 'DJ',
+        cohost: 'Co-hôte',
+    };
+
     let role = 'master';
     let permissions = null;
     let sharing = null;
-    /** Droits en cours de modification, pour ne pas les perdre au prochain état. */
+
+    /**
+     * Ce que le maître vient de cocher, en attendant que le serveur le confirme.
+     *
+     * Un aller-retour dure quelques dizaines de millisecondes, pendant
+     * lesquelles l'état diffusé porte encore les droits d'avant : redessiner
+     * sans mémoire remettrait l'interrupteur dans sa position initiale, sous le
+     * doigt de celui qui vient de le pousser.
+     *
+     * L'entrée est effacée dès que le serveur répond la même chose — voir
+     * `settle`. Sans cela, elle recouvrirait indéfiniment l'état réel, et une
+     * modification faite depuis un autre onglet ne s'afficherait jamais ici.
+     *
+     * @type {Map<string, object>}
+     */
     const inFlight = new Map();
+
+    /** Rubriques dépliées, par personne : « userId » ou « userId:groupe ». */
+    const unfolded = new Set();
 
     function el(id) {
         return document.getElementById(id);
@@ -89,6 +169,51 @@ window.MusicPlayer = window.MusicPlayer || {};
         if (typeof window.MusicPlayer.showToast === 'function') window.MusicPlayer.showToast(message);
     }
 
+    /* ═════════════════════ Le catalogue reçu du serveur ═════════════════════ */
+
+    /** Les rubriques, dans l'ordre du serveur. */
+    function groups() {
+        return sharing?.catalogue?.groups || FALLBACK_GROUPS;
+    }
+
+    /** Les droits d'une rubrique, dans l'ordre du serveur. */
+    function actionsOf(group) {
+        return sharing?.catalogue?.actions?.[group] || [];
+    }
+
+    /** Tous les droits, toutes rubriques confondues. */
+    function allActions() {
+        return groups().reduce((acc, group) => acc.concat(actionsOf(group)), []);
+    }
+
+    /** Les rôles tout faits, dans l'ordre du serveur. */
+    function presets() {
+        return sharing?.catalogue?.presets || {};
+    }
+
+    /** Le nom du libellé d'un droit : `queue.add` → `share_action_queue_add`. */
+    function actionKey(action) {
+        return `share_action_${action.replace(/\./g, '_')}`;
+    }
+
+    /**
+     * Ce jeu de droits est-il exactement un rôle tout fait ?
+     *
+     * Le même raisonnement que `matchPreset` côté serveur, et pour la même
+     * raison : rallumer la pastille du rôle quand la fenêtre rouvre, plutôt que
+     * d'annoncer « personnalisé » pour un invité qu'on venait de nommer DJ.
+     */
+    function presetOf(rights) {
+        const actions = allActions();
+        if (!actions.some((a) => rights[a])) return null;
+
+        for (const [name, keys] of Object.entries(presets())) {
+            const reference = new Set(keys);
+            if (actions.every((a) => Boolean(rights[a]) === reference.has(a))) return name;
+        }
+        return null;
+    }
+
     /* ═════════════════════ Grisage chez l'invité ═════════════════════ */
 
     /**
@@ -96,7 +221,7 @@ window.MusicPlayer = window.MusicPlayer || {};
      *
      * L'infobulle du refus remplace celle d'origine, qui est mise de côté pour
      * être restituée si le droit est accordé plus tard. L'élément reste
-     * survolable — c'est `brancherBlocage()` qui arrête les gestes, pas un
+     * survolable — c'est `bindLock()` qui arrête les gestes, pas un
      * `pointer-events: none` qui emporterait l'infobulle avec le clic.
      */
     function mark(element, denied, reason) {
@@ -128,16 +253,19 @@ window.MusicPlayer = window.MusicPlayer || {};
         const reason = t('perm_denied_tooltip', 'Droit non accordé par le maître de la session');
         const masterReason = t('perm_master_only_tooltip', 'Réservé au maître de la session');
 
-        for (const [group, selectors] of Object.entries(CONTROLS)) {
-            const denied = isMaster
-                ? false
-                : group === 'master' || !(permissions && permissions[group]);
-
+        for (const [action, selectors] of Object.entries(CONTROLS)) {
+            const denied = isMaster ? false : !(permissions && permissions[action]);
             for (const selector of selectors) {
                 document.querySelectorAll(selector).forEach((element) => {
-                    mark(element, denied, group === 'master' ? masterReason : reason);
+                    mark(element, denied, reason);
                 });
             }
+        }
+
+        for (const selector of MASTER_CONTROLS) {
+            document.querySelectorAll(selector).forEach((element) => {
+                mark(element, !isMaster, masterReason);
+            });
         }
 
         // Le bouton de partage n'a de sens que pour qui a quelque chose à
@@ -183,9 +311,9 @@ window.MusicPlayer = window.MusicPlayer || {};
      * Auditeurs à présenter, et ce qu'on sait d'eux.
      *
      * Les membres du salon vocal d'abord — ce sont eux qu'on veut inviter. Les
-     * comptes déjà authentifiés ensuite, même absents du salon : leurs droits
-     * restent en vigueur, et il faut pouvoir les leur retirer sans attendre
-     * qu'ils reviennent.
+     * invités du carnet ensuite, même absents du salon et même déconnectés :
+     * leurs droits restent en vigueur, et il faut pouvoir les leur retirer sans
+     * attendre qu'ils reviennent.
      */
     function listeners() {
         const state = window.MusicPlayer.state || {};
@@ -209,11 +337,14 @@ window.MusicPlayer = window.MusicPlayer || {};
         for (const member of state.members || []) {
             if (self && member.id === self) continue;
             seen.add(member.id);
+            const known = knownMembers.get(member.id);
             list.push({
                 userId: member.id,
                 displayName: member.displayName,
-                avatar: member.avatar || knownMembers.get(member.id)?.avatar || null,
-                authenticated: knownMembers.has(member.id),
+                avatar: member.avatar || known?.avatar || null,
+                authenticated: Boolean(known),
+                online: Boolean(known?.online),
+                lastSeenAt: known?.lastSeenAt || 0,
                 rights: grants[member.id] || null,
                 inChannel: true,
             });
@@ -221,16 +352,18 @@ window.MusicPlayer = window.MusicPlayer || {};
 
         for (const [userId, known] of knownMembers) {
             if (seen.has(userId) || (self && userId === self)) continue;
-            // Un compte authentifié mais parti : on ne le montre que s'il a été
-            // admis ou pourvu, sans quoi la liste s'allongerait de tous les
-            // passages. Un admis sans droits doit rester visible — c'est là,
-            // et nulle part ailleurs, qu'on lui en accordera.
+            // Un invité du carnet absent du salon : on ne le montre que s'il a
+            // été admis ou pourvu, sans quoi la liste s'allongerait de tous les
+            // passages. Un admis sans droits doit rester visible — c'est là, et
+            // nulle part ailleurs, qu'on lui en accordera.
             if (!grants[userId] && !admitted.has(userId)) continue;
             list.push({
                 userId,
                 displayName: known.displayName || userId,
                 avatar: known.avatar,
                 authenticated: true,
+                online: Boolean(known.online),
+                lastSeenAt: known.lastSeenAt || 0,
                 rights: grants[userId],
                 inChannel: false,
             });
@@ -241,6 +374,47 @@ window.MusicPlayer = window.MusicPlayer || {};
 
     function initial(name) {
         return (name || '?').trim().charAt(0).toUpperCase() || '?';
+    }
+
+    /**
+     * « il y a douze minutes », en gros.
+     *
+     * La précision n'a aucun intérêt ici : ce que le maître veut savoir, c'est
+     * si la personne est passée tout à l'heure ou le mois dernier. Une minute
+     * près ne changerait rien à ce qu'il en fait.
+     */
+    function sinceLabel(timestamp) {
+        if (!timestamp) return '';
+        const minutes = Math.floor((Date.now() - timestamp) / 60000);
+
+        if (minutes < 1) return t('share_seen_now', 'à l\'instant');
+        if (minutes < 60) return t('share_seen_minutes', 'il y a {n} min').replace('{n}', minutes);
+
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return t('share_seen_hours', 'il y a {n} h').replace('{n}', hours);
+
+        const days = Math.floor(hours / 24);
+        if (days < 30) return t('share_seen_days', 'il y a {n} j').replace('{n}', days);
+
+        return t('share_seen_long', 'il y a longtemps');
+    }
+
+    /** La pastille d'avatar d'une personne, image ou initiale. */
+    function avatarOf(person, extraClass = '') {
+        const className = `share-person-avatar${extraClass ? ` ${extraClass}` : ''}`;
+
+        if (person.avatar) {
+            const img = document.createElement('img');
+            img.className = className;
+            img.src = person.avatar;
+            img.alt = '';
+            return img;
+        }
+
+        const circle = document.createElement('div');
+        circle.className = className;
+        circle.textContent = initial(person.displayName);
+        return circle;
     }
 
     /**
@@ -260,18 +434,7 @@ window.MusicPlayer = window.MusicPlayer || {};
         const row = document.createElement('div');
         row.className = 'share-pending-row';
 
-        if (person.avatar) {
-            const img = document.createElement('img');
-            img.className = 'share-person-avatar';
-            img.src = person.avatar;
-            img.alt = '';
-            row.appendChild(img);
-        } else {
-            const circle = document.createElement('div');
-            circle.className = 'share-person-avatar';
-            circle.textContent = initial(person.displayName);
-            row.appendChild(circle);
-        }
+        row.appendChild(avatarOf(person));
 
         const text = document.createElement('div');
         text.className = 'share-pending-text';
@@ -300,6 +463,10 @@ window.MusicPlayer = window.MusicPlayer || {};
                 type: 'admitGuest',
                 data: { userId: person.userId },
             });
+            // La rubrique s'ouvre sur l'invité qu'on vient d'accepter : c'est
+            // là qu'on va, et l'y conduire évite un clic de plus pour retrouver
+            // quelqu'un dont on vient justement de s'occuper.
+            unfolded.add(person.userId);
         });
         row.appendChild(accept);
 
@@ -307,9 +474,9 @@ window.MusicPlayer = window.MusicPlayer || {};
         refuse.className = 'share-pending-btn refuse';
         refuse.textContent = t('share_pending_refuse', 'Refuser');
         refuse.addEventListener('click', () => {
-            // Refuser ferme la session : l'invité retombe sur la porte
-            // d'entrée, qui est explicite, au lieu de rester devant un tableau
-            // de bord qui ne répond à rien.
+            // Refuser congédie : droits, admission, sessions et fiche du carnet.
+            // L'invité retombe sur la porte d'entrée, qui est explicite, au lieu
+            // de rester devant un tableau de bord qui ne répond à rien.
             window.MusicPlayer.sendWS({ type: 'revokeControl', data: { userId: person.userId } });
         });
         row.appendChild(refuse);
@@ -317,109 +484,346 @@ window.MusicPlayer = window.MusicPlayer || {};
         return row;
     }
 
+    /**
+     * Envoie un jeu de droits complet, et le retient en attendant la réponse.
+     *
+     * Toujours l'état entier, jamais une différence : c'est ce que le serveur
+     * attend, et cela évite qu'un message perdu laisse les deux côtés en
+     * désaccord.
+     */
+    function grant(userId, rights) {
+        inFlight.set(userId, rights);
+        window.MusicPlayer.sendWS({
+            type: 'shareControl',
+            data: { userId, permissions: rights },
+        });
+        renderModal();
+    }
+
+    /**
+     * Oublie ce qui est en vol dès que le serveur dit la même chose.
+     *
+     * Sans cela, la mémoire d'attente recouvrirait l'état réel pour toujours :
+     * un droit modifié depuis un autre onglet — ou retiré par le serveur — ne
+     * s'afficherait jamais dans celui-ci.
+     */
+    function settle() {
+        const grants = sharing?.grants || {};
+        const actions = allActions();
+
+        for (const [userId, wanted] of inFlight) {
+            const actual = grants[userId] || {};
+            if (actions.every((a) => Boolean(wanted[a]) === Boolean(actual[a]))) {
+                inFlight.delete(userId);
+            }
+        }
+    }
+
+    /** Les droits à afficher pour quelqu'un : ce qui est en vol, sinon l'état. */
+    function rightsOf(person) {
+        return inFlight.get(person.userId) || person.rights || {};
+    }
+
+    /** Un interrupteur, du même modèle que ceux du reste du tableau de bord. */
+    function toggle(checked, disabled, onChange) {
+        const label = document.createElement('label');
+        label.className = 'switch switch-mini';
+
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.checked = checked;
+        box.disabled = disabled;
+        box.addEventListener('change', () => onChange(box.checked));
+
+        const rail = document.createElement('span');
+        rail.className = 'switch-slider';
+
+        label.appendChild(box);
+        label.appendChild(rail);
+        return label;
+    }
+
+    /**
+     * Les trois rôles tout faits, et la mention « personnalisé ».
+     *
+     * Un rôle n'est pas un niveau de plus dans le modèle : c'est une poignée de
+     * cases posée d'un coup. Décocher l'une d'elles l'instant d'après fait
+     * passer la ligne en « personnalisé », qui n'est pas un quatrième rôle mais
+     * l'absence de rôle.
+     */
+    function presetRow(person, rights) {
+        const bar = document.createElement('div');
+        bar.className = 'share-presets';
+
+        const current = presetOf(rights);
+        const names = Object.keys(presets());
+
+        for (const name of names) {
+            const btn = document.createElement('button');
+            btn.className = 'share-preset' + (current === name ? ' is-current' : '');
+            btn.textContent = t(`share_preset_${name}`, PRESET_FALLBACK[name] || name);
+            btn.disabled = !person.authenticated;
+            btn.dataset.tooltip = t(`share_preset_${name}_hint`, '');
+            btn.addEventListener('click', () => {
+                const next = {};
+                for (const action of presets()[name] || []) next[action] = true;
+                grant(person.userId, next);
+            });
+            bar.appendChild(btn);
+        }
+
+        const custom = document.createElement('span');
+        custom.className = 'share-preset-custom'
+            + (current === null && Object.values(rights).some(Boolean) ? ' is-current' : '');
+        custom.textContent = t('share_preset_custom', 'personnalisé');
+        bar.appendChild(custom);
+
+        return bar;
+    }
+
+    /**
+     * Une rubrique de droits : son en-tête, son compte, et ses interrupteurs.
+     *
+     * L'interrupteur de l'en-tête vaut pour toute la rubrique. Il porte trois
+     * états et non deux : « rien », « une partie », « tout ». Le laisser mentir
+     * dans un sens ou dans l'autre — coché dès le premier droit, ou décoché tant
+     * qu'il en manque un — était le plus sûr moyen de croire avoir tout accordé
+     * alors qu'il restait une case.
+     */
+    function groupBlock(person, group, rights) {
+        const actions = actionsOf(group);
+        const on = actions.filter((a) => rights[a]).length;
+        const foldKey = `${person.userId}:${group}`;
+        const open = unfolded.has(foldKey);
+
+        const block = document.createElement('div');
+        block.className = 'share-group' + (open ? ' is-open' : '');
+
+        const head = document.createElement('div');
+        head.className = 'share-group-head';
+
+        const fold = document.createElement('button');
+        fold.className = 'share-group-fold';
+        fold.setAttribute('aria-expanded', open ? 'true' : 'false');
+
+        const chevron = document.createElement('span');
+        chevron.className = 'share-group-chevron';
+        chevron.setAttribute('aria-hidden', 'true');
+        fold.appendChild(chevron);
+
+        const title = document.createElement('span');
+        title.className = 'share-group-name';
+        title.textContent = t(`share_group_${group}`, GROUP_FALLBACK[group] || group);
+        fold.appendChild(title);
+
+        const count = document.createElement('span');
+        count.className = 'share-group-count'
+            + (on === 0 ? ' is-none' : (on === actions.length ? ' is-all' : ' is-partial'));
+        count.textContent = `${on}/${actions.length}`;
+        fold.appendChild(count);
+
+        fold.addEventListener('click', () => {
+            if (open) unfolded.delete(foldKey);
+            else unfolded.add(foldKey);
+            renderModal();
+        });
+        head.appendChild(fold);
+
+        // Tout ou rien pour la rubrique entière. Une rubrique à moitié accordée
+        // bascule vers « tout » : c'est le geste qu'on attend d'un clic sur un
+        // interrupteur partiellement rempli.
+        const all = on === actions.length;
+        const bulk = toggle(all, !person.authenticated, () => {
+            const next = { ...rights };
+            for (const action of actions) next[action] = !all;
+            grant(person.userId, next);
+        });
+        bulk.classList.add('share-group-bulk');
+        if (on > 0 && !all) bulk.classList.add('is-partial');
+        head.appendChild(bulk);
+
+        block.appendChild(head);
+
+        if (!open) return block;
+
+        const body = document.createElement('div');
+        body.className = 'share-group-body';
+
+        for (const action of actions) {
+            const line = document.createElement('div');
+            line.className = 'share-action';
+
+            const label = document.createElement('span');
+            label.className = 'share-action-name';
+            label.textContent = t(actionKey(action), ACTION_FALLBACK[action] || action);
+            line.appendChild(label);
+
+            line.appendChild(toggle(Boolean(rights[action]), !person.authenticated, (checked) => {
+                grant(person.userId, { ...rights, [action]: checked });
+            }));
+
+            body.appendChild(line);
+        }
+
+        block.appendChild(body);
+        return block;
+    }
+
     /** Construit la ligne d'un auditeur. */
     function listenerRow(person) {
-        const rights = inFlight.get(person.userId) || person.rights || {};
-        const filled = GROUPS.some((g) => rights[g]);
+        const rights = rightsOf(person);
+        const actions = allActions();
+        const total = actions.filter((a) => rights[a]).length;
+        const open = unfolded.has(person.userId);
 
         const row = document.createElement('div');
         row.className = 'share-person'
-            + (filled ? ' has-grants' : '')
-            + (person.authenticated ? '' : ' pending');
+            + (total ? ' has-grants' : '')
+            + (person.authenticated ? '' : ' pending')
+            + (open ? ' is-open' : '');
         row.dataset.userId = person.userId;
+
+        /* ── L'en-tête : qui, où, et combien de droits ──────────────── */
 
         const head = document.createElement('div');
         head.className = 'share-person-head';
 
-        if (person.avatar) {
-            const img = document.createElement('img');
-            img.className = 'share-person-avatar';
-            img.src = person.avatar;
-            img.alt = '';
-            head.appendChild(img);
-        } else {
-            const circle = document.createElement('div');
-            circle.className = 'share-person-avatar';
-            circle.textContent = initial(person.displayName);
-            head.appendChild(circle);
-        }
+        const avatar = avatarOf(person);
+        avatar.classList.add(person.online ? 'is-online' : 'is-offline');
+        head.appendChild(avatar);
+
+        const identity = document.createElement('div');
+        identity.className = 'share-person-identity';
 
         const name = document.createElement('span');
         name.className = 'share-person-name';
-        name.textContent = person.displayName
-            + (person.inChannel ? '' : ` ${t('share_away', '(absent)')}`);
-        head.appendChild(name);
+        name.textContent = person.displayName;
+        identity.appendChild(name);
 
+        /*
+         * Une seule ligne d'état, et trois choses à y dire.
+         *
+         * « en ligne » l'emporte sur tout : c'est la seule information qui
+         * appelle une action tout de suite. Vient ensuite « vu il y a… », pour
+         * quelqu'un que l'on connaît mais qui n'est pas là — c'était le trou de
+         * l'ancienne fenêtre, où un invité déconnecté disparaissait purement.
+         * En dernier « pas encore connecté », pour un membre du salon vocal qui
+         * n'a jamais suivi le lien.
+         */
         const stateEl = document.createElement('span');
-        stateEl.className = 'share-person-state' + (person.authenticated ? ' connected' : '');
-        stateEl.textContent = person.authenticated
-            ? t('share_state_connected', 'authentifié')
-            : t('share_state_pending', 'pas encore connecté');
-        head.appendChild(stateEl);
-
-        if (filled) {
-            const revoke = document.createElement('button');
-            revoke.className = 'btn-share-revoke';
-            revoke.dataset.tooltip = t('share_revoke', 'Tout retirer');
-            revoke.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
-                + 'stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line>'
-                + '<line x1="6" y1="6" x2="18" y2="18"></line></svg>';
-            revoke.addEventListener('click', () => {
-                inFlight.delete(person.userId);
-                window.MusicPlayer.sendWS({ type: 'revokeControl', data: { userId: person.userId } });
-            });
-            head.appendChild(revoke);
+        stateEl.className = 'share-person-state';
+        if (person.online) {
+            stateEl.classList.add('is-online');
+            stateEl.textContent = t('share_state_online', 'en ligne');
+        } else if (person.authenticated) {
+            stateEl.classList.add('is-offline');
+            stateEl.textContent = `${t('share_state_offline', 'hors ligne')}`
+                + (person.lastSeenAt ? ` · ${sinceLabel(person.lastSeenAt)}` : '');
+        } else {
+            stateEl.classList.add('is-stranger');
+            stateEl.textContent = t('share_state_pending', 'pas encore connecté');
         }
+        identity.appendChild(stateEl);
+
+        if (person.inChannel) {
+            const here = document.createElement('span');
+            here.className = 'share-person-here';
+            here.textContent = t('share_in_channel', 'dans le salon');
+            identity.appendChild(here);
+        }
+
+        head.appendChild(identity);
+
+        const tally = document.createElement('span');
+        tally.className = 'share-person-tally' + (total ? ' has-grants' : '');
+        tally.textContent = `${total}/${actions.length}`;
+        tally.dataset.tooltip = t('share_tally_tooltip', 'Droits accordés');
+        head.appendChild(tally);
+
+        const fold = document.createElement('button');
+        fold.className = 'share-person-fold';
+        fold.setAttribute('aria-expanded', open ? 'true' : 'false');
+        fold.dataset.tooltip = open
+            ? t('share_fold', 'Replier')
+            : t('share_unfold', 'Régler les droits');
+        fold.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+            + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+            + '<polyline points="6 9 12 15 18 9"></polyline></svg>';
+        fold.addEventListener('click', () => {
+            if (open) unfolded.delete(person.userId);
+            else unfolded.add(person.userId);
+            renderModal();
+        });
+        head.appendChild(fold);
 
         row.appendChild(head);
 
-        const cases = document.createElement('div');
-        cases.className = 'share-grants';
+        if (!open) return row;
 
-        for (const group of GROUPS) {
-            const row = document.createElement('div');
-            row.className = 'share-grant';
+        /* ── Le détail, une fois déplié ─────────────────────────────── */
 
-            const label = document.createElement('span');
-            label.textContent = t(`share_group_${group}`, GROUP_FALLBACK[group]);
-            row.appendChild(label);
+        const panel = document.createElement('div');
+        panel.className = 'share-person-panel';
 
-            const tagEl = document.createElement('label');
-            tagEl.className = 'switch switch-mini';
-
-            const entry = document.createElement('input');
-            entry.type = 'checkbox';
-            entry.checked = Boolean(rights[group]);
-            entry.disabled = !person.authenticated;
-            entry.addEventListener('change', () => {
-                const next = {};
-                row.querySelectorAll('.share-grant input').forEach((box, index) => {
-                    next[GROUPS[index]] = box.checked;
-                });
-                // Retenu localement : l'état renvoyé par le serveur arrive après
-                // un aller-retour, et un rendu entre-temps remettrait la case
-                // dans sa position d'avant.
-                inFlight.set(person.userId, next);
-                window.MusicPlayer.sendWS({
-                    type: 'shareControl',
-                    data: { userId: person.userId, permissions: next },
-                });
-            });
-
-            const rail = document.createElement('span');
-            rail.className = 'switch-slider';
-
-            tagEl.appendChild(entry);
-            tagEl.appendChild(rail);
-            row.appendChild(tagEl);
-            cases.appendChild(row);
+        if (!person.authenticated) {
+            // Un membre du salon vocal qui n'a jamais suivi le lien : rien à
+            // cocher pour lui, le serveur n'aurait personne à qui accorder quoi
+            // que ce soit. Le dire vaut mieux que d'offrir des cases inertes.
+            const note = document.createElement('p');
+            note.className = 'share-person-note';
+            note.textContent = t('share_not_connected_note',
+                'Cette personne doit d\'abord se connecter avec son compte Discord. '
+                + 'Envoyez-lui le lien ci-dessus.');
+            panel.appendChild(note);
         }
 
-        row.appendChild(cases);
+        panel.appendChild(presetRow(person, rights));
+
+        const list = document.createElement('div');
+        list.className = 'share-groups';
+        for (const group of groups()) list.appendChild(groupBlock(person, group, rights));
+        panel.appendChild(list);
+
+        /* ── Les deux gestes de retrait, qui ne disent pas la même chose ── */
+
+        const footer = document.createElement('div');
+        footer.className = 'share-person-actions';
+
+        const clear = document.createElement('button');
+        clear.className = 'share-person-btn clear';
+        clear.textContent = t('share_clear_rights', 'Tout décocher');
+        clear.disabled = total === 0;
+        clear.addEventListener('click', () => grant(person.userId, {}));
+        footer.appendChild(clear);
+
+        /*
+         * Congédier n'est pas décocher.
+         *
+         * « Tout décocher » laisse la personne dans la liste, admise et
+         * reconnue, prête à recevoir de nouveau des droits d'un clic.
+         * « Retirer l'invité » l'efface : droits, admission, sessions ouvertes
+         * et fiche du carnet. Elle redevient un inconnu qui devra frapper.
+         *
+         * L'ancienne fenêtre n'avait qu'une croix pour les deux, et c'était la
+         * seconde qu'elle faisait — on croyait décocher, on renvoyait.
+         */
+        const dismiss = document.createElement('button');
+        dismiss.className = 'share-person-btn dismiss';
+        dismiss.textContent = t('share_dismiss', 'Retirer l\'invité');
+        dismiss.dataset.tooltip = t('share_dismiss_tooltip',
+            'Efface ses droits, ferme ses sessions et l\'oublie');
+        dismiss.addEventListener('click', () => {
+            inFlight.delete(person.userId);
+            unfolded.delete(person.userId);
+            window.MusicPlayer.sendWS({ type: 'revokeControl', data: { userId: person.userId } });
+        });
+        footer.appendChild(dismiss);
+
+        panel.appendChild(footer);
+        row.appendChild(panel);
         return row;
     }
 
-    /** Redessine la fenêtre de partage. */
     /**
      * Nomme le salon qui recevra le lien.
      *
@@ -445,6 +849,7 @@ window.MusicPlayer = window.MusicPlayer || {};
         cible.textContent = salon?.name ? ` « ${salon.name} »` : '';
     }
 
+    /** Redessine la fenêtre de partage. */
     function renderModal() {
         const modal = el('share-modal');
         if (!modal || modal.classList.contains('hidden')) return;
@@ -537,7 +942,11 @@ window.MusicPlayer = window.MusicPlayer || {};
 
         if (state.role) role = state.role;
         if (state.permissions) permissions = state.permissions;
-        if (state.sharing) sharing = state.sharing;
+        if (state.sharing) {
+            sharing = state.sharing;
+            // Ce que le serveur confirme n'a plus à être retenu à part.
+            settle();
+        }
 
         applyRights();
         renderBadge();
@@ -552,7 +961,7 @@ window.MusicPlayer = window.MusicPlayer || {};
     /** Le maître vient de tout retirer : l'invité doit le savoir. */
     window.MusicPlayer.onControlRevoked = function () {
         toast(t('perm_revoked_toast', 'Votre accès au lecteur a été retiré.'));
-        permissions = { playback: false, queue: false, playlists: false, volume: false };
+        permissions = {};
         applyRights();
     };
 

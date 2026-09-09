@@ -14,6 +14,9 @@ caché en memoria que hace fe durante la ejecución.
 | `data/settings.json` | Ajustes por servidor + listas de reproducción globales | En cada modificación, agrupadas en 120 ms |
 | `data/playback_state.json` | Último estado de reproducción conocido | Cada 5 s y ante un evento |
 | `data/dashboard-token` | Testigo de acceso | Una vez, en el primer arranque |
+| `data/sessions.json` | Sesiones de Discord abiertas | Al abrirse, luego agrupadas en 5 s |
+| `data/guests.json` | Libro de los invitados ya vistos | En cada visita, agrupadas en 5 s |
+| `data/owner.json` | Cuenta propietaria de la instalación | Una vez, al reivindicarla |
 
 > `better-sqlite3` figura en `optionalDependencies` pero **nunca se importa**. Es
 > un vestigio de un enfoque abandonado: la compilación nativa daba problemas en

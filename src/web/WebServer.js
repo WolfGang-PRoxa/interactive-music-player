@@ -424,6 +424,23 @@ class WebServer {
         this.app.use('/auth', createAuthRouter(this));
 
         /*
+         * Le carnet reprend les invités que cette installation connaissait déjà.
+         *
+         * Ils ont des droits et des admissions, mais pas de fiche : le carnet
+         * n'existait pas quand ils sont arrivés. Sans ce rattrapage, ils n'y
+         * entreraient qu'à leur prochaine authentification, et le maître les
+         * verrait entre-temps s'effacer de sa fenêtre au premier cookie périmé.
+         *
+         * Une seule fois, au montage des routes, et sans écraser quoi que ce
+         * soit : une fiche déjà là fait foi.
+         */
+        try {
+            require('./guests').adopt(require('./sessions').listUsers());
+        } catch (err) {
+            log.warn(`[Guests] Takeover from the open sessions failed: ${err.message}`);
+        }
+
+        /*
          * Manifeste d'application web, servi et non déposé en fichier.
          *
          * Sur iPhone, aucune page ne peut faire disparaître les barres du
@@ -514,6 +531,20 @@ class WebServer {
             if (!ws.identity.master && ws.identity.session) {
                 log.info(`[WebServer] Guest dashboard connected: `
                     + `${ws.identity.session.displayName} (${ws.identity.session.userId}).`);
+            }
+
+            // Le carnet retient le passage : c'est de là que vient le « vu il y
+            // a… » de la fenêtre de partage, et la session peut porter un nom
+            // plus frais que la fiche si le compte a été renommé entre-temps.
+            if (ws.identity.session?.userId) {
+                try {
+                    require('./guests').touch(ws.identity.session.userId, {
+                        displayName: ws.identity.session.displayName,
+                        avatar: ws.identity.session.avatar,
+                    });
+                } catch (err) {
+                    log.error('[WebServer] Guest book update failed:', err.message);
+                }
             }
 
             // L'initialisation d'un client interroge l'état du lecteur. Sans
@@ -619,6 +650,25 @@ class WebServer {
                     ...this._shareStateFor(ws, selectedGuildId),
                 }
             }));
+
+            /*
+             * Et prévenir les autres qu'il y a quelqu'un de plus.
+             *
+             * La fenêtre de partage montre qui est en ligne ; cette liste vient
+             * des connexions ouvertes, et rien d'autre ne la fait bouger. Sans
+             * cette diffusion, la pastille d'un invité qui arrive ne verdissait
+             * qu'au prochain événement de lecture — c'est-à-dire, un bot à
+             * l'arrêt, jamais.
+             *
+             * `_ensurePilot` ne suffisait pas : il ne diffuse que lorsqu'il
+             * désigne un nouveau pilote, c'est-à-dire à la première connexion.
+             * Or l'arrivée qui intéresse le maître est précisément la seconde —
+             * celle de son invité, alors que lui est déjà là.
+             *
+             * Différée d'un tour, pour laisser la connexion s'achever avant de
+             * peindre quoi que ce soit chez les autres.
+             */
+            setImmediate(() => this.broadcastState(selectedGuildId));
         }
 
         ws.on('message', async (message) => {
@@ -750,7 +800,6 @@ class WebServer {
      */
     _shareStateFor(ws, guildId) {
         const permissions = require('./permissions');
-        const sessions = require('./sessions');
         const oauth = require('./oauth');
 
         const identity = ws.identity || { master: false };
@@ -787,9 +836,23 @@ class WebServer {
                     oauthReady: oauth.isConfigured(),
                     publicUrl: oauth.publicUrl(),
                     grants: database.getSharedControl(guildId),
-                    knownUsers: sessions.listUsers(),
+                    knownUsers: this._knownGuests(),
                     pending: this._pendingGuests(guildId),
                     admitted: database.getAdmittedGuests(guildId),
+                    /*
+                     * Le catalogue des droits voyage avec l'état.
+                     *
+                     * La fenêtre de partage dessine un interrupteur par droit,
+                     * rangés par rubrique : elle a donc besoin de la liste, et
+                     * la recopier dans le script du navigateur ferait deux
+                     * tables à tenir d'accord. Celle-ci est la seule, et c'est
+                     * celle qui refuse pour de bon.
+                     */
+                    catalogue: {
+                        groups: permissions.GROUPS,
+                        actions: permissions.GROUP_ACTIONS,
+                        presets: permissions.PRESETS,
+                    },
                 },
             };
         }
@@ -825,13 +888,14 @@ class WebServer {
      * @returns {Array<{userId: string, displayName: string, avatar: string|null, since: number}>}
      */
     _pendingGuests(guildId) {
-        const sessions = require('./sessions');
+        const guests = require('./guests');
         const owner = require('./owner');
         const grants = database.getSharedControl(guildId) || {};
 
         const admitted = new Set(database.getAdmittedGuests(guildId));
+        const online = this._onlineGuestIds();
 
-        return sessions.listUsers()
+        return guests.list()
             .filter((u) => !grants[u.userId]
                 && !admitted.has(String(u.userId))
                 && !owner.isOwner({ userId: u.userId }))
@@ -840,7 +904,70 @@ class WebServer {
                 displayName: u.displayName || u.userId,
                 avatar: u.avatar || null,
                 since: u.lastSeenAt || 0,
+                online: online.has(u.userId),
             }));
+    }
+
+    /**
+     * Les comptes dont un tableau de bord est ouvert en ce moment.
+     *
+     * « En ligne » ne se déduit ni d'une session valable — un cookie dure trente
+     * jours et ne dit rien de la présence — ni de l'appartenance au salon vocal :
+     * on peut écouter sans tableau de bord, et tenir le tableau de bord sans
+     * être dans le salon. La seule mesure honnête est la connexion elle-même.
+     *
+     * Le battement de cœur de `wss` ferme les sockets muettes au bout de trente
+     * secondes ; un onglet fermé brutalement disparaît donc de cette liste dans
+     * ce délai, sans qu'il y ait rien de plus à faire.
+     *
+     * @returns {Set<string>}
+     */
+    _onlineGuestIds() {
+        const ids = new Set();
+        for (const client of this.wss?.clients || []) {
+            if (client.readyState !== 1) continue;
+            const userId = client.identity?.session?.userId;
+            if (userId) ids.add(String(userId));
+        }
+        return ids;
+    }
+
+    /**
+     * Le carnet des invités, augmenté de qui est là en ce moment.
+     *
+     * Le carnet (web/guests.js) survit aux sessions : un invité pourvu de droits
+     * mais dont le cookie a expiré reste donc nommé et illustré dans la fenêtre
+     * de partage, simplement marqué hors ligne. C'était l'inverse auparavant —
+     * la liste venait des sessions, et l'invité s'effaçait avec la sienne.
+     *
+     * @returns {Array<{ userId: string, displayName: string, avatar: string|null,
+     *   lastSeenAt: number, firstSeenAt: number, online: boolean }>}
+     */
+    _knownGuests() {
+        const guests = require('./guests');
+        const online = this._onlineGuestIds();
+
+        return guests.list().map((guest) => ({
+            userId: guest.userId,
+            displayName: guest.displayName || guest.userId,
+            avatar: guest.avatar || null,
+            firstSeenAt: guest.firstSeenAt || 0,
+            /*
+             * L'horodatage reste celui du carnet, figé.
+             *
+             * Il serait tentant d'y mettre l'instant présent pour quelqu'un de
+             * connecté, puisqu'on le voit à l'instant. Ce serait ruineux :
+             * `broadcastState` ne renvoie l'état que s'il a changé, et une date
+             * recalculée à chaque appel le ferait paraître différent à chaque
+             * fois — tous les tableaux de bord recevraient tout, en continu.
+             *
+             * La fenêtre n'en a d'ailleurs pas besoin : elle annonce « en
+             * ligne » pour les présents, et ne se sert de la date que pour les
+             * absents, à qui elle dit « vu il y a… ».
+             */
+            lastSeenAt: guest.lastSeenAt || 0,
+            online: online.has(guest.userId),
+        }));
     }
 
     /**
@@ -998,6 +1125,21 @@ class WebServer {
             // Différé : à cet instant la connexion figure encore parmi les
             // clients, et se réélirait elle-même.
             setImmediate(() => this._ensurePilot(guildId));
+        }
+
+        /*
+         * Le départ d'un invité éteint sa pastille chez le maître.
+         *
+         * Même raison que le différé ci-dessus : la socket qui se ferme est
+         * encore comptée parmi les clients à cet instant, et `_onlineGuestIds`
+         * la verrait toujours en ligne. Un tour plus tard, elle a disparu.
+         *
+         * Seules les connexions nommées valent la peine : une socket sans
+         * session ne figure dans aucune liste, et rien ne changerait à l'écran.
+         */
+        if (ws.identity?.session?.userId && ws.selectedGuildId) {
+            const guildId = ws.selectedGuildId;
+            setImmediate(() => this.broadcastState(guildId));
         }
     }
 

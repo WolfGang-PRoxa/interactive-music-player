@@ -14,6 +14,9 @@ Speicher-Cache, der während des Betriebs maßgeblich ist.
 | `data/settings.json` | Einstellungen je Server + globale Wiedergabelisten | Bei jeder Änderung, über 120 ms gebündelt |
 | `data/playback_state.json` | Letzter bekannter Wiedergabezustand | Alle 5 s und bei Ereignissen |
 | `data/dashboard-token` | Zugangstoken | Einmal, beim ersten Start |
+| `data/sessions.json` | Offene Discord-Sitzungen | Beim Öffnen, dann über 5 s gebündelt |
+| `data/guests.json` | Gästebuch der bereits Gesehenen | Bei jedem Besuch, über 5 s gebündelt |
+| `data/owner.json` | Konto, dem die Installation gehört | Einmal, beim Beanspruchen |
 
 > `better-sqlite3` steht in den `optionalDependencies`, wird aber **nie
 > importiert**. Es ist ein Überbleibsel eines aufgegebenen Ansatzes: die native

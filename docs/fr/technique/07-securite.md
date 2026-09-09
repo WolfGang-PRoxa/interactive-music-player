@@ -70,6 +70,44 @@ traitée en invité sans droit, jamais en maître. Tant que le jeton faisait le
 maître, ce repli était sans conséquence ; il ouvrirait maintenant tout à un
 incident.
 
+### Se souvenir d'un invité
+
+Une session Discord dure trente jours et ne franchit pas la frontière entre deux
+navigateurs. Un invité accepté devait donc recliquer « Se connecter » à chaque
+venue, et — plus gênant — il *disparaissait de la fenêtre du maître* dès sa
+session expirée : la liste des invités se lisait dans les sessions ouvertes,
+alors que ses droits, eux, restaient inscrits dans les réglages.
+
+Deux questions étaient mêlées, et les séparer suffit :
+
+- **qui est cette personne ?** — le carnet
+  ([`guests.js`](../../../src/web/guests.js)), écrit dans `data/guests.json`,
+  qui ne dure pas moins que les droits qu'il accompagne ;
+- **cet onglet est-il à elle ?** — la session
+  ([`sessions.js`](../../../src/web/sessions.js)), avec la durée de vie courte
+  que cela mérite.
+
+Le carnet ne contient **aucun secret** : ni jeton, ni jeton d'accès Discord,
+rien qui permette de se faire passer pour quelqu'un. Y figurer signifie « ce
+compte s'est authentifié au moins une fois », jamais « ce compte a le droit
+de… ». Un invité congédié en sort, sans quoi le refus n'en serait pas un.
+
+La porte tente alors de reconnaître son visiteur avant de lui montrer un bouton.
+L'essai passe par `prompt=none`, qui interdit à Discord d'afficher quoi que ce
+soit : ou bien il reconnaît le compte et le renvoie identifié, ou bien il répond
+`login_required` — une réponse normale, pas un incident — et la porte montre son
+bouton comme avant.
+
+L'essai ne se retente pas : le rappel revient avec `?login=manual`, doublé d'une
+marque en `sessionStorage`. Sans cette mémoire, un échec relancerait un essai,
+indéfiniment. Les deux traces sont nécessaires — le paramètre survit au
+changement d'origine du rappel, le stockage survit au nettoyage de l'URL.
+
+**Aucun droit n'est accordé au passage.** La reconnaissance muette répond à « qui
+êtes-vous », jamais à « pouvez-vous entrer » : un compte qui n'est membre
+d'aucun serveur du bot est refusé là comme ailleurs, et un invité reconnu
+retrouve exactement les droits qu'on lui avait laissés, pas un de plus.
+
 ### Origine du jeton
 
 `DASHBOARD_TOKEN` s'il est défini, sinon un jeton de 32 octets généré au premier

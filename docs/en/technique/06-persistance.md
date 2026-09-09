@@ -14,6 +14,9 @@ that is authoritative while the process runs.
 | `data/settings.json` | Per-server settings + global playlists | On every change, batched over 120 ms |
 | `data/playback_state.json` | Last known playback state | Every 5 s and on events |
 | `data/dashboard-token` | Access token | Once, on first startup |
+| `data/sessions.json` | Open Discord sessions | On opening, then batched over 5 s |
+| `data/guests.json` | Book of guests already seen | On every visit, batched over 5 s |
+| `data/owner.json` | Account that owns the installation | Once, when claimed |
 
 > `better-sqlite3` appears in `optionalDependencies` but is **never imported**.
 > It is a leftover from an abandoned approach: the native compilation was

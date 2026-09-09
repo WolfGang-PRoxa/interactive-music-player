@@ -69,6 +69,44 @@ The consequence shows in the fallbacks: a socket arriving without an identity is
 treated as a guest with no rights, never as the master. While the token made the
 master, that fallback was harmless; it would now open everything to an accident.
 
+### Remembering a guest
+
+A Discord session lasts thirty days and does not cross the boundary between two
+browsers. An accepted guest therefore had to click "Sign in" again on every
+visit and — worse — *vanished from the master's window* as soon as their session
+expired: the guest list was read from the open sessions, while their rights
+stayed recorded in the settings.
+
+Two questions were tangled together, and separating them is enough:
+
+- **who is this person?** — the guest book
+  ([`guests.js`](../../../src/web/guests.js)), written to `data/guests.json`,
+  which lasts at least as long as the rights it accompanies;
+- **does this tab belong to them?** — the session
+  ([`sessions.js`](../../../src/web/sessions.js)), with the short lifetime that
+  deserves.
+
+The book holds **no secret**: no token, no Discord access token, nothing that
+would let anyone impersonate anybody. Being in it means "this account
+authenticated at least once", never "this account may…". A dismissed guest is
+removed from it, otherwise the refusal would not be one.
+
+The gate then tries to recognise its visitor before showing a button. The
+attempt uses `prompt=none`, which forbids Discord from displaying anything:
+either it recognises the account and sends it back identified, or it answers
+`login_required` — a normal answer, not an incident — and the gate shows its
+button as before.
+
+The attempt is not retried: the callback returns with `?login=manual`, backed by
+a mark in `sessionStorage`. Without that memory, a failure would trigger another
+attempt, endlessly. Both traces are needed — the parameter survives the
+callback's change of origin, the storage survives the URL being cleaned.
+
+**No right is granted along the way.** Silent recognition answers "who are you",
+never "may you come in": an account belonging to no guild the bot serves is
+refused there as anywhere else, and a recognised guest recovers exactly the
+rights they were left with, not one more.
+
 ### Origin of the token
 
 `DASHBOARD_TOKEN` if it is defined, otherwise a 32-byte token generated on first

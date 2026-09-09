@@ -475,6 +475,15 @@ process.on('SIGINT', async () => {
     // Close database
     database.close();
 
+    // Le carnet des invités et les sessions écrivent en différé : sans cet
+    // appel, la dernière venue de quelqu'un se perdrait à chaque extinction.
+    try {
+        require('./web/guests').flush();
+        require('./web/sessions').flush();
+    } catch (err) {
+        log.error('[Shutdown] Could not save the guest book:', err.message);
+    }
+
     // Destroy client
     client.destroy();
 

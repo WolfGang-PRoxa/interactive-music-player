@@ -824,12 +824,15 @@ class GuildDatabase {
     /**
      * Droits accordés à un invité sur un serveur.
      *
-     * Rend toujours les quatre groupes, faux par défaut : les appelants n'ont
+     * Rend toujours le catalogue entier, faux par défaut : les appelants n'ont
      * ainsi jamais à distinguer « jamais invité » de « invité puis tout retiré ».
+     *
+     * `sanitize` relit au passage les jeux de droits écrits par une version
+     * antérieure, où ils tenaient en quatre groupes — voir web/permissions.js.
      *
      * @param {string} guildId
      * @param {string} userId
-     * @returns {{ playback: boolean, queue: boolean, playlists: boolean, volume: boolean }}
+     * @returns {Object<string, boolean>} Un booléen par droit du catalogue.
      */
     getUserPermissions(guildId, userId) {
         const { sanitize } = require('../web/permissions');
@@ -841,22 +844,33 @@ class GuildDatabase {
      * Accorde ou retire des droits à un invité.
      *
      * Un invité qui n'a plus aucun droit sort de la table plutôt que d'y rester
-     * avec quatre `false` : le fichier de réglages ne garde ainsi trace que des
-     * partages réellement en vigueur.
+     * avec vingt-neuf `false` : le fichier de réglages ne garde ainsi trace que
+     * des partages réellement en vigueur. C'est aussi pourquoi l'admission se
+     * range à part, dans `admittedGuests` — voir `admitGuest`.
+     *
+     * Seuls les droits accordés sont écrits, et non le catalogue entier : le
+     * fichier reste lisible, et un droit ajouté plus tard au catalogue naît
+     * fermé pour tout le monde plutôt que d'hériter d'un `false` figé.
      *
      * @param {string} guildId
      * @param {string} userId
      * @param {object} permissions Droits bruts, assainis avant enregistrement.
-     * @returns {{ playback: boolean, queue: boolean, playlists: boolean, volume: boolean }}
+     * @returns {Object<string, boolean>} Le jeu complet, tel qu'il est en vigueur.
      */
     setUserPermissions(guildId, userId, permissions) {
-        const { sanitize, hasAny } = require('../web/permissions');
+        const { sanitize, hasAny, granted } = require('../web/permissions');
         const settings = this.getSettings(guildId);
         if (!settings.sharedControl) settings.sharedControl = {};
 
         const clean = sanitize(permissions);
-        if (hasAny(clean)) settings.sharedControl[String(userId)] = clean;
-        else delete settings.sharedControl[String(userId)];
+        if (hasAny(clean)) {
+            settings.sharedControl[String(userId)] = granted(clean).reduce((acc, key) => {
+                acc[key] = true;
+                return acc;
+            }, {});
+        } else {
+            delete settings.sharedControl[String(userId)];
+        }
 
         this.cache.set(guildId, settings);
         this._save();

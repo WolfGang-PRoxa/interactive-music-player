@@ -14,6 +14,20 @@
  * donc invisible au script, et l'état de l'application Discord ne se devine
  * pas. Ce module lui demande, puis ouvre ou non la porte.
  *
+ * ## La reconnaissance muette
+ *
+ * Avant de montrer son bouton, la porte essaie de reconnaître son visiteur
+ * toute seule. Un invité déjà admis n'a aucune raison de recliquer « Se
+ * connecter » à chaque venue : son cookie de session ne dure que trente jours
+ * et ne franchit pas la frontière entre deux navigateurs, alors que Discord,
+ * lui, sait parfaitement qui il est et a déjà reçu son autorisation.
+ *
+ * L'essai passe par `prompt=none`, qui interdit à Discord d'afficher quoi que
+ * ce soit : ou bien il reconnaît le visiteur et le renvoie identifié — un
+ * clignotement, puis le tableau de bord avec ses droits —, ou bien il refuse,
+ * et la porte montre son bouton comme avant. Un aller-retour de perdu dans le
+ * second cas, et une seule fois par onglet : voir `trySilently`.
+ *
  * Elle ne se ferme pas. Ni croix, ni clic à côté, ni touche d'échappement : ce
  * n'est pas une confirmation qu'on écarte, et une fenêtre qu'on peut faire
  * disparaître d'un geste ne barre rien du tout. Le tableau de bord derrière
@@ -124,6 +138,67 @@ window.MusicPlayer = window.MusicPlayer || {};
     }
 
     /**
+     * A-t-on déjà tenté la reconnaissance muette dans ce navigateur ?
+     *
+     * Deux traces, parce qu'aucune ne suffit seule :
+     *
+     *  - le paramètre `?login=manual`, posé par le serveur au retour d'un essai
+     *    manqué. Il survit au changement d'origine — le rappel de Discord arrive
+     *    sur `PUBLIC_URL`, qui n'est pas toujours l'adresse d'où l'on est parti ;
+     *  - `sessionStorage`, qui survit lui au nettoyage de l'URL et aux
+     *    rechargements suivants de l'onglet.
+     *
+     * Sans cette mémoire, un essai manqué relancerait un essai, indéfiniment :
+     * la porte tournerait en rond au lieu de montrer son bouton.
+     */
+    const TRIED_KEY = 'loginGate.silentTried';
+
+    function alreadyTried() {
+        if (new URLSearchParams(window.location.search).get('login') === 'manual') return true;
+        try {
+            return sessionStorage.getItem(TRIED_KEY) === '1';
+        } catch (e) {
+            // Navigation privée, stockage refusé : on retombe sur le paramètre
+            // d'URL seul, qui suffit à empêcher la boucle.
+            return false;
+        }
+    }
+
+    function rememberTried() {
+        try {
+            sessionStorage.setItem(TRIED_KEY, '1');
+        } catch (e) {
+            // Sans stockage, le paramètre d'URL fait seul office de mémoire.
+        }
+    }
+
+    /**
+     * Tente de reconnaître le visiteur sans lui rien demander.
+     *
+     * Un invité déjà admis n'a aucune raison de recliquer « Se connecter » à
+     * chaque venue : il a déjà autorisé l'application, et Discord sait
+     * parfaitement qui il est. La porte pose donc la question en silence — le
+     * serveur ajoute `prompt=none`, qui interdit à Discord d'afficher quoi que
+     * ce soit — et l'invité ne voit qu'un clignotement avant son tableau de
+     * bord, ses droits retrouvés.
+     *
+     * Si Discord ne peut pas répondre sans parler à l'utilisateur — jamais
+     * connecté sur ce navigateur, autorisation retirée — il refuse, et le rappel
+     * revient ici avec `?login=manual`. La porte montre alors son bouton, comme
+     * avant. C'est un aller-retour de perdu, une seule fois par onglet.
+     *
+     * @returns {boolean} Vrai si la page est en train de partir.
+     */
+    function trySilently(state) {
+        if (!state.oauthReady || alreadyTried()) return false;
+
+        rememberTried();
+        const returnTo = window.location.pathname + window.location.search;
+        window.location.href = '/auth/discord?silent=1&returnTo=' + encodeURIComponent(returnTo);
+        return true;
+    }
+
+    /**
      * Demande au serveur où l'on en est, et agit.
      *
      * Une réponse illisible — serveur qui redémarre, réseau coupé — laisse la
@@ -144,8 +219,16 @@ window.MusicPlayer = window.MusicPlayer || {};
         }
 
         window.MusicPlayer.authState = state;
-        if (state.pendingLogin) open(state);
-        else close();
+
+        if (state.pendingLogin) {
+            // La reconnaissance muette d'abord : montrer un bouton pour le
+            // retirer un instant plus tard ferait clignoter la porte sous les
+            // yeux de quelqu'un qui n'avait rien à faire.
+            if (trySilently(state)) return state;
+            open(state);
+        } else {
+            close();
+        }
         return state;
     }
 

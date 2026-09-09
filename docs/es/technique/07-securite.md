@@ -70,6 +70,45 @@ trata como invitado sin derechos, nunca como maestro. Mientras el token hacía a
 maestro, ese repliegue no tenía consecuencias; ahora abriría todo ante un
 incidente.
 
+### Recordar a un invitado
+
+Una sesión de Discord dura treinta días y no cruza la frontera entre dos
+navegadores. Un invitado aceptado tenía pues que volver a pulsar «Conectarse» en
+cada visita y —más molesto aún— *desaparecía de la ventana del maestro* en
+cuanto expiraba su sesión: la lista de invitados se leía en las sesiones
+abiertas, mientras que sus permisos seguían inscritos en los ajustes.
+
+Dos preguntas estaban mezcladas, y basta con separarlas:
+
+- **¿quién es esta persona?** — el libro
+  ([`guests.js`](../../../src/web/guests.js)), escrito en `data/guests.json`,
+  que dura al menos tanto como los permisos que acompaña;
+- **¿esta pestaña es suya?** — la sesión
+  ([`sessions.js`](../../../src/web/sessions.js)), con la vida breve que eso
+  merece.
+
+El libro no contiene **ningún secreto**: ni testigo, ni testigo de acceso de
+Discord, nada que permita hacerse pasar por alguien. Figurar en él significa
+«esta cuenta se autenticó al menos una vez», nunca «esta cuenta puede…». Un
+invitado despedido sale de él; de lo contrario el rechazo no lo sería.
+
+La puerta intenta entonces reconocer a su visitante antes de mostrarle un botón.
+El intento usa `prompt=none`, que prohíbe a Discord mostrar nada: o bien
+reconoce la cuenta y la devuelve identificada, o bien responde `login_required`
+—una respuesta normal, no un incidente— y la puerta muestra su botón como antes.
+
+El intento no se repite: la llamada de retorno vuelve con `?login=manual`,
+reforzada por una marca en `sessionStorage`. Sin esa memoria, un fallo lanzaría
+otro intento, indefinidamente. Ambas huellas son necesarias: el parámetro
+sobrevive al cambio de origen de la llamada, el almacenamiento sobrevive a la
+limpieza de la URL.
+
+**No se concede ningún permiso de paso.** El reconocimiento silencioso responde a
+«quién eres», nunca a «puedes entrar»: una cuenta que no pertenece a ningún
+servidor del bot es rechazada allí como en cualquier otro sitio, y un invitado
+reconocido recupera exactamente los permisos que se le habían dejado, ni uno
+más.
+
 ### Origen del testigo
 
 `DASHBOARD_TOKEN` si está definido, y si no un testigo de 32 octetos generado en

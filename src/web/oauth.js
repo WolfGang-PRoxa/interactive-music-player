@@ -111,7 +111,8 @@ function purgeStates() {
  * connaît que la valeur, jamais ce qu'elle recouvre.
  *
  * @param {string} [returnTo] Chemin à rouvrir une fois l'invité reconnu.
- * @param {{ holdsToken?: boolean }} [carried] Ce que le rappel devra savoir.
+ * @param {{ holdsToken?: boolean, claim?: boolean, silent?: boolean }} [carried]
+ *   Ce que le rappel devra savoir.
  * @returns {string} L'URL vers laquelle rediriger le navigateur.
  */
 function buildAuthorizeUrl(returnTo = '/', carried = {}) {
@@ -123,6 +124,20 @@ function buildAuthorizeUrl(returnTo = '/', carried = {}) {
         returnTo,
         holdsToken: Boolean(carried.holdsToken),
         claim: Boolean(carried.claim),
+        /*
+         * La tentative muette, celle que personne n'a demandée.
+         *
+         * La porte du tableau de bord essaie de reconnaître son visiteur avant
+         * de lui montrer un bouton : c'est ce qui évite à un invité déjà admis
+         * de se reconnecter à chaque venue. Discord peut très bien répondre
+         * « je ne peux pas répondre sans lui parler », et ce n'est pas une
+         * erreur — c'est la réponse attendue une fois sur deux.
+         *
+         * Le rappel doit donc savoir d'où vient la demande : d'un clic, auquel
+         * un échec doit répondre par une page d'erreur, ou de cet essai-ci,
+         * auquel il doit répondre en rendant la main sans un mot.
+         */
+        silent: Boolean(carried.silent),
     });
 
     const url = new URL(AUTHORIZE_URL);
@@ -152,8 +167,8 @@ function buildAuthorizeUrl(returnTo = '/', carried = {}) {
  * seconde session.
  *
  * @param {string} state
- * @returns {{ returnTo: string, holdsToken: boolean, claim: boolean }|null} null si inconnu,
- *   déjà servi ou périmé.
+ * @returns {{ returnTo: string, holdsToken: boolean, claim: boolean, silent: boolean }|null}
+ *   null si inconnu, déjà servi ou périmé.
  */
 function consumeState(state) {
     purgeStates();
@@ -167,6 +182,7 @@ function consumeState(state) {
         returnTo: entry.returnTo || '/',
         holdsToken: Boolean(entry.holdsToken),
         claim: Boolean(entry.claim),
+        silent: Boolean(entry.silent),
     };
 }
 
