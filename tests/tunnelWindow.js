@@ -775,7 +775,43 @@ console.log('\nCe que le bouton d\'envoi répond\n');
      * coche et le mot disent encore tout — seul ce qui n'était que déplacement
      * s'efface.
      */
-    const reduit = CSS.slice(CSS.lastIndexOf('@media (prefers-reduced-motion: reduce) {'));
+    /**
+     * Le contenu de **toutes** les règles « prefers-reduced-motion » du fichier.
+     *
+     * Ce test prenait la dernière, à une époque où il n'y en avait qu'une. Une
+     * autre a depuis été écrite plus bas, pour un curseur sans rapport, et
+     * « la dernière » a cessé de désigner celle-ci — les deux vérifications
+     * échouaient alors sur une feuille de style parfaitement correcte.
+     *
+     * Ce qui compte n'a jamais été la position du bloc, mais que ces règles-là
+     * soient bien sous une réduction de mouvement. On les rassemble donc tous,
+     * en comptant les accolades : une règle imbriquée en contient, et couper au
+     * premier « } » rendrait un bloc tronqué.
+     */
+    const reducedMotionRules = (css) => {
+        const marker = '@media (prefers-reduced-motion: reduce) {';
+        const blocks = [];
+        let from = 0;
+
+        for (;;) {
+            const start = css.indexOf(marker, from);
+            if (start < 0) break;
+
+            let depth = 0;
+            let i = start + marker.length - 1;
+            for (; i < css.length; i++) {
+                if (css[i] === '{') depth++;
+                else if (css[i] === '}' && --depth === 0) break;
+            }
+
+            blocks.push(css.slice(start, i + 1));
+            from = i + 1;
+        }
+
+        return blocks.join('\n');
+    };
+
+    const reduit = reducedMotionRules(CSS);
     check('  … et se tait quand le mouvement est refusé',
         /\.is-sent \.share-invite-plane,\s*\n\s*\.share-invite-btn\.is-sent \.plane-trail \{ animation: none; opacity: 0; \}/
             .test(reduit),

@@ -147,6 +147,25 @@ const VERSION_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 const MAX_CACHE_BYTES = (Number(process.env.MAX_CACHE_MB) || 2048) * 1024 * 1024;
 
 /**
+ * Téléchargements de préchargement menés de front, au plus.
+ *
+ * Il n'y en avait aucun besoin tant qu'une section plafonnait à cinq pistes :
+ * la boucle de planification lançait tout ce qu'elle trouvait, et elle ne
+ * trouvait jamais grand-chose. Le cran « tout » des curseurs change cela — une
+ * bibliothèque de deux cents titres demanderait deux cents ffmpeg simultanés,
+ * c'est-à-dire une machine à genoux et une source qui commence à refuser les
+ * connexions.
+ *
+ * Trois : assez pour que le réseau ne dorme pas pendant qu'un transcodage
+ * occupe le processeur, assez peu pour que la lecture en cours ne se batte pas
+ * avec son propre préchargement.
+ *
+ * Ce qui dépasse n'est pas perdu : la planification reprend dès qu'une place se
+ * libère — voir `_schedulePump`.
+ */
+const MAX_PARALLEL_PRELOADS = 3;
+
+/**
  * Décompose un nom de fichier du cache en clé de piste et débit.
  *
  * Deux formes coexistent : `<clé>.<débit>.mp3` depuis l'introduction du choix
@@ -298,6 +317,29 @@ function pickByDuration(candidates, expectedMs) {
  * @param {boolean} boucle
  * @returns {object[]}
  */
+/**
+ * Combien de pistes précharger pour une section, d'après le réglage enregistré.
+ *
+ * Le tableau de bord offre six crans par section : zéro à cinq pistes, puis un
+ * dernier qui les prend toutes. « Toutes » n'étant pas un nombre, il s'enregistre
+ * comme `-1` — un compte négatif n'existe dans aucun monde, là où un `6` aurait
+ * cessé de vouloir dire « tout » le jour où les curseurs gagneraient un cran.
+ *
+ * Rendu comme `Infinity`, et non comme un très grand nombre : les trois usages
+ * en aval sont des `slice(0, limite)` et un `Math.min(limite, …)`, qui le
+ * traitent déjà correctement. C'est ce qui permet de ne rien changer ailleurs.
+ *
+ * @param {any} raw Valeur enregistrée, telle quelle.
+ * @param {number} [fallback=3] Réglage par défaut, si la valeur est illisible.
+ * @returns {number} Un entier de 0 à 5, ou `Infinity`.
+ */
+function preloadLimit(raw, fallback = 3) {
+    const value = parseInt(raw ?? fallback, 10);
+    if (!Number.isFinite(value)) return fallback;
+    if (value < 0) return Infinity;
+    return Math.min(5, value);
+}
+
 function upcomingTracks(tracks, currentIndex, limit, loop) {
     if (!loop) {
         return tracks.slice(currentIndex + 1, currentIndex + 1 + limit);
@@ -367,6 +409,15 @@ class PreloadManager {
          * définitivement morte soit reprise à chaque seconde.
          */
         this.failures = new Map();
+
+        /**
+         * Serveurs dont la planification s'est arrêtée sur le plafond de
+         * parallélisme, et qu'il faudra reprendre — voir `_schedulePump`.
+         * @type {Set<string>}
+         */
+        this.pendingGuilds = new Set();
+        /** Une reprise est déjà programmée pour le prochain tour de boucle. */
+        this.pumpScheduled = false;
 
         /** Horodatage de la dernière vérification de version de yt-dlp. */
         this._lastVersionCheckAt = 0;
@@ -1163,9 +1214,9 @@ class PreloadManager {
         const preloading = settings.preloading || { enabled: true, queueCount: 3, historyCount: 3, playlistCount: 3 };
         if (preloading.enabled === false) return [];
 
-        const historyLimit = Math.min(5, Math.max(0, parseInt(preloading.historyCount ?? 3, 10)));
-        const queueLimit = Math.min(5, Math.max(0, parseInt(preloading.queueCount ?? 3, 10)));
-        const playlistLimit = Math.min(5, Math.max(0, parseInt(preloading.playlistCount ?? 3, 10)));
+        const historyLimit = preloadLimit(preloading.historyCount);
+        const queueLimit = preloadLimit(preloading.queueCount);
+        const playlistLimit = preloadLimit(preloading.playlistCount);
 
         const sourceIsPlaylist = !!settings.activePlaybackSource
             && settings.activePlaybackSource.startsWith('playlist_');
@@ -1370,8 +1421,57 @@ class PreloadManager {
 
             const bitrate = resolveAudioBitrate(track);
             if (this.activeDownloads.has(this._downloadKey(key, bitrate))) continue;
+
+            /*
+             * Le reste attendra qu'une place se libère.
+             *
+             * `break` et non `continue` : les cibles sont rangées par urgence —
+             * la piste en cours, puis la file, puis l'historique, puis les
+             * playlists — et sauter par-dessus celle-ci pour en essayer une
+             * plus lointaine reviendrait à précharger à l'envers.
+             */
+            if (this.activeDownloads.size >= MAX_PARALLEL_PRELOADS) {
+                this.pendingGuilds.add(guildId);
+                break;
+            }
+
             this.startDownload(track, key, bitrate);
         }
+    }
+
+    /**
+     * Reprend la planification là où le plafond de parallélisme l'a arrêtée.
+     *
+     * Appelé quand un préchargement **aboutit**, et seulement alors. Le faire
+     * aussi après un échec donnerait une boucle serrée : la piste fautive
+     * repartirait aussitôt, échouerait de nouveau, et relancerait la reprise —
+     * le délai de reprise après échec ne s'appliquant qu'au choix des cibles,
+     * pas au rythme des tentatives. Un échec laisse donc le reliquat au
+     * prochain `update()`, que le moindre changement d'état déclenche.
+     *
+     * Différé d'un tour de boucle, et non exécuté sur place : `update()` peut
+     * annuler des téléchargements devenus hors cible, ce qui passe par le même
+     * point de sortie, et se rappellerait alors lui-même en pleine exécution.
+     */
+    _schedulePump() {
+        if (this.pumpScheduled) return;
+        this.pumpScheduled = true;
+
+        setImmediate(() => {
+            this.pumpScheduled = false;
+            if (this.suspended) return;
+            if (this.activeDownloads.size >= MAX_PARALLEL_PRELOADS) return;
+
+            const guilds = [...this.pendingGuilds];
+            this.pendingGuilds.clear();
+            for (const id of guilds) {
+                try {
+                    this.update(id);
+                } catch (err) {
+                    log.error(`[PreloadManager] Resuming the preload of guild ${id} failed:`, err.message);
+                }
+            }
+        });
     }
 
     /** Piste jouable correspondant à une URL, null si elle est irrésolvable. */
@@ -1795,6 +1895,10 @@ class PreloadManager {
                     });
 
                     this.failures.delete(key);
+
+                    // Une place vient de se libérer : s'il restait des cibles
+                    // en attente du plafond, elles repartent maintenant.
+                    this._schedulePump();
 
                     if (previous && previous.file !== cacheFileName(key, bitrate)) {
                         this._deleteCacheFile(key, previous.file);

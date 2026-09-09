@@ -2848,6 +2848,51 @@ input[type="range"] {
     transition: background 0.2s ease;
 }
 
+/*
+   Le cran de l'infini, au bout des curseurs de préchargement.
+
+   Le dernier cran de ces trois curseurs-là ne compte plus des pistes : il les
+   prend toutes. La piste elle-même reste nue — un glyphe posé dessus se
+   retrouvait sous la pastille, où il encombrait plus qu'il n'annonçait —, et
+   c'est un dégradé qui signale sa fin : la teinte du lecteur monte sur le
+   dernier sixième, là où se trouve le cran.
+
+   Le sixième n'est pas choisi au hasard : les curseurs comptent six intervalles
+   entre leurs sept crans, si bien que le dernier occupe exactement cette part
+   de la course.
+
+   Le symbole, lui, s'écrit dans la pastille de valeur, où l'œil va déjà lire le
+   nombre — voir `.scroll-val.is-infinity`.
+*/
+.scroll-range.has-infinity-end {
+    background: linear-gradient(to right,
+        rgba(255, 255, 255, 0.08) 0%,
+        rgba(255, 255, 255, 0.08) 83.33%,
+        color-mix(in srgb, var(--c-primary) 55%, rgba(255, 255, 255, 0.08)) 100%);
+}
+
+/* Une fois le cran atteint, le dégradé s'affirme : on y est. */
+.scroll-range.has-infinity-end.is-infinite {
+    background: linear-gradient(to right,
+        rgba(255, 255, 255, 0.08) 0%,
+        rgba(255, 255, 255, 0.08) 72%,
+        var(--c-primary) 100%);
+}
+
+html[data-theme="light"] .scroll-range.has-infinity-end {
+    background: linear-gradient(to right,
+        rgba(0, 0, 0, 0.1) 0%,
+        rgba(0, 0, 0, 0.1) 83.33%,
+        color-mix(in srgb, var(--c-primary) 45%, rgba(0, 0, 0, 0.1)) 100%);
+}
+
+html[data-theme="light"] .scroll-range.has-infinity-end.is-infinite {
+    background: linear-gradient(to right,
+        rgba(0, 0, 0, 0.1) 0%,
+        rgba(0, 0, 0, 0.1) 72%,
+        var(--c-primary) 100%);
+}
+
 html[data-theme="light"] .scroll-range,
 html[data-theme="light"] input[type="range"] {
     background: rgba(0, 0, 0, 0.1);
@@ -2897,6 +2942,23 @@ input[type="range"]::-moz-range-thumb:hover {
     font-weight: 700;
     color: var(--c-primary);
     text-align: right;
+}
+
+/*
+   Le symbole de l'infini, dans la pastille de valeur.
+
+   Il remplace un nombre, et à taille égale il pèse moins que lui : le glyphe
+   est bas, sans hampe ni jambage, et se perd dans une ligne où tous les autres
+   curseurs affichent des chiffres. Agrandi d'un tiers, il retrouve la présence
+   d'un « 3 » — c'est le réglage le plus marquant des trois, il doit se
+   remarquer.
+
+   La hauteur de ligne est ramenée à un : sans elle, la pastille grandirait avec
+   le glyphe et pousserait toute la rangée.
+*/
+.scroll-val.is-infinity {
+    font-size: 1.25rem;
+    line-height: 1;
 }
 
 .btn-default-reset {

@@ -719,10 +719,71 @@ window.MusicPlayer.initSettingsModal = function() {
             });
         }
 
+        /* ─────────────── Le cran de l'infini ───────────────
+         *
+         * Les trois curseurs de préchargement ont un dernier cran qui ne compte
+         * plus des pistes : il les prend toutes. « Tout » n'étant pas un
+         * nombre, il s'enregistre comme `-1` plutôt qu'avec la position du
+         * curseur : celle-ci ne vaut que par rapport au maximum du jour, et le
+         * jour où l'on porterait les curseurs à huit crans, un « 6 » enregistré
+         * cesserait de vouloir dire « tout » sans que rien ne le signale. Un
+         * nombre négatif, lui, n'est un compte dans aucun monde.
+         */
+        const PRELOAD_RANGES = new Set([
+            'preload-queue-count', 'preload-history-count', 'preload-playlist-count',
+        ]);
+
+        /** Valeur enregistrée pour « toutes les pistes de la section ». */
+        const PRELOAD_ALL = -1;
+
+        /** Ce curseur est-il posé sur son cran d'infini ? */
+        function atInfinity(range) {
+            return PRELOAD_RANGES.has(range.id) && Number(range.value) >= Number(range.max);
+        }
+
+        /**
+         * Ce qu'affiche la pastille d'un curseur.
+         *
+         * Centralisé : la valeur est peinte à l'ouverture, au glissement, à la
+         * molette et à la remise par défaut. Écrire le symbole à trois de ces
+         * quatre endroits donnerait un curseur qui affiche « 6 » selon la façon
+         * dont on l'a atteint.
+         */
+        function rangeDisplay(range, unit) {
+            return atInfinity(range) ? '∞' : `${range.value}${unit}`;
+        }
+
+        /**
+         * Marque le cran d'infini là où il se voit : la fin de la piste, et la
+         * pastille de valeur.
+         *
+         * La pastille est retrouvée par son identifiant plutôt que reçue en
+         * argument : cette fonction est appelée depuis quatre endroits, dont la
+         * remise par défaut, qui ne travaille pas sur les mêmes variables que
+         * les trois autres.
+         */
+        function paintInfinity(range) {
+            if (!PRELOAD_RANGES.has(range.id)) return;
+
+            const infinite = atInfinity(range);
+            range.classList.toggle('is-infinite', infinite);
+
+            const badge = document.getElementById(`val-${range.id}`);
+            if (badge) badge.classList.toggle('is-infinity', infinite);
+        }
+
+        /** Du réglage enregistré vers la position du curseur. */
+        function preloadPosition(stored, range) {
+            const max = Number(range.max);
+            const n = parseInt(stored ?? 3, 10);
+            if (!Number.isFinite(n)) return 3;
+            return n < 0 ? max : Math.min(max - 1, Math.max(0, n));
+        }
+
         const rangeInputs = settingsModal ? settingsModal.querySelectorAll('.scroll-range') : [];
         rangeInputs.forEach(range => {
             const valSpan = document.getElementById(`val-${range.id}`) || range.nextElementSibling;
-            
+
             if (range.id === 'setting-fadeout-duration') range.value = dashboardSettings.fadeoutDuration ?? 5;
             else if (range.id === 'setting-fadein-duration') range.value = dashboardSettings.fadeinDuration ?? 5;
             else if (range.id === 'setting-departure-delay') range.value = dashboardSettings.presenceDepartureDelay ?? 30;
@@ -737,15 +798,17 @@ window.MusicPlayer.initSettingsModal = function() {
             else if (range.id === 'hold-playlist') range.value = (dashboardSettings.holdDuration && dashboardSettings.holdDuration.playlist) ?? 1.5;
             else if (range.id === 'hold-queue') range.value = (dashboardSettings.holdDuration && dashboardSettings.holdDuration.queue) ?? 1.5;
             else if (range.id === 'hold-history') range.value = (dashboardSettings.holdDuration && dashboardSettings.holdDuration.history) ?? 1.5;
-            else if (range.id === 'preload-queue-count') range.value = (dashboardSettings.preloading && dashboardSettings.preloading.queueCount) ?? 3;
-            else if (range.id === 'preload-history-count') range.value = (dashboardSettings.preloading && dashboardSettings.preloading.historyCount) ?? 3;
-            else if (range.id === 'preload-playlist-count') range.value = (dashboardSettings.preloading && dashboardSettings.preloading.playlistCount) ?? 3;
+            else if (range.id === 'preload-queue-count') range.value = preloadPosition(dashboardSettings.preloading && dashboardSettings.preloading.queueCount, range);
+            else if (range.id === 'preload-history-count') range.value = preloadPosition(dashboardSettings.preloading && dashboardSettings.preloading.historyCount, range);
+            else if (range.id === 'preload-playlist-count') range.value = preloadPosition(dashboardSettings.preloading && dashboardSettings.preloading.playlistCount, range);
 
             const unit = (range.id.includes('duration') || range.id.includes('hold') || range.id.includes('delay') || range.id.startsWith('setting-toast-')) ? 's' : (range.id.includes('video') ? 'px' : '');
-            if (valSpan) valSpan.textContent = `${range.value}${unit}`;
+            if (valSpan) valSpan.textContent = rangeDisplay(range, unit);
+            paintInfinity(range);
 
             range.addEventListener('input', () => {
-                if (valSpan) valSpan.textContent = `${range.value}${unit}`;
+                if (valSpan) valSpan.textContent = rangeDisplay(range, unit);
+                paintInfinity(range);
                 updateSettingsFromUI();
                 if (range.id.includes('video') && typeof window.MusicPlayer.applyDefaultVideoWindowGeometry === 'function') {
                     window.MusicPlayer.applyDefaultVideoWindowGeometry();
@@ -764,7 +827,8 @@ window.MusicPlayer.initSettingsModal = function() {
                     val = Math.max(min, val - step);
                 }
                 range.value = val.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
-                if (valSpan) valSpan.textContent = `${range.value}${unit}`;
+                if (valSpan) valSpan.textContent = rangeDisplay(range, unit);
+                paintInfinity(range);
                 updateSettingsFromUI();
                 if (range.id.includes('video') && typeof window.MusicPlayer.applyDefaultVideoWindowGeometry === 'function') {
                     window.MusicPlayer.applyDefaultVideoWindowGeometry();
@@ -786,7 +850,12 @@ window.MusicPlayer.initSettingsModal = function() {
 
                 if (targetInput) {
                     targetInput.value = defaultVal;
-                    if (valDisplay) valDisplay.textContent = `${defaultVal}${unit}`;
+                    // Passé par le même formateur que les autres peintures : la
+                    // valeur par défaut d'un curseur de préchargement pourrait
+                    // un jour être son cran d'infini, et elle s'afficherait
+                    // « 6 » ici alors qu'elle vaut « ∞ » partout ailleurs.
+                    if (valDisplay) valDisplay.textContent = rangeDisplay(targetInput, unit);
+                    paintInfinity(targetInput);
                     updateSettingsFromUI();
                     if (targetId && targetId.includes('video') && typeof window.MusicPlayer.applyDefaultVideoWindowGeometry === 'function') {
                         window.MusicPlayer.applyDefaultVideoWindowGeometry();
@@ -899,11 +968,27 @@ window.MusicPlayer.initSettingsModal = function() {
                 history: parseFloat(document.getElementById('hold-history')?.value || 1.5)
             };
 
+            /**
+             * De la position du curseur vers le réglage enregistré.
+             *
+             * Le dernier cran vaut « toutes les pistes » et s'écrit `-1` : voir
+             * `PRELOAD_ALL` plus haut, et `preloadLimit` dans
+             * audio/PreloadManager.js, qui le relit.
+             */
+            const preloadCount = (id) => {
+                const range = document.getElementById(id);
+                if (!range) return 3;
+                const max = Number(range.max);
+                const pos = parseInt(range.value, 10);
+                if (!Number.isFinite(pos)) return 3;
+                return pos >= max ? PRELOAD_ALL : Math.min(max - 1, Math.max(0, pos));
+            };
+
             dashboardSettings.preloading = {
                 enabled: preloadEnable ? preloadEnable.checked : true,
-                queueCount: Math.min(5, Math.max(0, parseInt(document.getElementById('preload-queue-count')?.value || 3, 10))),
-                historyCount: Math.min(5, Math.max(0, parseInt(document.getElementById('preload-history-count')?.value || 3, 10))),
-                playlistCount: Math.min(5, Math.max(0, parseInt(document.getElementById('preload-playlist-count')?.value || 3, 10)))
+                queueCount: preloadCount('preload-queue-count'),
+                historyCount: preloadCount('preload-history-count'),
+                playlistCount: preloadCount('preload-playlist-count')
             };
 
             window.MusicPlayer.saveDashboardSettings();
