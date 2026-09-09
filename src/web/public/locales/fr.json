@@ -433,6 +433,8 @@
     "mem_estimate_note": "Les navigateurs n'exposent pas la mémoire réelle par élément. Les nœuds, attributs et images décodées sont comptés, puis convertis à 256 o par nœud ; le tas et le code chargé, eux, sont mesurés.",
     "select_version": "Version du bot :",
     "drawer_version_label": "Version",
+    "tooltip_copy_version": "Copier le numéro de version",
+    "version_copy_failed": "Copie impossible : sélectionnez le numéro à la main.",
     "version_current_prefix": "Actuelle :",
     "version_dev_short": "DEV",
     "version_option_dev": "DEV — code local",

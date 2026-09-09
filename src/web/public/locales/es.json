@@ -433,6 +433,8 @@
     "mem_estimate_note": "Los navegadores no exponen la memoria real por elemento. Se cuentan nodos, atributos e imágenes decodificadas, y se convierten a 256 B por nodo; el montículo y el código cargado, en cambio, sí se miden.",
     "select_version": "Versión del bot:",
     "drawer_version_label": "Versión",
+    "tooltip_copy_version": "Copiar el número de versión",
+    "version_copy_failed": "No se pudo copiar: seleccione el número a mano.",
     "version_current_prefix": "Actual:",
     "version_dev_short": "DEV",
     "version_option_dev": "DEV — código local",

@@ -2617,7 +2617,20 @@
                 <line x1="7" y1="7" x2="7.01" y2="7"></line>
             </svg>
             <span class="drawer-footer-label" data-i18n="drawer_version_label">Version</span>
-            <span class="drawer-footer-value" id="drawer-version-value">—</span>
+            <!--
+                 Un vrai <button>, et non un <span> qu'on écoute : la version se
+                 copie d'un clic, et le rendre cliquable sans le rendre
+                 focalisable le mettrait hors de portée du clavier. Le type est
+                 explicite — un bouton sans type vaut « submit », ce qui n'a pas
+                 de sens ici mais en aurait un le jour où ce pied se retrouverait
+                 dans un formulaire.
+
+                 Désactivé tant que la version n'est pas connue : le tiret qu'il
+                 affiche alors ne se copie pas. Voir js/versions.js.
+            -->
+            <button type="button" class="drawer-footer-value" id="drawer-version-value"
+                    data-tooltip="Copier le numéro de version"
+                    data-i18n-tooltip="tooltip_copy_version" disabled>—</button>
         </div>
     </aside>
 

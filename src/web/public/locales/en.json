@@ -433,6 +433,8 @@
     "mem_estimate_note": "Browsers do not expose real per-element memory. Nodes, attributes and decoded images are counted, then converted at 256 B per node; the heap and loaded code, by contrast, are measured.",
     "select_version": "Bot version:",
     "drawer_version_label": "Version",
+    "tooltip_copy_version": "Copy the version number",
+    "version_copy_failed": "Copy failed: select the number by hand.",
     "version_current_prefix": "Current:",
     "version_dev_short": "DEV",
     "version_option_dev": "DEV — local code",

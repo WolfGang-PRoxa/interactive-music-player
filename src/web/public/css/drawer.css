@@ -908,11 +908,113 @@ html[data-style="retro-synthwave"] .bandwidth-value {
     font-size: 0.72rem;
 }
 
+/*
+   La version se copie d'un clic : c'est un bouton, avec tout ce qu'un bouton
+   traîne comme apparence par défaut à défaire. Le fond, la bordure et la police
+   sont donc repris, faute de quoi le pied du tiroir gagnerait un rectangle gris
+   au milieu de sa ligne.
+
+   `position: relative` porte le double qui s'envole — voir `.version-ghost`.
+*/
 .drawer-footer-value {
     margin-left: auto;
+    /*
+       Le remplissage ajouté pour la zone de clic pousserait le numéro de sept
+       pixels vers l'intérieur : la marge négative le remet là où il a toujours
+       été. Le pied garde son alignement, et le fond du survol vient affleurer
+       le bord du tiroir plutôt que de flotter à mi-chemin.
+    */
+    margin-right: -7px;
+    position: relative;
+    font: inherit;
     font-weight: 600;
     color: var(--text-main);
     letter-spacing: 0.02em;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    padding: 2px 7px;
+    cursor: pointer;
+    transition: background 0.18s ease, border-color 0.18s ease,
+        color 0.18s ease, transform 0.12s ease;
+}
+
+.drawer-footer-value:hover:not(:disabled) {
+    background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+    border-color: var(--border-card, rgba(255, 255, 255, 0.1));
+}
+
+.drawer-footer-value:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+}
+
+/*
+   Tant que la version n'est pas connue, le bouton n'affiche qu'un tiret : il ne
+   se copie pas, et il ne doit pas non plus faire mine d'être cliquable.
+*/
+.drawer-footer-value:disabled {
+    cursor: default;
+    border-color: transparent;
+    background: none;
+}
+
+/*
+   L'enfoncement, puis la confirmation.
+
+   Le creux est court et le retour lent : c'est ce qui distingue un bouton qu'on
+   presse d'un bouton qui rebondit. La couleur, elle, tient le temps que le
+   double achève sa montée — elle est la confirmation, et c'est elle qui reste
+   quand les animations sont refusées.
+*/
+.drawer-footer-value.is-copied {
+    color: var(--c-success);
+    border-color: color-mix(in srgb, var(--c-success) 45%, transparent);
+    background: color-mix(in srgb, var(--c-success) 12%, transparent);
+}
+
+.drawer-footer-value.is-pressed {
+    transform: scale(0.94);
+    transition-duration: 0.06s;
+}
+
+/*
+   Le double qui s'envole.
+
+   Copier ne déplace rien : l'original reste en place, et c'est un exemplaire de
+   plus qui part. D'où ce calque, exact décalque du bouton, qui monte et se
+   dissout pendant que la valeur ne bouge pas d'un pixel.
+
+   `padding: inherit` reprend celui du bouton : sans lui, le double s'afficherait
+   décalé de sept pixels au premier instant, ce qui se voit précisément parce
+   qu'il part de l'original.
+*/
+.version-ghost {
+    position: absolute;
+    left: 0;
+    top: 0;
+    padding: inherit;
+    font: inherit;
+    font-weight: 600;
+    letter-spacing: inherit;
+    color: var(--c-success);
+    white-space: nowrap;
+    pointer-events: none;
+    animation: version-ghost-lift 0.62s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@keyframes version-ghost-lift {
+    0% { opacity: 0.95; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-16px) scale(1.07); }
+}
+
+/*
+   Animations refusées : le double ne part pas, mais la confirmation demeure.
+   Une copie silencieuse laisserait douter qu'elle a eu lieu.
+*/
+@media (prefers-reduced-motion: reduce) {
+    .drawer-footer-value.is-pressed { transform: none; }
+    .version-ghost { animation: none; opacity: 0; }
 }
 
 /* La version de développement se signale d'elle-même : c'est du code en cours

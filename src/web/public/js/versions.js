@@ -66,6 +66,9 @@ window.MusicPlayer = window.MusicPlayer || {};
         if (value) {
             value.textContent = versionLabel(currentVersion);
             value.classList.toggle('is-dev', !!currentVersion && currentVersion.type === 'dev');
+            // Tant qu'on ne connaît pas la version, le bouton n'affiche qu'un
+            // tiret : le copier ne rendrait service à personne.
+            value.disabled = !currentVersion;
         }
 
         const index = el('version-current-hint');
@@ -74,6 +77,124 @@ window.MusicPlayer = window.MusicPlayer || {};
                 ? `${t('version_current_prefix', 'Actuelle :')} ${versionLabel(currentVersion)}`
                 : '';
         }
+    }
+
+    /* ─────────────────── Copier la version d'un clic ───────────────────
+     *
+     * Le numéro affiché finit toujours par être recopié à la main — dans un
+     * message, un rapport de bug, une question au dépôt. Le rendre cliquable
+     * supprime la transcription, et avec elle la faute de frappe qui fait
+     * chercher un bug dans la mauvaise version.
+     *
+     * **C'est le texte affiché qui part**, pas une valeur reconstruite en
+     * coulisses. On copie ce qu'on voit : « v1.4.0 » pour une release, « DEV
+     * (1.0.0) » pour du code en cours d'écriture — cette dernière forme dit à
+     * la fois qu'il ne s'agit pas d'une release et de quelle base elle part,
+     * ce qui est exactement ce qu'un rapport doit porter.
+     *
+     * L'animation dit ce que copier veut dire : rien n'est déplacé, un
+     * exemplaire de plus est pris. Un décalque de la valeur se détache donc et
+     * monte en se dissolvant, tandis que l'original ne bouge pas d'un pixel.
+     * Le bouton s'enfonce sous le doigt, puis passe au vert le temps que le
+     * double achève sa montée.
+     */
+
+    /** Durée de la confirmation verte, en millisecondes. */
+    const COPY_FEEDBACK_MS = 900;
+
+    const copyReducedMotion = () => (window.matchMedia
+        ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        : false);
+
+    /**
+     * Détache un décalque de la valeur et le laisse monter.
+     *
+     * Le double est un enfant du bouton, et non un élément flottant posé dans
+     * la page : il hérite ainsi de sa police, de son interlignage et de son
+     * remplissage, et part donc exactement de l'endroit où le regard se trouve.
+     *
+     * **Un seul à la fois.** Laisser les doubles s'accumuler semblait dire « on
+     * a pris plusieurs copies » ; à l'écran, deux calques superposés à des
+     * phases différentes ne donnent qu'une image dédoublée. Un clic répété
+     * relance donc le vol au lieu d'en ajouter un second.
+     *
+     * @param {HTMLElement} button
+     * @param {string} label Le texte à faire monter, pris au modèle et non au
+     *   bouton — voir `copyCurrentVersion`.
+     */
+    function flyCopy(button, label) {
+        if (copyReducedMotion()) return;
+
+        const previous = button.querySelector('.version-ghost');
+        if (previous && previous.parentNode) previous.parentNode.removeChild(previous);
+
+        const ghost = document.createElement('span');
+        ghost.className = 'version-ghost';
+        ghost.setAttribute('aria-hidden', 'true');
+        ghost.textContent = label;
+        button.appendChild(ghost);
+
+        const drop = () => { if (ghost.parentNode) ghost.parentNode.removeChild(ghost); };
+        ghost.addEventListener('animationend', drop);
+        // Filet : un navigateur qui n'animerait rien ne déclencherait jamais
+        // `animationend`, et le double resterait posé sur la valeur.
+        setTimeout(drop, 1200);
+    }
+
+    /** Copie la version affichée, et le fait savoir. */
+    async function copyCurrentVersion() {
+        const button = el('drawer-version-value');
+        if (!button || button.disabled) return;
+
+        /*
+         * Le libellé vient du modèle, jamais du bouton.
+         *
+         * `textContent` rend le texte de l'élément **et de tous ses
+         * descendants**, et le double en vol en est un. Lu sur le bouton, il
+         * valait donc « DEV (1.0.0) » au premier clic, puis
+         * « DEV (1.0.0)DEV (1.0.0) » au deuxième s'il tombait avant la fin du
+         * vol — chaîne aussitôt copiée telle quelle dans le presse-papier, puis
+         * recopiée dans le double suivant, qui grossissait à chaque clic.
+         *
+         * `versionLabel` est la source dont `paintCurrentVersion` tire déjà ce
+         * qu'il affiche : la lire ici, c'est copier ce que l'on voit sans
+         * dépendre de ce que le bouton contient à cet instant.
+         */
+        const label = versionLabel(currentVersion);
+
+        // L'enfoncement répond au geste avant même que la copie n'aboutisse :
+        // c'est le clic qu'il accuse, pas son résultat.
+        button.classList.add('is-pressed');
+        setTimeout(() => button.classList.remove('is-pressed'), 110);
+
+        const copier = window.MusicPlayer.copyToClipboard;
+        const done = typeof copier === 'function' ? await copier(label) : false;
+
+        if (!done) {
+            /*
+             * Le refus se dit, et il arrive pour de bon : hors contexte
+             * sécurisé, `execCommand` est le seul recours et certains
+             * navigateurs le refusent désormais. Rester muet laisserait coller
+             * le contenu d'avant en croyant tenir la version.
+             */
+            if (typeof window.MusicPlayer.showToast === 'function') {
+                window.MusicPlayer.showToast(
+                    t('version_copy_failed', 'Copie impossible : sélectionnez le numéro à la main.'));
+            }
+            return;
+        }
+
+        flyCopy(button, label);
+        button.classList.add('is-copied');
+        clearTimeout(button._copyBack);
+        button._copyBack = setTimeout(() => button.classList.remove('is-copied'), COPY_FEEDBACK_MS);
+    }
+
+    function bindVersionCopy() {
+        const button = el('drawer-version-value');
+        if (!button || button._copyBound) return;
+        button._copyBound = true;
+        button.addEventListener('click', copyCurrentVersion);
     }
 
     /**
@@ -591,9 +712,14 @@ window.MusicPlayer = window.MusicPlayer || {};
         return true;
     };
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', refreshCurrentVersion);
-    } else {
+    function startVersions() {
+        bindVersionCopy();
         refreshCurrentVersion();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', startVersions);
+    } else {
+        startVersions();
     }
 })();

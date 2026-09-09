@@ -433,6 +433,8 @@
     "mem_estimate_note": "Browser geben den tatsächlichen Speicher je Element nicht preis. Knoten, Attribute und dekodierte Bilder werden gezählt und mit 256 B pro Knoten umgerechnet; Heap und geladener Code hingegen werden gemessen.",
     "select_version": "Bot-Version:",
     "drawer_version_label": "Version",
+    "tooltip_copy_version": "Versionsnummer kopieren",
+    "version_copy_failed": "Kopieren nicht möglich: Nummer von Hand auswählen.",
     "version_current_prefix": "Aktuell:",
     "version_dev_short": "DEV",
     "version_option_dev": "DEV — lokaler Code",
