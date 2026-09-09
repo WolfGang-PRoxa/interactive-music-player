@@ -243,6 +243,8 @@
     "tooltip_no_track_playing": "No track currently playing",
     "tooltip_voice_det_on": "Voice detection enabled",
     "tooltip_voice_det_off": "Voice detection disabled",
+    "tooltip_mic_muted": "Microphone muted",
+    "tooltip_mic_muted_server": "Muted by a moderator",
     "tooltip_play_now": "Play now",
     "tooltip_play_from_here": "Play now from this track",
     "tooltip_delete_from_queue": "Remove from queue",

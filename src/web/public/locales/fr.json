@@ -243,6 +243,8 @@
     "tooltip_no_track_playing": "Aucune musique en cours de lecture",
     "tooltip_voice_det_on": "Détection vocale activée",
     "tooltip_voice_det_off": "Détection vocale désactivée",
+    "tooltip_mic_muted": "Micro coupé",
+    "tooltip_mic_muted_server": "Micro coupé par un modérateur",
     "tooltip_play_now": "Jouer maintenant",
     "tooltip_play_from_here": "Jouer maintenant à partir de ce morceau",
     "tooltip_delete_from_queue": "Supprimer de la file",

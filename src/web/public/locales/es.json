@@ -243,6 +243,8 @@
     "tooltip_no_track_playing": "Ninguna canción en reproducción",
     "tooltip_voice_det_on": "Detección de voz activada",
     "tooltip_voice_det_off": "Detección de voz desactivada",
+    "tooltip_mic_muted": "Micrófono silenciado",
+    "tooltip_mic_muted_server": "Silenciado por un moderador",
     "tooltip_play_now": "Reproducir ahora",
     "tooltip_play_from_here": "Reproducir ahora a partir de esta canción",
     "tooltip_delete_from_queue": "Eliminar de la cola",

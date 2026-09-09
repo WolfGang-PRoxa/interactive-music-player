@@ -243,6 +243,8 @@
     "tooltip_no_track_playing": "Keine Wiedergabe",
     "tooltip_voice_det_on": "Spracherkennung aktiviert",
     "tooltip_voice_det_off": "Spracherkennung deaktiviert",
+    "tooltip_mic_muted": "Mikrofon stummgeschaltet",
+    "tooltip_mic_muted_server": "Von einem Moderator stummgeschaltet",
     "tooltip_play_now": "Jetzt abspielen",
     "tooltip_play_from_here": "Ab diesem Titel jetzt abspielen",
     "tooltip_delete_from_queue": "Aus Warteschlange entfernen",

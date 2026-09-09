@@ -93,11 +93,79 @@
     }
 }
 
-/* Contrôles speaker (switch + glow) */
+/* Contrôles speaker (micro coupé + switch + glow) */
 .speaker-controls {
     display: flex;
     align-items: center;
     gap: 0.6rem;
+}
+
+/*
+   Le micro coupé.
+
+   Rouge comme dans Discord, et c'est délibéré : le tableau de bord reflète une
+   application où cette couleur veut déjà dire « on ne l'entend pas ». En
+   inventer une autre obligerait à réapprendre ici ce qu'on sait déjà là-bas.
+
+   La place est tenue en permanence — `visibility` et non `display` : sans cela,
+   chaque personne qui coupe son micro décalerait son interrupteur de vingt
+   pixels, et la colonne des interrupteurs cesserait d'en être une. Cachée,
+   l'icône sort en prime de l'arbre d'accessibilité, ce qu'une simple opacité
+   nulle ne ferait pas : un lecteur d'écran annoncerait un micro coupé qui ne
+   l'est pas.
+*/
+.speaker-mute {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    color: var(--c-error);
+    visibility: hidden;
+    opacity: 0;
+    transform: scale(0.65);
+    /* Le délai ne porte que sur la disparition : `visibility` bascule d'un coup,
+       il faut donc attendre que l'opacité soit retombée avant de la couper. */
+    transition: opacity 0.18s ease,
+        transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+        visibility 0s linear 0.18s;
+}
+
+.speaker-mute svg {
+    width: 100%;
+    height: 100%;
+}
+
+.speaker-mute.is-muted {
+    visibility: visible;
+    opacity: 0.92;
+    transform: scale(1);
+    transition-delay: 0s;
+}
+
+/*
+   Un micro coupé reste lisible quand la détection vocale est désactivée.
+
+   La ligne entière tombe alors à 50 % d'opacité — le nom se barre, le halo
+   s'éteint —, et l'icône y disparaissait presque. Or les deux états n'ont rien
+   à voir : l'un dit que le bot n'écoute pas cette personne, l'autre qu'elle ne
+   dit rien. Les confondre ferait chercher longtemps pourquoi le volume ne
+   baisse jamais.
+*/
+.speaker-item.voice-disabled .speaker-mute.is-muted {
+    opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .speaker-mute {
+        transform: none;
+        transition: opacity 0.18s ease, visibility 0s linear 0.18s;
+    }
+
+    .speaker-mute.is-muted {
+        transform: none;
+    }
 }
 
 /* Mini switch pour la détection vocale */

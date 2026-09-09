@@ -1594,7 +1594,24 @@ class WebServer {
                             return channel.members.filter(m => !m.user.bot).map(m => ({
                                 id: m.id,
                                 displayName: m.displayName,
-                                avatar: m.user.displayAvatarURL({ size: 64 })
+                                avatar: m.user.displayAvatarURL({ size: 64 }),
+                                /*
+                                 * Micro coupé, et par qui.
+                                 *
+                                 * Les deux voyagent séparément plutôt que
+                                 * réduits à un seul booléen : le tableau de
+                                 * bord ne dit pas la même chose de quelqu'un
+                                 * qui s'est tu et de quelqu'un qu'un modérateur
+                                 * a fait taire, et c'est une distinction que le
+                                 * serveur ne doit pas trancher à sa place.
+                                 *
+                                 * `m.voice` existe toujours ici — ces membres
+                                 * sont ceux d'un salon vocal —, mais le lire
+                                 * prudemment coûte moins qu'un tableau de bord
+                                 * vide le jour où le cache prend du retard.
+                                 */
+                                selfMute: Boolean(m.voice?.selfMute),
+                                serverMute: Boolean(m.voice?.serverMute)
                             }));
                         }
                     }

@@ -876,7 +876,33 @@ window.MusicPlayer.updateSpeakersUI = function() {
 
                 const controls = document.createElement('div');
                 controls.className = 'speaker-controls';
-                
+
+                /*
+                 * Le micro coupé, avant l'interrupteur.
+                 *
+                 * Il explique ce que la boîte ne dirait pas autrement : un
+                 * membre dont le halo ne s'allume jamais n'a pas forcément la
+                 * détection vocale coupée — il peut simplement s'être tu. Les
+                 * deux se ressemblent à l'écran et n'ont rien à voir.
+                 *
+                 * La place est réservée en permanence, `visibility` plutôt que
+                 * `display` : sans cela, chaque personne qui coupe son micro
+                 * décalerait son interrupteur, et la colonne cesserait d'être
+                 * une colonne. Cachée, l'icône sort aussi de l'arbre
+                 * d'accessibilité — un lecteur d'écran n'annonce pas un micro
+                 * coupé qui ne l'est pas.
+                 */
+                const mute = document.createElement('span');
+                mute.className = 'speaker-mute';
+                mute.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+                    + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+                    + '<line x1="1" y1="1" x2="23" y2="23"></line>'
+                    + '<path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"></path>'
+                    + '<path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"></path>'
+                    + '<line x1="12" y1="19" x2="12" y2="23"></line>'
+                    + '<line x1="8" y1="23" x2="16" y2="23"></line></svg>';
+                controls.appendChild(mute);
+
                 const switchLabel = document.createElement('label');
                 switchLabel.className = 'switch switch-mini';
                 
@@ -920,6 +946,25 @@ window.MusicPlayer.updateSpeakersUI = function() {
             const switchLabel = item.querySelector('.switch-mini');
             if (switchLabel) {
                 switchLabel.dataset.tooltip = isDetectionEnabled ? ((window.MusicPlayer.t && window.MusicPlayer.t('tooltip_voice_det_on')) || 'Détection vocale activée') : ((window.MusicPlayer.t && window.MusicPlayer.t('tooltip_voice_det_off')) || 'Détection vocale désactivée');
+            }
+
+            /*
+             * Le micro coupé se relit à chaque état : c'est une chose qui change
+             * en cours de route, contrairement au nom ou à l'avatar.
+             *
+             * S'être tu et avoir été fait taire donnent la même icône — dans les
+             * deux cas plus rien ne sort — mais pas la même infobulle : l'un se
+             * défait d'un clic par l'intéressé, l'autre non.
+             */
+            const muteBadge = item.querySelector('.speaker-mute');
+            if (muteBadge) {
+                const silenced = Boolean(member.selfMute) || Boolean(member.serverMute);
+                muteBadge.classList.toggle('is-muted', silenced);
+                muteBadge.dataset.tooltip = member.serverMute
+                    ? ((window.MusicPlayer.t && window.MusicPlayer.t('tooltip_mic_muted_server'))
+                        || 'Micro coupé par un modérateur')
+                    : ((window.MusicPlayer.t && window.MusicPlayer.t('tooltip_mic_muted'))
+                        || 'Micro coupé');
             }
 
             const switchInput = item.querySelector('.switch-mini input');
