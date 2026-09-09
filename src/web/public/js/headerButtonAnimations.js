@@ -1353,4 +1353,497 @@ window.MusicPlayer = window.MusicPlayer || {};
         });
     }
 
+    /**
+     * L'onde qui quitte un bouton de l'en-tête au clic.
+     *
+     * Elle prend `currentColor`, et c'est tout l'intérêt : le bouton
+     * d'enregistrement est vert à cet instant, le cadenas rose quand il vient
+     * de fermer. L'onde dit donc d'elle-même ce qui s'est produit, sans qu'on
+     * ait à la teinter dans deux directions depuis le script.
+     *
+     * Relancée alors qu'elle s'affiche encore : on retire la classe et on force
+     * un calcul de style avant de la reposer, sans quoi l'animation ne rejouerait
+     * pas — le navigateur ne voit aucun changement à animer.
+     */
+    function headerPulse(button) {
+        if (!button) return;
+        button.classList.remove('header-pulse');
+        void button.offsetWidth;
+        button.classList.add('header-pulse');
+        clearTimeout(button._pulseBack);
+        button._pulseBack = setTimeout(() => button.classList.remove('header-pulse'), 600);
+    }
+
+    /* ─────────────────── Le relevé de la disposition ───────────────────
+     *
+     * « Définir la configuration actuelle par défaut » ne sauvegarde pas un
+     * fichier : ce bouton relève le plan des boîtes tel qu'il est à cet instant
+     * et en fait celui du prochain démarrage. L'animation dit cela, et rien
+     * d'autre.
+     *
+     * D'où un balayage plutôt qu'une flèche qui descend. La barre claire
+     * parcourt la disquette comme la vitre d'un scanner passe sous une page, et
+     * laisse derrière elle, sur l'étiquette, une maquette de ce qu'elle vient
+     * de relever : deux boîtes côte à côte, une plus large en dessous.
+     *
+     * Trois choses portent le sens, et aucune ne se voit dans un diff.
+     *
+     *  - **Les rectangles ne s'allument qu'au passage de la barre.** Les
+     *    montrer d'emblée ferait de la barre un ornement qui passe devant un
+     *    dessin déjà là ; c'est le relevé qui les fait exister.
+     *
+     *  - **L'allumage est un fondu, pas un seuil.** La barre a une épaisseur ;
+     *    un basculement net la ferait paraître infiniment fine, et le balayage
+     *    perdrait sa matière.
+     *
+     *  - **Le clic reprend le même geste, en plus vif.** Ce n'est pas une
+     *    seconde animation : c'est la promesse du survol, tenue. Le relevé
+     *    court deux fois plus vite et s'achève par un sursaut de la maquette,
+     *    qui est le moment où la disposition est effectivement retenue.
+     */
+    const btnSaveLayout = document.getElementById('btn-save-default-layout');
+    const saveReducedMotion = window.matchMedia
+        ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        : false;
+    const saveScan = btnSaveLayout ? btnSaveLayout.querySelector('.save-scan') : null;
+    const saveCards = btnSaveLayout
+        ? Array.prototype.slice.call(btnSaveLayout.querySelectorAll('.save-card'))
+        : [];
+
+    if (btnSaveLayout && saveScan && saveCards.length && !saveReducedMotion) {
+        /** Course de la barre, dans le repère de l'icône. */
+        const SCAN_TOP = 4.5;
+        const SCAN_BOTTOM = 19.6;
+
+        /** Secondes. Le survol prend son temps ; le clic ne l'a pas. */
+        const SWEEP = 0.9;
+        const SWEEP_CLICK = 0.4;
+
+        /** Secondes, et amplitude du sursaut final au clic. */
+        const POP = 0.26;
+        const POP_SCALE = 0.35;
+
+        /** La maquette respire une fois relevée, au lieu de rester figée. */
+        const BREATH_PERIOD = 3.0;
+        const BREATH_DEPTH = 0.18;
+
+        /** Secondes d'extinction au départ du pointeur. */
+        const RELEASE = 0.22;
+
+        /**
+         * Hauteur sur laquelle un rectangle s'allume au passage de la barre.
+         *
+         * Un peu plus que la hauteur d'un rectangle : assez pour que l'allumage
+         * soit un fondu et non un déclic, assez peu pour que deux rangées ne
+         * s'allument pas ensemble.
+         */
+        const REVEAL_SPAN = 1.5;
+
+        /** Position au repos de la barre, telle que le balisage la pose. */
+        const SCAN_HOME = saveScan.getAttribute('y');
+
+        const clamp01 = (v) => Math.max(0, Math.min(1, v));
+        const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+
+        let savePhase = null;
+        let savePhaseStart = 0;
+        let saveFrame = null;
+        let saveHeld = false;
+        let saveDuration = SWEEP;
+        /** Un relevé lancé au clic va jusqu'au bout, pointeur parti ou non. */
+        let saveFromClick = false;
+        /** Opacité des rectangles à l'instant du départ : l'extinction part de là. */
+        let saveReleaseFrom = 0;
+
+        /** Rend le repos à la feuille de style plutôt que de l'écrire à la main. */
+        const restSave = () => {
+            saveScan.style.removeProperty('opacity');
+            saveScan.setAttribute('y', SCAN_HOME);
+            for (const card of saveCards) {
+                card.style.removeProperty('opacity');
+                card.removeAttribute('transform');
+            }
+        };
+
+        /**
+         * Le sursaut de la maquette, à la fin d'un relevé cliqué.
+         *
+         * L'échelle est appliquée autour du centre de chaque rectangle : un
+         * `transform` SVG part sinon de l'origine du repère, ce qui les
+         * enverrait en diagonale hors de l'étiquette au lieu de les gonfler.
+         */
+        const popCards = (amount) => {
+            for (const card of saveCards) {
+                if (amount <= 0) {
+                    card.removeAttribute('transform');
+                    continue;
+                }
+                const cx = Number(card.getAttribute('x')) + Number(card.getAttribute('width')) / 2;
+                const cy = Number(card.getAttribute('y')) + Number(card.getAttribute('height')) / 2;
+                const s = 1 + amount * POP_SCALE;
+                card.setAttribute('transform',
+                    `translate(${cx} ${cy}) scale(${s.toFixed(4)}) translate(${-cx} ${-cy})`);
+            }
+        };
+
+        const saveEnter = (phase, now) => {
+            savePhase = phase;
+            savePhaseStart = now;
+        };
+
+        function stepSave(now) {
+            const t = (now - savePhaseStart) / 1000;
+
+            /* --- Le balayage --- */
+            if (savePhase === 'sweep') {
+                const ratio = clamp01(t / saveDuration);
+                const y = SCAN_TOP + (SCAN_BOTTOM - SCAN_TOP) * easeOutCubic(ratio);
+                saveScan.setAttribute('y', y.toFixed(4));
+                // La barre s'allume en entrant et s'efface en sortant : elle
+                // vient de quelque part et s'en va, au lieu de clignoter.
+                saveScan.style.opacity = String(0.9 * clamp01(Math.min(ratio, 1 - ratio) / 0.12));
+
+                for (const card of saveCards) {
+                    const mid = Number(card.getAttribute('y'))
+                        + Number(card.getAttribute('height')) / 2;
+                    card.style.opacity = String(easeOutCubic(clamp01((y - mid) / REVEAL_SPAN)));
+                }
+
+                if (ratio >= 1) {
+                    if (saveFromClick) {
+                        saveFromClick = false;
+                        saveEnter('pop', now);
+                    } else if (!saveHeld) {
+                        saveReleaseFrom = 1;
+                        saveEnter('release', now);
+                    } else {
+                        saveEnter('hold', now);
+                    }
+                } else if (!saveHeld && !saveFromClick) {
+                    // Parti en plein relevé : on éteint depuis ce qui est
+                    // allumé, plutôt que de finir un geste que plus personne
+                    // ne regarde.
+                    saveReleaseFrom = Number(saveCards[saveCards.length - 1].style.opacity) || 0;
+                    saveEnter('release', now);
+                }
+
+                saveFrame = requestAnimationFrame(stepSave);
+                return;
+            }
+
+            saveScan.style.opacity = '0';
+            saveScan.setAttribute('y', SCAN_HOME);
+
+            /* --- Le sursaut, au clic seulement --- */
+            if (savePhase === 'pop') {
+                for (const card of saveCards) card.style.opacity = '1';
+                // Un aller-retour en une demi-sinusoïde : la maquette gonfle,
+                // puis se repose. Deux courbes mises bout à bout marqueraient
+                // un arrêt au sommet, là où il n'y en a pas.
+                popCards(Math.sin(clamp01(t / POP) * Math.PI));
+
+                if (t >= POP) {
+                    popCards(0);
+                    saveReleaseFrom = 1;
+                    saveEnter(saveHeld ? 'hold' : 'release', now);
+                }
+                saveFrame = requestAnimationFrame(stepSave);
+                return;
+            }
+
+            /* --- La respiration, tant que le pointeur reste --- */
+            if (savePhase === 'hold') {
+                const breath = 1 - BREATH_DEPTH
+                    + BREATH_DEPTH * Math.cos(t * 2 * Math.PI / BREATH_PERIOD);
+                for (const card of saveCards) card.style.opacity = String(breath);
+
+                if (!saveHeld) {
+                    saveReleaseFrom = breath;
+                    saveEnter('release', now);
+                }
+                saveFrame = requestAnimationFrame(stepSave);
+                return;
+            }
+
+            /* --- L'extinction --- */
+            if (savePhase === 'release') {
+                if (t >= RELEASE) {
+                    savePhase = null;
+                    saveFrame = null;
+                    restSave();
+                    return;
+                }
+                const fade = saveReleaseFrom * (1 - t / RELEASE);
+                for (const card of saveCards) card.style.opacity = String(fade);
+                saveFrame = requestAnimationFrame(stepSave);
+                return;
+            }
+
+            savePhase = null;
+            saveFrame = null;
+            restSave();
+        }
+
+        const runSave = (fromClick) => {
+            saveFromClick = fromClick;
+            saveDuration = fromClick ? SWEEP_CLICK : SWEEP;
+            saveEnter('sweep', performance.now());
+            if (saveFrame === null) saveFrame = requestAnimationFrame(stepSave);
+        };
+
+        btnSaveLayout.addEventListener('mouseenter', () => {
+            saveHeld = true;
+            // Un relevé déjà lancé par un clic va à son terme : le relancer
+            // depuis le haut effacerait la réponse au geste qu'on vient de faire.
+            if (savePhase === 'sweep' && saveFromClick) return;
+            if (savePhase === 'pop') return;
+            runSave(false);
+        });
+
+        btnSaveLayout.addEventListener('mouseleave', () => {
+            saveHeld = false;
+        });
+
+        btnSaveLayout.addEventListener('click', () => {
+            runSave(true);
+            headerPulse(btnSaveLayout);
+        });
+    }
+
+    /* ─────────────────── Le cadenas qu'on soupèse ───────────────────
+     *
+     * « Verrouiller toutes les boîtes » est une bascule, et une bascule doit
+     * annoncer ce qu'elle va faire avant qu'on la pousse. L'anse est le seul
+     * morceau mobile d'un cadenas : c'est elle qui parle.
+     *
+     * **Au survol, le cadenas penche vers son autre état sans y aller.**
+     * Ouvert, l'anse s'incline vers la fermeture ; fermé, elle tire vers le
+     * haut et retombe. On soupèse le geste, on ne le fait pas — le faire est
+     * précisément ce que le clic ajoute.
+     *
+     * **Au clic, elle claque.** Le mouvement dépasse sa cible et revient en
+     * s'amortissant, comme le ferait un ressort réel, et le corps encaisse le
+     * choc d'un contrecoup vertical bref. Sans ce dépassement, l'anse arrive à
+     * destination comme un curseur qu'on aurait posé, et le cadenas n'a plus de
+     * masse.
+     *
+     * Deux détails sans lesquels rien ne tient :
+     *
+     *  - **La charnière est en (7, 11)**, le pied de la branche gauche, là où
+     *    l'anse entre dans le corps. Toute autre origine fait flotter l'anse
+     *    au-dessus de sa serrure.
+     *
+     *  - **Le glyphe change sous l'animation.** Les deux états sont deux `<svg>`
+     *    que le tableau de bord échange (`updateHeaderLockAllButton`), et cet
+     *    échange a lieu dans un autre écouteur, dont l'ordre n'est pas garanti.
+     *    Le claquement est donc différé d'une trame : il s'applique à l'anse
+     *    qui vient d'apparaître, et la fait partir de l'angle où se trouvait
+     *    celle qui s'en va — d'où l'illusion d'un seul mouvement continu.
+     */
+    const btnLockAll = document.getElementById('btn-lock-all');
+    const lockReducedMotion = window.matchMedia
+        ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        : false;
+
+    if (btnLockAll && btnLockAll.querySelector('.lock-shackle') && !lockReducedMotion) {
+        /** Charnière de l'anse, dans le repère de l'icône. */
+        const PIVOT_X = 7;
+        const PIVOT_Y = 11;
+
+        /** Degrés. Positif ferme l'anse, négatif l'ouvre — voir le balisage. */
+        const LEAN = 11;
+        const SNAP_TRAVEL = 27;
+
+        /** Secondes. */
+        const SETTLE = 0.42;
+        const BACK = 0.26;
+        const SNAP = 0.5;
+
+        /** Le balancement de l'anse une fois penchée : elle est tenue, pas figée. */
+        const SWAY_PERIOD = 2.6;
+        const SWAY = 1.6;
+
+        /** Ressort du claquement : période courte, amortissement plus court encore. */
+        const SNAP_PERIOD = 0.23;
+        const SNAP_DAMP = 0.085;
+
+        /** Contrecoup du corps, en unités du repère. */
+        const RECOIL = 1.1;
+        const RECOIL_PERIOD = 0.14;
+        const RECOIL_DAMP = 0.07;
+
+        const clamp01 = (v) => Math.max(0, Math.min(1, v));
+
+        /**
+         * Sortie avec dépassement.
+         *
+         * L'anse arrive un peu au-delà de sa cible avant de s'y ranger : c'est
+         * ce que fait une pièce qui a de la masse, et c'est ce qui manque à une
+         * interpolation qui se contente d'arriver.
+         */
+        const easeOutBack = (t) => 1 + 2.2 * Math.pow(t - 1, 3) + 1.4 * Math.pow(t - 1, 2);
+
+        /** La pièce demandée, dans celui des deux glyphes qui est visible. */
+        const visiblePart = (selector) => {
+            const svgs = btnLockAll.querySelectorAll('svg');
+            for (let i = 0; i < svgs.length; i++) {
+                if (!svgs[i].classList.contains('hidden')) return svgs[i].querySelector(selector);
+            }
+            return null;
+        };
+
+        /**
+         * Les boîtes sont-elles toutes verrouillées ?
+         *
+         * Lu sur la classe que pose `updateHeaderLockAllButton`, et non sur
+         * l'état interne du tableau de bord : c'est elle qui décide du glyphe
+         * affiché, donc de l'anse que l'on anime.
+         */
+        const isLocked = () => btnLockAll.classList.contains('header-lock-active');
+
+        /** Rend le repos aux deux glyphes, pas seulement à celui qui est visible. */
+        const restLock = () => {
+            const parts = btnLockAll.querySelectorAll('.lock-shackle, .lock-body');
+            for (let i = 0; i < parts.length; i++) parts[i].removeAttribute('transform');
+        };
+
+        const setAngle = (deg) => {
+            const shackle = visiblePart('.lock-shackle');
+            if (shackle) {
+                shackle.setAttribute('transform',
+                    `rotate(${deg.toFixed(4)} ${PIVOT_X} ${PIVOT_Y})`);
+            }
+        };
+
+        const setRecoil = (dy) => {
+            const body = visiblePart('.lock-body');
+            if (!body) return;
+            if (Math.abs(dy) < 0.001) body.removeAttribute('transform');
+            else body.setAttribute('transform', `translate(0 ${dy.toFixed(4)})`);
+        };
+
+        let lockPhase = null;
+        let lockPhaseStart = 0;
+        let lockFrame = null;
+        let lockHeld = false;
+        /** Angle d'où part le geste en cours : penché au repos, ou au claquement. */
+        let lockFrom = 0;
+        /** Sens du penchant : vers la fermeture si ouvert, vers l'ouverture si fermé. */
+        let lockLean = LEAN;
+
+        const lockEnter = (phase, now) => {
+            lockPhase = phase;
+            lockPhaseStart = now;
+        };
+
+        function stepLock(now) {
+            const t = (now - lockPhaseStart) / 1000;
+
+            /* --- Le claquement du clic --- */
+            if (lockPhase === 'snap') {
+                if (t >= SNAP) {
+                    setAngle(0);
+                    setRecoil(0);
+                    // Le pointeur est encore là : le cadenas reprend aussitôt
+                    // son penchant, mais dans l'autre sens — il annonce
+                    // désormais le geste inverse.
+                    if (lockHeld) {
+                        lockLean = isLocked() ? -LEAN : LEAN;
+                        lockFrom = 0;
+                        lockEnter('settle', now);
+                    } else {
+                        restLock();
+                        lockPhase = null;
+                        lockFrame = null;
+                        return;
+                    }
+                } else {
+                    const decay = Math.exp(-t / SNAP_DAMP);
+                    setAngle(lockFrom * decay * Math.cos(t * 2 * Math.PI / SNAP_PERIOD));
+                    setRecoil(RECOIL * Math.exp(-t / RECOIL_DAMP)
+                        * Math.sin(t * 2 * Math.PI / RECOIL_PERIOD));
+                }
+                lockFrame = requestAnimationFrame(stepLock);
+                return;
+            }
+
+            /* --- La mise en place, au survol --- */
+            if (lockPhase === 'settle') {
+                const ratio = clamp01(t / SETTLE);
+                setAngle(lockFrom + (lockLean - lockFrom) * easeOutBack(ratio));
+
+                if (!lockHeld) {
+                    lockFrom = lockLean;
+                    lockEnter('back', now);
+                } else if (ratio >= 1) {
+                    lockEnter('sway', now);
+                }
+                lockFrame = requestAnimationFrame(stepLock);
+                return;
+            }
+
+            /* --- Le balancement, tant que le pointeur reste --- */
+            if (lockPhase === 'sway') {
+                const angle = lockLean + Math.sign(lockLean) * SWAY
+                    * Math.sin(t * 2 * Math.PI / SWAY_PERIOD);
+                setAngle(angle);
+
+                if (!lockHeld) {
+                    lockFrom = angle;
+                    lockEnter('back', now);
+                }
+                lockFrame = requestAnimationFrame(stepLock);
+                return;
+            }
+
+            /* --- Le retour au repos --- */
+            if (lockPhase === 'back') {
+                if (t >= BACK) {
+                    restLock();
+                    lockPhase = null;
+                    lockFrame = null;
+                    return;
+                }
+                setAngle(lockFrom * (1 - clamp01(t / BACK)));
+                lockFrame = requestAnimationFrame(stepLock);
+                return;
+            }
+
+            restLock();
+            lockPhase = null;
+            lockFrame = null;
+        }
+
+        btnLockAll.addEventListener('mouseenter', () => {
+            lockHeld = true;
+            if (lockPhase === 'snap') return;
+            lockLean = isLocked() ? -LEAN : LEAN;
+            lockFrom = 0;
+            lockEnter('settle', performance.now());
+            if (lockFrame === null) lockFrame = requestAnimationFrame(stepLock);
+        });
+
+        btnLockAll.addEventListener('mouseleave', () => {
+            lockHeld = false;
+        });
+
+        btnLockAll.addEventListener('click', () => {
+            /*
+             * Différé d'une trame : l'échange des deux glyphes a lieu dans
+             * l'écouteur de layoutPersistence.js, et rien ne garantit qu'il
+             * s'exécute avant celui-ci. Une trame plus tard, l'anse visible est
+             * celle du nouvel état, et c'est elle qu'il faut faire claquer.
+             */
+            requestAnimationFrame(() => {
+                restLock();
+                // Elle part de là où se trouvait l'anse qui s'en va, et revient
+                // à zéro : le glyphe a changé, le mouvement paraît continu.
+                lockFrom = isLocked() ? -SNAP_TRAVEL : SNAP_TRAVEL;
+                lockEnter('snap', performance.now());
+                if (lockFrame === null) lockFrame = requestAnimationFrame(stepLock);
+                headerPulse(btnLockAll);
+            });
+        });
+    }
+
 })();
