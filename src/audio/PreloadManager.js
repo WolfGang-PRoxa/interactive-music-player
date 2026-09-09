@@ -1228,17 +1228,26 @@ class PreloadManager {
         }
 
         if (queueLimit > 0) {
-            if (nextTracks.length > 0) {
-                targets.push(...nextTracks.slice(0, queueLimit));
-            }
+            /*
+             * Où se trouve la file d'attente de l'utilisateur, au juste.
+             *
+             * Le lecteur n'a qu'une liste de pistes. Quand une playlist
+             * l'occupe, c'est **elle** que `getTracks()` rend, et la file de
+             * l'utilisateur est mise de côté dans les réglages.
+             *
+             * Les deux cas étaient servis à la suite, si bien que la liste du
+             * lecteur passait sous `queueCount` quoi qu'elle contienne : régler
+             * la file d'attente sur « tout » préchargeait alors toute la
+             * playlist en cours, file vide comprise. Les tranches de la playlist
+             * relèvent de `playlistCount`, et le bloc plus bas s'en charge déjà
+             * à partir de la base — d'où un choix, et non deux ajouts.
+             */
+            const userQueue = sourceIsPlaylist
+                ? this._setAsideQueue(settings)
+                : nextTracks;
 
-            // Le lecteur n'a qu'une liste de pistes : quand une playlist
-            // l'occupe, c'est elle que `getTracks()` rend, et la file d'attente
-            // de l'utilisateur est mise de côté dans les réglages. Sans ce
-            // détour, elle perdrait son préchargement dès qu'une playlist
-            // démarre — et y revenir se ferait sur une coupure.
-            if (sourceIsPlaylist) {
-                targets.push(...this._setAsideQueue(settings).slice(0, queueLimit));
+            if (userQueue.length > 0) {
+                targets.push(...userQueue.slice(0, queueLimit));
             }
         }
 

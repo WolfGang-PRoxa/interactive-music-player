@@ -208,6 +208,48 @@ check('  … et en boucle, elle en fait le tour sans se répéter',
 check('  … tandis qu\'une limite finie borne toujours',
     upcoming(tracks, 0, limit(2), false).join('') === 'bc');
 
+/* ══════════════════ À qui s'applique quel curseur ══════════════════ */
+
+console.log('\nChaque curseur gouverne sa propre section\n');
+
+/*
+ * Le défaut relevé à l'usage : régler la file d'attente sur « tout »
+ * préchargeait toute la playlist en cours, file vide comprise.
+ *
+ * Le lecteur n'a qu'une liste de pistes. Quand une playlist l'occupe, c'est elle
+ * que `getTracks()` rend, et la file de l'utilisateur est mise de côté dans les
+ * réglages. Les deux cas étaient servis à la suite, si bien que la liste du
+ * lecteur passait sous `queueCount` quoi qu'elle contînt.
+ */
+const queueBlock = /if \(queueLimit > 0\) \{([\s\S]*?)\n        \}/.exec(PRELOAD);
+
+check('la file d\'attente est choisie, pas cumulée',
+    Boolean(queueBlock)
+    && /const userQueue = sourceIsPlaylist\s*\?\s*this\._setAsideQueue\(settings\)\s*:\s*nextTracks;/
+        .test(queueBlock[1]),
+    'une playlist en lecture occupe la liste du lecteur');
+
+check('  … et la liste du lecteur ne passe plus sous « queueCount » quoi qu\'elle contienne',
+    Boolean(queueBlock)
+    && !/targets\.push\(\.\.\.nextTracks\.slice\(0, queueLimit\)\)/.test(queueBlock[1]),
+    'c\'était là que la playlist se faisait précharger par le curseur de la file');
+
+check('  … une seule poussée sous ce curseur',
+    Boolean(queueBlock) && (queueBlock[1].match(/targets\.push\(/g) || []).length === 1,
+    'deux ajouts, c\'était deux sections servies par un seul réglage');
+
+/*
+ * La playlist en cours reste servie — mais par son propre curseur, et depuis la
+ * base plutôt que depuis la liste du lecteur.
+ */
+check('la playlist en cours relève de « playlistCount »',
+    /if \(playlistLimit > 0\) \{[\s\S]*?upcomingTracks\(\s*activePlaylist\.tracks, currentIdx, playlistLimit/
+        .test(PRELOAD));
+check('  … et les autres playlists aussi',
+    /globalPlaylists\.forEach\(pl => \{[\s\S]{0,200}?pl\.tracks\.slice\(0, playlistLimit\)/.test(PRELOAD));
+check('l\'historique garde le sien',
+    /prevTracks\.slice\(0, historyLimit\)/.test(PRELOAD));
+
 /* ══════════════════ Le plafond de parallélisme ══════════════════ */
 
 console.log('\nCe qui empêche « tout » de tout lancer d\'un coup\n');

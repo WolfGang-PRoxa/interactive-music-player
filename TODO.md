@@ -1,0 +1,5 @@
+- [ ] Un appui long sur le bouton jour/nuit permet d'afficher un petit slider qui permet de jauger plus précisément entre les deux modes. On ajoute un texte dans le texte du tooltip qui indique à l'utilisateur que cette fonctionnalité existe. (ex: "Appui long pour un réglage plus précis"). Tout le dashboard doit s'adapter correctement à ce réglage y compris l'adaptation du contraste entre certains éléments du dashboard. Le slider doit apparaître avec une animation bouncy et moderne
+
+- [ ] Un appui long sur le bouton github permet d'accéder à un sous-menu qui donne accès à d'autres boutons tels que mettre le projet en favori, le partager, soumettre une issue. Même animation d'apparition bouncy et moderne que le slider du bouton jour/nuit.
+
+- [ ] Le tooltip du bouton qui permet de copier le contenu d'une notification toast doit se trouver visuellement au-dessus de la notification toast.
