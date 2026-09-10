@@ -419,6 +419,19 @@
         }
     }
 
+    /**
+     * Rejoue ce qui dépend du pôle courant : l'icône du bouton et la couleur
+     * d'interface du navigateur.
+     *
+     * Exposé parce que le réglage fin (js/themeBlend.js) déplace `data-theme`
+     * sans passer par la bascule : sans ce point d'entrée, il lui faudrait
+     * réécrire les deux, et l'icône finirait par dire autre chose que le fond.
+     */
+    window.MusicPlayer.applyThemeAppearance = function (theme) {
+        updateThemeIcons(theme);
+        updateThemeColor();
+    };
+
     // Throttle helper for slider updates
     function throttle(func, limit) {
         let inThrottle;

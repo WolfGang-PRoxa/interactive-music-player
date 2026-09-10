@@ -172,7 +172,31 @@ window.MusicPlayer = window.MusicPlayer || {};
             return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
         }
 
-        const m = normalised.match(/([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/);
+        /*
+         * `color(srgb 0.34 0.4 0.95)` — la forme que prend un `color-mix`.
+         *
+         * C'est elle qui rendait les particules blanches. Le mélange du fondu
+         * jour/nuit ne se calcule pas en `rgb()` mais dans l'espace nommé, et le
+         * navigateur en rend la notation moderne : composantes de 0 à 1,
+         * séparées par des espaces. La recherche ci-dessous, qui attendait des
+         * virgules et des entiers, n'y trouvait rien — et le repli de dernier
+         * recours est blanc.
+         *
+         * Placée avant l'autre : les mêmes chiffres s'y liraient comme des
+         * composantes sur 255, et donneraient un noir quasi parfait.
+         */
+        const srgb = /^color\(\s*srgb\s+([\d.eE+-]+)\s+([\d.eE+-]+)\s+([\d.eE+-]+)/.exec(normalised);
+        if (srgb) {
+            return {
+                r: clamp(+srgb[1] * 255, 0, 255),
+                g: clamp(+srgb[2] * 255, 0, 255),
+                b: clamp(+srgb[3] * 255, 0, 255)
+            };
+        }
+
+        // `rgb(r, g, b)` comme `rgb(r g b)` : la notation moderne se passe de
+        // virgules, et le canevas rend l'une ou l'autre selon ce qu'on lui donne.
+        const m = normalised.match(/([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/);
         return m
             ? { r: +m[1], g: +m[2], b: +m[3] }
             : { r: 255, g: 255, b: 255 };
@@ -185,30 +209,74 @@ window.MusicPlayer = window.MusicPlayer || {};
     // --- Palette du thème ----------------------------------------------------
 
     /**
+     * Sonde qui résout une couleur du thème, quelle que soit son écriture.
+     *
+     * Lire `--particle-a` avec `getPropertyValue` ne suffit plus. Depuis le
+     * fondu jour/nuit, ces jetons ne contiennent pas une couleur mais un
+     * `color-mix(…)`, et la valeur calculée d'une propriété personnalisée n'est
+     * pas évaluée : elle rend le texte tel quel. Le canevas de `toRGB`, lui, ne
+     * sait pas lire `color-mix` — il refusait donc la valeur, et les quatre
+     * styles retombaient tous sur les mêmes couleurs de repli.
+     *
+     * Le détour par une propriété *typée* tranche la question : `color` accepte
+     * `color-mix`, le navigateur l'évalue, et sa valeur calculée est toujours un
+     * `rgb(...)` que le canevas comprend.
+     */
+    let colorProbe = null;
+    function resolveThemeColor(expression, fallback) {
+        if (!colorProbe) {
+            colorProbe = document.createElement('span');
+            colorProbe.setAttribute('aria-hidden', 'true');
+            colorProbe.style.cssText = 'position:absolute;width:0;height:0;'
+                + 'overflow:hidden;pointer-events:none;visibility:hidden';
+            document.body.appendChild(colorProbe);
+        }
+
+        // Le repli est posé d'abord : une expression que le navigateur refuse
+        // laisse la déclaration précédente en place, et c'est lui qu'on relit.
+        colorProbe.style.color = fallback;
+        colorProbe.style.color = expression;
+
+        return toRGB(getComputedStyle(colorProbe).color, fallback);
+    }
+
+    /**
      * Reconstruit la palette à partir des variables CSS du thème courant.
      *
-     * Le style minimaliste est traité à part : ses trois teintes sont des gris,
-     * et `--c-violet` y est si proche du fond qu'une particule de cette couleur
-     * serait invisible. On s'y limite donc aux deux teintes contrastées, sans
-     * halo — ce style n'en emploie nulle part ailleurs.
+     * Les teintes viennent de jetons qui n'appartiennent qu'aux particules —
+     * `--particle-a`, `-b`, `-c`, définis par style dans css/base.css. Elles
+     * empruntaient auparavant les accents de l'interface, ce qui n'est pas le
+     * même métier : une couleur lisible sous un libellé ne fait pas forcément
+     * un point de trois pixels visible sur le fond de la page. Le minimaliste
+     * en était la preuve — son violet s'y confondait avec le fond, et il fallait
+     * l'écarter ici, à la main.
+     *
+     * Le halo, lui, reste affaire de style : il délave sur fond clair, et le
+     * minimaliste n'en emploie nulle part ailleurs.
      */
     function buildPalette() {
         const rootEl = document.documentElement;
-        const styles = getComputedStyle(rootEl);
-        const readVar = (nameOf, fallback) => toRGB(styles.getPropertyValue(nameOf).trim(), fallback);
 
         const style = rootEl.getAttribute('data-style') || 'glassmorphism';
         const light = rootEl.getAttribute('data-theme') === 'light';
         const muted = style === 'minimalist';
 
-        const primary = readVar('--c-primary', '#5865F2');
-        const accent = readVar('--c-accent', '#EB459E');
-        const violet = readVar('--c-violet', '#8e44ad');
+        /*
+         * Le repli désigne l'ancien jeton d'accent : une installation dont la
+         * feuille de style aurait pris du retard sur le script garde ainsi des
+         * particules colorées, au lieu de trois points noirs.
+         */
+        const readTint = (name, legacy, fallback) =>
+            resolveThemeColor(`var(${name}, var(${legacy}, ${fallback}))`, fallback);
+
+        const a = readTint('--particle-a', '--c-primary', '#5865F2');
+        const b = readTint('--particle-b', '--c-accent', '#EB459E');
+        const c = readTint('--particle-c', '--c-violet', '#8e44ad');
 
         palette = {
-            colors: muted ? [primary, accent] : [primary, accent, violet],
-            lineStart: rgba(primary, light ? 0.34 : 0.22),
-            lineEnd: rgba(accent, light ? 0.34 : 0.22),
+            colors: [a, b, c],
+            lineStart: rgba(a, light ? 0.34 : 0.22),
+            lineEnd: rgba(b, light ? 0.34 : 0.22),
             strokeWidth: muted ? 1 : 1.3,
             // Un halo sur fond clair ne fait que délaver la couleur : il est
             // réduit en thème clair, supprimé en minimaliste.

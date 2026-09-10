@@ -2705,15 +2705,12 @@ html[data-theme="light"][data-style="retro-synthwave"] #custom-tooltip {
 }
 
 .settings-section {
-    background: rgba(0, 0, 0, 0.15);
+    background: color-mix(in srgb, rgba(255, 255, 255, 0.45) var(--blend-pct), rgba(0, 0, 0, 0.15));
     border: 1px solid var(--border-card);
     border-radius: 14px;
     padding: 1.2rem 1.5rem;
 }
 
-html[data-theme="light"] .settings-section {
-    background: rgba(255, 255, 255, 0.45);
-}
 
 .settings-section-title {
     font-size: 1.15rem;
@@ -2822,7 +2819,7 @@ html[data-theme="light"] .settings-section {
     display: flex;
     align-items: center;
     gap: 0.8rem;
-    background: rgba(0, 0, 0, 0.2);
+    background: color-mix(in srgb, rgba(255, 255, 255, 0.6) var(--blend-pct), rgba(0, 0, 0, 0.2));
     border: 1px solid var(--border-card);
     padding: 0.4rem 0.85rem;
     border-radius: 10px;
@@ -2831,10 +2828,6 @@ html[data-theme="light"] .settings-section {
     transition: all 0.2s ease;
 }
 
-html[data-theme="light"] .scroll-input-wrapper {
-    background: rgba(255, 255, 255, 0.6);
-    border-color: rgba(0, 0, 0, 0.08);
-}
 
 .scroll-range,
 input[type="range"] {
@@ -2843,7 +2836,7 @@ input[type="range"] {
     appearance: none;
     height: 6px;
     border-radius: 5px;
-    background: rgba(255, 255, 255, 0.08);
+    background: color-mix(in srgb, rgba(0, 0, 0, 0.1) var(--blend-pct), rgba(255, 255, 255, 0.08));
     outline: none;
     transition: background 0.2s ease;
 }
@@ -2866,36 +2859,17 @@ input[type="range"] {
 */
 .scroll-range.has-infinity-end {
     background: linear-gradient(to right,
-        rgba(255, 255, 255, 0.08) 0%,
-        rgba(255, 255, 255, 0.08) 83.33%,
-        color-mix(in srgb, var(--c-primary) 55%, rgba(255, 255, 255, 0.08)) 100%);
+        color-mix(in srgb, rgba(0, 0, 0, 0.1) var(--blend-pct), rgba(255, 255, 255, 0.08)) 0%,
+        color-mix(in srgb, rgba(0, 0, 0, 0.1) var(--blend-pct), rgba(255, 255, 255, 0.08)) 83.33%,
+        color-mix(in srgb, var(--c-primary) 50%, color-mix(in srgb, rgba(0, 0, 0, 0.1) var(--blend-pct), rgba(255, 255, 255, 0.08))) 100%);
 }
 
 /* Une fois le cran atteint, le dégradé s'affirme : on y est. */
 .scroll-range.has-infinity-end.is-infinite {
     background: linear-gradient(to right,
-        rgba(255, 255, 255, 0.08) 0%,
-        rgba(255, 255, 255, 0.08) 72%,
+        color-mix(in srgb, rgba(0, 0, 0, 0.1) var(--blend-pct), rgba(255, 255, 255, 0.08)) 0%,
+        color-mix(in srgb, rgba(0, 0, 0, 0.1) var(--blend-pct), rgba(255, 255, 255, 0.08)) 72%,
         var(--c-primary) 100%);
-}
-
-html[data-theme="light"] .scroll-range.has-infinity-end {
-    background: linear-gradient(to right,
-        rgba(0, 0, 0, 0.1) 0%,
-        rgba(0, 0, 0, 0.1) 83.33%,
-        color-mix(in srgb, var(--c-primary) 45%, rgba(0, 0, 0, 0.1)) 100%);
-}
-
-html[data-theme="light"] .scroll-range.has-infinity-end.is-infinite {
-    background: linear-gradient(to right,
-        rgba(0, 0, 0, 0.1) 0%,
-        rgba(0, 0, 0, 0.1) 72%,
-        var(--c-primary) 100%);
-}
-
-html[data-theme="light"] .scroll-range,
-html[data-theme="light"] input[type="range"] {
-    background: rgba(0, 0, 0, 0.1);
 }
 
 .scroll-range::-webkit-slider-thumb,
@@ -3124,7 +3098,7 @@ input[type="range"]::-moz-range-thumb:hover {
     padding: 0.9rem 1rem;
     border: 1px solid var(--border-card);
     border-radius: 14px;
-    background: rgba(0, 0, 0, 0.18);
+    background: color-mix(in srgb, rgba(0, 0, 0, 0.04) var(--blend-pct), rgba(0, 0, 0, 0.18));
 }
 
 .version-target-from,
@@ -3228,9 +3202,6 @@ input[type="range"]::-moz-range-thumb:hover {
 }
 
 html.light-theme .version-target,
-html[data-theme="light"] .version-target {
-    background: rgba(0, 0, 0, 0.04);
-}
 
 /* ═══════════════ Sources et formats de la boîte d'import ═══════════════ */
 
@@ -3329,16 +3300,12 @@ html[data-theme="light"] .version-target {
     padding: 1px 7px;
     border-radius: 5px;
     border: 1px solid var(--border-card);
-    background: rgba(255, 255, 255, 0.05);
+    background: color-mix(in srgb, rgba(0, 0, 0, 0.04) var(--blend-pct), rgba(255, 255, 255, 0.05));
     font-size: 0.75rem;
     font-weight: 600;
     letter-spacing: 0.3px;
     color: var(--text-muted);
     white-space: nowrap;
-}
-
-html[data-theme="light"] .import-info-chips span {
-    background: rgba(0, 0, 0, 0.04);
 }
 
 /*
@@ -3514,15 +3481,11 @@ body.login-gate-open {
 }
 
 .login-gate-warning code {
-    background: rgba(255, 255, 255, 0.08);
+    background: color-mix(in srgb, rgba(0, 0, 0, 0.08) var(--blend-pct), rgba(255, 255, 255, 0.08));
     padding: 0.1em 0.35em;
     border-radius: 4px;
     font-size: 0.92em;
     word-break: break-all;
-}
-
-html[data-theme="light"] .login-gate-warning code {
-    background: rgba(0, 0, 0, 0.08);
 }
 
 .login-gate-callback {
@@ -3771,4 +3734,155 @@ html[data-theme="light"] .login-gate-warning code {
     font-size: 0.76rem;
     color: #ff4757;
     word-break: break-word;
+}
+
+/* ═════════════ Le réglage fin du jour et de la nuit ═════════════ */
+
+/*
+   Le curseur se pose sous le bouton, qui lui sert d'ancrage. Le bouton
+   lui-même ne pouvait pas jouer ce rôle : un `<input type="range">` posé dans
+   un `<button>` verrait chacun de ses gestes pris pour un clic.
+*/
+.theme-blend-anchor {
+    position: relative;
+    display: inline-flex;
+}
+
+/*
+   `hidden` doit l'emporter sur le `display` de la règle ci-dessous.
+
+   L'attribut ne vaut qu'un `display: none` de la feuille de style du
+   navigateur, que n'importe quel `display` d'auteur écrase. Le panneau restait
+   donc affiché en permanence — dès le chargement de la page, et quoi que fasse
+   le script : `pop.hidden = true` s'écrivait bien, sans rien cacher.
+
+   Écrit avant la règle générale et non après, pour que la lecture aille du cas
+   qui gagne au cas ordinaire.
+*/
+.theme-blend-pop[hidden] {
+    display: none;
+}
+
+.theme-blend-pop {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 50%;
+    z-index: 1200;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    width: 190px;
+    padding: 0.7rem 0.85rem;
+    border-radius: 14px;
+    background: var(--bg-dropdown);
+    border: 1px solid var(--border-card-hover);
+    box-shadow: var(--shadow-card), 0 8px 24px rgba(0, 0, 0, 0.28);
+    backdrop-filter: blur(var(--blur-val));
+    -webkit-backdrop-filter: blur(var(--blur-val));
+
+    /*
+       L'apparition rebondit.
+
+       `transform-origin` en haut : le panneau sort du bouton, il ne grandit pas
+       depuis son propre centre. Sans cela il se déploie vers le haut autant que
+       vers le bas, et le lien avec le bouton se perd.
+
+       Le déplacement horizontal est repris à chaque image de l'animation —
+       `translateX(-50%)` doit accompagner l'échelle, faute de quoi le panneau
+       se recentre d'un bond à la fin.
+    */
+    transform-origin: 50% 0;
+    animation: theme-blend-pop-in 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes theme-blend-pop-in {
+    0% { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.72); }
+    100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+/* Le repli est net : on referme, on ne fait pas ses adieux. */
+.theme-blend-pop.is-closing {
+    animation: theme-blend-pop-out 0.16s ease-in both;
+}
+
+@keyframes theme-blend-pop-out {
+    0% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-6px) scale(0.88); }
+}
+
+.theme-blend-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.4rem;
+}
+
+.theme-blend-pole {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.theme-blend-readout {
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--c-accent);
+}
+
+/*
+   La piste montre le trajet qu'elle commande : de la couleur de fond de nuit à
+   celle de jour, du style courant. C'est le seul endroit du tableau de bord où
+   les deux se voient côte à côte, et cela vaut mieux qu'un dégradé décoratif
+   choisi au hasard.
+*/
+.theme-blend-range {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    border-radius: 6px;
+    outline: none;
+    border: 1px solid var(--border-card);
+    background: linear-gradient(to right, var(--night-bg-main), var(--day-bg-main));
+}
+
+.theme-blend-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--c-accent);
+    border: 2px solid var(--bg-dropdown);
+    cursor: pointer;
+    box-shadow: 0 0 10px var(--c-accent);
+    transition: transform 0.15s ease;
+}
+
+.theme-blend-range::-webkit-slider-thumb:hover,
+.theme-blend-range:active::-webkit-slider-thumb {
+    transform: scale(1.15);
+}
+
+.theme-blend-range::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--c-accent);
+    border: 2px solid var(--bg-dropdown);
+    cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .theme-blend-pop {
+        animation-duration: 0.01s;
+        animation-timing-function: linear;
+    }
+
+    .theme-blend-pop.is-closing {
+        animation-duration: 0.01s;
+    }
 }

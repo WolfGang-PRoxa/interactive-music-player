@@ -1,179 +1,334 @@
 /* Style System — Tableau de bord premium glassmorphic pour bot musique */
 
-:root {
-    /* Default Dark Glassmorphism */
-    --bg-main: #0a090f;
-    --bg-card: rgba(255, 255, 255, 0.03);
-    --border-card: rgba(255, 255, 255, 0.06);
-    --border-card-hover: rgba(255, 255, 255, 0.12);
-    
-    --c-primary: #5865F2; /* Blurple Discord */
-    --c-accent: #EB459E;  /* Neon pink */
-    --c-violet: #8e44ad;  /* Glow violet */
-    --c-success: #57F287; /* Green status */
-    --c-error: #ED4245;   /* Red alert */
-    
-    --text-main: #f5f4f8;
-    --text-muted: #8c899d;
-    --text-dark: #1e1b29;
-    
-    --font-primary: 'Outfit', sans-serif;
-    --blur-val: 16px;
+/*
+ * ══════════════════ Le fondu du jour à la nuit ══════════════════
+ *
+ * Le tableau de bord n'a plus deux thèmes mais un curseur entre les deux :
+ * 0 % la nuit, 100 % le jour, et tout ce qu'il y a entre. Un appui long sur le
+ * bouton jour/nuit le fait apparaître — voir js/themeBlend.js.
+ *
+ * ## Deux valeurs par jeton, et un seul calcul
+ *
+ * Chaque style déclare ses paires `--night-*` / `--day-*`, et le bloc de calcul
+ * plus bas les interpole une bonne fois. Il n'est écrit qu'une fois pour les
+ * quatre styles : les propriétés personnalisées se substituent au moment de
+ * l'emploi, si bien que `--bg-main` va chercher la paire du style courant sans
+ * qu'on ait à récrire le mélange à chaque fois.
+ *
+ * C'est aussi ce qui fait que tout suit. Une règle qui écrit `var(--bg-card)`
+ * se fond d'elle-même ; seules celles qui codaient une couleur en dur avaient
+ * besoin d'être reprises.
+ *
+ * ## Le texte ne se fond pas comme le reste
+ *
+ * Un fond qui va du noir au blanc croise à mi-course un texte qui va du blanc
+ * au noir : les deux se retrouvent gris au même instant, et le contraste tombe
+ * à 1 — illisible, précisément au milieu du curseur.
+ *
+ * Le texte bascule donc sur une bande étroite autour de la moitié, quand le
+ * fond, lui, se fond linéairement. Le fondu reste continu — c'est ce qu'on
+ * demande à un curseur — mais l'instant de faible contraste se réduit à un
+ * geste qu'on ne s'arrête pas de faire.
+ *
+ * ## Ce qui ne se mélange pas
+ *
+ * `--shadow-card` est une ombre, parfois double, parfois `inset`, parfois
+ * `none` : aucune interpolation n'a de sens entre deux structures différentes.
+ * Elle bascule au milieu, sur l'attribut `data-theme` que le script tient à
+ * jour sur le pôle le plus proche.
+ */
 
-    --decor-opacity: 0.25;
-    --bg-dropdown: rgba(10, 9, 15, 0.96);
-    --bg-select: rgba(255, 255, 255, 0.03);
-    --bg-hover: rgba(255, 255, 255, 0.06);
+:root {
+    /*
+     * Position du curseur. `--blend-pct` sert aux mélanges de couleur,
+     * `--blend` aux `calc()` sur les longueurs et les opacités, qui ne veulent
+     * pas d'unité. Le script pose les deux ensemble.
+     */
+    --blend-pct: 0%;
+    --blend: 0;
+
+    /*
+     * Le texte bascule, il ne se fond pas.
+     *
+     * Une bande de transition, si étroite soit-elle, ne sauve rien : le
+     * contraste ne dépend pas de la vitesse à laquelle le texte traverse, mais
+     * du fait qu'il traverse pendant que le fond traverse aussi. Au point de
+     * croisement les deux sont gris, et le rapport tombe à 1,05 — mesuré, et
+     * c'est le test qui l'a montré.
+     *
+     * Il n'y a pas d'échappatoire : deux couleurs qui échangent leurs clairs et
+     * leurs sombres de façon continue se rencontrent forcément. Le texte prend
+     * donc franchement le parti du pôle dont le fond se rapproche, et le
+     * contraste ne descend jamais sous 3,6 — au lieu de 1,05.
+     *
+     * Le facteur mille fait de ce `clamp` une marche : nul en deçà de la
+     * moitié, plein au-delà. C'est écrit ainsi plutôt qu'avec une requête de
+     * media ou un attribut, pour que la marche suive la même variable que le
+     * reste et ne puisse pas s'en désaccorder.
+     */
+    --text-pct: clamp(0%, calc((var(--blend-pct) - 50%) * 1000), 100%);
+
+    /* ── Glassmorphism, le style par défaut ── */
+    --night-bg-main: #0a090f;
+    --night-bg-card: rgba(255, 255, 255, 0.03);
+    --night-border-card: rgba(255, 255, 255, 0.06);
+    --night-border-card-hover: rgba(255, 255, 255, 0.12);
+    --night-c-primary: #5865F2;   /* Blurple Discord */
+    --night-c-accent: #EB459E;    /* Neon pink */
+    --night-c-violet: #8e44ad;    /* Glow violet */
+    --night-c-success: #57F287;   /* Green status */
+    --night-c-error: #ED4245;     /* Red alert */
+    --night-text-main: #f5f4f8;
+    --night-text-muted: #8c899d;
+    --night-text-dark: #1e1b29;
+    --night-bg-dropdown: rgba(10, 9, 15, 0.96);
+    --night-bg-select: rgba(255, 255, 255, 0.03);
+    --night-bg-hover: rgba(255, 255, 255, 0.06);
+    --night-blur: 16px;
+    --night-decor: 0.25;
+
+    --day-bg-main: #f0edf6;
+    --day-bg-card: rgba(255, 255, 255, 0.45);
+    --day-border-card: rgba(0, 0, 0, 0.08);
+    --day-border-card-hover: rgba(0, 0, 0, 0.15);
+    /* Le verre garde ses couleurs de marque de jour comme de nuit. */
+    --day-c-primary: #5865F2;
+    --day-c-accent: #EB459E;
+    --day-c-violet: #8e44ad;
+    --day-c-success: #57F287;
+    --day-c-error: #ED4245;
+    --day-text-main: #1b1626;
+    --day-text-muted: #625f73;
+    --day-text-dark: #f5f4f8;
+    --day-bg-dropdown: rgba(240, 237, 246, 0.96);
+    --day-bg-select: rgba(0, 0, 0, 0.02);
+    --day-bg-hover: rgba(0, 0, 0, 0.05);
+    --day-blur: 20px;
+    --day-decor: 0.12;
+
+    /*
+     * Les trois teintes du chemin de particules.
+     *
+     * Elles ont leurs propres jetons plutôt que d'emprunter `--c-primary` et
+     * ses voisines : ce qui fait une bonne couleur d'accent — lisible sous un
+     * libellé, tranchée sur un bouton — ne fait pas forcément une bonne
+     * particule, qui est un point de trois pixels posé sur le fond de la page.
+     * Le minimaliste le montrait déjà : son violet s'y confondait avec le fond,
+     * et le code devait l'écarter à la main.
+     *
+     * Le verre garde les siennes de jour comme de nuit, comme ses accents.
+     */
+    --night-particle-a: #5865F2;
+    --night-particle-b: #EB459E;
+    --night-particle-c: #8e44ad;
+    --day-particle-a: #5865F2;
+    --day-particle-b: #EB459E;
+    --day-particle-c: #8e44ad;
+
+    /* ── Le calcul, écrit une fois pour les quatre styles ── */
+    --bg-main: color-mix(in srgb, var(--day-bg-main) var(--blend-pct), var(--night-bg-main));
+    --bg-card: color-mix(in srgb, var(--day-bg-card) var(--blend-pct), var(--night-bg-card));
+    --border-card: color-mix(in srgb, var(--day-border-card) var(--blend-pct), var(--night-border-card));
+    --border-card-hover: color-mix(in srgb, var(--day-border-card-hover) var(--blend-pct), var(--night-border-card-hover));
+    --c-primary: color-mix(in srgb, var(--day-c-primary) var(--blend-pct), var(--night-c-primary));
+    --c-accent: color-mix(in srgb, var(--day-c-accent) var(--blend-pct), var(--night-c-accent));
+    --c-violet: color-mix(in srgb, var(--day-c-violet) var(--blend-pct), var(--night-c-violet));
+    --c-success: color-mix(in srgb, var(--day-c-success) var(--blend-pct), var(--night-c-success));
+    --c-error: color-mix(in srgb, var(--day-c-error) var(--blend-pct), var(--night-c-error));
+    --bg-dropdown: color-mix(in srgb, var(--day-bg-dropdown) var(--blend-pct), var(--night-bg-dropdown));
+    --bg-select: color-mix(in srgb, var(--day-bg-select) var(--blend-pct), var(--night-bg-select));
+    --bg-hover: color-mix(in srgb, var(--day-bg-hover) var(--blend-pct), var(--night-bg-hover));
+    --particle-a: color-mix(in srgb, var(--day-particle-a) var(--blend-pct), var(--night-particle-a));
+    --particle-b: color-mix(in srgb, var(--day-particle-b) var(--blend-pct), var(--night-particle-b));
+    --particle-c: color-mix(in srgb, var(--day-particle-c) var(--blend-pct), var(--night-particle-c));
+
+    /* Le texte traverse vite : voir `--text-pct` et l'en-tête. */
+    --text-main: color-mix(in srgb, var(--day-text-main) var(--text-pct), var(--night-text-main));
+    --text-muted: color-mix(in srgb, var(--day-text-muted) var(--text-pct), var(--night-text-muted));
+    --text-dark: color-mix(in srgb, var(--day-text-dark) var(--text-pct), var(--night-text-dark));
+
+    /* Longueur et opacité : pas de mélange de couleur, une interpolation. */
+    --blur-val: calc(var(--night-blur) + (var(--day-blur) - var(--night-blur)) * var(--blend));
+    --decor-opacity: calc(var(--night-decor) + (var(--day-decor) - var(--night-decor)) * var(--blend));
+
+    --font-primary: 'Outfit', sans-serif;
+
+    /* Ne se mélange pas : bascule au pôle le plus proche. Voir l'en-tête. */
     --shadow-card: 0 20px 40px rgba(0, 0, 0, 0.3);
 }
 
-/* Light Glassmorphism */
-html[data-theme="light"][data-style="glassmorphism"] {
-    --bg-main: #f0edf6;
-    --bg-card: rgba(255, 255, 255, 0.45);
-    --border-card: rgba(0, 0, 0, 0.08);
-    --border-card-hover: rgba(0, 0, 0, 0.15);
-    --text-main: #1b1626;
-    --text-muted: #625f73;
-    --text-dark: #f5f4f8;
-    --blur-val: 20px;
-    --decor-opacity: 0.12;
-    --bg-dropdown: rgba(240, 237, 246, 0.96);
-    --bg-select: rgba(0, 0, 0, 0.02);
-    --bg-hover: rgba(0, 0, 0, 0.05);
+/*
+ * Le curseur au repos suit l'interrupteur : tout en bas la nuit, tout en haut
+ * le jour. Le script n'écrit `--blend-pct` en ligne que lorsqu'on s'arrête
+ * entre les deux — sans quoi une bascule ordinaire laisserait le tableau de
+ * bord sur un réglage qu'on n'a pas demandé.
+ */
+html[data-theme="light"] {
+    --blend-pct: 100%;
+    --blend: 1;
     --shadow-card: 0 20px 40px rgba(31, 38, 135, 0.08);
 }
 
-/* Cyberpunk Dark */
+/* ── Cyberpunk ── */
 html[data-style="neon-cyberpunk"] {
-    --blur-val: 0px;
-}
-html[data-theme="dark"][data-style="neon-cyberpunk"] {
-    --bg-main: #05010c;
-    --bg-card: rgba(5, 1, 12, 0.95);
-    --border-card: #00f0ff;
-    --border-card-hover: #ff007f;
-    --c-primary: #00f0ff;
-    --c-accent: #ff007f;
-    --c-violet: #d600ff;
-    --c-success: #39ff14;
-    --c-error: #ff073a;
-    --text-main: #00f0ff;
-    --text-muted: #a100ff;
-    --text-dark: #05010c;
-    --decor-opacity: 0.15;
-    --bg-dropdown: rgba(5, 1, 12, 0.98);
-    --bg-select: rgba(0, 240, 255, 0.03);
-    --bg-hover: rgba(0, 240, 255, 0.1);
+    --night-bg-main: #05010c;
+    --night-bg-card: rgba(5, 1, 12, 0.95);
+    --night-border-card: #00f0ff;
+    --night-border-card-hover: #ff007f;
+    --night-c-primary: #00f0ff;
+    --night-c-accent: #ff007f;
+    --night-c-violet: #d600ff;
+    --night-c-success: #39ff14;
+    --night-c-error: #ff073a;
+    --night-text-main: #00f0ff;
+    --night-text-muted: #a100ff;
+    --night-text-dark: #05010c;
+    --night-bg-dropdown: rgba(5, 1, 12, 0.98);
+    --night-bg-select: rgba(0, 240, 255, 0.03);
+    --night-bg-hover: rgba(0, 240, 255, 0.1);
+    --night-blur: 0px;
+    --night-decor: 0.15;
+
+    --day-bg-main: #f6f8fa;
+    --day-bg-card: #ffffff;
+    --day-border-card: #00b4d8;
+    --day-border-card-hover: #ff006e;
+    --day-c-primary: #00b4d8;
+    --day-c-accent: #ff006e;
+    --day-c-violet: #8338ec;
+    --day-c-success: #38b000;
+    --day-c-error: #d90429;
+    --day-text-main: #0f172a;
+    --day-text-muted: #64748b;
+    --day-text-dark: #ffffff;
+    --day-bg-dropdown: #ffffff;
+    --day-bg-select: rgba(0, 180, 216, 0.05);
+    --day-bg-hover: rgba(0, 180, 216, 0.08);
+    --day-blur: 0px;
+    --day-decor: 0.08;
+
+    /* Néon franc sur presque-noir ; de jour, les mêmes teintes assombries pour
+       tenir sur le blanc. */
+    --night-particle-a: #00f0ff;
+    --night-particle-b: #ff007f;
+    --night-particle-c: #d600ff;
+    --day-particle-a: #00b4d8;
+    --day-particle-b: #ff006e;
+    --day-particle-c: #8338ec;
+
     --shadow-card: 0 0 15px rgba(0, 240, 255, 0.25), inset 0 0 15px rgba(0, 240, 255, 0.1);
 }
 
-/* Cyberpunk Light */
 html[data-theme="light"][data-style="neon-cyberpunk"] {
-    --bg-main: #f6f8fa;
-    --bg-card: #ffffff;
-    --border-card: #00b4d8;
-    --border-card-hover: #ff006e;
-    --c-primary: #00b4d8;
-    --c-accent: #ff006e;
-    --c-violet: #8338ec;
-    --c-success: #38b000;
-    --c-error: #d90429;
-    --text-main: #0f172a;
-    --text-muted: #64748b;
-    --text-dark: #ffffff;
-    --decor-opacity: 0.08;
-    --bg-dropdown: #ffffff;
-    --bg-select: rgba(0, 180, 216, 0.05);
-    --bg-hover: rgba(0, 180, 216, 0.08);
     --shadow-card: 0 8px 20px rgba(0, 180, 216, 0.15);
 }
 
-/* Minimalist Dark */
+/* ── Minimalist ── */
 html[data-style="minimalist"] {
-    --blur-val: 0px;
-    --decor-opacity: 0;
-}
-html[data-theme="dark"][data-style="minimalist"] {
-    --bg-main: #0f0f11;
-    --bg-card: #161619;
-    --border-card: #232329;
-    --border-card-hover: #3d3d47;
-    --c-primary: #e4e4e7;
-    --c-accent: #a1a1aa;
-    --c-violet: #3f3f46;
-    --c-success: #52525b;
-    --c-error: #7f1d1d;
-    --text-main: #e4e4e7;
-    --text-muted: #71717a;
-    --text-dark: #000000;
-    --bg-dropdown: #161619;
-    --bg-select: #1b1b20;
-    --bg-hover: #232329;
+    --night-bg-main: #0f0f11;
+    --night-bg-card: #161619;
+    --night-border-card: #232329;
+    --night-border-card-hover: #3d3d47;
+    --night-c-primary: #e4e4e7;
+    --night-c-accent: #a1a1aa;
+    --night-c-violet: #3f3f46;
+    --night-c-success: #52525b;
+    --night-c-error: #7f1d1d;
+    --night-text-main: #e4e4e7;
+    --night-text-muted: #71717a;
+    --night-text-dark: #000000;
+    --night-bg-dropdown: #161619;
+    --night-bg-select: #1b1b20;
+    --night-bg-hover: #232329;
+    --night-blur: 0px;
+    --night-decor: 0;
+
+    --day-bg-main: #f4f4f5;
+    --day-bg-card: #ffffff;
+    --day-border-card: #e4e4e7;
+    --day-border-card-hover: #d4d4d8;
+    --day-c-primary: #18181b;
+    --day-c-accent: #71717a;
+    --day-c-violet: #d4d4d8;
+    --day-c-success: #d4d4d8;
+    --day-c-error: #fee2e2;
+    --day-text-main: #18181b;
+    --day-text-muted: #71717a;
+    --day-text-dark: #ffffff;
+    --day-bg-dropdown: #ffffff;
+    --day-bg-select: #f4f4f5;
+    --day-bg-hover: #e4e4e7;
+    --day-blur: 0px;
+    --day-decor: 0;
+
+    /* Trois gris, et non les accents du style : ceux-ci sont trop proches de
+       son fond pour faire des particules — c'est ce qui obligeait le script à
+       écarter le troisième à la main. Une échelle tirée du fond vers le texte
+       se voit, elle, parfaitement. */
+    --night-particle-a: #e4e4e7;
+    --night-particle-b: #a1a1aa;
+    --night-particle-c: #71717a;
+    --day-particle-a: #18181b;
+    --day-particle-b: #52525b;
+    --day-particle-c: #a1a1aa;
+
     --shadow-card: none;
 }
 
-/* Minimalist Light */
 html[data-theme="light"][data-style="minimalist"] {
-    --bg-main: #f4f4f5;
-    --bg-card: #ffffff;
-    --border-card: #e4e4e7;
-    --border-card-hover: #d4d4d8;
-    --c-primary: #18181b;
-    --c-accent: #71717a;
-    --c-violet: #d4d4d8;
-    --c-success: #d4d4d8;
-    --c-error: #fee2e2;
-    --text-main: #18181b;
-    --text-muted: #71717a;
-    --text-dark: #ffffff;
-    --bg-dropdown: #ffffff;
-    --bg-select: #f4f4f5;
-    --bg-hover: #e4e4e7;
     --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
-/* Retro Synthwave Dark */
-html[data-theme="dark"][data-style="retro-synthwave"] {
-    --bg-main: #17072b;
-    --bg-card: rgba(32, 10, 58, 0.7);
-    --border-card: #ff5e62;
-    --border-card-hover: #ff9966;
-    --c-primary: #ff5e62;
-    --c-accent: #ff9966;
-    --c-violet: #ff007f;
-    --c-success: #00ffcc;
-    --c-error: #ff3366;
-    --text-main: #ffe3e3;
-    --text-muted: #b89dbd;
-    --text-dark: #17072b;
-    --blur-val: 12px;
-    --decor-opacity: 0.2;
-    --bg-dropdown: rgba(23, 7, 43, 0.98);
-    --bg-select: rgba(255, 94, 98, 0.05);
-    --bg-hover: rgba(255, 94, 98, 0.12);
+/* ── Retro Synthwave ── */
+html[data-style="retro-synthwave"] {
+    --night-bg-main: #17072b;
+    --night-bg-card: rgba(32, 10, 58, 0.7);
+    --night-border-card: #ff5e62;
+    --night-border-card-hover: #ff9966;
+    --night-c-primary: #ff5e62;
+    --night-c-accent: #ff9966;
+    --night-c-violet: #ff007f;
+    --night-c-success: #00ffcc;
+    --night-c-error: #ff3366;
+    --night-text-main: #ffe3e3;
+    --night-text-muted: #b89dbd;
+    --night-text-dark: #17072b;
+    --night-bg-dropdown: rgba(23, 7, 43, 0.98);
+    --night-bg-select: rgba(255, 94, 98, 0.05);
+    --night-bg-hover: rgba(255, 94, 98, 0.12);
+    --night-blur: 12px;
+    --night-decor: 0.2;
+
+    --day-bg-main: #fff0f5;
+    --day-bg-card: rgba(255, 255, 255, 0.75);
+    --day-border-card: #ff9a9e;
+    --day-border-card-hover: #fecfef;
+    --day-c-primary: #ff758c;
+    --day-c-accent: #ff7eb3;
+    --day-c-violet: #c33764;
+    --day-c-success: #48c9b0;
+    --day-c-error: #ec7063;
+    --day-text-main: #4a0e2e;
+    --day-text-muted: #8b5a74;
+    --day-text-dark: #ffffff;
+    --day-bg-dropdown: rgba(255, 240, 245, 0.98);
+    --day-bg-select: rgba(255, 117, 140, 0.05);
+    --day-bg-hover: rgba(255, 117, 140, 0.08);
+    --day-blur: 12px;
+    --day-decor: 0.12;
+
+    /* Le dégradé de coucher de soleil du style, pris à ses trois bouts. */
+    --night-particle-a: #ff5e62;
+    --night-particle-b: #ff9966;
+    --night-particle-c: #ff007f;
+    --day-particle-a: #ff758c;
+    --day-particle-b: #ff7eb3;
+    --day-particle-c: #c33764;
+
     --shadow-card: 0 8px 25px rgba(255, 94, 98, 0.15);
 }
 
-/* Retro Synthwave Light */
 html[data-theme="light"][data-style="retro-synthwave"] {
-    --bg-main: #fff0f5;
-    --bg-card: rgba(255, 255, 255, 0.75);
-    --border-card: #ff9a9e;
-    --border-card-hover: #fecfef;
-    --c-primary: #ff758c;
-    --c-accent: #ff7eb3;
-    --c-violet: #c33764;
-    --c-success: #48c9b0;
-    --c-error: #ec7063;
-    --text-main: #4a0e2e;
-    --text-muted: #8b5a74;
-    --text-dark: #ffffff;
-    --blur-val: 12px;
-    --decor-opacity: 0.12;
-    --bg-dropdown: rgba(255, 240, 245, 0.98);
-    --bg-select: rgba(255, 117, 140, 0.05);
-    --bg-hover: rgba(255, 117, 140, 0.08);
     --shadow-card: 0 8px 25px rgba(255, 117, 140, 0.08);
 }
 

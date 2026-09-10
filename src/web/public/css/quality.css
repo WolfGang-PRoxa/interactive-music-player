@@ -608,12 +608,8 @@
     position: relative;
     height: 6px;
     border-radius: 3px;
-    background: rgba(255, 255, 255, 0.07);
+    background: color-mix(in srgb, rgba(0, 0, 0, 0.08) var(--blend-pct), rgba(255, 255, 255, 0.07));
     overflow: hidden;
-}
-
-html[data-theme="light"] .loudness-meter {
-    background: rgba(0, 0, 0, 0.08);
 }
 
 .loudness-meter-fill {

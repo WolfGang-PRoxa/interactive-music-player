@@ -423,10 +423,15 @@ body.is-dragging-active .playlist-tracks-list {
 }
 
 /* Preloaded Track Light Green Tint Filter */
+/*
+   Le vert du préchargement se fond du jour à la nuit — voir css/base.css.
+   Il tenait dans deux règles, dont une de jour ; repliées en une, elles suivent
+   le curseur au lieu de basculer d'un coup à mi-course.
+*/
 .queue-item.is-preloaded,
 .history-item.is-preloaded {
-    background: rgba(46, 204, 113, 0.08) !important;
-    border-color: rgba(46, 204, 113, 0.28) !important;
+    background: color-mix(in srgb, rgba(46, 204, 113, 0.12) var(--blend-pct), rgba(46, 204, 113, 0.08)) !important;
+    border-color: color-mix(in srgb, rgba(46, 204, 113, 0.35) var(--blend-pct), rgba(46, 204, 113, 0.28)) !important;
     box-shadow: inset 0 0 10px rgba(46, 204, 113, 0.06);
 }
 
@@ -445,12 +450,6 @@ body.is-dragging-active .playlist-tracks-list {
 .queue-item.is-preloaded .queue-index,
 .history-item.is-preloaded .history-title {
     color: #2ecc71;
-}
-
-html[data-theme="light"] .queue-item.is-preloaded,
-html[data-theme="light"] .history-item.is-preloaded {
-    background: rgba(46, 204, 113, 0.12) !important;
-    border-color: rgba(46, 204, 113, 0.35) !important;
 }
 
 html[data-style="neon-cyberpunk"] .queue-item.is-preloaded,

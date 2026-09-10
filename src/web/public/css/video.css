@@ -15,7 +15,7 @@
     flex-direction: column;
     padding: 0 !important;
     border-radius: 20px;
-    background: rgba(10, 9, 15, calc(0.92 * var(--video-bg-opacity, 1)));
+    background: color-mix(in srgb, rgba(240, 237, 246, calc(0.94 * var(--video-bg-opacity, 1))) var(--blend-pct), rgba(10, 9, 15, calc(0.92 * var(--video-bg-opacity, 1))));
     backdrop-filter: blur(calc(20px * var(--video-bg-opacity, 1)));
     -webkit-backdrop-filter: blur(calc(20px * var(--video-bg-opacity, 1)));
     border: 1px solid var(--border-card-hover);
@@ -79,7 +79,6 @@ body.video-fullscreen-active #video-floating-window .video-window-body,
 }
 
 html[data-theme="light"] .floating-video-window {
-    background: rgba(240, 237, 246, calc(0.94 * var(--video-bg-opacity, 1)));
     box-shadow: 0 20px 50px rgba(0, 0, 0, calc(0.2 * var(--video-bg-opacity, 1))), 0 0 20px rgba(235, 69, 158, calc(0.15 * var(--video-bg-opacity, 1)));
 }
 
@@ -118,15 +117,11 @@ html[data-theme="light"] .floating-video-window {
     display: flex;
     align-items: center;
     gap: 5px;
-    background: rgba(0, 0, 0, 0.25);
+    background: color-mix(in srgb, rgba(0, 0, 0, 0.05) var(--blend-pct), rgba(0, 0, 0, 0.25));
     padding: 3px 8px;
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-html[data-theme="light"] .video-header-opacity {
-    background: rgba(0, 0, 0, 0.05);
-    border-color: rgba(0, 0, 0, 0.12);
+    border-color: color-mix(in srgb, rgba(0, 0, 0, 0.12) var(--blend-pct), rgba(255, 255, 255, 0.08));
 }
 
 .video-opacity-slider {

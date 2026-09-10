@@ -148,7 +148,7 @@ body.drawer-is-open .drawer-edge-tab,
     flex-direction: column;
     gap: 0.75rem;
     border-bottom: 1px solid var(--border-card, rgba(255, 255, 255, 0.08));
-    background: rgba(0, 0, 0, 0.08);
+    background: color-mix(in srgb, rgba(0, 0, 0, 0.02) var(--blend-pct), rgba(0, 0, 0, 0.08));
 }
 
 .drawer-setting-row {
@@ -258,7 +258,7 @@ body.drawer-is-open .drawer-edge-tab,
     z-index: 40;
     pointer-events: none;
     will-change: transform;
-    background: rgba(255, 255, 255, 0.05);
+    background: color-mix(in srgb, rgba(255, 255, 255, 0.9) var(--blend-pct), rgba(255, 255, 255, 0.05));
     border-color: var(--c-primary, #5865f2);
     box-shadow: 0 16px 34px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(88, 101, 242, 0.35);
 }
@@ -402,8 +402,8 @@ body.drawer-widget-drag-active .drawer-panel * {
     position: relative;
     width: 100%;
     height: 170px;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: color-mix(in srgb, rgba(0, 0, 0, 0.05) var(--blend-pct), rgba(0, 0, 0, 0.3));
+    border: 1px solid color-mix(in srgb, rgba(0, 0, 0, 0.08) var(--blend-pct), rgba(255, 255, 255, 0.08));
     border-radius: 10px;
     cursor: crosshair;
     user-select: none;
@@ -438,7 +438,7 @@ body.drawer-widget-drag-active .drawer-panel * {
     transform: translateY(-50%);
     font-size: 10px;
     font-family: monospace;
-    color: rgba(255, 255, 255, 0.45);
+    color: color-mix(in srgb, rgba(0, 0, 0, 0.5) var(--blend-pct), rgba(255, 255, 255, 0.45));
     text-align: right;
     white-space: nowrap;
     transition: color 0.15s ease;
@@ -462,12 +462,12 @@ body.drawer-widget-drag-active .drawer-panel * {
     transform: translateX(-50%);
     font-size: 10px;
     font-family: monospace;
-    color: rgba(255, 255, 255, 0.4);
+    color: color-mix(in srgb, rgba(0, 0, 0, 0.5) var(--blend-pct), rgba(255, 255, 255, 0.4));
     white-space: nowrap;
 }
 
 .graph-grid-line {
-    stroke: rgba(255, 255, 255, 0.07);
+    stroke: color-mix(in srgb, rgba(0, 0, 0, 0.09) var(--blend-pct), rgba(255, 255, 255, 0.07));
     stroke-width: 1;
 }
 
@@ -609,8 +609,8 @@ body.drawer-widget-drag-active .drawer-panel * {
     height: 12px;
     border-radius: 6px;
     overflow: hidden;
-    background: rgba(0, 0, 0, 0.28);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: color-mix(in srgb, rgba(0, 0, 0, 0.06) var(--blend-pct), rgba(0, 0, 0, 0.28));
+    border: 1px solid color-mix(in srgb, rgba(0, 0, 0, 0.08) var(--blend-pct), rgba(255, 255, 255, 0.06));
     margin-bottom: 10px;
 }
 
@@ -636,7 +636,7 @@ body.drawer-widget-drag-active .drawer-panel * {
     color: var(--text-muted, #a0a0b0);
     margin: 10px 0 4px;
     padding-bottom: 3px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    border-bottom: 1px solid color-mix(in srgb, rgba(0, 0, 0, 0.1) var(--blend-pct), rgba(255, 255, 255, 0.07));
 }
 
 .breakdown-group-title:first-child {
@@ -661,7 +661,7 @@ body.drawer-widget-drag-active .drawer-panel * {
     left: 0;
     top: 0;
     bottom: 0;
-    opacity: 0.13;
+    opacity: calc(0.13 + 0.05 * var(--blend));
     border-radius: 5px;
     transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
     pointer-events: none;
@@ -728,7 +728,7 @@ body.drawer-widget-drag-active .drawer-panel * {
     color: var(--text-muted, #a0a0b0);
     margin-top: 10px;
     padding-top: 8px;
-    border-top: 1px dashed rgba(255, 255, 255, 0.07);
+    border-top: 1px dashed color-mix(in srgb, rgba(0, 0, 0, 0.1) var(--blend-pct), rgba(255, 255, 255, 0.07));
 }
 
 /* Bot System Details */
@@ -776,20 +776,19 @@ html.light-theme .drawer-header {
     border-bottom-color: rgba(0, 0, 0, 0.08);
 }
 
-html.light-theme .drawer-settings,
-html[data-theme="light"] .drawer-settings {
-    background: rgba(0, 0, 0, 0.02);
-    border-bottom-color: rgba(0, 0, 0, 0.08);
-}
-
 html.light-theme .drawer-section {
     background: rgba(0, 0, 0, 0.02);
     border-color: rgba(0, 0, 0, 0.06);
 }
 
 html.light-theme .drawer-widget.widget-dragging,
+/*
+   L'ombre de la carte saisie ne se mélange pas — deux ombres superposées, dont
+   la structure ne s'interpole pas. Elle bascule au pôle le plus proche, comme
+   `--shadow-card`. Le fond, lui, est replié dans la règle de base et suit le
+   curseur.
+*/
 html[data-theme="light"] .drawer-widget.widget-dragging {
-    background: rgba(255, 255, 255, 0.9);
     box-shadow: 0 16px 34px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(88, 101, 242, 0.3);
 }
 
@@ -798,48 +797,21 @@ html.light-theme .bandwidth-card {
     border-color: rgba(0, 0, 0, 0.06);
 }
 
-html.light-theme .memory-graph-wrapper,
-html[data-theme="light"] .memory-graph-wrapper {
-    background: rgba(0, 0, 0, 0.05);
-    border-color: rgba(0, 0, 0, 0.08);
-}
 
-html.light-theme .y-axis-label,
-html[data-theme="light"] .y-axis-label,
-html.light-theme .x-axis-label,
-html[data-theme="light"] .x-axis-label {
-    color: rgba(0, 0, 0, 0.5);
-}
 
-html.light-theme .graph-grid-line,
-html[data-theme="light"] .graph-grid-line {
-    stroke: rgba(0, 0, 0, 0.09);
-}
 
-html.light-theme .breakdown-bar,
-html[data-theme="light"] .breakdown-bar {
-    background: rgba(0, 0, 0, 0.06);
-    border-color: rgba(0, 0, 0, 0.08);
-}
 
-html.light-theme .breakdown-group-title,
-html[data-theme="light"] .breakdown-group-title {
-    border-bottom-color: rgba(0, 0, 0, 0.1);
-}
 
-html.light-theme .breakdown-note,
-html[data-theme="light"] .breakdown-note {
-    border-top-color: rgba(0, 0, 0, 0.1);
-}
-
-html.light-theme .breakdown-rowbar,
-html[data-theme="light"] .breakdown-rowbar {
-    opacity: 0.18;
-}
 
 html.light-theme .svg-crosshair,
-html[data-theme="light"] .svg-crosshair {
-    stroke: rgba(0, 0, 0, 0.45);
+/*
+   Le réticule tient sa couleur de nuit d'un attribut `stroke` posé dans le
+   balisage. Une déclaration de feuille de style l'emporte sur un attribut de
+   présentation : celle-ci peut donc mélanger les deux versants, là où la
+   surcharge de jour qu'elle remplace basculait d'un coup.
+*/
+.svg-crosshair {
+    stroke: color-mix(in srgb, rgba(0, 0, 0, 0.45) var(--blend-pct), rgba(255, 255, 255, 0.45));
 }
 
 /* Neon Cyberpunk Theme */

@@ -112,22 +112,49 @@
                     </select>
                 </div>
 
-                <button id="btn-theme-toggle" class="theme-toggle-btn" data-tooltip="Changer de mode Jour/Nuit" data-i18n-tooltip="tooltip_theme_toggle" style="margin-right: 8px;">
-                    <svg id="svg-sun" class="hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="5"></circle>
-                        <line x1="12" y1="1" x2="12" y2="3"></line>
-                        <line x1="12" y1="21" x2="12" y2="23"></line>
-                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                        <line x1="1" y1="12" x2="3" y2="12"></line>
-                        <line x1="21" y1="12" x2="23" y2="12"></line>
-                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                    </svg>
-                    <svg id="svg-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                    </svg>
-                </button>
+                <!--
+                     Le bouton jour/nuit et son réglage fin.
+
+                     Les deux sont enveloppés parce que le curseur se pose sous
+                     le bouton : il lui faut un ancrage positionné, et le bouton
+                     lui-même ne peut pas servir — un `<input type="range">` à
+                     l'intérieur d'un `<button>` verrait chacun de ses gestes pris
+                     pour un clic sur le bouton.
+                -->
+                <div class="theme-blend-anchor" style="margin-right: 8px;">
+                    <button id="btn-theme-toggle" class="theme-toggle-btn" data-tooltip="Changer de mode Jour/Nuit" data-i18n-tooltip="tooltip_theme_toggle">
+                        <svg id="svg-sun" class="hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                        <svg id="svg-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        </svg>
+                    </button>
+
+                    <!--
+                         Le réglage fin, ouvert par un appui long — voir
+                         js/themeBlend.js. `hidden` au repos : il ne doit ni
+                         s'afficher, ni prendre le focus au clavier, ni être lu
+                         tant qu'on ne l'a pas demandé.
+                    -->
+                    <div class="theme-blend-pop" id="theme-blend-pop" hidden>
+                        <div class="theme-blend-head">
+                            <span class="theme-blend-pole" data-i18n="theme_blend_night">Nuit</span>
+                            <span class="theme-blend-readout" id="theme-blend-readout">0 %</span>
+                            <span class="theme-blend-pole" data-i18n="theme_blend_day">Jour</span>
+                        </div>
+                        <input type="range" id="theme-blend-range" class="theme-blend-range"
+                               min="0" max="100" step="1" value="0">
+                    </div>
+                </div>
 
                 <!--
                      Le cadenas qu'on soupèse, au survol — voir
@@ -2704,6 +2731,7 @@
     <script src="js/particlePath.js"></script>
     <script src="js/faviconAnimator.js"></script>
     <script src="js/headerButtonAnimations.js"></script>
+    <script src="js/themeBlend.js"></script>
     <script src="js/drawer.js"></script>
     <script src="js/drawerWidgets.js"></script>
     <script src="js/touchDrawers.js"></script>

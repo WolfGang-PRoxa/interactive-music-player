@@ -87,9 +87,14 @@ check('  … qui démarre au dernier cran', Boolean(trackRule)
     'six intervalles entre sept crans : le dernier sixième');
 check('  … et s\'affirme une fois le cran atteint',
     /\.scroll-range\.has-infinity-end\.is-infinite \{[^}]*var\(--c-primary\)/.test(CSS));
-check('  … dans les deux thèmes',
-    /html\[data-theme="light"\] \.scroll-range\.has-infinity-end \{/.test(CSS),
-    'le gris clair du thème clair ne se dégrade pas comme le sombre');
+/*
+ * Le rail suivait le thème par une surcharge de jour ; il suit désormais le
+ * curseur jour/nuit, dont les deux pôles sont ces mêmes valeurs — voir
+ * css/base.css et tests/themeBlend.js.
+ */
+check('  … et le rail se fond avec le reste du tableau de bord',
+    Boolean(trackRule) && /var\(--blend-pct\)/.test(trackRule[1]),
+    'le gris de la piste va du sombre au clair comme les autres surfaces');
 
 /*
  * Le symbole remplace un nombre, et à taille égale il pèse moins que lui : bas,
