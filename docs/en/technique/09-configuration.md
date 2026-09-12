@@ -28,6 +28,8 @@ Copy `.env.example` to `.env` and fill in at least `DISCORD_TOKEN`.
 |---|---|---|
 | `DISCORD_TOKEN` | **Yes** | Bot token. Its absence interrupts startup. |
 | `DISCORD_CLIENT_ID` | For `npm run deploy` | Identifier of the application |
+| `DISCORD_CLIENT_SECRET` | For Discord sign-in | OAuth2 secret. Left empty, nobody can be identified: the dashboard says so and falls back on the access token alone. |
+| `GUILD_ID` | For a local deployment | Registers the commands on that one server, with no propagation delay |
 
 ### Dashboard
 
@@ -35,7 +37,21 @@ Copy `.env.example` to `.env` and fill in at least `DISCORD_TOKEN`.
 |---|---|---|
 | `PORT` | `3000` | Listening port |
 | `HOST` | `127.0.0.1` | Listening interface. `0.0.0.0` to expose on the local network. |
+| `PUBLIC_URL` | — | Address at which guests reach this dashboard, with no trailing slash. It cannot be guessed, and the callback URL `<PUBLIC_URL>/auth/discord/callback` must be declared identically in the Discord portal. |
+| `AUTO_OPEN_DASHBOARD` | `true` | Opening of the browser at startup. `false` when the bot runs on a remotely driven machine — that dashboard would play the music twice over. |
 | `DASHBOARD_TOKEN` | generated | Access token. If empty, generated and saved in `data/dashboard-token`. |
+
+### Versions
+
+| Variable | Default | Role |
+|---|---|---|
+| `GITHUB_TOKEN`, `GH_TOKEN` | — | GitHub API token. Optional on a public repository; raises the quota from 60 to 5,000 requests per hour. Failing that, the `gh` CLI is consulted if installed and signed in. |
+| `IMP_REPO` | repository from `package.json` | Repository whose releases are offered, as `owner/repo` or as a URL |
+| `IMP_VERSIONS_DIR` | `versions/` | Moves the installed releases elsewhere — secondary disk, folder outside the repository |
+| `IMP_RESTART` | — | Set by the instance relaunching itself. Marks a resume, which removes the opening fade and makes the favourite channel be ignored. |
+
+The last three are not user settings: the bot sets them itself when relaunching
+another version. See [10 — Versions](10-versions.md).
 
 ### Media
 
@@ -94,7 +110,7 @@ connected permanently, empty channel or not. See
 `presence.departureDelay` is only a fallback value: each server sets its own from
 the dashboard (*Settings → Bot settings → Delay before leaving an empty
 channel*), saved per server under `presenceDepartureDelay` — **in seconds**, the
-unit of the slider, which `PresenceManager._delaiDepart()` converts back into
+unit of the slider, which `PresenceManager._departureDelayMs()` converts back into
 milliseconds. The slider runs from 0 to 300 s, and the server re-bounds the value
 it receives; zero means a departure with no delay, which forbids the usual `||`
 on this setting. Changing the delay rearms a countdown already under way, so as
@@ -127,38 +143,68 @@ read.
 | `mixEnabled` | `false` | DJ-style crossfade |
 | `mixDuration` | `5` | Duration of the crossfade, in seconds |
 | `mixType` | `'volume'` | `'volume'` or `'effects'` |
+| `lufsSyncEnabled` | `false` | Align every track on a single loudness |
+| `lufsSyncTarget` | `-14` | Shared target, in LUFS |
 | `fadeinEnabled` | `false` | Fade in |
 | `fadeinDuration` | `5` | Seconds |
 | `fadeoutEnabled` | `true` | Fade out on shutdown |
 | `fadeoutDuration` | `5` | Seconds |
+| `addTarget` | `'queue'` | Destination of the add field: `queue`, `playlist`, `play` or `download` |
+| `importFormat` | `'mp3'` | Container of the files written to disk |
+| `importAudioQuality` | `'320'` | MP3 bitrate of the preload, in kbps |
+| `importVideoQuality` | `'720'` | Target height of the video stream, in pixels |
+| `presenceDepartureDelay` | `30` | Delay before leaving an emptied channel, **in seconds** |
 | `ignoredVoiceUsers` | `{}` | Ducking exclusions, per channel |
+| `sharedControl` | `{}` | Rights granted to guests, per Discord account |
+| `preloading` | see below | Preloading: `enabled`, `queueCount`, `historyCount`, `playlistCount` |
 | `activePlaybackSource` | `'queue'` | `'queue'` or a playlist identifier |
 | `playlistCurrentIndex` | `0` | Position in the active playlist |
-| `queueBackupPersonal` | `null` | Queue set aside, written in personal mode |
-| `queueBackupEveryone` | `null` | Queue set aside, written in shared mode |
+| `loopPlaylist` | `false` | Replay the active playlist from its first entry |
+| `channelQueues` | `{}` | The queue, filed voice channel by voice channel |
+| `queueBackupPersonal` | `null` | Backup from before the per-channel filing |
+| `queueBackupEveryone` | `null` | Likewise, shared mode |
 
-The last two keys carry **the same** queue — the one a playlist has set aside —,
-filed under that of the current broadcast mode; the other is cleared. Everything
-goes through [`setAsideQueue`](../../../src/utils/setAsideQueue.js): a plain list
-of tracks, `{ pistes: [...] }`, in which nothing is "current" since nothing is
-playing from it while the playlist occupies the player. These keys used to carry
-two distinct shapes, and changing mode made the interface read from an empty
-backup — the queue appeared lost. The old shapes (`{ tracks }`,
+`channelQueues` is `{ "<channelId>": [track | switch, …] }`. A "party" channel
+and a "quiet" channel each have their own queue and find it again on return,
+where a single per-server queue used to follow the bot everywhere. It is also
+the only place where a switch can wait its turn: it needs an ordered list in
+order to designate a position, which the player did not offer it. See
+[`channelQueue`](../../../src/audio/channelQueue.js).
+
+The last two keys are **inherited**, and stay at `null`: they carried the queue
+set aside before the per-channel filing.
+[`channelQueue`](../../../src/audio/channelQueue.js) reads them once to pour
+back what an earlier version left there, then clears them. Everything now goes
+through [`setAsideQueue`](../../../src/utils/setAsideQueue.js): a plain list of
+tracks, in which nothing is "current" since nothing is playing from it while the
+playlist occupies the player. The old shapes (`{ tracks }`,
 `{ virtualCurrentTrack, virtualTracks }`) are still accepted on reading.
+
+`loopPlaylist` is distinct from discord-player's repeat mode, which only knows
+the queue actually loaded: replaying "the playlist" means reloading it from its
+first entry, even if playback had started in the middle.
 
 `activePlaybackSource` does not go back to `'queue'` on the user's decision
 alone: a playlist that finishes without looping hands back to the queue set
 aside, which then starts again on its first title
-(`WebServer.enchainerSurLaFile()`). The switch is attempted at both points of
+(`WebServer.advanceToQueue()`). The switch is attempted at both points of
 exhaustion — the virtual queue of personal mode and the `emptyQueue` event of
 shared mode —, always after the loop restart: it is that order, and not a test on
 `loopPlaylist`, that gives priority to the loop. An empty set-aside queue lets
 playback stop, as before.
 
 The `preloading` sub-object (`enabled`, `queueCount`, `historyCount`,
-`playlistCount`) is not declared in `_defaults()`: it is written by the dashboard
-and read with fallback values in
-[`PreloadManager.js`](../../../src/audio/PreloadManager.js).
+`playlistCount`) is set from the dashboard but **consumed on the server side**
+by [`PreloadManager.js`](../../../src/audio/PreloadManager.js): the value must
+therefore live here, and not in the browser's `localStorage` alone.
+
+The three counters run from 0 to 5, plus a final notch that no longer counts and
+takes the whole section. That one is recorded as **`-1`**, never as the slider's
+position: the position is only worth anything relative to the maximum of the
+day, and the day the sliders gained a notch, a recorded `6` would stop meaning
+"everything" without anything signalling it. A negative count, by contrast, is
+not one in any world. It is read back as `Infinity`, which the `slice(0, n)` and
+`Math.min(n, …)` downstream already handle correctly.
 
 ---
 

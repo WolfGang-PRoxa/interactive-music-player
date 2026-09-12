@@ -10,22 +10,29 @@ modèle de menace retenu.
 
 ## Modèle de menace
 
-Le bot est conçu pour tourner sur la machine de son propriétaire. Le tableau de
-bord n'a **pas** de gestion de comptes : un jeton unique donne accès à tout.
+Le bot est conçu pour tourner sur la machine de son propriétaire. Le jeton
+d'accès y ouvre la page ; **il ne nomme personne**. Les droits sont attachés à
+un compte Discord, et un compte sans droit voit un tableau de bord inerte.
 
 Ce qui est couvert :
 
-- accès depuis une autre machine du réseau local ;
+- accès depuis une autre machine du réseau local, ou depuis l'internet quand le
+  tunnel est monté ([11 — Accès distant](11-acces-distant.md)) ;
 - lecture de fichiers arbitraires du disque via les routes média ;
 - épuisement mémoire ou disque par une requête unique ;
-- arrêt du processus par un tiers non authentifié.
+- arrêt du processus par un tiers non authentifié ;
+- séparation de privilèges entre le maître de session et ses invités — un
+  invité ne peut ni éteindre le bot, ni changer sa version, ni distribuer les
+  droits.
 
 Ce qui ne l'est pas :
 
-- séparation de privilèges entre plusieurs utilisateurs du tableau de bord ;
-- exposition directe sur Internet — placer le bot derrière un reverse proxy avec
-  TLS si nécessaire ;
-- protection contre un utilisateur légitime malveillant.
+- protection contre le maître de session lui-même : il peut tout, par
+  construction ;
+- protection contre un invité à qui l'on a accordé un droit dont il abuse — le
+  retrait est le seul recours (`revokeControl`) ;
+- confidentialité du contenu servi : une piste lisible par un invité est
+  téléchargeable par lui.
 
 ---
 
@@ -107,6 +114,59 @@ changement d'origine du rappel, le stockage survit au nettoyage de l'URL.
 êtes-vous », jamais à « pouvez-vous entrer » : un compte qui n'est membre
 d'aucun serveur du bot est refusé là comme ailleurs, et un invité reconnu
 retrouve exactement les droits qu'on lui avait laissés, pas un de plus.
+
+### Droits partagés
+
+[`permissions.js`](../../../src/web/permissions.js) décide de ce qu'un invité a
+le droit de faire. **Le contrôle est là, et nulle part ailleurs** : le tableau
+de bord grise les commandes interdites, mais ce n'est qu'une politesse envers
+l'invité — rien n'empêche d'ouvrir la console du navigateur et d'envoyer le
+message à la main. La seule barrière qui compte est celle que le serveur oppose.
+
+Un droit correspond à **un geste**, et se nomme `rubrique.geste`. Les quatre
+rubriques ne sont plus qu'un rangement : elles donnent à la fenêtre de partage
+ses sections et ses interrupteurs d'ensemble, elles ne décident de rien.
+
+| Rubrique | Droits |
+|---|---|
+| `playback` | `transport`, `skip`, `seek`, `mode`, `source`, `speed`, `mix`, `loudness` |
+| `queue` | `add`, `playNow`, `remove`, `reorder`, `history`, `download`, `clear` |
+| `playlists` | `create`, `addTrack`, `removeTrack`, `reorderTracks`, `rename`, `organise`, `transitions`, `delete` |
+| `volume` | `level`, `ducking`, `quality`, `trackGain`, `broadcast`, `channel` |
+
+Ce grain fin est venu remplacer quatre droits d'ensemble, trop grossiers :
+confier la file d'attente donnait du même geste le droit de la vider, et laisser
+régler le volume laissait aussi changer de salon vocal. On ne pouvait pas dire
+« ajoute ce que tu veux, mais n'efface rien », qui est pourtant la chose qu'on
+veut dire le plus souvent. Le point de `rubrique.geste` n'est pas décoratif :
+c'est à lui qu'on reconnaît un droit d'aujourd'hui d'un droit d'hier, ce qui
+permet de relire sans broncher un `settings.json` écrit par une version
+précédente.
+
+Trois valeurs particulières complètent le catalogue :
+
+- `ALWAYS` — les messages qui ne commandent rien (`requestState`, `clientLog`,
+  `syncProgress`). Les refuser ne protégerait rien et laisserait le tableau de
+  bord de l'invité aveugle.
+- `FIELD_FILTERED` — `updateSettings`, dont chaque champ relève d'un droit
+  différent. Le message passe, et `filterSettings()` ne garde que les réglages
+  permis ; un invité sans droit voit sa demande vidée de tout contenu, ce que
+  l'appelant traite comme un refus.
+- `MASTER_ONLY` — quinze messages qui restent au maître : éteindre ou
+  redémarrer le bot, changer sa version, le faire quitter un serveur, monter le
+  tunnel, et distribuer les droits eux-mêmes.
+
+**Un message inconnu de la table est assimilé à `MASTER_ONLY`.** C'est
+délibéré : une commande ajoutée plus tard sans y penser sera fermée par défaut
+plutôt qu'ouverte à tous.
+
+Les droits vivent dans les réglages du serveur, sous `sharedControl`
+(voir [09 — Configuration](09-configuration.md#réglages-par-serveur)). Deux
+gestes voisins ne disent pas la même chose et les confondre coûte cher :
+`shareControl` avec un jeu vide décoche tout — l'invité reste admis, reconnu,
+simplement sans pouvoir, et on peut lui rendre ses droits l'instant d'après ;
+`revokeControl` congédie pour de bon — droits effacés, admission retirée,
+sessions fermées, fiche du carnet supprimée.
 
 ### Origine du jeton
 
@@ -260,6 +320,12 @@ dépassement et le fichier partiel supprimé, sans attendre la fin de la requêt
 depuis la machine hôte. Pour y accéder depuis un téléphone ou un autre poste,
 définir `HOST=0.0.0.0` — l'authentification prend alors tout son sens. Un
 avertissement est journalisé au démarrage dans ce cas.
+
+Le tableau de bord peut aussi être publié sur l'internet entier par un tunnel
+Tailscale Funnel. C'est le seul geste que le module concerné refuse de faire de
+lui-même, même quand tout est prêt : le monter sans l'avoir demandé publierait
+le lecteur de quelqu'un à son insu. Voir
+[11 — Accès distant](11-acces-distant.md).
 
 ---
 

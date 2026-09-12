@@ -214,7 +214,7 @@ only renamed to `.mp3` once complete and validated.
 
 `getActivePreloadTracks()` builds the list to preload:
 
-| Source | Quantity (adjustable, max 5) |
+| Source | Quantity (adjustable from 0 to 5, or "everything") |
 |---|---|
 | Current track | always |
 | Next tracks in the queue | `preloading.queueCount` (default 3) |
@@ -275,6 +275,45 @@ saying so saves looking on the cache side. On a YouTube track, a 403 almost
 always signals a stale yt-dlp, which `npm run update-ytdlp` brings up to date:
 the URLs YouTube hands out are bound to the client that requested them, and its
 rules change faster than the binary shipped with the package.
+
+### Chunked downloading
+
+A preload was taking twelve minutes for a twenty-five-minute file. The log
+showed FFmpeg writing around 32 KB/s, barely twice real time, where an MP3
+transcode runs at a hundred times. It was neither the disk, nor the processor,
+nor the codec:
+
+```
+plain GET, no Range header    →     32,754 B/s
+the same URL in 4 MB chunks   → 38,000,000 B/s
+```
+
+YouTube **throttles a continuous progressive download to the playback rate**.
+That is not a fault: it is what keeps a browser playing a video from pulling a
+hundred times faster than it consumes. But here we are not listening, we are
+archiving — and FFmpeg, which opens a single request and keeps it open from
+start to finish, lands squarely in that case.
+
+[`rangeStream.js`](../../../src/audio/rangeStream.js) therefore asks for the
+same address piece by piece, with a `Range` header, and sews the responses back
+into a single stream. No request stays open long enough to be throttled, and
+FFmpeg receives the whole thing on its standard input without knowing where it
+comes from. A chunk is four megabytes: short enough to slip under the
+throttling, long enough for the cost of establishing the connection to drown in
+it.
+
+A stream rather than a temporary file, because it allows encoding to start
+before the download ends, and because the pipeline already knows how to receive
+"a URL or a stream" — there is nothing to reorganise, and nothing to clean up
+afterwards. A server that cannot slice answers `200` instead of `206` and sends
+everything: the module pours that response through and stops, so that no caller
+has to know whether the source handles ranges.
+
+What is lost: on a URL, FFmpeg can jump into the middle of a file without
+downloading its beginning, which the resumption below took advantage of. On
+standard input it must read and discard — but reading and discarding
+twenty-five megabytes at 38 MB/s takes less than a second, against the twelve
+minutes the throttling cost.
 
 ### Resuming after a restart
 

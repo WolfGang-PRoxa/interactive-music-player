@@ -22,6 +22,9 @@ This folder is for people who modify the code. For everyday use, see the
 | [07 — Security](07-securite.md) | Authentication, path restriction, ceilings |
 | [08 — Logging](08-journalisation.md) | Logger, levels, broadcast to the dashboard |
 | [09 — Configuration](09-configuration.md) | Environment variables, `config.js`, command deployment |
+| [10 — Versions](10-versions.md) | Shared and install roots, GitHub releases, version switching |
+| [11 — Remote access](11-acces-distant.md) | Tailscale tunnel, `PUBLIC_URL`, control sharing |
+| [12 — Tests](12-tests.md) | The suites in `tests/`, what they cover, how to write one |
 
 ---
 
@@ -52,12 +55,15 @@ with snapshots on disk (see [06 — Persistence](06-persistance.md)).
 
 ## Structuring principles
 
-**The process is single-instance and single-user.**
-The dashboard has no notion of accounts: one token grants access to everything.
-The bot is designed to be hosted on its owner's machine.
+**The process is single-instance, and the bot belongs to someone.**
+The bot is designed to be hosted on its owner's machine. The access token opens
+the page, but it names nobody: rights are attached to a **Discord account**. The
+first account back from Discord presenting the token becomes the session master;
+the others are guests, who have only what the master grants them, gesture by
+gesture. See [07 — Security](07-securite.md).
 
 **Playback state belongs to the project.**
-The 23 state properties (`virtualCurrentTrack`, `channelStates`,
+The 26 state properties (`virtualCurrentTrack`, `channelStates`,
 `transitioningToEveryone`…) are declared in
 [`PlaybackSession`](../../../src/audio/PlaybackSession.js), rather than being
 grafted schema-less onto discord-player's `GuildQueue` object. See
@@ -95,8 +101,8 @@ These are identified debts, not bugs to report.
 
 | Topic | Description | See |
 |---|---|---|
-| Playback state | All 455 sites still reach state through `queue.xxx`, now accessors onto `PlaybackSession`. Rewriting them as `session.xxx` remains to be done. | [01](01-architecture.md#playbacksession) |
+| Playback state | All 375 sites still reach state through `queue.xxx`, now accessors onto `PlaybackSession`. Rewriting them as `session.xxx` remains to be done. | [01](01-architecture.md#playbacksession) |
 | 1 s broadcast loop | The interval is never stopped — there is no `stop()` on `WebServer`. The periodic payload itself has been brought down to ~200 bytes. | [05](05-tableau-de-bord.md#the-refresh-loop) |
 | Dual playback model | Shared and personal modes are interleaved by `isPersonal ? … : …` ternaries throughout the state code. | [04](04-diffusion.md#the-cost-of-the-dual-model) |
-| No global safety net | Neither `uncaughtException`, nor `unhandledRejection`, nor `SIGTERM`: an exception outside the protected zones terminates the process. | [05](05-tableau-de-bord.md#robustness) |
-| No automated tests | No test suite is versioned in the repository. | — |
+| Stopping on an unexpected error | `uncaughtException` and `unhandledRejection` log, then let the process die — that is intended, but nothing picks it back up. `SIGTERM` is still not handled. | [05](05-tableau-de-bord.md#robustness) |
+| Unfinished frontend split | `app.js` still concentrates 3,819 lines that the `js/` folder has started to extract. | [05](05-tableau-de-bord.md#unfinished-split) |

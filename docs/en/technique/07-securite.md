@@ -10,22 +10,28 @@ model adopted.
 
 ## Threat model
 
-The bot is designed to run on its owner's machine. The dashboard has **no**
-account management: a single token grants access to everything.
+The bot is designed to run on its owner's machine. The access token opens the
+page there; **it names nobody**. Rights are attached to a Discord account, and
+an account with no rights sees an inert dashboard.
 
 What is covered:
 
-- access from another machine on the local network;
+- access from another machine on the local network, or from the internet when
+  the tunnel is mounted ([11 — Remote access](11-acces-distant.md));
 - reading arbitrary files from disk through the media routes;
 - memory or disk exhaustion by a single request;
-- stopping the process by an unauthenticated third party.
+- stopping the process by an unauthenticated third party;
+- privilege separation between the session master and their guests — a guest can
+  neither shut the bot down, nor change its version, nor hand out rights.
 
 What is not:
 
-- privilege separation between several dashboard users;
-- direct exposure on the Internet — put the bot behind a reverse proxy with TLS
-  if necessary;
-- protection against a malicious legitimate user.
+- protection against the session master themselves: they can do everything, by
+  construction;
+- protection against a guest granted a right they then abuse — withdrawal is the
+  only recourse (`revokeControl`);
+- confidentiality of the content served: a track a guest can play is a track
+  they can download.
 
 ---
 
@@ -106,6 +112,59 @@ callback's change of origin, the storage survives the URL being cleaned.
 never "may you come in": an account belonging to no guild the bot serves is
 refused there as anywhere else, and a recognised guest recovers exactly the
 rights they were left with, not one more.
+
+### Shared rights
+
+[`permissions.js`](../../../src/web/permissions.js) decides what a guest is
+allowed to do. **The control is there, and nowhere else**: the dashboard greys
+out forbidden commands, but that is only a courtesy to the guest — nothing
+prevents opening the browser console and sending the message by hand. The only
+barrier that counts is the one the server puts up.
+
+A right corresponds to **one gesture**, and is named `section.gesture`. The four
+sections are no more than an arrangement: they give the sharing window its
+headings and its blanket switches, they decide nothing.
+
+| Section | Rights |
+|---|---|
+| `playback` | `transport`, `skip`, `seek`, `mode`, `source`, `speed`, `mix`, `loudness` |
+| `queue` | `add`, `playNow`, `remove`, `reorder`, `history`, `download`, `clear` |
+| `playlists` | `create`, `addTrack`, `removeTrack`, `reorderTracks`, `rename`, `organise`, `transitions`, `delete` |
+| `volume` | `level`, `ducking`, `quality`, `trackGain`, `broadcast`, `channel` |
+
+This fine grain came to replace four blanket rights that were too coarse:
+entrusting the queue to someone granted, in the same gesture, the right to empty
+it, and letting them set the volume also let them change voice channel. There
+was no way to say "add whatever you like, but erase nothing", which is the thing
+one most often wants to say. The dot in `section.gesture` is not decorative: it
+is what tells a right of today from a right of yesterday, which makes it
+possible to re-read without flinching a `settings.json` written by an earlier
+version.
+
+Three special values complete the catalogue:
+
+- `ALWAYS` — messages that command nothing (`requestState`, `clientLog`,
+  `syncProgress`). Refusing them would protect nothing and would leave the
+  guest's dashboard blind.
+- `FIELD_FILTERED` — `updateSettings`, each field of which falls under a
+  different right. The message goes through, and `filterSettings()` keeps only
+  the permitted settings; a guest with no rights sees their request emptied of
+  all content, which the caller treats as a refusal.
+- `MASTER_ONLY` — fifteen messages that stay with the master: shutting down or
+  restarting the bot, changing its version, making it leave a server, mounting
+  the tunnel, and handing out the rights themselves.
+
+**A message unknown to the table is treated as `MASTER_ONLY`.** That is
+deliberate: a command added later without thinking will be closed by default
+rather than open to all.
+
+Rights live in the server's settings, under `sharedControl` (see
+[09 — Configuration](09-configuration.md#per-server-settings)). Two neighbouring
+gestures do not say the same thing, and confusing them is costly:
+`shareControl` with an empty set unticks everything — the guest stays admitted,
+recognised, simply without power, and their rights can be handed back a moment
+later; `revokeControl` dismisses for good — rights erased, admission withdrawn,
+sessions closed, book entry deleted.
 
 ### Origin of the token
 
@@ -258,6 +317,12 @@ end of the request.
 machine. To reach it from a phone or another workstation, set `HOST=0.0.0.0` —
 authentication then takes on its full meaning. A warning is logged at startup in
 that case.
+
+The dashboard can also be published on the whole internet through a Tailscale
+Funnel tunnel. It is the only gesture the module concerned refuses to make on
+its own, even when everything is ready: mounting it unasked would publish
+someone's player without their knowledge. See
+[11 — Remote access](11-acces-distant.md).
 
 ---
 

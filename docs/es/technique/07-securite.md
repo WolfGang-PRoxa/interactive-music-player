@@ -10,22 +10,27 @@ dispuestas y el modelo de amenaza adoptado.
 
 ## Modelo de amenaza
 
-El bot está pensado para funcionar en la máquina de su propietario. El panel de
-control **no** tiene gestión de cuentas: un testigo único da acceso a todo.
+El bot está pensado para funcionar en la máquina de su propietario. El testigo de
+acceso abre allí la página; **no nombra a nadie**. Los derechos van unidos a una
+cuenta de Discord, y una cuenta sin derechos ve un panel inerte.
 
 Lo que queda cubierto:
 
-- acceso desde otra máquina de la red local;
+- acceso desde otra máquina de la red local, o desde internet cuando el túnel
+  está montado ([11 — Acceso remoto](11-acces-distant.md));
 - lectura de archivos arbitrarios del disco mediante las rutas de medios;
 - agotamiento de memoria o de disco por una única petición;
-- parada del proceso por un tercero no autenticado.
+- parada del proceso por un tercero no autenticado;
+- separación de privilegios entre el maestro de sesión y sus invitados — un
+  invitado no puede apagar el bot, ni cambiar su versión, ni repartir derechos.
 
 Lo que no lo está:
 
-- separación de privilegios entre varios usuarios del panel de control;
-- exposición directa en Internet — colocar el bot detrás de un proxy inverso con
-  TLS si hace falta;
-- protección frente a un usuario legítimo malintencionado.
+- protección frente al propio maestro de sesión: puede todo, por construcción;
+- protección frente a un invitado al que se ha concedido un derecho del que
+  abusa — la retirada es el único recurso (`revokeControl`);
+- confidencialidad del contenido servido: una pista que un invitado puede
+  escuchar es una pista que puede descargar.
 
 ---
 
@@ -108,6 +113,58 @@ limpieza de la URL.
 servidor del bot es rechazada allí como en cualquier otro sitio, y un invitado
 reconocido recupera exactamente los permisos que se le habían dejado, ni uno
 más.
+
+### Derechos compartidos
+
+[`permissions.js`](../../../src/web/permissions.js) decide lo que un invitado
+tiene derecho a hacer. **El control está ahí, y en ningún otro sitio**: el panel
+atenúa las órdenes prohibidas, pero eso no es más que una cortesía hacia el
+invitado — nada impide abrir la consola del navegador y enviar el mensaje a
+mano. La única barrera que cuenta es la que opone el servidor.
+
+Un derecho corresponde a **un gesto**, y se llama `sección.gesto`. Las cuatro
+secciones no son más que un ordenamiento: dan a la ventana de compartición sus
+apartados y sus interruptores de conjunto, no deciden nada.
+
+| Sección | Derechos |
+|---|---|
+| `playback` | `transport`, `skip`, `seek`, `mode`, `source`, `speed`, `mix`, `loudness` |
+| `queue` | `add`, `playNow`, `remove`, `reorder`, `history`, `download`, `clear` |
+| `playlists` | `create`, `addTrack`, `removeTrack`, `reorderTracks`, `rename`, `organise`, `transitions`, `delete` |
+| `volume` | `level`, `ducking`, `quality`, `trackGain`, `broadcast`, `channel` |
+
+Este grano fino vino a sustituir a cuatro derechos de conjunto, demasiado
+groseros: confiar la cola de espera daba con el mismo gesto el derecho a
+vaciarla, y dejar ajustar el volumen dejaba también cambiar de canal de voz. No
+se podía decir «añade lo que quieras, pero no borres nada», que es sin embargo lo
+que más a menudo se quiere decir. El punto de `sección.gesto` no es decorativo:
+es por él que se reconoce un derecho de hoy de un derecho de ayer, lo que permite
+releer sin pestañear un `settings.json` escrito por una versión anterior.
+
+Tres valores particulares completan el catálogo:
+
+- `ALWAYS` — los mensajes que no ordenan nada (`requestState`, `clientLog`,
+  `syncProgress`). Rechazarlos no protegería nada y dejaría ciego el panel del
+  invitado.
+- `FIELD_FILTERED` — `updateSettings`, cuyo cada campo depende de un derecho
+  distinto. El mensaje pasa, y `filterSettings()` solo conserva los ajustes
+  permitidos; un invitado sin ningún derecho ve su petición vaciada de todo
+  contenido, lo que el llamante trata como un rechazo.
+- `MASTER_ONLY` — quince mensajes que quedan para el maestro: apagar o reiniciar
+  el bot, cambiar su versión, hacerlo salir de un servidor, montar el túnel y
+  repartir los derechos mismos.
+
+**Un mensaje desconocido para la tabla se asimila a `MASTER_ONLY`.** Es
+deliberado: una orden añadida más tarde sin pensarlo estará cerrada por defecto
+en lugar de abierta a todos.
+
+Los derechos viven en los ajustes del servidor, bajo `sharedControl` (véase
+[09 — Configuración](09-configuration.md#ajustes-por-servidor)). Dos gestos
+vecinos no dicen lo mismo y confundirlos sale caro: `shareControl` con un juego
+vacío desmarca todo — el invitado sigue admitido, reconocido, simplemente sin
+poder, y se le pueden devolver los derechos al instante siguiente;
+`revokeControl` despide de verdad — derechos borrados, admisión retirada,
+sesiones cerradas, ficha del libro suprimida.
 
 ### Origen del testigo
 
@@ -263,6 +320,12 @@ la petición.
 accesible desde la máquina anfitriona. Para acceder a él desde un teléfono u otro
 puesto, definir `HOST=0.0.0.0` — la autenticación cobra entonces todo su sentido.
 En ese caso se registra un aviso en el arranque.
+
+El panel también puede publicarse en internet entero mediante un túnel Tailscale
+Funnel. Es el único gesto que el módulo correspondiente se niega a hacer por sí
+mismo, incluso cuando todo está listo: montarlo sin haberlo pedido publicaría el
+reproductor de alguien sin que lo sepa. Véase
+[11 — Acceso remoto](11-acces-distant.md).
 
 ---
 

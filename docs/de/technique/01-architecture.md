@@ -19,7 +19,13 @@ src/
 │   ├── PlayerEvents.js       Ereignis-Listener von discord-player
 │   ├── PresenceManager.js    Kommen und Gehen des Bots je nach Kanalbelegung
 │   ├── PreloadManager.js     Festplatten-Cache der entfernten Titel
+│   ├── rangeStream.js        Abschnittsweises Laden, um die Drosselung zu umgehen
 │   ├── LocalFilePlayer.js    Hilfsmittel zum Durchsuchen von Audioordnern
+│   ├── LoudnessAnalyzer.js   LUFS-Messung einer Datei, mittels FFmpeg
+│   ├── loudness.js           Messung + Ziel → Verstärkung, ohne Audiowissen
+│   ├── channelQueue.js       Die Warteschlange, Sprachkanal für Sprachkanal abgelegt
+│   ├── transitions.js        Weichen zwischen zwei Titeln einer Wiedergabeliste
+│   ├── videoSource.js        Auflösung des Bildstroms eines Titels
 │   ├── playbackSettings.js   Geschwindigkeit und Mischeffekte, unabhängig vom Audioweg
 │   └── mix/                  Mischbus: die gemeinsame Übertragung, zwei überlagerbare Spuren
 │       ├── format.js         PCM-Austauschformat und Aufteilung in Frames
@@ -44,16 +50,35 @@ src/
 │   ├── atomicJson.js         Absturzsicheres Lesen/Schreiben von JSON
 │   ├── mediaPaths.js         Schutzgeländer für die dem Client gelieferten Pfade
 │   ├── downloadDir.js        Ordner, in den heruntergeladene Dateien geschrieben werden
+│   ├── downloadFormats.js    Angebotene Container → FFmpeg-Argumente
+│   ├── mp3.js                Analyse einer unvollständigen MP3, um ein Vorladen fortzusetzen
+│   ├── artwork.js            Ersatz-Cover, vom Bot statt von Dritten geliefert
+│   ├── setAsideQueue.js      Von einer Wiedergabeliste beiseitegelegte Warteschlange
+│   ├── historyOrder.js       Wiedereinfügen eines Verlaufs in eine LIFO-Schlange
 │   ├── paths.js              Vergleich und Bereinigung von Pfaden
 │   ├── duration.js           Formatierung und Auswertung von Dauern
 │   ├── embeds.js             Discord-Einbettungen
-│   └── permissions.js        Prüfung von Berechtigungen
+│   └── permissions.js        Prüfung von Discord-Berechtigungen
+│
+├── versioning/               Bot-Versionen: Katalog, Installation, Wechsel
+│   ├── index.js              Vom Dashboard genutzte Fassade
+│   ├── locations.js          Geteilte vs. Installationswurzel, Schutzgeländer
+│   ├── github.js             Releases des Repositorys und Herunterladen ihrer Archive
+│   ├── installer.js          Entpacken, Abhängigkeiten, Bestandsaufnahme der Platte
+│   └── targz.js              `.tar.gz`-Entpacken ohne externe Abhängigkeit
 │
 └── web/
     ├── WebServer.js          HTTP- + WebSocket-Server, Zusammenführung des Zustands
     ├── auth.js               Zugangstoken (HTTP und WebSocket)
+    ├── oauth.js              Discord-OAuth2-Ablauf
+    ├── sessions.js           Kurzlebige Sitzungen je Tab
+    ├── owner.js              Konto, dem die Installation gehört
+    ├── guests.js             Buch der bereits erschienenen Gäste
+    ├── permissions.js        Was ein Gast tun darf
+    ├── tailscale.js          Veröffentlichung des Dashboards im Internet
     ├── uploadService.js      Annahme und Einbindung der importierten Dateien
     ├── routes/api.js         HTTP-Routen (stream, download, upload, video-info)
+    ├── routes/auth.js        Authentifizierungsablauf eines Gastes
     ├── websocket/
     │   ├── wsHandler.js      Router der WebSocket-Nachrichten
     │   ├── handlerUtils.js   Von den Handlern gemeinsam genutzte Helfer
@@ -68,11 +93,18 @@ data/
 ├── settings.json           Einstellungen je Server + globale Wiedergabelisten
 ├── playback_state.json     Letzter bekannter Wiedergabezustand
 ├── dashboard-token         Beim ersten Start erzeugtes Zugangstoken
+├── owner.json              Konto, dem die Installation gehört
+├── guests.json             Buch der bereits erschienenen Gäste
+├── sessions.json           Offene Discord-Sitzungen
 ├── uploads/                Importierte Dateien, nach Prüfsumme benannt
 ├── cache/                  Vorgeladene entfernte Titel als MP3
 ├── downloads/              Heruntergeladene Dateien, wenn kein anderer Ordner gewählt ist
 └── logs/                   Ein Protokoll je Start + latest.log
 ```
+
+Ein zweiter nicht versionierter Ordner, `versions/`, trägt die installierten
+Releases — einen je Kennzeichnung. Er bleibt leer, solange das
+Entwicklungs-Repository läuft. Siehe [10 — Versionen](10-versions.md).
 
 Der Ordner `tools/` trägt das Windows-Werkzeug, ohne Bezug zum Prozess des Bots
 — kein Modul aus `src/` verweist darauf:
@@ -209,14 +241,21 @@ werden deklariert (siehe
 Ereignis-Listener und des Vorlade-Managers.
 
 **7. Verbindung zu Discord.** Beim Ereignis `ClientReady`:
+- Bekanntgabe der laufenden Version und Kehren abgebrochener Installationen;
+- Wahl des Eröffnungskanals — der Favorit beim Einschalten, der zuletzt besuchte
+  bei der Wiederaufnahme (siehe [06](06-persistance.md#database));
 - Start des Webservers;
-- Wiederherstellung des gesicherten Wiedergabezustands;
-- Einplanung der regelmäßigen Sicherung (alle 5 s).
+- Wiederherstellung des gesicherten Wiedergabezustands, das Vorladen bis zum
+  Ende ausgesetzt;
+- Einplanung der regelmäßigen Sicherung (alle 5 s) und des Sicherheitsnetzes der
+  Anwesenheitsregel (alle 30 s).
 
 ```
 index.js
   ├─ patch spawn (win32)
+  ├─ dieLoudly : uncaughtException, unhandledRejection
   ├─ AudioFilters : speed_0_20 … speed_3_05, muffled
+  ├─ installBridge()            (discord-player-Knoten → Mischbus)
   ├─ new Client(...)
   ├─ loadCommands()
   ├─ initPlayer()
@@ -225,10 +264,21 @@ index.js
   │    └─ preloadManager.init()
   └─ client.login()
        └─ ClientReady
+            ├─ versioning.currentVersion() + cleanTempDirs()
+            ├─ database.applyStartupChannel({ resuming })
             ├─ webServer.start(client, PORT, HOST)
             ├─ playbackStateManager.restoreAll()
-            └─ setInterval(saveState, 5000)
+            │    └─ finally : preloadManager.setSuspended(false)
+            ├─ presenceManager.evaluate(guildId)   (für jeden Server)
+            ├─ setInterval(saveState, 5000)
+            └─ setInterval(presence.evaluate, 30000)
 ```
+
+Das Vorladen bleibt während der gesamten Wiederherstellung ausgesetzt: es
+entfernt aus dem Cache jeden Titel, der in den Schlangen fehlt, und diese sind
+erst vollständig, wenn `restoreAll()` beendet ist. Die anschließende
+Anwesenheitsschleife holt jene nach, die währenddessen einen Kanal betreten
+haben — kein Sprachereignis wird sie nachträglich melden.
 
 ---
 
@@ -308,6 +358,7 @@ hängte ihm seine eigenen Eigenschaften unmittelbar an, ohne Kapselung:
 | `isPendingTransition`, `transitionTimeout` | Sperre gegen doppelten Sprung |
 | `restorePaused`, `restoreProgress`, `restoreShouldBePaused` | Wiederherstellung beim Start |
 | `isMixFadingOut`, `mixAppliedTrackId`, `trackStartedAt` | Übergang im DJ-Stil |
+| `absentEmptyChannel`, `frozenPositionMs`, `frozenIsPlaying` | Eingefrorene Wiedergabe, während der Bot aus einem leeren Kanal fort ist |
 | `pauseOnNextTrack` | Aufgeschobene Pause |
 
 **Warum das ein Problem war.** Keine dieser Eigenschaften war irgendwo
@@ -319,7 +370,7 @@ hätte den Bot stillschweigend zerstört.
 
 ### Der Zustand gehört nunmehr dem Projekt
 
-[`PlaybackSession`](../../../src/audio/PlaybackSession.js) deklariert die 23
+[`PlaybackSession`](../../../src/audio/PlaybackSession.js) deklariert die 26
 Eigenschaften in einem einzigen `SCHEMA`, mit Typ und Anfangswert. Der Zustand
 lebt in diesem Objekt; die Warteschlange besitzt ihn nicht mehr.
 
@@ -356,9 +407,18 @@ persönlichem Modus verbergen:
 Verwendet von `PreloadManager.getActivePreloadTracks` und
 `WebServer.getPlaybackPosition`.
 
+`isFrozen()` tritt zu dieser Verzweigung hinzu. Hat sich der Bot aus einem von
+seinen Menschen geleerten Kanal zurückgezogen, bleibt die Schlange im Speicher
+am Leben, doch der discord-player-Knoten ist mit der Sprachverbindung
+verschwunden: die Position kommt nicht mehr von ihm, sondern aus
+`frozenPositionMs`. Das Einfrieren verlangt beides — die gesetzte Markierung
+**und** das Fehlen einer Verbindung —, denn die Markierung kann gesetzt bleiben,
+wenn der Bot bereits zurück ist, und ein „eingefroren“ würde das Dashboard dann
+auf eine Position vor seiner Rückkehr festnageln, während der Ton weiterläuft.
+
 ### Verbleibende Migration
 
-Die 455 bestehenden Zugriffsstellen arbeiten weiterhin über die Zugriffe: die
+Die 375 bestehenden Zugriffsstellen arbeiten weiterhin über die Zugriffe: die
 Schreibweise `queue.virtualTracks` ist unverändert, nur die Speicherung ist
 umgezogen. Ihre Umschreibung auf `session.virtualTracks` und anschließend das
 Entfernen der Zugriffe kann Datei für Datei geschehen — der wesentliche Gewinn

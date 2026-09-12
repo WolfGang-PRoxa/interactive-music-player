@@ -215,7 +215,7 @@ renommé en `.mp3` qu'une fois complet et validé.
 
 `getActivePreloadTracks()` construit la liste à précharger :
 
-| Source | Quantité (réglable, max 5) |
+| Source | Quantité (réglable de 0 à 5, ou « tout ») |
 |---|---|
 | Piste courante | toujours |
 | Prochaines pistes de la file | `preloading.queueCount` (défaut 3) |
@@ -276,6 +276,44 @@ chercher du côté du cache. Sur une piste YouTube, un 403 signale presque toujo
 un yt-dlp périmé, que `npm run update-ytdlp` remet à niveau : les URL que YouTube
 délivre sont liées au client qui les a demandées, et ses règles changent plus vite
 que le binaire livré avec le paquet.
+
+### Téléchargement par tranches
+
+Un préchargement mettait douze minutes pour un fichier de vingt-cinq. Le journal
+montrait FFmpeg écrire environ 32 Ko/s, soit à peine deux fois le temps réel, là
+où un transcodage MP3 tourne à cent fois. Ce n'était ni le disque, ni le
+processeur, ni le codec :
+
+```
+GET simple, sans en-tête Range   →     32 754 o/s
+la même URL par tranches de 4 Mo → 38 000 000 o/s
+```
+
+YouTube **bride un téléchargement progressif continu au débit de lecture**. Ce
+n'est pas une panne : c'est ce qu'il faut pour qu'un navigateur qui lit une
+vidéo ne tire pas cent fois plus vite qu'il ne consomme. Mais ici on n'écoute
+pas, on archive — et FFmpeg, qui ouvre une seule requête et la garde ouverte du
+début à la fin, tombe pile dans ce cas.
+
+[`rangeStream.js`](../../../src/audio/rangeStream.js) redemande donc la même
+adresse morceau par morceau, avec un en-tête `Range`, et recoud les réponses en
+un flux unique. Aucune requête ne reste ouverte assez longtemps pour être
+bridée, et FFmpeg reçoit le tout sur son entrée standard sans savoir d'où cela
+vient. La tranche fait quatre mégaoctets : assez court pour passer sous le
+bridage, assez long pour que le coût d'établissement de la connexion s'y noie.
+
+Un flux plutôt qu'un fichier temporaire, parce qu'il permet de commencer à
+encoder avant la fin du téléchargement et que le pipeline sait déjà recevoir
+« une URL ou un flux » — il n'y a rien à réorganiser, ni à nettoyer après coup.
+Un serveur qui ne sait pas découper répond `200` au lieu de `206` et envoie
+tout : le module verse cette réponse-là et s'arrête, de sorte qu'aucun appelant
+n'a à savoir si la source gère les plages.
+
+Ce qui est perdu : sur une URL, FFmpeg peut sauter au milieu du fichier sans en
+télécharger le début, ce dont la reprise ci-dessous tirait parti. Sur une entrée
+standard, il doit lire et jeter — mais lire et jeter vingt-cinq mégaoctets à
+38 Mo/s prend moins d'une seconde, contre les douze minutes que coûtait le
+bridage.
 
 ### Reprise après redémarrage
 

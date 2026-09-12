@@ -22,6 +22,9 @@ alltäglichen Gebrauch siehe das [Benutzerhandbuch](../GUIDE.md).
 | [07 — Sicherheit](07-securite.md) | Authentifizierung, Pfadbeschränkung, Obergrenzen |
 | [08 — Protokollierung](08-journalisation.md) | Logger, Stufen, Übertragung ans Dashboard |
 | [09 — Konfiguration](09-configuration.md) | Umgebungsvariablen, `config.js`, Bereitstellung der Befehle |
+| [10 — Versionen](10-versions.md) | Geteilte und Installationswurzel, GitHub-Releases, Versionswechsel |
+| [11 — Fernzugriff](11-acces-distant.md) | Tailscale-Tunnel, `PUBLIC_URL`, Teilung der Steuerung |
+| [12 — Tests](12-tests.md) | Die Suiten in `tests/`, was sie abdecken, wie man eine schreibt |
 
 ---
 
@@ -54,12 +57,16 @@ Arbeitsspeicher dieses Prozesses lebt, mit Momentaufnahmen auf der Festplatte
 
 ## Strukturierende Prinzipien
 
-**Der Prozess ist Einzelinstanz und Einzelbenutzer.**
-Das Dashboard kennt keine Konten: ein einziges Token gewährt Zugang zu allem.
-Der Bot ist dafür ausgelegt, auf dem Rechner seines Besitzers zu laufen.
+**Der Prozess ist Einzelinstanz, und der Bot gehört jemandem.**
+Der Bot ist dafür ausgelegt, auf dem Rechner seines Besitzers zu laufen. Das
+Zugangstoken öffnet die Seite, doch es benennt niemanden: die Rechte hängen an
+einem **Discord-Konto**. Das erste Konto, das von Discord unter Vorlage des
+Tokens zurückkehrt, wird Sitzungsmeister; die übrigen sind Gäste, die nur haben,
+was der Meister ihnen Geste für Geste gewährt. Siehe
+[07 — Sicherheit](07-securite.md).
 
 **Der Wiedergabezustand gehört dem Projekt.**
-Die 23 Zustandseigenschaften (`virtualCurrentTrack`, `channelStates`,
+Die 26 Zustandseigenschaften (`virtualCurrentTrack`, `channelStates`,
 `transitioningToEveryone`…) werden in
 [`PlaybackSession`](../../../src/audio/PlaybackSession.js) deklariert und nicht
 mehr schemalos auf das `GuildQueue`-Objekt von discord-player aufgepfropft.
@@ -98,8 +105,8 @@ Diese Punkte sind erkannte Altlasten, keine zu meldenden Fehler.
 
 | Thema | Beschreibung | Siehe |
 |---|---|---|
-| Wiedergabezustand | Alle 455 Stellen greifen weiterhin über `queue.xxx` auf den Zustand zu, nunmehr Zugriffsmethoden auf `PlaybackSession`. Ihre Umschreibung auf `session.xxx` steht noch aus. | [01](01-architecture.md#playbacksession) |
+| Wiedergabezustand | Alle 375 Stellen greifen weiterhin über `queue.xxx` auf den Zustand zu, nunmehr Zugriffsmethoden auf `PlaybackSession`. Ihre Umschreibung auf `session.xxx` steht noch aus. | [01](01-architecture.md#playbacksession) |
 | 1-s-Sendeschleife | Das Intervall wird nie gestoppt — es gibt kein `stop()` auf `WebServer`. Die periodische Nutzlast selbst wurde auf ~200 Byte verkleinert. | [05](05-tableau-de-bord.md#die-aktualisierungsschleife) |
 | Doppeltes Wiedergabemodell | Der gemeinsame und der persönliche Modus sind im gesamten Zustandscode durch `isPersonal ? … : …`-Ternäroperatoren verflochten. | [04](04-diffusion.md#der-preis-des-doppelten-modells) |
-| Kein globales Sicherheitsnetz | Weder `uncaughtException` noch `unhandledRejection` noch `SIGTERM`: eine Ausnahme außerhalb der geschützten Zonen beendet den Prozess. | [05](05-tableau-de-bord.md#robustheit) |
-| Fehlende automatisierte Tests | Im Repository ist keine Testsuite versioniert. | — |
+| Halt bei unerwartetem Fehler | `uncaughtException` und `unhandledRejection` protokollieren und lassen den Prozess dann sterben — das ist gewollt, doch nichts hebt ihn wieder auf. `SIGTERM` bleibt unbehandelt. | [05](05-tableau-de-bord.md#robustheit) |
+| Unvollendete Frontend-Aufteilung | `app.js` bündelt noch 3 819 Zeilen, die der Ordner `js/` auszulagern begonnen hat. | [05](05-tableau-de-bord.md#unvollendete-aufteilung) |

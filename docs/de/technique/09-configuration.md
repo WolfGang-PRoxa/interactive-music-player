@@ -28,6 +28,8 @@ leben seine tatsächlichen Einstellungen in `settings.json` (siehe
 |---|---|---|
 | `DISCORD_TOKEN` | **Ja** | Token des Bots. Sein Fehlen bricht den Start ab. |
 | `DISCORD_CLIENT_ID` | Für `npm run deploy` | Kennung der Anwendung |
+| `DISCORD_CLIENT_SECRET` | Für die Discord-Anmeldung | OAuth2-Geheimnis. Leer gelassen kann sich niemand ausweisen: das Dashboard sagt es und fällt auf das bloße Zugangstoken zurück. |
+| `GUILD_ID` | Für eine lokale Bereitstellung | Registriert die Befehle nur auf diesem Server, ohne Verbreitungsfrist |
 
 ### Dashboard
 
@@ -35,7 +37,21 @@ leben seine tatsächlichen Einstellungen in `settings.json` (siehe
 |---|---|---|
 | `PORT` | `3000` | Port, auf dem gelauscht wird |
 | `HOST` | `127.0.0.1` | Schnittstelle, auf der gelauscht wird. `0.0.0.0`, um im lokalen Netz erreichbar zu sein. |
+| `PUBLIC_URL` | — | Adresse, unter der Gäste dieses Dashboard erreichen, ohne abschließenden Schrägstrich. Sie lässt sich nicht erraten, und die Rückruf-URL `<PUBLIC_URL>/auth/discord/callback` muss im Discord-Portal genau so eingetragen sein. |
+| `AUTO_OPEN_DASHBOARD` | `true` | Öffnen des Browsers beim Start. `false`, wenn der Bot auf einem fernbedienten Rechner läuft — dieses Dashboard spielte die Musik doppelt. |
 | `DASHBOARD_TOKEN` | erzeugt | Zugangstoken. Wenn leer, wird es erzeugt und in `data/dashboard-token` gespeichert. |
+
+### Versionen
+
+| Variable | Vorgabe | Rolle |
+|---|---|---|
+| `GITHUB_TOKEN`, `GH_TOKEN` | — | Token der GitHub-API. Bei einem öffentlichen Repository entbehrlich; hebt das Kontingent von 60 auf 5 000 Anfragen je Stunde. Andernfalls wird die `gh`-CLI befragt, sofern installiert und angemeldet. |
+| `IMP_REPO` | Repository aus `package.json` | Repository, dessen Releases angeboten werden, als `owner/repo` oder als URL |
+| `IMP_VERSIONS_DIR` | `versions/` | Verlagert die installierten Releases anderswohin — zweite Platte, Ordner außerhalb des Repositorys |
+| `IMP_RESTART` | — | Von der sich neu startenden Instanz gesetzt. Kennzeichnet eine Wiederaufnahme, was die Eröffnungsblende entfallen und den Lieblingskanal übergehen lässt. |
+
+Die letzten drei sind keine Benutzereinstellungen: der Bot setzt sie selbst, wenn
+er eine andere Version neu startet. Siehe [10 — Versionen](10-versions.md).
 
 ### Medien
 
@@ -97,7 +113,7 @@ bleibt dauerhaft verbunden, ob der Kanal leer ist oder nicht. Siehe
 eigenen über das Dashboard fest (*Einstellungen → Bot-Einstellungen → Frist vor
 dem Verlassen eines leeren Kanals*), je Server unter `presenceDepartureDelay`
 gespeichert — **in Sekunden**, der Einheit des Reglers, die
-`PresenceManager._delaiDepart()` wieder in Millisekunden umrechnet. Der Regler
+`PresenceManager._departureDelayMs()` wieder in Millisekunden umrechnet. Der Regler
 läuft von 0 bis 300 s, und der Server begrenzt den empfangenen Wert erneut; null
 bedeutet einen Abgang ohne Frist, was das übliche `||` bei dieser Einstellung
 verbietet. Die Frist zu ändern spannt einen bereits laufenden Countdown neu, um
@@ -131,31 +147,54 @@ Schlüssel zu ergänzen genügt: alle bestehenden Server erben ihn, da
 | `mixEnabled` | `false` | Übergang im DJ-Stil |
 | `mixDuration` | `5` | Dauer des Übergangs, in Sekunden |
 | `mixType` | `'volume'` | `'volume'` oder `'effects'` |
+| `lufsSyncEnabled` | `false` | Alle Stücke auf dieselbe Lautheit ausrichten |
+| `lufsSyncTarget` | `-14` | Gemeinsames Ziel, in LUFS |
 | `fadeinEnabled` | `false` | Einblenden |
 | `fadeinDuration` | `5` | Sekunden |
 | `fadeoutEnabled` | `true` | Ausblenden beim Abschalten |
 | `fadeoutDuration` | `5` | Sekunden |
+| `addTarget` | `'queue'` | Ziel des Eingabefelds: `queue`, `playlist`, `play` oder `download` |
+| `importFormat` | `'mp3'` | Container der auf die Platte geschriebenen Dateien |
+| `importAudioQuality` | `'320'` | MP3-Rate des Vorladens, in kbps |
+| `importVideoQuality` | `'720'` | Zielhöhe des Videostroms, in Pixeln |
+| `presenceDepartureDelay` | `30` | Frist vor dem Verlassen eines geleerten Kanals, **in Sekunden** |
 | `ignoredVoiceUsers` | `{}` | Ausschlüsse vom Ducking, je Kanal |
+| `sharedControl` | `{}` | Gästen gewährte Rechte, je Discord-Konto |
+| `preloading` | siehe unten | Vorladen: `enabled`, `queueCount`, `historyCount`, `playlistCount` |
 | `activePlaybackSource` | `'queue'` | `'queue'` oder Kennung einer Wiedergabeliste |
 | `playlistCurrentIndex` | `0` | Position in der aktiven Wiedergabeliste |
-| `queueBackupPersonal` | `null` | Beiseitegestellte Warteschlange, im persönlichen Modus geschrieben |
-| `queueBackupEveryone` | `null` | Beiseitegestellte Warteschlange, im gemeinsamen Modus geschrieben |
+| `loopPlaylist` | `false` | Die aktive Wiedergabeliste ab ihrem ersten Titel erneut abspielen |
+| `channelQueues` | `{}` | Die Warteschlange, Sprachkanal für Sprachkanal abgelegt |
+| `queueBackupPersonal` | `null` | Sicherung aus der Zeit vor der Ablage je Kanal |
+| `queueBackupEveryone` | `null` | Ebenso, gemeinsamer Modus |
 
-Die beiden letzten Schlüssel tragen **dieselbe** Warteschlange — jene, die eine
-Wiedergabeliste beiseitegestellt hat —, abgelegt unter dem des laufenden
-Übertragungsmodus; der andere wird gelöscht. Alles läuft über
-[`setAsideQueue`](../../../src/utils/setAsideQueue.js): eine schlichte Titelliste,
-`{ pistes: [...] }`, in der nichts „laufend" ist, da nichts daraus gespielt wird,
-solange die Wiedergabeliste den Player belegt. Diese Schlüssel trugen früher zwei
-verschiedene Formen, und ein Moduswechsel ließ die Oberfläche aus einer leeren
-Sicherung lesen — die Warteschlange schien verloren. Die alten Formen
-(`{ tracks }`, `{ virtualCurrentTrack, virtualTracks }`) werden beim Lesen
-weiterhin angenommen.
+`channelQueues` ist `{ "<channelId>": [Titel | Weiche, …] }`. Ein Kanal „Party“
+und ein Kanal „ruhig“ haben je ihre eigene und finden sie bei der Rückkehr
+wieder, wo eine einzige Warteschlange je Server dem Bot überallhin folgte. Es ist
+zudem der einzige Ort, an dem eine Weiche warten kann: sie braucht eine geordnete
+Liste, um eine Position zu bezeichnen, was der Player ihr nicht bot. Siehe
+[`channelQueue`](../../../src/audio/channelQueue.js).
+
+Die beiden letzten Schlüssel sind **ererbt** und bleiben auf `null`: sie trugen
+die beiseitegestellte Warteschlange vor der Ablage je Kanal.
+[`channelQueue`](../../../src/audio/channelQueue.js) liest sie einmal, um
+zurückzugießen, was eine frühere Fassung dort hinterlassen hat, und löscht sie
+dann. Alles läuft nunmehr über
+[`setAsideQueue`](../../../src/utils/setAsideQueue.js): eine schlichte
+Titelliste, in der nichts „laufend“ ist, da nichts daraus gespielt wird, solange
+die Wiedergabeliste den Player belegt. Die alten Formen (`{ tracks }`,
+`{ virtualCurrentTrack, virtualTracks }`) werden beim Lesen weiterhin
+angenommen.
+
+`loopPlaylist` ist vom Wiederholmodus von discord-player verschieden, der nur die
+tatsächlich geladene Warteschlange kennt: „die Wiedergabeliste“ erneut
+abzuspielen heißt, sie ab ihrem ersten Titel neu zu laden, auch wenn die
+Wiedergabe mittendrin begonnen hatte.
 
 `activePlaybackSource` kehrt nicht allein auf Entscheidung des Benutzers zu
 `'queue'` zurück: eine Wiedergabeliste, die ohne Schleife endet, gibt an die
 beiseitegestellte Warteschlange zurück, die dann mit ihrem ersten Stück beginnt
-(`WebServer.enchainerSurLaFile()`). Der Wechsel wird an beiden
+(`WebServer.advanceToQueue()`). Der Wechsel wird an beiden
 Erschöpfungspunkten versucht — der virtuellen Warteschlange des persönlichen
 Modus und dem Ereignis `emptyQueue` des gemeinsamen Modus —, stets nach dem
 Neustart der Schleife: diese Reihenfolge und nicht eine Prüfung von
@@ -163,9 +202,17 @@ Neustart der Schleife: diese Reihenfolge und nicht eine Prüfung von
 Warteschlange lässt die Wiedergabe enden, wie zuvor.
 
 Das Unterobjekt `preloading` (`enabled`, `queueCount`, `historyCount`,
-`playlistCount`) ist in `_defaults()` nicht deklariert: es wird vom Dashboard
-geschrieben und mit Rückfallwerten in
-[`PreloadManager.js`](../../../src/audio/PreloadManager.js) gelesen.
+`playlistCount`) wird vom Dashboard eingestellt, aber **serverseitig verbraucht**
+von [`PreloadManager.js`](../../../src/audio/PreloadManager.js): der Wert muss
+daher hier leben und nicht allein im `localStorage` des Browsers.
+
+Die drei Zähler reichen von 0 bis 5, dazu eine letzte Raste, die nicht mehr zählt
+und den ganzen Abschnitt nimmt. Sie wird als **`-1`** gespeichert, nie als die
+Position des Reglers: diese gilt nur im Verhältnis zum Höchstwert des Tages, und
+an dem Tag, an dem die Regler eine Raste gewönnen, hörte eine gespeicherte `6`
+auf, „alles“ zu bedeuten, ohne dass irgendetwas es meldete. Eine negative Zahl
+dagegen ist in keiner Welt eine. Sie wird als `Infinity` zurückgelesen, was die
+nachgelagerten `slice(0, n)` und `Math.min(n, …)` bereits richtig behandeln.
 
 ---
 

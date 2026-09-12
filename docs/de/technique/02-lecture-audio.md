@@ -220,7 +220,7 @@ Datei wird erst in `.mp3` umbenannt, wenn sie vollständig und geprüft ist.
 
 `getActivePreloadTracks()` stellt die vorzuladende Liste zusammen:
 
-| Quelle | Menge (einstellbar, max. 5) |
+| Quelle | Menge (einstellbar von 0 bis 5, oder „alles“) |
 |---|---|
 | Laufender Titel | immer |
 | Nächste Titel der Warteschlange | `preloading.queueCount` (Vorgabe 3) |
@@ -284,6 +284,45 @@ veraltetes yt-dlp hin, das `npm run update-ytdlp` auf den neuesten Stand bringt:
 die URLs, die YouTube ausgibt, sind an den Client gebunden, der sie angefragt
 hat, und dessen Regeln ändern sich schneller als die mit dem Paket ausgelieferte
 Binärdatei.
+
+### Abschnittsweises Herunterladen
+
+Ein Vorladen brauchte zwölf Minuten für eine Datei von fünfundzwanzig. Das
+Protokoll zeigte FFmpeg mit etwa 32 KB/s schreiben, kaum das Doppelte der
+Echtzeit, wo eine MP3-Umwandlung mit dem Hundertfachen läuft. Es lag weder an
+der Platte, noch am Prozessor, noch am Codec:
+
+```
+einfaches GET, ohne Range-Kopfzeile   →     32 754 B/s
+dieselbe URL in Abschnitten zu 4 MB   → 38 000 000 B/s
+```
+
+YouTube **drosselt ein fortlaufendes progressives Herunterladen auf die
+Wiedergaberate**. Das ist kein Fehler: es ist nötig, damit ein Browser, der ein
+Video abspielt, nicht hundertmal schneller zieht, als er verbraucht. Doch hier
+hören wir nicht, wir archivieren — und FFmpeg, das eine einzige Anfrage öffnet
+und sie von Anfang bis Ende offen hält, fällt genau in diesen Fall.
+
+[`rangeStream.js`](../../../src/audio/rangeStream.js) fordert dieselbe Adresse
+daher Stück für Stück an, mit einer `Range`-Kopfzeile, und näht die Antworten zu
+einem einzigen Strom zusammen. Keine Anfrage bleibt lange genug offen, um
+gedrosselt zu werden, und FFmpeg empfängt das Ganze auf seiner
+Standardeingabe, ohne zu wissen, woher es kommt. Ein Abschnitt misst vier
+Megabyte: kurz genug, um unter der Drosselung durchzukommen, lang genug, damit
+die Kosten des Verbindungsaufbaus darin untergehen.
+
+Ein Strom statt einer temporären Datei, weil er erlaubt, mit dem Kodieren zu
+beginnen, bevor das Herunterladen endet, und weil die bestehende Kette bereits
+„eine URL oder einen Strom“ entgegenzunehmen weiß — es gibt nichts umzubauen und
+nichts hinterher aufzuräumen. Ein Server, der nicht zerteilen kann, antwortet
+`200` statt `206` und schickt alles: das Modul gießt diese Antwort durch und
+hält an, sodass kein Aufrufer wissen muss, ob die Quelle Bereiche beherrscht.
+
+Was verloren geht: auf einer URL kann FFmpeg mitten in die Datei springen, ohne
+ihren Anfang zu laden, wovon die untenstehende Fortsetzung profitierte. Auf
+einer Standardeingabe muss es lesen und verwerfen — doch fünfundzwanzig Megabyte
+mit 38 MB/s zu lesen und zu verwerfen dauert weniger als eine Sekunde, gegenüber
+den zwölf Minuten, die die Drosselung kostete.
 
 ### Fortsetzung nach einem Neustart
 

@@ -25,7 +25,12 @@ URL containing the access token.
 |---|---|
 | [`WebServer.js`](../../../src/web/WebServer.js) | Life cycle, state aggregation, broadcast |
 | [`auth.js`](../../../src/web/auth.js) | HTTP and WebSocket access token |
+| [`oauth.js`](../../../src/web/oauth.js), [`sessions.js`](../../../src/web/sessions.js) | Discord OAuth journey, per-tab sessions |
+| [`owner.js`](../../../src/web/owner.js), [`guests.js`](../../../src/web/guests.js) | Owner of the installation, book of guests |
+| [`permissions.js`](../../../src/web/permissions.js) | What a guest is allowed to do |
+| [`tailscale.js`](../../../src/web/tailscale.js) | Publishing the dashboard on the internet |
 | [`routes/api.js`](../../../src/web/routes/api.js) | HTTP routes |
+| [`routes/auth.js`](../../../src/web/routes/auth.js) | A guest's authentication journey |
 | [`uploadService.js`](../../../src/web/uploadService.js) | Reception and integration of imports |
 | [`websocket/wsHandler.js`](../../../src/web/websocket/wsHandler.js) | Message router |
 | [`websocket/handlers/`](../../../src/web/websocket/handlers/) | Business logic, one module per domain |
@@ -45,10 +50,12 @@ All are protected by the token ([07 — Security](07-securite.md)).
 | `GET /api/video-info` | Resolution of a video URL through yt-dlp, one-hour memory cache |
 | `POST /api/upload` | File import, raw stream with an `X-File-Name` header |
 | `GET /api/docs` | Contents of the embedded documentation, in the requested language |
-| `GET /api/docs/contenu` | Markdown source of a document, designated by its identifier and its language |
+| `GET /api/docs/content` | Markdown source of a document, designated by its identifier and its language |
 | `GET /api/download-dir` | Current download folder, and the default it compares against |
 | `POST /api/download-dir` | Choice of folder, validated before being kept; empty body returns to the default |
 | `GET /api/browse-dirs` | Sub-folders of a path on the host machine, for the picker |
+| `GET /api/version` | Running version — `dev` or the release tag |
+| `GET /api/clients` | Number of connected dashboards, consulted by the launch window |
 
 `/api/docs` inventories `docs/` on every call, from the **version currently
 running** and not from the shared root: the documentation displayed is therefore
@@ -96,6 +103,24 @@ The remote transcode, for its part, is intrinsically sequential
 (`Transfer-Encoding: chunked`) and cannot honour a range — all the more reason
 for preloading to feed the cache.
 
+### Authentication routes
+
+Four routes escape the `/api` prefix and are carried by
+[`routes/auth.js`](../../../src/web/routes/auth.js):
+
+| Route | Role |
+|---|---|
+| `GET /auth/discord` | Departure to `discord.com`, token noted and stowed in the `state` |
+| `GET /auth/discord/callback` | Return from Discord: code exchanged, session opened, back to the dashboard |
+| `GET /auth/state` | Who is signed in on this tab, and what they are allowed to do |
+| `POST /auth/logout` | Closes this tab's session |
+
+The first two are **open without a token** (`PUBLIC_PATHS` in
+[`auth.js`](../../../src/web/auth.js)): whoever clicks the link posted in the
+voice channel's chat has by definition nothing to authenticate with — that is
+precisely what they have come for. See
+[07 — Security](07-securite.md#authentication).
+
 ---
 
 ## WebSocket protocol
@@ -110,25 +135,43 @@ for preloading to feed the cache.
 | `logsHistory` | The last 200 entries, on connection |
 | `error` | `{ message }`, shown as a notification |
 | `status` | `{ status: 'restarting' \| 'shutting_down', … }` |
+| `memory` | Memory samples, as long as the side panel asks for them |
+| `speakers` | Who is speaking right now, for the voice activity box |
+| `permissionDenied` | A message was refused to a guest — the right that was missing |
+| `shareResult`, `controlRevoked` | Aftermath of a sharing gesture, for the master and for the guest |
+| `tunnelState` | State of the tunnel, when its window opens |
+| `versionCatalog` | Catalogue of versions, re-read from GitHub each time the menu opens |
+| `trackFormats` | Formats and bitrates actually available for a track |
 
 ### Client → server messages
 
-37 types, declared in the routing table
-[`handlers/index.js`](../../../src/web/websocket/handlers/index.js):
+54 types, declared in the routing table
+[`handlers/index.js`](../../../src/web/websocket/handlers/index.js). Each domain
+matches one module of `handlers/`:
 
 | Domain | Messages |
 |---|---|
-| Playback | `play`, `pause`, `resume`, `skip`, `previous`, `stop`, `seek`, `setPlayMode`, `syncProgress` |
+| Playback | `play`, `pause`, `resume`, `skip`, `previous`, `stop`, `seek`, `setPlayMode`, `syncProgress`, `startPlaybackSource` |
 | Queue | `removeTrack`, `playNow`, `moveOrInsertTrack`, `clearQueue`, `removeFromHistory`, `clearHistory` |
-| Playlists | `createPlaylist`, `renamePlaylist`, `deletePlaylist`, `reorderPlaylists`, `addPlaylistTrack`, `addTrackToPlaylist`, `removeTrackFromPlaylist`, `movePlaylistTrack`, `setActivePlaybackSource` |
+| Playlists | `createPlaylist`, `renamePlaylist`, `deletePlaylist`, `reorderPlaylists`, `addPlaylistTrack`, `addTrackToPlaylist`, `removeTrackFromPlaylist`, `movePlaylistTrack`, `setActivePlaybackSource`, `insertTransition`, `setTransitionTarget` |
 | Discord server | `selectChannel`, `setDefaultChannel`, `updateSettings`, `toggleVoiceDetection`, `leaveGuild` |
-| Track | `setTrackQuality`, `downloadTrack` |
+| Track | `setTrackQuality`, `requestTrackFormats`, `requestTrackLoudness`, `setTrackLoudness`, `downloadTrack` |
+| Control sharing | `sendInviteLink`, `admitGuest`, `shareControl`, `revokeControl` |
+| Tunnel | `tunnelState`, `tunnelLogin`, `tunnelMount`, `tunnelUnmount` |
+| Versions | `listVersions`, `installVersion`, `uninstallVersion` |
 | System | `requestState`, `clientLog`, `memoryStream`, `startupFadeinConsumed`, `restartBot`, `shutdownBot` |
+
+The last four domains are **reserved for the session master**: they do not
+appear in the sharing window, and a guest who sent them by hand would be refused
+by [`permissions.js`](../../../src/web/permissions.js) (see
+[07 — Security](07-securite.md#shared-rights)). Sharing, publishing the
+dashboard on the internet, changing the running version or shutting the bot down
+are not playback commands.
 
 `leaveGuild` makes the bot leave a Discord server — the wastebasket in the
 settings, after confirmation of the name. The playback queue is destroyed before
 the departure, then the dashboards left on that server are switched over to
-another (`WebServer.reattribuerClients`), failing which they would no longer
+another (`WebServer.reassignClients`), failing which they would no longer
 receive any state. To be distinguished from the neighbouring switch, which only
 hides the server in the lists of that browser — a local setting, with no effect
 on the bot.
@@ -149,6 +192,7 @@ is exchanged.
   mixTransition: null | { sortante: { url, positionMs, dureeMs, ratio },
                           entrante: { url, positionMs, dureeMs, ratio, track } },
   isPlaying, isPaused, isTransitioning, repeatMode, volume,
+  listenerWait: null | { playing },   // playback frozen, channel emptied of humans
   settings: { duckingEnabled, duckingLevel, duckingDelay, duckingFade,
               broadcastMode, playbackSpeed, mixEnabled, mixDuration, mixType, … },
   queue: [...], history: [...], playlists: [...],
@@ -245,7 +289,7 @@ The periodic payload no longer depends on the number of tracks.
 
 1. **Progress alone on the one-second turn** — `broadcastProgress` only sends
    `{ progress, isPlaying, isPaused, botStats }`.
-2. **In-memory index of the preload cache** — `PreloadManager.cachedKeys`
+2. **In-memory index of the preload cache** — `PreloadManager.cacheIndex`
    replaces re-reading the disk; the status of a track goes from 32.4 µs to
    1.3 µs. An `http(s)` URL now short-circuits the local file test, which could
    not have found anything anyway.
@@ -269,10 +313,17 @@ message and is then disconnected; the bot carries on.
 Incoming messages are protected in the same way: `ws.on('message')` wraps the
 call to the router.
 
-> There is, on the other hand, **no global safety net**: neither
-> `uncaughtException`, nor `unhandledRejection`, nor any handling of `SIGTERM`
-> (only `SIGINT` is dealt with). An exception elsewhere in the code still
-> terminates the process.
+Higher up, `uncaughtException` and `unhandledRejection` are wired to
+`dieLoudly()` in [`index.js`](../../../src/index.js). Those two handlers
+**catch nothing**: they write `[FATAL]` to the log, then let the process die.
+That is deliberate — carrying on after an error whose shape nobody anticipated
+would leave a bot running in an unknown state, which is worse than stopping.
+What they bring is the **trace**: since the bot runs without a console, what
+Node writes by itself on `stderr` before dying is visible nowhere, and a token
+refused at login used to depart without a word in `data/logs/`.
+
+> `SIGTERM` is still not handled — only `SIGINT` is, with the fade-out of
+> [06 — Persistence](06-persistance.md#fade-out).
 
 A 30-second *heartbeat* (`ping`/`pong`) closes dead connections.
 
@@ -280,9 +331,9 @@ A 30-second *heartbeat* (`ping`/`pong`) closes dead connections.
 
 ## Frontend
 
-Around 9,800 lines of JavaScript, served without transformation. No ES modules,
-no bundler: 18 `<script>` tags loaded sequentially in
-[`index.html`](../../../src/web/public/index.html) — 16 modules from `js/`, the
+Around 28,000 lines of JavaScript, served without transformation. No ES modules,
+no bundler: 43 `<script>` tags loaded sequentially in
+[`index.html`](../../../src/web/public/index.html) — 41 modules from `js/`, the
 translations and `app.js` — communicating through the global `window.MusicPlayer`
 namespace.
 
@@ -291,26 +342,30 @@ namespace.
 | `state.js` | Shared state, preferences, internationalisation |
 | `websocket.js` | Connection, automatic reconnection, sending |
 | `app.js` | Conductor: player, settings, personal playback |
-| `player.js` | Progress bar, formatting of durations |
-| `queue.js` | Queue and history, drag and drop, import |
-| `playlists.js` | Playlist tabs |
-| `video.js` | Video playback and audio visualiser |
-| `logs.js` | Log terminal |
-| `drawer.js` | Statistics side panel |
-| `settingsModal.js`, `speedPad.js`, `customSelect.js` | Interface controls |
+| `player.js`, `mediaSession.js`, `loudnessGain.js` | Progress bar, durations, system controls, level gain |
+| `queue.js`, `searchHistory.js`, `downloadTarget.js` | Queue, history, the add field and its destination |
+| `playlists.js`, `playlistTabsScroll.js`, `transitions.js` | Playlist tabs and switches |
+| `video.js`, `qualityMenu.js` | Video playback, visualiser, quality and format menus |
+| `logs.js`, `clientErrors.js` | Log terminal, reporting of browser errors |
+| `drawer.js`, `drawerWidgets.js`, `memoryBreakdown.js` | Statistics side panel |
+| `docs.js` | Reader for this documentation, column pagination |
+| `loginGate.js`, `account.js`, `sharedControl.js`, `shareTunnel.js` | Discord sign-in, account, control sharing, tunnel |
+| `versions.js`, `githubMenu.js` | Version menu and GitHub gestures |
+| `settingsModal.js`, `speedPad.js`, `customSelect.js`, `outputLevel.js` | Interface controls |
+| `deviceMode.js`, `touchDrawers.js`, `touchDragDrop.js`, `dragPreview.js`, `scrollLock.js`, `scrollFade.js` | Adaptation to touch and small screens |
 | `layoutPersistence.js` | Saving of the layout |
-| `tooltipSystem.js`, `faviconAnimator.js`, `headerButtonAnimations.js`, `particlePath.js` | Styling |
+| `tooltipSystem.js`, `faviconAnimator.js`, `headerButtonAnimations.js`, `particlePath.js`, `themeBlend.js` | Styling |
 
-The style sheets are assembled by `@import` in
-[`style.css`](../../../src/web/public/style.css), plus `css/drawer.css` loaded
-separately.
+The thirteen style sheets are assembled by `@import` in
+[`style.css`](../../../src/web/public/style.css), the only sheet referenced by
+`index.html`.
 
 The loading order is an implicit dependency: `state.js` must come before all the
 others, `app.js` must come last.
 
 ### Unfinished split
 
-[`app.js`](../../../src/web/public/app.js) is 1,823 lines long and concentrates
+[`app.js`](../../../src/web/public/app.js) is 3,819 lines long and concentrates
 responsibilities that the `js/` folder has already begun to extract. It is the
 frontend counterpart of the split carried out on the server side, which remains
 to be finished.

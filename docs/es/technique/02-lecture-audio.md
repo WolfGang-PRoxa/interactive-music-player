@@ -215,7 +215,7 @@ solo se renombra a `.mp3` una vez completo y validado.
 
 `getActivePreloadTracks()` construye la lista que hay que precargar:
 
-| Fuente | Cantidad (ajustable, máx. 5) |
+| Fuente | Cantidad (ajustable de 0 a 5, o «todo») |
 |---|---|
 | Pista actual | siempre |
 | Siguientes pistas de la cola | `preloading.queueCount` (por defecto 3) |
@@ -275,6 +275,45 @@ buscar por el lado de la caché. En una pista de YouTube, un 403 señala casi
 siempre un yt-dlp periclitado, que `npm run update-ytdlp` pone al día: las URL
 que YouTube entrega están ligadas al cliente que las ha pedido, y sus reglas
 cambian más deprisa que el binario entregado con el paquete.
+
+### Descarga por tramos
+
+Una precarga tardaba doce minutos para un archivo de veinticinco. El registro
+mostraba a FFmpeg escribiendo unos 32 KB/s, apenas el doble del tiempo real, allí
+donde una transcodificación MP3 corre a cien veces. No era ni el disco, ni el
+procesador, ni el códec:
+
+```
+GET simple, sin cabecera Range      →     32 754 B/s
+la misma URL en tramos de 4 MB      → 38 000 000 B/s
+```
+
+YouTube **limita una descarga progresiva continua al ritmo de reproducción**. No
+es una avería: es lo que hace falta para que un navegador que reproduce un vídeo
+no tire cien veces más rápido de lo que consume. Pero aquí no escuchamos,
+archivamos — y FFmpeg, que abre una única petición y la mantiene abierta de
+principio a fin, cae justo en ese caso.
+
+[`rangeStream.js`](../../../src/audio/rangeStream.js) vuelve a pedir la misma
+dirección trozo a trozo, con una cabecera `Range`, y recose las respuestas en un
+flujo único. Ninguna petición permanece abierta el tiempo suficiente para ser
+limitada, y FFmpeg recibe el conjunto por su entrada estándar sin saber de dónde
+viene. El tramo es de cuatro megabytes: lo bastante corto para pasar bajo la
+limitación, lo bastante largo para que el coste de establecer la conexión se
+diluya en él.
+
+Un flujo antes que un archivo temporal, porque permite empezar a codificar antes
+del final de la descarga y porque la cadena ya sabe recibir «una URL o un flujo»
+— no hay nada que reorganizar, ni que limpiar después. Un servidor que no sabe
+trocear responde `200` en lugar de `206` y lo envía todo: el módulo vierte esa
+respuesta y se detiene, de modo que ningún llamante ha de saber si la fuente
+gestiona los rangos.
+
+Lo que se pierde: sobre una URL, FFmpeg puede saltar al medio del archivo sin
+descargar su principio, de lo que se aprovechaba la reanudación de más abajo.
+Sobre una entrada estándar debe leer y descartar — pero leer y descartar
+veinticinco megabytes a 38 MB/s lleva menos de un segundo, frente a los doce
+minutos que costaba la limitación.
 
 ### Reanudación tras un reinicio
 

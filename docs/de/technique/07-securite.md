@@ -11,22 +11,28 @@ vorhandenen Schutzmaßnahmen und das zugrunde gelegte Bedrohungsmodell.
 ## Bedrohungsmodell
 
 Der Bot ist dafür ausgelegt, auf dem Rechner seines Besitzers zu laufen. Das
-Dashboard kennt **keine** Kontenverwaltung: ein einziges Token gewährt Zugang zu
-allem.
+Zugangstoken öffnet dort die Seite; **es benennt niemanden**. Die Rechte hängen
+an einem Discord-Konto, und ein Konto ohne Rechte sieht ein reglos daliegendes
+Dashboard.
 
 Was abgedeckt ist:
 
-- Zugriff von einem anderen Rechner des lokalen Netzes;
+- Zugriff von einem anderen Rechner des lokalen Netzes oder aus dem Internet,
+  wenn der Tunnel steht ([11 — Fernzugriff](11-acces-distant.md));
 - Lesen beliebiger Dateien von der Festplatte über die Medienrouten;
 - Erschöpfung von Speicher oder Festplatte durch eine einzelne Anfrage;
-- Anhalten des Prozesses durch einen nicht authentifizierten Dritten.
+- Anhalten des Prozesses durch einen nicht authentifizierten Dritten;
+- Trennung der Rechte zwischen dem Sitzungsmeister und seinen Gästen — ein Gast
+  kann den Bot weder abschalten noch seine Version wechseln noch Rechte
+  verteilen.
 
 Was es nicht ist:
 
-- Trennung der Rechte zwischen mehreren Benutzern des Dashboards;
-- unmittelbare Erreichbarkeit aus dem Internet — den Bot bei Bedarf hinter einen
-  Reverse Proxy mit TLS stellen;
-- Schutz vor einem böswilligen berechtigten Benutzer.
+- Schutz vor dem Sitzungsmeister selbst: er kann bauartbedingt alles;
+- Schutz vor einem Gast, dem man ein Recht eingeräumt hat, das er missbraucht —
+  der Entzug ist das einzige Mittel (`revokeControl`);
+- Vertraulichkeit der ausgelieferten Inhalte: ein Titel, den ein Gast hören
+  kann, ist ein Titel, den er herunterladen kann.
 
 ---
 
@@ -112,6 +118,59 @@ nötig — der Parameter überlebt den Herkunftswechsel des Rückrufs, der Speic
 du“, nie „darfst du herein“: ein Konto, das keinem Server des Bots angehört,
 wird dort wie überall abgewiesen, und ein erkannter Gast erhält genau die
 Rechte zurück, die man ihm gelassen hatte, kein einziges mehr.
+
+### Geteilte Rechte
+
+[`permissions.js`](../../../src/web/permissions.js) entscheidet, was ein Gast
+tun darf. **Die Kontrolle liegt dort und nirgends sonst**: das Dashboard graut
+verbotene Befehle aus, doch das ist nur eine Höflichkeit gegenüber dem Gast —
+nichts hindert daran, die Browserkonsole zu öffnen und die Nachricht von Hand zu
+senden. Die einzige Schranke, die zählt, ist die des Servers.
+
+Ein Recht entspricht **einer Geste** und heißt `Rubrik.Geste`. Die vier Rubriken
+sind nur noch eine Ordnung: sie geben dem Teilungsfenster seine Abschnitte und
+seine Sammelschalter, sie entscheiden nichts mehr.
+
+| Rubrik | Rechte |
+|---|---|
+| `playback` | `transport`, `skip`, `seek`, `mode`, `source`, `speed`, `mix`, `loudness` |
+| `queue` | `add`, `playNow`, `remove`, `reorder`, `history`, `download`, `clear` |
+| `playlists` | `create`, `addTrack`, `removeTrack`, `reorderTracks`, `rename`, `organise`, `transitions`, `delete` |
+| `volume` | `level`, `ducking`, `quality`, `trackGain`, `broadcast`, `channel` |
+
+Diese Feinkörnigkeit trat an die Stelle von vier Sammelrechten, die zu grob
+waren: wer die Warteschlange anvertraute, gab damit zugleich das Recht, sie zu
+leeren, und wer die Lautstärke regeln ließ, ließ auch den Sprachkanal wechseln.
+Man konnte nicht sagen „füg hinzu, was du willst, aber lösche nichts“, was doch
+das ist, was man am häufigsten sagen möchte. Der Punkt in `Rubrik.Geste` ist
+nicht schmückend: an ihm erkennt man ein heutiges Recht von einem gestrigen, was
+erlaubt, eine von einer früheren Fassung geschriebene `settings.json` ohne
+Zucken wieder zu lesen.
+
+Drei besondere Werte ergänzen den Katalog:
+
+- `ALWAYS` — die Nachrichten, die nichts befehlen (`requestState`, `clientLog`,
+  `syncProgress`). Sie abzulehnen schützte nichts und ließe das Dashboard des
+  Gastes blind.
+- `FIELD_FILTERED` — `updateSettings`, dessen Felder je einem anderen Recht
+  unterstehen. Die Nachricht geht durch, und `filterSettings()` behält nur die
+  erlaubten Einstellungen; ein Gast ohne jedes Recht sieht seine Anfrage von
+  allem Inhalt geleert, was der Aufrufer als Ablehnung behandelt.
+- `MASTER_ONLY` — fünfzehn Nachrichten, die beim Meister bleiben: den Bot
+  abschalten oder neu starten, seine Version wechseln, ihn einen Server
+  verlassen lassen, den Tunnel aufbauen und die Rechte selbst verteilen.
+
+**Eine der Tabelle unbekannte Nachricht wird `MASTER_ONLY` gleichgestellt.** Das
+ist gewollt: ein später gedankenlos hinzugefügter Befehl ist von vornherein
+geschlossen statt allen offen.
+
+Die Rechte leben in den Einstellungen des Servers, unter `sharedControl` (siehe
+[09 — Konfiguration](09-configuration.md#einstellungen-je-server)). Zwei
+benachbarte Gesten sagen nicht dasselbe, und sie zu verwechseln kostet:
+`shareControl` mit leerem Satz hakt alles ab — der Gast bleibt zugelassen,
+erkannt, nur ohne Macht, und man kann ihm die Rechte im nächsten Augenblick
+zurückgeben; `revokeControl` verabschiedet endgültig — Rechte gelöscht,
+Zulassung entzogen, Sitzungen geschlossen, Eintrag im Buch getilgt.
 
 ### Herkunft des Tokens
 
@@ -267,6 +326,12 @@ der Anfrage abzuwarten.
 erreichbar. Um von einem Telefon oder einem anderen Arbeitsplatz darauf
 zuzugreifen, `HOST=0.0.0.0` setzen — die Authentifizierung erhält dann ihren
 vollen Sinn. In diesem Fall wird beim Start eine Warnung protokolliert.
+
+Das Dashboard lässt sich zudem über einen Tailscale-Funnel-Tunnel im gesamten
+Internet veröffentlichen. Es ist die einzige Geste, die das zuständige Modul von
+sich aus verweigert, selbst wenn alles bereitsteht: sie ungefragt auszuführen
+würde den Player eines Menschen ohne dessen Wissen veröffentlichen. Siehe
+[11 — Fernzugriff](11-acces-distant.md).
 
 ---
 

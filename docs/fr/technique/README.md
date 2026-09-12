@@ -22,6 +22,9 @@ courante, voir le [guide utilisateur](../GUIDE.md).
 | [07 — Sécurité](07-securite.md) | Authentification, restriction des chemins, plafonds |
 | [08 — Journalisation](08-journalisation.md) | Logger, niveaux, diffusion vers le tableau de bord |
 | [09 — Configuration](09-configuration.md) | Variables d'environnement, `config.js`, déploiement des commandes |
+| [10 — Versions](10-versions.md) | Racines partagée et d'installation, releases GitHub, bascule de version |
+| [11 — Accès distant](11-acces-distant.md) | Tunnel Tailscale, `PUBLIC_URL`, partage du contrôle |
+| [12 — Tests](12-tests.md) | Les suites de `tests/`, ce qu'elles couvrent, comment en écrire une |
 
 ---
 
@@ -53,12 +56,16 @@ avec des instantanés sur disque (voir [06 — Persistance](06-persistance.md)).
 
 ## Principes structurants
 
-**Le processus est mono-instance et mono-utilisateur.**
-Le tableau de bord n'a pas de notion de compte : un jeton unique donne accès à
-tout. Le bot est conçu pour être hébergé sur la machine de son propriétaire.
+**Le processus est mono-instance, et le bot appartient à quelqu'un.**
+Le bot est conçu pour être hébergé sur la machine de son propriétaire. Le jeton
+d'accès ouvre la page, mais il ne nomme personne : les droits sont attachés à
+un **compte Discord**. Le premier compte revenu de Discord en présentant le
+jeton devient le maître de session ; les autres sont des invités, qui n'ont que
+ce que le maître leur accorde, geste par geste. Voir
+[07 — Sécurité](07-securite.md).
 
 **L'état de lecture appartient au projet.**
-Les 23 propriétés d'état (`virtualCurrentTrack`, `channelStates`,
+Les 26 propriétés d'état (`virtualCurrentTrack`, `channelStates`,
 `transitioningToEveryone`…) sont déclarées dans
 [`PlaybackSession`](../../../src/audio/PlaybackSession.js), et non plus greffées
 sans schéma sur l'objet `GuildQueue` de discord-player. Voir
@@ -95,8 +102,8 @@ Ces points sont des dettes identifiées, pas des bugs à signaler.
 
 | Sujet | Description | Voir |
 |---|---|---|
-| État de lecture | Les 455 sites accèdent encore à l'état via `queue.xxx`, désormais des accesseurs vers `PlaybackSession`. Leur réécriture en `session.xxx` reste à faire. | [01](01-architecture.md#playbacksession) |
+| État de lecture | Les 375 sites accèdent encore à l'état via `queue.xxx`, désormais des accesseurs vers `PlaybackSession`. Leur réécriture en `session.xxx` reste à faire. | [01](01-architecture.md#playbacksession) |
 | Boucle de diffusion 1 s | L'intervalle n'est jamais arrêté — il n'existe pas de `stop()` sur `WebServer`. La charge utile périodique, elle, a été ramenée à ~200 octets. | [05](05-tableau-de-bord.md#la-boucle-de-rafraîchissement) |
 | Double modèle de lecture | Les modes commun et personnel sont entrelacés par des ternaires `isPersonal ? … : …` dans tout le code d'état. | [04](04-diffusion.md#le-coût-du-double-modèle) |
-| Pas de garde-fou global | Ni `uncaughtException`, ni `unhandledRejection`, ni `SIGTERM` : une exception hors des zones protégées termine le processus. | [05](05-tableau-de-bord.md#robustesse) |
-| Absence de tests automatisés | Aucune suite de tests n'est versionnée dans le dépôt. | — |
+| Arrêt sur erreur inattendue | `uncaughtException` et `unhandledRejection` journalisent puis laissent mourir le processus — c'est voulu, mais rien ne le relève. `SIGTERM` reste non traité. | [05](05-tableau-de-bord.md#robustesse) |
+| Découpage frontend inachevé | `app.js` concentre encore 3 819 lignes que le dossier `js/` a commencé à extraire. | [05](05-tableau-de-bord.md#découpage-inachevé) |

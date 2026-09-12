@@ -26,7 +26,12 @@ testigo de acceso.
 |---|---|
 | [`WebServer.js`](../../../src/web/WebServer.js) | Ciclo de vida, agregación de estado, difusión |
 | [`auth.js`](../../../src/web/auth.js) | Testigo de acceso HTTP y WebSocket |
+| [`oauth.js`](../../../src/web/oauth.js), [`sessions.js`](../../../src/web/sessions.js) | Recorrido OAuth de Discord, sesiones de pestaña |
+| [`owner.js`](../../../src/web/owner.js), [`guests.js`](../../../src/web/guests.js) | Propietario de la instalación, libro de invitados |
+| [`permissions.js`](../../../src/web/permissions.js) | Lo que un invitado tiene derecho a hacer |
+| [`tailscale.js`](../../../src/web/tailscale.js) | Publicación del panel en internet |
 | [`routes/api.js`](../../../src/web/routes/api.js) | Rutas HTTP |
+| [`routes/auth.js`](../../../src/web/routes/auth.js) | Recorrido de autenticación de un invitado |
 | [`uploadService.js`](../../../src/web/uploadService.js) | Recepción e integración de las importaciones |
 | [`websocket/wsHandler.js`](../../../src/web/websocket/wsHandler.js) | Enrutador de mensajes |
 | [`websocket/handlers/`](../../../src/web/websocket/handlers/) | Lógica de negocio, un módulo por dominio |
@@ -46,10 +51,12 @@ Todas están protegidas por el testigo ([07 — Seguridad](07-securite.md)).
 | `GET /api/video-info` | Resolución de una URL de vídeo mediante yt-dlp, caché en memoria de una hora |
 | `POST /api/upload` | Importación de archivo, flujo en bruto con cabecera `X-File-Name` |
 | `GET /api/docs` | Índice de la documentación embebida, en el idioma pedido |
-| `GET /api/docs/contenu` | Fuente Markdown de un documento, designado por su identificador y su idioma |
+| `GET /api/docs/content` | Fuente Markdown de un documento, designado por su identificador y su idioma |
 | `GET /api/download-dir` | Carpeta de descarga actual, y el valor por defecto con el que se compara |
 | `POST /api/download-dir` | Elección de la carpeta, validada antes de retenerse; cuerpo vacío para volver al valor por defecto |
 | `GET /api/browse-dirs` | Subcarpetas de una ruta de la máquina anfitriona, para el selector |
+| `GET /api/version` | Versión en ejecución — `dev` o la etiqueta de la release |
+| `GET /api/clients` | Número de paneles conectados, consultado por la ventana de lanzamiento |
 
 `/api/docs` inventaría `docs/` en cada llamada, desde la **versión en curso de
 ejecución** y no desde la raíz compartida: la documentación mostrada es, pues, la
@@ -98,6 +105,24 @@ La transcodificación remota, en cambio, es intrínsecamente secuencial
 (`Transfer-Encoding: chunked`) y no puede honrar ningún rango — razón de más para
 que la precarga alimente la caché.
 
+### Rutas de autenticación
+
+Cuatro rutas escapan al prefijo `/api` y las lleva
+[`routes/auth.js`](../../../src/web/routes/auth.js):
+
+| Ruta | Función |
+|---|---|
+| `GET /auth/discord` | Salida hacia `discord.com`, testigo constatado y guardado en el `state` |
+| `GET /auth/discord/callback` | Regreso de Discord: código canjeado, sesión abierta, vuelta al panel |
+| `GET /auth/state` | Quién está conectado en esta pestaña, y qué tiene derecho a hacer |
+| `POST /auth/logout` | Cierra la sesión de esta pestaña |
+
+Las dos primeras están **abiertas sin testigo** (`PUBLIC_PATHS` en
+[`auth.js`](../../../src/web/auth.js)): quien pulsa el enlace publicado en el
+chat del canal de voz no tiene por definición nada con lo que autenticarse, que
+es justamente lo que viene a buscar. Véase
+[07 — Seguridad](07-securite.md#autenticación).
+
 ---
 
 ## Protocolo WebSocket
@@ -112,25 +137,43 @@ que la precarga alimente la caché.
 | `logsHistory` | Las 200 últimas entradas, en la conexión |
 | `error` | `{ message }`, mostrado como notificación |
 | `status` | `{ status: 'restarting' \| 'shutting_down', … }` |
+| `memory` | Muestras de memoria, mientras el panel lateral las pida |
+| `speakers` | Quién habla en este instante, para el recuadro de actividad vocal |
+| `permissionDenied` | Un mensaje ha sido rechazado a un invitado — el derecho que faltaba |
+| `shareResult`, `controlRevoked` | Consecuencias de un gesto de compartición, para el maestro y el invitado |
+| `tunnelState` | Estado del túnel, al abrirse su ventana |
+| `versionCatalog` | Catálogo de versiones, releído de GitHub cada vez que se abre el menú |
+| `trackFormats` | Formatos y tasas realmente disponibles para una pista |
 
 ### Mensajes cliente → servidor
 
-37 tipos, declarados en la tabla de enrutamiento
-[`handlers/index.js`](../../../src/web/websocket/handlers/index.js):
+54 tipos, declarados en la tabla de enrutamiento
+[`handlers/index.js`](../../../src/web/websocket/handlers/index.js). Cada
+dominio corresponde a un módulo de `handlers/`:
 
 | Dominio | Mensajes |
 |---|---|
-| Reproducción | `play`, `pause`, `resume`, `skip`, `previous`, `stop`, `seek`, `setPlayMode`, `syncProgress` |
+| Reproducción | `play`, `pause`, `resume`, `skip`, `previous`, `stop`, `seek`, `setPlayMode`, `syncProgress`, `startPlaybackSource` |
 | Cola de espera | `removeTrack`, `playNow`, `moveOrInsertTrack`, `clearQueue`, `removeFromHistory`, `clearHistory` |
-| Listas de reproducción | `createPlaylist`, `renamePlaylist`, `deletePlaylist`, `reorderPlaylists`, `addPlaylistTrack`, `addTrackToPlaylist`, `removeTrackFromPlaylist`, `movePlaylistTrack`, `setActivePlaybackSource` |
+| Listas de reproducción | `createPlaylist`, `renamePlaylist`, `deletePlaylist`, `reorderPlaylists`, `addPlaylistTrack`, `addTrackToPlaylist`, `removeTrackFromPlaylist`, `movePlaylistTrack`, `setActivePlaybackSource`, `insertTransition`, `setTransitionTarget` |
 | Servidor de Discord | `selectChannel`, `setDefaultChannel`, `updateSettings`, `toggleVoiceDetection`, `leaveGuild` |
-| Pista | `setTrackQuality`, `downloadTrack` |
+| Pista | `setTrackQuality`, `requestTrackFormats`, `requestTrackLoudness`, `setTrackLoudness`, `downloadTrack` |
+| Compartición del control | `sendInviteLink`, `admitGuest`, `shareControl`, `revokeControl` |
+| Túnel | `tunnelState`, `tunnelLogin`, `tunnelMount`, `tunnelUnmount` |
+| Versiones | `listVersions`, `installVersion`, `uninstallVersion` |
 | Sistema | `requestState`, `clientLog`, `memoryStream`, `startupFadeinConsumed`, `restartBot`, `shutdownBot` |
+
+Los cuatro últimos dominios están **reservados al maestro de sesión**: no
+aparecen en la ventana de compartición y un invitado que los enviara a mano
+sería rechazado por [`permissions.js`](../../../src/web/permissions.js) (véase
+[07 — Seguridad](07-securite.md#derechos-compartidos)). Compartir, publicar el
+panel en internet, cambiar la versión en ejecución o apagar el bot no son
+órdenes de reproducción.
 
 `leaveGuild` hace que el bot abandone un servidor de Discord — la papelera de los
 ajustes, tras confirmación del nombre. La cola de reproducción se destruye antes
 de la salida, y luego los paneles de control que se hayan quedado en ese servidor
-se recolocan en otro (`WebServer.reattribuerClients`), sin lo cual ya no
+se recolocan en otro (`WebServer.reassignClients`), sin lo cual ya no
 recibirían ningún estado. A distinguir del interruptor vecino, que solo oculta el
 servidor en las listas de ese navegador — un ajuste local, sin efecto sobre el
 bot.
@@ -151,6 +194,7 @@ intercambia ningún mensaje WebSocket.
   mixTransition: null | { sortante: { url, positionMs, dureeMs, ratio },
                           entrante: { url, positionMs, dureeMs, ratio, track } },
   isPlaying, isPaused, isTransitioning, repeatMode, volume,
+  listenerWait: null | { playing },   // reproducción congelada, canal sin humanos
   settings: { duckingEnabled, duckingLevel, duckingDelay, duckingFade,
               broadcastMode, playbackSpeed, mixEnabled, mixDuration, mixType, … },
   queue: [...], history: [...], playlists: [...],
@@ -247,7 +291,7 @@ La carga útil periódica ya no depende del número de pistas.
 
 1. **Solo el progreso en la vuelta de segundo** — `broadcastProgress` únicamente
    envía `{ progress, isPlaying, isPaused, botStats }`.
-2. **Índice en memoria de la caché de precarga** — `PreloadManager.cachedKeys`
+2. **Índice en memoria de la caché de precarga** — `PreloadManager.cacheIndex`
    sustituye a la relectura del disco; el estado de una pista pasa de 32,4 µs a
    1,3 µs. Una URL `http(s)` cortocircuita ahora la prueba de archivo local, que
    de todos modos no podía encontrar nada.
@@ -271,9 +315,18 @@ de error y luego se le desconecta; el bot prosigue.
 Los mensajes entrantes están protegidos del mismo modo: `ws.on('message')`
 envuelve la llamada al enrutador.
 
-> No existe, en cambio, **ninguna salvaguarda global**: ni `uncaughtException`,
-> ni `unhandledRejection`, ni gestión de `SIGTERM` (solo se trata `SIGINT`). Una
-> excepción en otro lugar del código sigue terminando el proceso.
+Más arriba, `uncaughtException` y `unhandledRejection` están conectados a
+`dieLoudly()` en [`index.js`](../../../src/index.js). Estos dos gestores **no
+recuperan nada**: escriben `[FATAL]` en el registro y luego dejan morir al
+proceso. Es deliberado — continuar tras un error cuya forma nadie ha previsto
+dejaría funcionando un bot en un estado desconocido, lo que es peor que la
+parada. Lo que aportan es el **rastro**: como el bot funciona sin consola, lo
+que Node escribe por sí mismo en `stderr` antes de morir no se ve en ninguna
+parte, y un testigo rechazado al iniciar sesión salía así sin una palabra en
+`data/logs/`.
+
+> `SIGTERM` sigue sin tratarse — solo lo está `SIGINT`, con el fundido de salida
+> de [06 — Persistencia](06-persistance.md#fundido-de-salida).
 
 Un *heartbeat* de 30 segundos (`ping`/`pong`) cierra las conexiones muertas.
 
@@ -281,9 +334,9 @@ Un *heartbeat* de 30 segundos (`ping`/`pong`) cierra las conexiones muertas.
 
 ## Frontend
 
-Alrededor de 9 800 líneas de JavaScript, servidas sin transformación. Sin módulos
-ES, sin bundler: 18 etiquetas `<script>` cargadas secuencialmente en
-[`index.html`](../../../src/web/public/index.html) — 16 módulos de `js/`, las
+Alrededor de 28 000 líneas de JavaScript, servidas sin transformación. Sin módulos
+ES, sin bundler: 43 etiquetas `<script>` cargadas secuencialmente en
+[`index.html`](../../../src/web/public/index.html) — 41 módulos de `js/`, las
 traducciones y `app.js` — que se comunican mediante el espacio de nombres global
 `window.MusicPlayer`.
 
@@ -292,26 +345,30 @@ traducciones y `app.js` — que se comunican mediante el espacio de nombres glob
 | `state.js` | Estado compartido, preferencias, internacionalización |
 | `websocket.js` | Conexión, reconexión automática, envío |
 | `app.js` | Director de orquesta: reproductor, ajustes, reproducción personal |
-| `player.js` | Barra de progreso, formateo de las duraciones |
-| `queue.js` | Cola de espera e historial, arrastrar y soltar, importación |
-| `playlists.js` | Pestañas de listas de reproducción |
-| `video.js` | Reproducción de vídeo y visualizador de audio |
-| `logs.js` | Terminal de registros |
-| `drawer.js` | Panel lateral de estadísticas |
-| `settingsModal.js`, `speedPad.js`, `customSelect.js` | Controles de interfaz |
+| `player.js`, `mediaSession.js`, `loudnessGain.js` | Barra de progreso, duraciones, mandos del sistema, ganancia de nivel |
+| `queue.js`, `searchHistory.js`, `downloadTarget.js` | Cola, historial, campo de añadido y su destino |
+| `playlists.js`, `playlistTabsScroll.js`, `transitions.js` | Pestañas de listas y desvíos |
+| `video.js`, `qualityMenu.js` | Reproducción de vídeo, visualizador, menús de calidad y formato |
+| `logs.js`, `clientErrors.js` | Terminal de registros, reporte de los errores del navegador |
+| `drawer.js`, `drawerWidgets.js`, `memoryBreakdown.js` | Panel lateral de estadísticas |
+| `docs.js` | Lector de esta documentación, paginación en columnas |
+| `loginGate.js`, `account.js`, `sharedControl.js`, `shareTunnel.js` | Conexión Discord, cuenta, compartición del control, túnel |
+| `versions.js`, `githubMenu.js` | Menú de versiones y gestos de GitHub |
+| `settingsModal.js`, `speedPad.js`, `customSelect.js`, `outputLevel.js` | Controles de interfaz |
+| `deviceMode.js`, `touchDrawers.js`, `touchDragDrop.js`, `dragPreview.js`, `scrollLock.js`, `scrollFade.js` | Adaptación al táctil y a la pantalla pequeña |
 | `layoutPersistence.js` | Guardado de la disposición |
-| `tooltipSystem.js`, `faviconAnimator.js`, `headerButtonAnimations.js`, `particlePath.js` | Ornamentación |
+| `tooltipSystem.js`, `faviconAnimator.js`, `headerButtonAnimations.js`, `particlePath.js`, `themeBlend.js` | Ornamentación |
 
-Las hojas de estilo se ensamblan mediante `@import` en
-[`style.css`](../../../src/web/public/style.css), más `css/drawer.css` cargada
-aparte.
+Las trece hojas de estilo se ensamblan mediante `@import` en
+[`style.css`](../../../src/web/public/style.css), única hoja referenciada por
+`index.html`.
 
 El orden de carga es una dependencia implícita: `state.js` debe preceder a todos
 los demás, `app.js` debe venir en último lugar.
 
 ### Troceado inacabado
 
-[`app.js`](../../../src/web/public/app.js) tiene 1 823 líneas y concentra
+[`app.js`](../../../src/web/public/app.js) tiene 3 819 líneas y concentra
 responsabilidades que la carpeta `js/` ya ha empezado a extraer. Es el equivalente
 en el frontend del troceado efectuado del lado del servidor, que queda por
 terminar.

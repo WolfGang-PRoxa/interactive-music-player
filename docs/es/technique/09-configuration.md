@@ -28,6 +28,8 @@ Copiar `.env.example` a `.env` e indicar como mínimo `DISCORD_TOKEN`.
 |---|---|---|
 | `DISCORD_TOKEN` | **Sí** | Testigo del bot. Su ausencia interrumpe el arranque. |
 | `DISCORD_CLIENT_ID` | Para `npm run deploy` | Identificador de la aplicación |
+| `DISCORD_CLIENT_SECRET` | Para la conexión Discord | Secreto OAuth2. Dejado vacío, nadie puede identificarse: el panel lo dice y recae en el solo testigo de acceso. |
+| `GUILD_ID` | Para un despliegue local | Registra las órdenes en ese único servidor, sin plazo de propagación |
 
 ### Panel de control
 
@@ -35,7 +37,21 @@ Copiar `.env.example` a `.env` e indicar como mínimo `DISCORD_TOKEN`.
 |---|---|---|
 | `PORT` | `3000` | Puerto de escucha |
 | `HOST` | `127.0.0.1` | Interfaz de escucha. `0.0.0.0` para exponer a la red local. |
+| `PUBLIC_URL` | — | Dirección por la que los invitados alcanzan este panel, sin barra final. No se adivina, y la URL de retorno `<PUBLIC_URL>/auth/discord/callback` debe declararse idéntica en el portal de Discord. |
+| `AUTO_OPEN_DASHBOARD` | `true` | Apertura del navegador en el arranque. `false` cuando el bot corre en una máquina pilotada a distancia — ese panel reproduciría la música por duplicado. |
 | `DASHBOARD_TOKEN` | generado | Testigo de acceso. Si está vacío, se genera y se guarda en `data/dashboard-token`. |
+
+### Versiones
+
+| Variable | Predeterminado | Función |
+|---|---|---|
+| `GITHUB_TOKEN`, `GH_TOKEN` | — | Testigo de la API de GitHub. Opcional en un repositorio público; eleva la cuota de 60 a 5 000 peticiones por hora. En su defecto se consulta la CLI `gh` si está instalada y conectada. |
+| `IMP_REPO` | repositorio de `package.json` | Repositorio cuyas releases se ofrecen, en `owner/repo` o en URL |
+| `IMP_VERSIONS_DIR` | `versions/` | Traslada las releases instaladas a otro sitio — disco secundario, carpeta fuera del repositorio |
+| `IMP_RESTART` | — | Puesto por la instancia que se relanza. Marca una reanudación, lo que suprime el fundido de apertura y hace ignorar el canal favorito. |
+
+Las tres últimas no son ajustes de usuario: el bot las pone él mismo al relanzar
+otra versión. Véase [10 — Versiones](10-versions.md).
 
 ### Medios
 
@@ -96,7 +112,7 @@ permanece conectado de continuo, con el canal vacío o no. Véase
 el suyo desde el panel de control (*Parámetros → Parámetros del bot → Plazo antes
 de abandonar un canal vacío*), guardado por servidor bajo
 `presenceDepartureDelay` — **en segundos**, la unidad del deslizador, que
-`PresenceManager._delaiDepart()` reconvierte en milisegundos. El deslizador va de
+`PresenceManager._departureDelayMs()` reconvierte en milisegundos. El deslizador va de
 0 a 300 s, y el servidor vuelve a acotar el valor recibido; cero significa una
 salida sin plazo, lo que prohíbe el `||` habitual en este ajuste. Cambiar el
 plazo rearma una cuenta atrás ya lanzada, para no esperar al siguiente canal
@@ -129,39 +145,69 @@ valores predeterminados en cada lectura.
 | `mixEnabled` | `false` | Encadenamiento tipo DJ |
 | `mixDuration` | `5` | Duración del encadenamiento, en segundos |
 | `mixType` | `'volume'` | `'volume'` o `'effects'` |
+| `lufsSyncEnabled` | `false` | Alinear todos los temas en una misma sonoridad |
+| `lufsSyncTarget` | `-14` | Objetivo común, en LUFS |
 | `fadeinEnabled` | `false` | Fundido de entrada |
 | `fadeinDuration` | `5` | Segundos |
 | `fadeoutEnabled` | `true` | Fundido de salida al apagar |
 | `fadeoutDuration` | `5` | Segundos |
+| `addTarget` | `'queue'` | Destino del campo de añadido: `queue`, `playlist`, `play` o `download` |
+| `importFormat` | `'mp3'` | Contenedor de los archivos escritos en el disco |
+| `importAudioQuality` | `'320'` | Tasa MP3 de la precarga, en kbps |
+| `importVideoQuality` | `'720'` | Altura objetivo del flujo de vídeo, en píxeles |
+| `presenceDepartureDelay` | `30` | Plazo antes de abandonar un canal vaciado, **en segundos** |
 | `ignoredVoiceUsers` | `{}` | Exclusiones de ducking, por canal |
+| `sharedControl` | `{}` | Derechos concedidos a los invitados, por cuenta de Discord |
+| `preloading` | véase más abajo | Precarga: `enabled`, `queueCount`, `historyCount`, `playlistCount` |
 | `activePlaybackSource` | `'queue'` | `'queue'` o identificador de lista de reproducción |
 | `playlistCurrentIndex` | `0` | Posición en la lista de reproducción activa |
-| `queueBackupPersonal` | `null` | Cola apartada, escrita en modo personal |
-| `queueBackupEveryone` | `null` | Cola apartada, escrita en modo común |
+| `loopPlaylist` | `false` | Volver a leer la lista activa desde su primer título |
+| `channelQueues` | `{}` | La cola de espera, ordenada canal de voz por canal de voz |
+| `queueBackupPersonal` | `null` | Guardado de antes del ordenamiento por canal |
+| `queueBackupEveryone` | `null` | Ídem, modo común |
 
-Las dos últimas claves llevan **la misma** cola de espera — la que una lista de
-reproducción ha apartado —, guardada bajo la del modo de difusión en curso; la
-otra se borra. Todo pasa por
-[`setAsideQueue`](../../../src/utils/setAsideQueue.js): una simple lista de
-pistas, `{ pistes: [...] }`, en la que nada es «actual» puesto que nada suena de
-ella mientras la lista ocupa el reproductor. Estas claves llevaban antes dos
-formas distintas, y cambiar de modo hacía que la interfaz leyera de un guardado
-vacío — la cola parecía perdida. Las formas antiguas (`{ tracks }`,
+`channelQueues` es `{ "<channelId>": [pista | desvío, …] }`. Un canal «fiesta» y
+un canal «tranquilo» tienen cada uno la suya y la recuperan al volver, allí donde
+una cola única por servidor seguía al bot a todas partes. Es además el único
+lugar donde un desvío puede esperar su turno: necesita una lista ordenada para
+designar una posición, cosa que el reproductor no le ofrecía. Véase
+[`channelQueue`](../../../src/audio/channelQueue.js).
+
+Las dos últimas claves son **heredadas**, y permanecen a `null`: llevaban la cola
+apartada antes del ordenamiento por canal.
+[`channelQueue`](../../../src/audio/channelQueue.js) las relee una vez para
+verter lo que una versión anterior hubiera dejado allí, y luego las borra. Todo
+pasa ahora por [`setAsideQueue`](../../../src/utils/setAsideQueue.js): una simple
+lista de pistas, en la que nada es «actual» puesto que nada suena de ella
+mientras la lista ocupa el reproductor. Las formas antiguas (`{ tracks }`,
 `{ virtualCurrentTrack, virtualTracks }`) siguen aceptándose en lectura.
+
+`loopPlaylist` es distinto del modo de repetición de discord-player, que solo
+conoce la cola realmente cargada: volver a reproducir «la lista» supone
+recargarla desde su primer título, aunque la reproducción hubiera empezado por
+la mitad.
 
 `activePlaybackSource` no vuelve a `'queue'` por la sola decisión del usuario:
 una lista de reproducción que termina sin bucle devuelve el mando a la cola
 apartada, que arranca entonces por su primer título
-(`WebServer.enchainerSurLaFile()`). El cambio se intenta en los dos puntos de
+(`WebServer.advanceToQueue()`). El cambio se intenta en los dos puntos de
 agotamiento — la cola virtual del modo personal y el evento `emptyQueue` del modo
 común —, siempre después del relanzamiento en bucle: es ese orden, y no una
 prueba sobre `loopPlaylist`, lo que da prioridad al bucle. Una cola apartada
 vacía deja que la reproducción se detenga, como antes.
 
 El subobjeto `preloading` (`enabled`, `queueCount`, `historyCount`,
-`playlistCount`) no está declarado en `_defaults()`: lo escribe el panel de
-control y se lee con valores de repliegue en
-[`PreloadManager.js`](../../../src/audio/PreloadManager.js).
+`playlistCount`) se ajusta desde el panel de control pero se **consume en el
+lado del servidor** por [`PreloadManager.js`](../../../src/audio/PreloadManager.js):
+el valor debe por tanto vivir aquí, y no solo en el `localStorage` del navegador.
+
+Los tres contadores van de 0 a 5, más una última muesca que ya no cuenta y toma
+toda la sección. Esta se registra como **`-1`**, nunca como la posición del
+deslizador: esta solo vale en relación con el máximo del día, y el día en que los
+deslizadores ganaran una muesca, un `6` registrado dejaría de querer decir «todo»
+sin que nada lo señalara. Un recuento negativo, en cambio, no lo es en ningún
+mundo. Se relee como `Infinity`, que los `slice(0, n)` y `Math.min(n, …)` de
+después ya tratan correctamente.
 
 ---
 

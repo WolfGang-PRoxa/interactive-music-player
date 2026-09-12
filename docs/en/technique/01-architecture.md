@@ -19,7 +19,13 @@ src/
 │   ├── PlayerEvents.js       discord-player event listeners
 │   ├── PresenceManager.js    Bot arrival and departure by channel occupancy
 │   ├── PreloadManager.js     Disk cache of remote tracks
+│   ├── rangeStream.js        Chunked downloading, to get around throttling
 │   ├── LocalFilePlayer.js    Audio folder scanning helpers
+│   ├── LoudnessAnalyzer.js   LUFS measurement of a file, through FFmpeg
+│   ├── loudness.js           Measurement + target → gain, knowing nothing of audio
+│   ├── channelQueue.js       The queue, filed voice channel by voice channel
+│   ├── transitions.js        Switches placed between two playlist entries
+│   ├── videoSource.js        Resolution of a track's picture stream
 │   ├── playbackSettings.js   Speed and mix effects, whatever the audio path
 │   └── mix/                  Mixing bus: shared broadcast, two stackable tracks
 │       ├── format.js         PCM exchange format and framing
@@ -44,16 +50,35 @@ src/
 │   ├── atomicJson.js         Crash-resistant JSON reading/writing
 │   ├── mediaPaths.js         Guard rail for paths served to the client
 │   ├── downloadDir.js        Folder the downloaded files are written to
+│   ├── downloadFormats.js    Offered containers → FFmpeg arguments
+│   ├── mp3.js                Partial MP3 analysis, to resume a preload
+│   ├── artwork.js            Fallback artwork, served by the bot rather than a third party
+│   ├── setAsideQueue.js      Queue set aside by a playlist
+│   ├── historyOrder.js       Reinserting a history into a LIFO queue
 │   ├── paths.js              Path comparison and cleanup
 │   ├── duration.js           Duration formatting and parsing
 │   ├── embeds.js             Discord embeds
-│   └── permissions.js        Permission checks
+│   └── permissions.js        Discord permission checks
+│
+├── versioning/               Bot versions: catalogue, installation, switching
+│   ├── index.js              Façade consumed by the dashboard
+│   ├── locations.js          Shared root vs install root, guard rails
+│   ├── github.js             Repository releases and archive downloads
+│   ├── installer.js          Extraction, dependencies, disk inventory
+│   └── targz.js              `.tar.gz` extraction with no external dependency
 │
 └── web/
     ├── WebServer.js          HTTP + WebSocket server, state aggregation
     ├── auth.js               Access token (HTTP and WebSocket)
+    ├── oauth.js              Discord OAuth2 journey
+    ├── sessions.js           Short-lived per-tab sessions
+    ├── owner.js              Account that owns the installation
+    ├── guests.js             Book of guests who have already come
+    ├── permissions.js        What a guest is allowed to do
+    ├── tailscale.js          Publishing the dashboard on the internet
     ├── uploadService.js      Reception and integration of imported files
     ├── routes/api.js         HTTP routes (stream, download, upload, video-info)
+    ├── routes/auth.js        A guest's authentication journey
     ├── websocket/
     │   ├── wsHandler.js      WebSocket message router
     │   ├── handlerUtils.js   Helpers shared by the handlers
@@ -68,11 +93,18 @@ data/
 ├── settings.json           Per-server settings + global playlists
 ├── playback_state.json     Last known playback state
 ├── dashboard-token         Access token generated on first startup
+├── owner.json              Account that owns the installation
+├── guests.json             Book of guests who have already come
+├── sessions.json           Open Discord sessions
 ├── uploads/                Imported files, named by fingerprint
 ├── cache/                  Preloaded remote tracks in MP3
 ├── downloads/              Downloaded files, if no other folder is chosen
 └── logs/                   One log per startup + latest.log
 ```
+
+A second unversioned folder, `versions/`, holds the installed releases — one per
+tag. It stays empty as long as the development repository is what runs. See
+[10 — Versions](10-versions.md).
 
 The `tools/` folder carries the Windows tooling, unrelated to the bot's process
 — no module in `src/` references it:
@@ -198,14 +230,20 @@ declared (see [02 — Audio playback](02-lecture-audio.md#playback-speed)).
 event listeners and of the preload manager.
 
 **7. Connection to Discord.** On the `ClientReady` event:
+- announcement of the running version and sweep of interrupted installations;
+- choice of the opening channel — the favourite on a cold start, the last
+  visited one on a resume (see [06](06-persistance.md#database));
 - startup of the web server;
-- restoration of the saved playback state;
-- scheduling of the periodic save (every 5 s).
+- restoration of the saved playback state, preloading suspended throughout;
+- scheduling of the periodic save (every 5 s) and of the presence-rule safety
+  net (every 30 s).
 
 ```
 index.js
   ├─ patch spawn (win32)
+  ├─ dieLoudly : uncaughtException, unhandledRejection
   ├─ AudioFilters : speed_0_20 … speed_3_05, muffled
+  ├─ installBridge()            (discord-player node → mixing bus)
   ├─ new Client(...)
   ├─ loadCommands()
   ├─ initPlayer()
@@ -214,10 +252,21 @@ index.js
   │    └─ preloadManager.init()
   └─ client.login()
        └─ ClientReady
+            ├─ versioning.currentVersion() + cleanTempDirs()
+            ├─ database.applyStartupChannel({ resuming })
             ├─ webServer.start(client, PORT, HOST)
             ├─ playbackStateManager.restoreAll()
-            └─ setInterval(saveState, 5000)
+            │    └─ finally : preloadManager.setSuspended(false)
+            ├─ presenceManager.evaluate(guildId)   (for each server)
+            ├─ setInterval(saveState, 5000)
+            └─ setInterval(presence.evaluate, 30000)
 ```
+
+Preloading stays suspended for the whole restoration: it purges from the cache
+any track absent from the queues, and those are only complete once
+`restoreAll()` has finished. The presence loop that follows catches up with
+people who walked into a channel meanwhile — no voice event will report them
+after the fact.
 
 ---
 
@@ -296,6 +345,7 @@ attach its own properties directly to it, without encapsulation:
 | `isPendingTransition`, `transitionTimeout` | Anti-double-jump lock |
 | `restorePaused`, `restoreProgress`, `restoreShouldBePaused` | Restoration at startup |
 | `isMixFadingOut`, `mixAppliedTrackId`, `trackStartedAt` | DJ-style crossfading |
+| `absentEmptyChannel`, `frozenPositionMs`, `frozenIsPlaying` | Playback frozen while the bot is out of an empty channel |
 | `pauseOnNextTrack` | Deferred pause |
 
 **Why that was a problem.** None of these properties was declared anywhere:
@@ -306,7 +356,7 @@ would have broken the bot silently.
 
 ### The state now belongs to the project
 
-[`PlaybackSession`](../../../src/audio/PlaybackSession.js) declares the 23
+[`PlaybackSession`](../../../src/audio/PlaybackSession.js) declares the 26
 properties in a single `SCHEMA`, with their type and their initial value. The
 state lives in that object; the queue no longer owns it.
 
@@ -341,9 +391,17 @@ personal mode:
 Used by `PreloadManager.getActivePreloadTracks` and
 `WebServer.getPlaybackPosition`.
 
+`isFrozen()` joins that branching. When the bot has withdrawn from a channel
+emptied of its humans, the queue stays alive in memory but the discord-player
+node has gone with the voice connection: the position no longer comes from it
+but from `frozenPositionMs`. Freezing demands both — the flag raised **and** the
+absence of a connection — because the flag can stay raised once the bot is back,
+and answering "frozen" would then pin the dashboard to a position from before
+its return while the sound moves on.
+
 ### Remaining migration
 
-The 455 existing access sites keep working through the accessors: the
+The 375 existing access sites keep working through the accessors: the
 `queue.virtualTracks` syntax is unchanged, only the storage has moved. Rewriting
 them as `session.virtualTracks`, then removing the accessors, can be done file
 by file — the bulk of the benefit (declared schema, guaranteed initial values,
