@@ -324,8 +324,8 @@ async function announce(port) {
             break;
         case STEP.NEEDS_LOGIN:
             log.warn('[Tailscale] This machine is not signed in to a tailnet '
-                + `(state: ${state.backendState}). Run "tailscale up", or put an auth key `
-                + 'in TAILSCALE_AUTHKEY to have the bot do it.');
+                + `(state: ${state.backendState}). Run "tailscale up", or paste an auth key `
+                + 'into the tunnel window of the dashboard to have the bot do it.');
             break;
         case STEP.NEEDS_CAPABILITY:
             log.warn('[Tailscale] Signed in, but this tailnet does not grant the right to '

@@ -1,5 +1,5 @@
 /**
- * installateur — Télécharge, installe et inventorie les versions du bot.
+ * installer — Télécharge, installe et inventorie les versions du bot.
  *
  * Règle directrice : **rien de déjà en place n'est jamais écrasé.** Chaque
  * release vit dans son propre dossier `versions/<tag>/`, et une installation ne
@@ -8,7 +8,7 @@
  *   - une version déjà installée n'est pas retéléchargée : on se contente de la
  *     relancer, ce qui met la version en cours d'exécution à l'abri de sa propre
  *     réinstallation ;
- *   - le dépôt de développement n'est pas une cible possible — `emplacements`
+ *   - le dépôt de développement n'est pas une cible possible — `locations`
  *     le refuse avant la moindre écriture ;
  *   - l'extraction se fait dans un dossier temporaire, renommé vers sa
  *     destination définitive une fois complet. Un téléchargement interrompu ne
@@ -284,7 +284,7 @@ async function install(tag, onStep = () => {}) {
  * partagée, qui n'ont jamais appartenu à la version, ni les autres releases.
  *
  * Deux refus, prononcés avant la moindre écriture :
- *   - le garde-fou d'`emplacements` écarte le dépôt de développement et la
+ *   - le garde-fou de `locations` écarte le dépôt de développement et la
  *     version en cours d'exécution ;
  *   - une version qui n'est pas sur le disque n'a rien à désinstaller.
  *

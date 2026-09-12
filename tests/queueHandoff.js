@@ -7,7 +7,7 @@
  * désormais, et aucune ne se voit tant qu'on ne joue pas une playlist jusqu'au
  * bout :
  *
- *   - le serveur (`WebServer.enchainerSurLaFile`) bascule la source et remet la
+ *   - le serveur (`WebServer.advanceToQueue`) bascule la source et remet la
  *     file en lecture, dans les deux modes de diffusion ;
  *   - le navigateur (`MusicPlayer.pisteSuivante`) prépare le fondu enchaîné sur
  *     le premier titre de cette file, faute de quoi la diffusion personnelle
@@ -54,7 +54,7 @@ stub('../src/database/Database', {
     ],
 });
 
-/** File de lecture minimale : ce que `enchainerSurLaFile` en attend. */
+/** File de lecture minimale : ce que `advanceToQueue` en attend. */
 function fakeQueue() {
     const queue = {
         guild: { id: 'g1' },
@@ -139,7 +139,7 @@ check('a player without a channel leaves the queue where it is',
 check('  … and the source stays the playlist',
     settings.activePlaybackSource === 'playlist_1');
 
-// La priorité de la boucle ne tient pas à un test dans `enchainerSurLaFile`,
+// La priorité de la boucle ne tient pas à un test dans `advanceToQueue`,
 // mais à l'ordre des deux appels sur les points d'épuisement : la relance est
 // consultée d'abord, et rend la main dès qu'elle a repris la playlist.
 prepare({ loopPlaylist: true, queueBackupEveryone: { tracks: [A, B] } });
@@ -148,7 +148,7 @@ check('a looping playlist restarts itself, the queue waits its turn',
 check('  … and the source stays the playlist',
     settings.activePlaybackSource === 'playlist_1');
 
-console.log('\nenchainerSurLaFile — diffusion commune\n');
+console.log('\nadvanceToQueue — diffusion commune\n');
 
 let queue = prepare({ queueBackupEveryone: { tracks: [A, B] } });
 const switched = webServer.advanceToQueue('g1');
@@ -168,7 +168,7 @@ setTimeout(() => {
         queue.added.length === 1 && queue.added[0].url === B.url,
         queue.added.map(t => t.url).join(', ') || 'none');
 
-    console.log('\nenchainerSurLaFile — diffusion personnelle\n');
+    console.log('\nadvanceToQueue — diffusion personnelle\n');
 
     queue = prepare({ broadcastMode: 'personal', queueBackupPersonal: { tracks: [A, B] } });
     const togglePersonal = webServer.advanceToQueue('g1', 1500);

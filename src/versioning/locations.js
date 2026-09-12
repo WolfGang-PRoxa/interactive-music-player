@@ -1,5 +1,5 @@
 /**
- * emplacements — Où vivent le code et les données, et quelle version tourne.
+ * locations — Où vivent le code et les données, et quelle version tourne.
  *
  * Le bot sépare deux racines qui, en développement, se confondent :
  *
@@ -19,8 +19,8 @@
  * la moindre copie.
  *
  * Ce module est le seul à savoir tout cela, et le seul habilité à dire si un
- * dossier peut être écrasé ou supprimé : `verifierCibleInstallable()` et
- * `verifierCibleSupprimable()` sont les garde-fous qui mettent le dépôt de
+ * dossier peut être écrasé ou supprimé : `assertTargetInstallable()` et
+ * `assertTargetRemovable()` sont les garde-fous qui mettent le dépôt de
  * développement — et la version en cours d'exécution — hors d'atteinte de
  * l'installateur comme de la désinstallation.
  */

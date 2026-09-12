@@ -5,8 +5,8 @@
  * lesquelles existent, lesquelles sont déjà sur le disque) et traduit un choix
  * de l'utilisateur en point d'entrée à lancer.
  *
- * Voir `emplacements.js` pour la disposition sur le disque et les garde-fous,
- * `installateur.js` pour le téléchargement.
+ * Voir `locations.js` pour la disposition sur le disque et les garde-fous,
+ * `installer.js` pour le téléchargement.
  */
 
 const locations = require('./locations');

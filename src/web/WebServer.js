@@ -2354,7 +2354,7 @@ class WebServer {
      * rebasculée sur « file d'attente ».
      *
      * Appelée aux deux mêmes points d'épuisement que
-     * `relancerPlaylistBouclee()` — la file virtuelle du mode personnel et
+     * `restartLoopedPlaylist()` — la file virtuelle du mode personnel et
      * l'événement `emptyQueue` du mode commun — et toujours **après** elle :
      * une playlist qui reboucle n'est pas une playlist terminée. C'est cet
      * ordre, et non un second test sur `loopPlaylist`, qui porte la règle. Une

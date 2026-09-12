@@ -2,8 +2,11 @@
  * Test de fumée — vérifie qu'une modification transversale n'a rien cassé.
  *
  * Écrit pour accompagner le passage des identifiants du français à l'anglais :
- * un renommage ne lève aucune erreur tant que le code n'est pas exécuté, et ce
- * projet n'a pas de suite de tests. Deux étages, du moins cher au plus cher :
+ * un renommage ne lève aucune erreur tant que le code n'est pas exécuté, et
+ * aucune des autres suites ne charge le projet en entier. C'est resté sa raison
+ * d'être — les quarante-neuf autres éprouvent chacune un point précis, celle-ci
+ * est la seule à vérifier que le tout tient encore debout. Deux étages, du
+ * moins cher au plus cher :
  *
  *   1. Chargement — chaque module de src/ est requis. Attrape les require()
  *      cassés, les exports disparus et les erreurs de syntaxe.
