@@ -223,24 +223,27 @@ html[data-style="retro-synthwave"] .progress-buffer {
     box-shadow: none !important;
 }
 
+/*
+ * Le bouton principal ne se distingue plus que par sa taille.
+ *
+ * Il était rempli en clair, icône sombre, sous un halo blanc : un aplat au
+ * milieu de trois cercles à peine teintés, qui ne partageait ni leur fond, ni
+ * leur bordure, ni leur survol. Il ne s'accordait avec aucun des quatre styles
+ * non plus — sa couleur venait de `--text-main`, celle des libellés, et son
+ * halo était écrit en blanc en dur.
+ *
+ * Quinze pixels de diamètre de plus et une icône d'un tiers plus grande disent
+ * assez lequel est l'action principale. Tout le reste — fond, bordure, survol —
+ * lui vient maintenant de `.control-btn`, comme aux trois autres.
+ */
 .control-btn.play-main-btn {
     width: 65px;
     height: 65px;
-    background: var(--text-main);
-    color: var(--text-dark);
-    border: none;
-    box-shadow: 0 0 20px rgba(255, 255, 255, 0.15);
 }
 
 .control-btn.play-main-btn svg {
     width: 24px;
     height: 24px;
-}
-
-.control-btn.play-main-btn:hover {
-    background: #ffffff;
-    box-shadow: 0 0 25px rgba(255, 255, 255, 0.3);
-    transform: scale(1.08);
 }
 
 /* Add / Search Morceau */
