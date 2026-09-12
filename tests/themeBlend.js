@@ -351,7 +351,7 @@ check('le bouton et son réglage partagent un ancrage',
     && MARKUP.indexOf('theme-blend-anchor') < MARKUP.indexOf('id="btn-theme-toggle"'),
     'un <input type="range"> dans un <button> verrait ses gestes pris pour des clics');
 check('le panneau est replié au repos',
-    /<div class="theme-blend-pop" id="theme-blend-pop" hidden>/.test(MARKUP),
+    /<div class="header-pop theme-blend-pop" id="theme-blend-pop" hidden>/.test(MARKUP),
     '`hidden` : ni affiché, ni focalisable, ni lu');
 
 /*
@@ -366,23 +366,29 @@ check('le panneau est replié au repos',
  * ne peut être que là.
  */
 check('  … et `hidden` l\'emporte sur son propre display',
-    /\.theme-blend-pop\[hidden\] \{[^}]*display: none;/.test(MODALS),
+    /\.header-pop\[hidden\] \{[^}]*display: none;/.test(MODALS),
     'sans quoi le panneau ne se referme jamais');
 check('le curseur va de la nuit au jour',
     /id="theme-blend-range"[\s\S]{0,120}?min="0" max="100"/.test(MARKUP));
 check('le module est chargé', /<script src="js\/themeBlend\.js"><\/script>/.test(MARKUP));
 
+/*
+ * Le ressort n'est plus écrit ici : il appartient à `.header-pop`, que ce
+ * panneau partage avec le sous-menu de GitHub — deux panneaux ouverts par le
+ * même appui long doivent s'ouvrir de la même façon. Voir tests/githubMenu.js,
+ * qui vérifie que ni l'un ni l'autre ne s'en refait une copie.
+ */
 check('l\'apparition rebondit',
-    /animation: theme-blend-pop-in [\d.]+s cubic-bezier\(0\.34, 1\.56, 0\.64, 1\)/.test(MODALS),
+    /animation: header-pop-in [\d.]+s cubic-bezier\(0\.34, 1\.56, 0\.64, 1\)/.test(MODALS),
     'le dépassement du ressort tient dans la courbe');
 check('  … depuis le bouton, pas depuis son propre centre',
-    /\.theme-blend-pop \{[^}]*transform-origin: 50% 0;/.test(MODALS));
+    /\.header-pop \{[^}]*transform-origin: 50% 0;/.test(MODALS));
 /*
  * Les images clés contiennent des accolades imbriquées : « [^}]* » s'arrête à
  * la première, c'est-à-dire au bout de l'image « 0 % ». Le bloc entier est donc
  * découpé, puis on compte.
  */
-const popIn = (/@keyframes theme-blend-pop-in \{[\s\S]*?\n\}/.exec(MODALS) || [''])[0];
+const popIn = (/@keyframes header-pop-in \{[\s\S]*?\n\}/.exec(MODALS) || [''])[0];
 check('  … en gardant son centrage à chaque image',
     popIn.split('translateX(-50%)').length - 1 === 2,
     'sans quoi le panneau se recentre d\'un bond à la fin');
@@ -645,16 +651,17 @@ console.log('\nL\'appui long, et le clic qui ne l\'est pas\n');
 console.log('\nCe que l\'infobulle annonce\n');
 
 {
-    const s = mount();
     /*
-     * Le double de `t()` rend la clé qu'on lui passe ; le module traite ce cas
-     * comme une traduction manquante et retombe sur son libellé écrit en dur.
-     * C'est donc ce libellé-là qu'on retrouve, et le fait qu'il y ait deux
-     * lignes : le rôle du bouton, puis ce qu'un appui long y ajoute.
+     * L'indice se déclare sur le bouton, et c'est l'infobulle qui l'ajoute au
+     * libellé traduit au moment de s'afficher.
+     *
+     * Il était composé ici, dans `data-tooltip`, et n'atteignait jamais l'écran :
+     * l'infobulle relit `data-i18n-tooltip` à chaque affichage et remplace le
+     * libellé entier, `applyLanguage` le récrit à chaque changement de langue.
+     * La phrase s'écrivait bien, et disparaissait deux fois plutôt qu'une.
      */
-    const tip = s.button.dataset.tooltip || '';
     check('l\'appui long est annoncé',
-        tip.split('\n').length === 2 && /[Aa]ppui long/.test(tip),
+        /id="btn-theme-toggle"[^>]*data-tooltip-hint="tooltip_theme_blend_hint"/.test(MARKUP),
         'une fonctionnalité qu\'on ne devine pas n\'existe que pour qui l\'a codée');
 
     for (const lang of ['fr', 'en', 'es', 'de']) {

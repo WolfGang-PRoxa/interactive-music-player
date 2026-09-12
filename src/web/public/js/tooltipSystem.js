@@ -116,18 +116,43 @@ const TooltipSystem = (() => {
         }
     }
 
+    /** La traduction d'une clé, ou rien si le dictionnaire ne la connaît pas. */
+    function translate(key) {
+        if (typeof window.MusicPlayer?.t === 'function') {
+            const translated = window.MusicPlayer.t(key);
+            if (translated && translated !== key) return translated;
+        } else if (typeof t === 'function') {
+            const translated = t(key);
+            if (translated && translated !== key) return translated;
+        }
+        return '';
+    }
+
     function show(target) {
         let text = target.getAttribute('data-tooltip');
         const i18nKey = target.getAttribute('data-i18n-tooltip');
         if (i18nKey) {
-            if (typeof window.MusicPlayer?.t === 'function') {
-                const translated = window.MusicPlayer.t(i18nKey);
-                if (translated && translated !== i18nKey) text = translated;
-            } else if (typeof t === 'function') {
-                const translated = t(i18nKey);
-                if (translated && translated !== i18nKey) text = translated;
-            }
+            const translated = translate(i18nKey);
+            if (translated) text = translated;
         }
+
+        /*
+         * La seconde ligne, pour les boutons qui cachent un geste : l'appui
+         * long du jour/nuit, celui de GitHub. Une fonctionnalité qu'on ne
+         * devine pas n'existe que pour qui l'a codée.
+         *
+         * Ajoutée ici, à l'affichage, et non collée d'avance dans
+         * `data-tooltip` : la traduction ci-dessus remplace le libellé entier à
+         * chaque affichage, et `applyLanguage` le récrit à chaque changement de
+         * langue. Une phrase composée en amont ne survivait ni à l'une ni à
+         * l'autre — elle s'écrivait bien, et ne s'affichait jamais.
+         */
+        const hintKey = target.getAttribute('data-tooltip-hint');
+        if (hintKey) {
+            const hint = translate(hintKey);
+            if (hint) text = text ? `${text}\n${hint}` : hint;
+        }
+
         if (!text) return;
 
         // La durée de maintien annoncée est recalculée à chaque affichage : le

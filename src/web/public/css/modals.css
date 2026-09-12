@@ -3749,65 +3749,20 @@ body.login-gate-open {
 }
 
 /*
-   `hidden` doit l'emporter sur le `display` de la règle ci-dessous.
+   Le panneau n'a plus ici que sa forme.
 
-   L'attribut ne vaut qu'un `display: none` de la feuille de style du
-   navigateur, que n'importe quel `display` d'auteur écrase. Le panneau restait
-   donc affiché en permanence — dès le chargement de la page, et quoi que fasse
-   le script : `pop.hidden = true` s'écrivait bien, sans rien cacher.
-
-   Écrit avant la règle générale et non après, pour que la lecture aille du cas
-   qui gagne au cas ordinaire.
+   La surface, le ressort de l'ouverture et le repli sont ceux de
+   `.header-pop`, qu'il partage avec le sous-menu de GitHub — voir le bas de
+   cette feuille. Deux panneaux ouverts par le même geste doivent s'ouvrir de
+   la même façon, et deux copies d'une animation finissent toujours par
+   diverger.
 */
-.theme-blend-pop[hidden] {
-    display: none;
-}
-
 .theme-blend-pop {
-    position: absolute;
-    top: calc(100% + 10px);
-    left: 50%;
-    z-index: 1200;
     display: flex;
     flex-direction: column;
     gap: 0.45rem;
     width: 190px;
     padding: 0.7rem 0.85rem;
-    border-radius: 14px;
-    background: var(--bg-dropdown);
-    border: 1px solid var(--border-card-hover);
-    box-shadow: var(--shadow-card), 0 8px 24px rgba(0, 0, 0, 0.28);
-    backdrop-filter: blur(var(--blur-val));
-    -webkit-backdrop-filter: blur(var(--blur-val));
-
-    /*
-       L'apparition rebondit.
-
-       `transform-origin` en haut : le panneau sort du bouton, il ne grandit pas
-       depuis son propre centre. Sans cela il se déploie vers le haut autant que
-       vers le bas, et le lien avec le bouton se perd.
-
-       Le déplacement horizontal est repris à chaque image de l'animation —
-       `translateX(-50%)` doit accompagner l'échelle, faute de quoi le panneau
-       se recentre d'un bond à la fin.
-    */
-    transform-origin: 50% 0;
-    animation: theme-blend-pop-in 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-
-@keyframes theme-blend-pop-in {
-    0% { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.72); }
-    100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
-}
-
-/* Le repli est net : on referme, on ne fait pas ses adieux. */
-.theme-blend-pop.is-closing {
-    animation: theme-blend-pop-out 0.16s ease-in both;
-}
-
-@keyframes theme-blend-pop-out {
-    0% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
-    100% { opacity: 0; transform: translateX(-50%) translateY(-6px) scale(0.88); }
 }
 
 .theme-blend-head {
@@ -3876,13 +3831,154 @@ body.login-gate-open {
     cursor: pointer;
 }
 
+/* ═════════════ Les panneaux que déplie un appui long ═════════════ */
+
+/*
+   Deux boutons de l'en-tête en ouvrent un : le jour/nuit son réglage fin, et
+   GitHub son sous-menu. Ce qu'ils ont en commun tient ici — la surface, la
+   place sous le bouton, et le ressort de l'apparition. Chacun n'ajoute ensuite
+   que son contenu.
+
+   `hidden` doit l'emporter sur le `display` que ces contenus posent.
+
+   L'attribut ne vaut qu'un `display: none` de la feuille de style du
+   navigateur, que n'importe quel `display` d'auteur écrase. Le panneau restait
+   donc affiché en permanence — dès le chargement de la page, et quoi que fasse
+   le script : `pop.hidden = true` s'écrivait bien, sans rien cacher. Le
+   sélecteur ci-dessous porte en plus un attribut : il l'emporte sur la simple
+   classe des deux panneaux, quel que soit l'ordre où on les écrit.
+
+   Écrit avant la règle générale et non après, pour que la lecture aille du cas
+   qui gagne au cas ordinaire.
+*/
+.header-pop[hidden] {
+    display: none;
+}
+
+.header-pop {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 50%;
+    z-index: 1200;
+    border-radius: 14px;
+    background: var(--bg-dropdown);
+    border: 1px solid var(--border-card-hover);
+    box-shadow: var(--shadow-card), 0 8px 24px rgba(0, 0, 0, 0.28);
+    backdrop-filter: blur(var(--blur-val));
+    -webkit-backdrop-filter: blur(var(--blur-val));
+
+    /*
+       L'apparition rebondit.
+
+       `transform-origin` en haut : le panneau sort du bouton, il ne grandit pas
+       depuis son propre centre. Sans cela il se déploie vers le haut autant que
+       vers le bas, et le lien avec le bouton se perd.
+
+       Le déplacement horizontal est repris à chaque image de l'animation —
+       `translateX(-50%)` doit accompagner l'échelle, faute de quoi le panneau
+       se recentre d'un bond à la fin.
+    */
+    transform-origin: 50% 0;
+    animation: header-pop-in 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes header-pop-in {
+    0% { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.72); }
+    100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+/* Le repli est net : on referme, on ne fait pas ses adieux. */
+.header-pop.is-closing {
+    animation: header-pop-out 0.16s ease-in both;
+}
+
+@keyframes header-pop-out {
+    0% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-6px) scale(0.88); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-    .theme-blend-pop {
+    .header-pop,
+    .header-pop.is-closing {
         animation-duration: 0.01s;
         animation-timing-function: linear;
     }
+}
 
-    .theme-blend-pop.is-closing {
-        animation-duration: 0.01s;
+/* ═════════════ Le sous-menu de GitHub ═════════════ */
+
+/*
+   L'ancrage du menu, exactement comme celui du réglage fin : le panneau se
+   place par rapport à lui, et le lien GitHub ne pouvait pas jouer ce rôle —
+   tout ce qu'on aurait posé dedans aurait été cliqué avec lui.
+*/
+.gh-menu-anchor {
+    position: relative;
+    display: inline-flex;
+}
+
+/*
+   Au doigt, un appui maintenu sur un lien fait apparaître la loupe et la
+   feuille « Ouvrir dans un nouvel onglet » d'iOS. Elles arriveraient pile sur
+   le geste qui déplie le menu. Le script refuse déjà le menu contextuel ;
+   celles-là ne se refusent que d'ici.
+*/
+#btn-github {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.gh-menu-pop {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 210px;
+    padding: 0.35rem;
+}
+
+.gh-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.6rem;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-main);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-align: left;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease;
+}
+
+/*
+   L'icône ne se comprime pas : sans ce plancher, un libellé long — l'allemand,
+   surtout — la réduirait à un trait pendant que le texte, lui, garde sa place.
+*/
+.gh-menu-item svg {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+}
+
+.gh-menu-item:hover,
+.gh-menu-item:focus-visible {
+    background: var(--bg-hover);
+    color: var(--c-accent);
+    outline: none;
+}
+
+.gh-menu-item:active {
+    transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gh-menu-item {
+        transition: none;
     }
 }

@@ -122,7 +122,7 @@
                      pour un clic sur le bouton.
                 -->
                 <div class="theme-blend-anchor" style="margin-right: 8px;">
-                    <button id="btn-theme-toggle" class="theme-toggle-btn" data-tooltip="Changer de mode Jour/Nuit" data-i18n-tooltip="tooltip_theme_toggle">
+                    <button id="btn-theme-toggle" class="theme-toggle-btn" data-tooltip="Changer de mode Jour/Nuit" data-i18n-tooltip="tooltip_theme_toggle" data-tooltip-hint="tooltip_theme_blend_hint">
                         <svg id="svg-sun" class="hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="5"></circle>
                             <line x1="12" y1="1" x2="12" y2="3"></line>
@@ -145,7 +145,7 @@
                          s'afficher, ni prendre le focus au clavier, ni être lu
                          tant qu'on ne l'a pas demandé.
                     -->
-                    <div class="theme-blend-pop" id="theme-blend-pop" hidden>
+                    <div class="header-pop theme-blend-pop" id="theme-blend-pop" hidden>
                         <div class="theme-blend-head">
                             <span class="theme-blend-pole" data-i18n="theme_blend_night">Nuit</span>
                             <span class="theme-blend-readout" id="theme-blend-readout">0 %</span>
@@ -249,37 +249,88 @@
                 </button>
             </div>
             <div class="theme-controls-wrapper">
-                <!-- GitHub Button -->
-                <a id="btn-github" href="https://github.com/WolfGang-PRoxa/interactive_music_player" target="_blank" rel="noopener noreferrer" class="theme-toggle-btn" data-tooltip="Voir sur GitHub" data-i18n-tooltip="tooltip_view_github" style="margin-right: 8px; text-decoration: none;">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <!--
-                             Le logo tenait en un seul tracé : la queue, puis le
-                             contour du chat rejoint par un « m » relatif. Le
-                             voici en trois morceaux, parce que trois choses
-                             bougent séparément — voir js/headerButtonAnimations.js.
+                <!--
+                     GitHub, et le sous-menu qu'un appui long déplie.
 
-                             Les points de coupe ne sont pas choisis : ce sont
-                             les sommets que le tracé d'origine traversait déjà.
+                     Le lien et son menu sont enveloppés pour la même raison que
+                     le bouton jour/nuit et son curseur : le panneau se pose sous
+                     le lien, il lui faut un ancrage positionné, et le lien
+                     lui-même ne peut pas servir — tout ce qu'on y poserait
+                     serait cliqué avec lui, et ouvrirait le dépôt.
 
-                               · la queue, de 9,19 à 2,16 ;
-                               · les pattes et les épaules, qui restent plantées.
-                                 Elles commencent à 16,22 — où le « m 14 6 »
-                                 relatif tombait depuis la fin de la queue — et
-                                 leur second morceau redescend de 9.94,15.55 ;
-                               · la tête, d'une épaule à l'autre, soit de
-                                 15.06,15.52 à 9.94,15.55. Elle seule porte la
-                                 rotation, autour de la nuque à mi-chemin des
-                                 deux.
+                     La marge de droite passe à l'ancrage : c'est lui, désormais,
+                     que la rangée de l'en-tête espace.
+                -->
+                <div class="gh-menu-anchor" style="margin-right: 8px;">
+                    <a id="btn-github" href="https://github.com/WolfGang-PRoxa/interactive_music_player" target="_blank" rel="noopener noreferrer" class="theme-toggle-btn" data-tooltip="Voir sur GitHub" data-i18n-tooltip="tooltip_view_github" data-tooltip-hint="tooltip_github_menu_hint" draggable="false" style="text-decoration: none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <!--
+                                 Le logo tenait en un seul tracé : la queue, puis le
+                                 contour du chat rejoint par un « m » relatif. Le
+                                 voici en trois morceaux, parce que trois choses
+                                 bougent séparément — voir js/headerButtonAnimations.js.
 
-                             Le rendu au repos est inchangé, au point près : les
-                             extrémités coïncident et les bouts arrondis
-                             referment la jointure.
-                        -->
-                        <path class="gh-tail" d="M9 19c-5 1.5-5-2.5-7-3"></path>
-                        <path class="gh-legs" d="M16 22v-3.87a3.37 3.37 0 0 0-.94-2.61M9.94 15.55A3.37 3.37 0 0 0 9 18.13V22"></path>
-                        <path class="gh-head" d="M15.06 15.52c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7"></path>
-                    </svg>
-                </a>
+                                 Les points de coupe ne sont pas choisis : ce sont
+                                 les sommets que le tracé d'origine traversait déjà.
+
+                                   · la queue, de 9,19 à 2,16 ;
+                                   · les pattes et les épaules, qui restent plantées.
+                                     Elles commencent à 16,22 — où le « m 14 6 »
+                                     relatif tombait depuis la fin de la queue — et
+                                     leur second morceau redescend de 9.94,15.55 ;
+                                   · la tête, d'une épaule à l'autre, soit de
+                                     15.06,15.52 à 9.94,15.55. Elle seule porte la
+                                     rotation, autour de la nuque à mi-chemin des
+                                     deux.
+
+                                 Le rendu au repos est inchangé, au point près : les
+                                 extrémités coïncident et les bouts arrondis
+                                 referment la jointure.
+                            -->
+                            <path class="gh-tail" d="M9 19c-5 1.5-5-2.5-7-3"></path>
+                            <path class="gh-legs" d="M16 22v-3.87a3.37 3.37 0 0 0-.94-2.61M9.94 15.55A3.37 3.37 0 0 0 9 18.13V22"></path>
+                            <path class="gh-head" d="M15.06 15.52c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7"></path>
+                        </svg>
+                    </a>
+
+                    <!--
+                         Les trois gestes qui tournent autour du dépôt — voir
+                         js/githubMenu.js. `hidden` au repos : ni affiché, ni
+                         focalisable, ni lu tant qu'on ne l'a pas demandé.
+
+                         Aucune adresse ici : le script les déduit toutes les
+                         trois du `href` ci-dessus, qui reste le seul endroit où
+                         le dépôt est nommé.
+                    -->
+                    <div class="header-pop gh-menu-pop" id="gh-menu-pop" role="menu" hidden>
+                        <a class="gh-menu-item" id="gh-menu-star" role="menuitem" target="_blank" rel="noopener noreferrer">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                            </svg>
+                            <span data-i18n="github_menu_star">Mettre en favori</span>
+                        </a>
+
+                        <button type="button" class="gh-menu-item" id="gh-menu-share" role="menuitem">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="18" cy="5" r="3"></circle>
+                                <circle cx="6" cy="12" r="3"></circle>
+                                <circle cx="18" cy="19" r="3"></circle>
+                                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                            </svg>
+                            <span data-i18n="github_menu_share">Partager le projet</span>
+                        </button>
+
+                        <a class="gh-menu-item" id="gh-menu-issue" role="menuitem" target="_blank" rel="noopener noreferrer">
+                            <!-- Le cercle et son point : l'icône d'une issue ouverte, chez GitHub même. -->
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="9"></circle>
+                                <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"></circle>
+                            </svg>
+                            <span data-i18n="github_menu_issue">Soumettre une issue</span>
+                        </a>
+                    </div>
+                </div>
 
                 <!-- Buy Me a Coffee Button (Donation) -->
                 <a id="btn-buy-coffee" href="https://buymeacoffee.com/wolfgang_proxa" target="_blank" rel="noopener noreferrer" class="btn-coffee-donate" data-tooltip="Faire un don pour soutenir le projet" data-i18n-tooltip="tooltip_buy_coffee">
@@ -2732,6 +2783,7 @@
     <script src="js/faviconAnimator.js"></script>
     <script src="js/headerButtonAnimations.js"></script>
     <script src="js/themeBlend.js"></script>
+    <script src="js/githubMenu.js"></script>
     <script src="js/drawer.js"></script>
     <script src="js/drawerWidgets.js"></script>
     <script src="js/touchDrawers.js"></script>

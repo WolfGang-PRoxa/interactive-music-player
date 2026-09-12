@@ -287,24 +287,19 @@ window.MusicPlayer = window.MusicPlayer || {};
 
     /* ═════════════════════ Au chargement ═════════════════════ */
 
-    /**
-     * L'infobulle dit que le réglage existe.
+    /*
+     * L'infobulle dit que le réglage existe — un appui long ne se devine pas.
      *
-     * Un appui long ne se devine pas : sans cette phrase, la fonctionnalité
-     * n'existerait que pour qui l'a codée. Ajoutée au libellé traduit plutôt
-     * qu'écrite en dur, et reposée après chaque changement de langue.
+     * La phrase n'est plus composée ici. Elle se déclare sur le bouton, par
+     * `data-tooltip-hint`, et c'est l'infobulle qui l'ajoute au moment de
+     * s'afficher : écrite d'avance dans `data-tooltip`, elle était effacée
+     * deux fois plutôt qu'une — par la traduction que l'infobulle relit à
+     * chaque affichage, et par `applyLanguage` à chaque changement de langue.
+     * Voir js/tooltipSystem.js.
      */
-    function paintHint() {
-        const base = t('tooltip_theme_toggle', 'Changer de mode Jour/Nuit');
-        const hint = t('tooltip_theme_blend_hint', 'Appui long pour un réglage plus précis');
-        button.dataset.tooltip = `${base}\n${hint}`;
-    }
-
-    window.MusicPlayer.repaintThemeBlendHint = paintHint;
 
     const fine = stored();
     if (fine !== null) apply(fine);
     range.value = String(current());
     paintReadout(Number(range.value));
-    paintHint();
 })();
