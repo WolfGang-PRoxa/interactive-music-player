@@ -855,6 +855,50 @@ html[data-style="neon-cyberpunk"] .history-item.is-preloaded {
     position: relative;
     display: inline-block;
     flex-grow: 1;
+    /*
+       Le nom cède le premier.
+
+       Un champ de saisie refuse de descendre sous sa largeur intrinsèque — une
+       vingtaine de caractères —, et l'en-tête ne passe pas à la ligne : sur une
+       carte étroite, c'est le résumé qui se serait fait pousser dehors. Avec ce
+       plancher levé, le nom se réduit et les deux nombres restent lisibles.
+    */
+    min-width: 0;
+}
+
+/*
+   Le résumé d'une playlist : combien de morceaux, et pour combien de temps.
+
+   Il se range entre le nom et la corbeille, seule place libre de l'en-tête, et
+   la seule qui mette les deux nombres au bout du nom qu'ils décrivent.
+
+   `flex-shrink: 0` : le champ de nom prend tout ce qui reste, et sans ce
+   plancher le résumé se serait comprimé jusqu'à couper « 12 morceaux » en deux.
+*/
+.playlist-summary {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-card);
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    cursor: default;
+}
+
+/*
+   `hidden` doit l'emporter sur le `display` ci-dessus : l'attribut ne vaut
+   qu'un `display: none` de la feuille du navigateur, que le moindre `display`
+   d'auteur écrase. Sans cette règle, une playlist vide afficherait un résumé
+   vide — une pastille sans rien dedans.
+*/
+.playlist-summary[hidden] {
+    display: none;
 }
 
 .playlist-name-input {

@@ -43,6 +43,63 @@ function getSortedPlaylists(playlists) {
     }
 }
 
+/**
+ * Le résumé d'une playlist : combien de morceaux, et pour combien de temps.
+ *
+ * Trois choix s'y cachent.
+ *
+ * **Les aiguillages ne comptent pas.** Ce ne sont pas des morceaux — ils ne se
+ * jouent pas, n'ont pas de durée, et disparaissent une fois franchis. Les
+ * compter ferait mentir les deux nombres à la fois.
+ *
+ * **Une durée inconnue s'écrit « 0:00 »** partout dans le tableau de bord, et
+ * rien ne la distingue d'un morceau qui durerait vraiment zéro seconde — sauf
+ * qu'un morceau de zéro seconde n'existe pas. Le total devient alors un
+ * minimum, et le dit : « ≥ » devant, et une seconde ligne dans l'infobulle.
+ *
+ * **Vide, le résumé s'efface.** La liste annonce déjà qu'elle n'a rien ;
+ * « 0 morceau · 0:00 » n'ajouterait qu'un doublon. C'est aussi ce qui permet au
+ * singulier de n'être employé qu'à 1, où les quatre langues s'accordent — « 0
+ * morceau » en français mais « 0 tracks » en anglais, désaccord qu'aucune paire
+ * de clés ne réglerait.
+ *
+ * @param {HTMLElement|null} el
+ * @param {object} playlist
+ */
+window.MusicPlayer.paintPlaylistSummary = function(el, playlist) {
+    if (!el) return;
+
+    const t = (key, fallback) => {
+        const translated = window.MusicPlayer.t ? window.MusicPlayer.t(key) : key;
+        return translated && translated !== key ? translated : fallback;
+    };
+
+    const tracks = (playlist.tracks || []).filter(tr => !window.MusicPlayer.isTransition(tr));
+
+    el.hidden = tracks.length === 0;
+    if (!tracks.length) return;
+
+    let totalMs = 0;
+    let unknown = 0;
+    for (const track of tracks) {
+        const ms = window.MusicPlayer.parseDurationMs(track.duration);
+        if (ms > 0) totalMs += ms;
+        else unknown++;
+    }
+
+    const count = tracks.length === 1
+        ? t('playlist_summary_one', '{n} morceau')
+        : t('playlist_summary_many', '{n} morceaux');
+    const total = (unknown ? '≥ ' : '') + window.MusicPlayer.formatMs(totalMs);
+
+    el.textContent = `${count.replace('{n}', String(tracks.length))} · ${total}`;
+
+    // La seconde ligne de l'infobulle n'apparaît que lorsqu'elle a quelque
+    // chose à dire — voir js/tooltipSystem.js.
+    if (unknown) el.dataset.tooltipHint = 'playlist_summary_unknown';
+    else delete el.dataset.tooltipHint;
+};
+
 window.MusicPlayer.handleTrackDropOnPlaylist = function(playlistId, dragData, targetIndex) {
     const state = window.MusicPlayer.state;
     const t = window.MusicPlayer.t || (k => k);
@@ -505,7 +562,17 @@ window.MusicPlayer.updatePlaylistsUI = function() {
             e.preventDefault();
         });
 
+        // Le résumé se glisse entre le nom et la corbeille — replié tant
+        // qu'il n'a rien à résumer, voir paintPlaylistSummary.
+        const summary = document.createElement('span');
+        summary.className = 'playlist-summary';
+        summary.hidden = true;
+        summary.dataset.i18nTooltip = 'tooltip_playlist_summary';
+        summary.dataset.tooltip = (window.MusicPlayer.t && window.MusicPlayer.t('tooltip_playlist_summary'))
+            || 'Nombre de morceaux et durée totale de la playlist';
+
         headerDiv.appendChild(nameContainer);
+        headerDiv.appendChild(summary);
         headerDiv.appendChild(deleteBtn);
         activePlaylistContent.appendChild(headerDiv);
 
@@ -600,6 +667,12 @@ window.MusicPlayer.updatePlaylistsUI = function() {
         }
         tracksListDiv = activePlaylistContent.querySelector('#playlist-tracks-list');
     }
+
+    // Repeint à chaque passage, et non au seul changement de playlist : un
+    // morceau ajouté, retiré ou dont la durée vient d'être résolue change le
+    // résumé sans changer la playlist affichée.
+    window.MusicPlayer.paintPlaylistSummary(
+        activePlaylistContent.querySelector('.playlist-summary'), playlist);
 
     const tracksStructJson = JSON.stringify((playlist.tracks || []).map(t => ({ title: t.title, url: t.url, duration: t.duration, thumbnail: t.thumbnail })));
     const activePlayingSource = state.activePlaybackSource;

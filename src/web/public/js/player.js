@@ -22,6 +22,26 @@ window.MusicPlayer.formatMs = function(ms) {
     return `${minutes}:${paddedSeconds}`;
 };
 
+/**
+ * Convertit une durée textuelle (`ss`, `m:ss` ou `h:mm:ss`) en millisecondes.
+ *
+ * Le pendant de `formatMs`, et le miroir de `parseDurationToMs` côté serveur
+ * (src/utils/duration.js) : les durées circulent en texte d'un bout à l'autre
+ * du tableau de bord, et tout ce qui veut les additionner doit d'abord les
+ * relire.
+ *
+ * Rend 0 pour ce qui ne se lit pas — une durée absente et une durée nulle se
+ * confondent déjà en amont, où l'inconnu s'écrit « 0:00 ».
+ */
+window.MusicPlayer.parseDurationMs = function(text) {
+    if (!text) return 0;
+    const parts = String(text).split(':').map(Number);
+    if (parts.length > 3 || parts.some(n => !Number.isFinite(n) || n < 0)) return 0;
+    if (parts.length === 3) return ((parts[0] * 3600) + (parts[1] * 60) + parts[2]) * 1000;
+    if (parts.length === 2) return ((parts[0] * 60) + parts[1]) * 1000;
+    return parts[0] * 1000;
+};
+
 window.MusicPlayer.getAudioBufferPercent = function(audio) {
     if (!audio) return 0;
     if (audio.readyState >= 4) return 100;
