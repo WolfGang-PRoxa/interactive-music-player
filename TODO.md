@@ -2,4 +2,4 @@
 
 - [x] Un appui long sur le bouton github permet d'accéder à un sous-menu qui donne accès à d'autres boutons tels que mettre le projet en favori, le partager, soumettre une issue. Même animation d'apparition bouncy et moderne que le slider du bouton jour/nuit.
 
-- [ ] Le tooltip du bouton qui permet de copier le contenu d'une notification toast doit se trouver visuellement au-dessus de la notification toast.
+- [x] Le tooltip du bouton qui permet de copier le contenu d'une notification toast doit se trouver visuellement au-dessus de la notification toast.

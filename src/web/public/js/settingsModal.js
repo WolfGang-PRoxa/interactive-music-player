@@ -209,12 +209,24 @@ function watchFullscreen() {
         || document.mozFullScreenElement
         || null;
 
-    // Retour à l'emplacement d'origine, et non au corps du document : la
-    // notification est déclarée en dernier dans son conteneur, et c'est de
-    // cette place qu'elle tient son avantage sur les calques à z-index égal.
+    // Retour à l'emplacement d'origine, et non au corps du document : rien ne
+    // dit que la notification y était déclarée directement.
     const parent = fullscreen || toastOriginParent || document.body;
     if (toast.parentElement !== parent) {
         parent.appendChild(toast);
+    }
+
+    /*
+     * L'infobulle voyage avec elle.
+     *
+     * Le bouton de copie reste visible et survolable pendant le plein écran :
+     * l'infobulle qui l'explique doit donc s'afficher, et restée dans le corps
+     * du document elle serait sous la couche supérieure — c'est-à-dire nulle
+     * part, quel que soit son rang dans la pile.
+     */
+    const tooltip = document.getElementById('custom-tooltip');
+    if (tooltip && tooltip.parentElement !== parent) {
+        parent.appendChild(tooltip);
     }
 }
 

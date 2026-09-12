@@ -60,7 +60,9 @@ body.video-fullscreen-active #video-floating-window,
     border-radius: 0 !important;
     border: none !important;
     box-shadow: none !important;
-    z-index: 2147483647 !important;
+    /* Un cran sous la notification, deux sous l'infobulle, et au-dessus de
+       tout le reste — voir l'échelle en tête de css/modals.css. */
+    z-index: 2147483645 !important;
     background: #000000 !important;
 }
 

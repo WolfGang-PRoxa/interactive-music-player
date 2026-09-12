@@ -2722,10 +2722,12 @@
     </aside>
 
     <!--
-        Notification toast — délibérément le dernier élément du corps.
-        Elle doit passer devant tout le reste : à z-index égal (la vidéo en
-        plein écran monte elle aussi au maximum), c'est l'ordre du document qui
-        départage, et le dernier l'emporte.
+        Notification toast — le dernier élément du corps, désormais par simple
+        commodité de lecture.
+
+        Son rang ne dépend plus de cette place : les trois derniers rangs de la
+        pile sont attribués un par un — l'infobulle, la notification, puis le
+        plein écran de la vidéo. Voir l'échelle en tête de css/modals.css.
     -->
     <div id="error-toast" class="toast hidden">
         <div class="toast-content">

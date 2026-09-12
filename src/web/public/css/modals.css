@@ -8,13 +8,27 @@
     border-radius: 12px;
     padding: 1rem 1.5rem;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    /* Au-dessus de tout : modales (30000), tiroir (9999), fenêtres
-       flottantes, et jusqu'à la vidéo en plein écran, qui monte au même
-       maximum — l'égalité se tranche alors sur l'ordre du document, d'où la
-       place de la notification en fin de <body>. Le vrai plein écran, lui,
-       occupe la couche supérieure du navigateur, hors de portée de tout
-       z-index : settingsModal.js y déplace la notification. */
-    z-index: 2147483647;
+    /*
+       Les trois derniers rangs de la pile, de haut en bas :
+
+         2147483647  l'infobulle    (#custom-tooltip, plus bas dans ce fichier)
+         2147483646  la notification
+         2147483645  la vidéo en plein écran de pure CSS (css/video.css)
+
+       Tout le reste est loin dessous : modales à 30 000, tiroir à 9 999,
+       fenêtres flottantes distribuées par `bringToFront()` à partir de 9 990.
+
+       Les trois valeurs sont distinctes à dessein. Elles tenaient au même
+       maximum et c'est l'ordre du document qui les départageait — un équilibre
+       qui ne tenait qu'à un fil : l'infobulle est ajoutée au corps par son
+       module, la notification y est replacée à la sortie du plein écran, et le
+       dernier arrivé l'emportait. Une échelle explicite ne dépend plus de qui a
+       été écrit, ou déplacé, en dernier.
+
+       Le vrai plein écran, lui, occupe la couche supérieure du navigateur, hors
+       de portée de tout z-index : settingsModal.js y déplace la notification et
+       son infobulle. */
+    z-index: 2147483646;
     max-width: min(420px, calc(100vw - 4rem));
 
     /*
@@ -2495,7 +2509,16 @@
 
 #custom-tooltip {
     position: fixed;
-    z-index: 100000;
+    /*
+       Le dernier rang, au-dessus de la notification — voir l'échelle en tête de
+       cette feuille.
+
+       L'infobulle du bouton de copie s'affiche sur la notification qui le
+       porte : la notification occupant le maximum, l'infobulle était peinte
+       dessous, c'est-à-dire nulle part. Le bouton n'avait plus d'étiquette au
+       seul endroit où il existe.
+    */
+    z-index: 2147483647;
     pointer-events: none;
     max-width: 280px;
     padding: 7px 12px;

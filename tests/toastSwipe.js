@@ -17,6 +17,12 @@
  *    qu'on cherchait à lire ;
  *  - **le compte à rebours**, suspendu tant que le doigt est posé et repris
  *    s'il repart sans avoir chassé la notification.
+ *
+ * S'y ajoute le rang de la notification dans la pile. Elle passe devant tout le
+ * tableau de bord, mais pas devant l'infobulle du bouton qui la copie : cette
+ * étiquette s'affiche sur la notification qui la porte, et sous elle, elle
+ * n'existait pas. Les trois derniers rangs sont donc attribués un par un,
+ * plutôt que laissés à l'ordre du document — voir css/modals.css.
  */
 const fs = require('fs');
 const vm = require('vm');
@@ -28,6 +34,10 @@ const SOURCE = fs.readFileSync(
 );
 const CSS = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'web', 'public', 'css', 'modals.css'),
+    'utf8'
+);
+const VIDEO_CSS = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'web', 'public', 'css', 'video.css'),
     'utf8'
 );
 
@@ -61,7 +71,9 @@ function makeElement(id) {
         addEventListener: (type, fn) => { listeners[type] = fn; },
         removeEventListener: (type) => { delete listeners[type]; },
         matches: () => false,
-        appendChild() {},
+        // Le déménagement en plein écran se lit sur le parent : un appendChild
+        // qui ne note rien laisserait croire que la notification n'a pas bougé.
+        appendChild(child) { if (child) child.parentElement = el; },
     };
     el._classes = classes;
     el._listeners = listeners;
@@ -83,14 +95,22 @@ function mountToast({ touch = true } = {}) {
         'error-toast-message': makeElement('error-toast-message'),
         'btn-toast-action': makeElement('btn-toast-action'),
         'btn-copy-toast': makeElement('btn-copy-toast'),
+        'custom-tooltip': makeElement('custom-tooltip'),
     };
 
+    const docListeners = {};
     const fakeDocument = {
         getElementById: (id) => elements[id] || null,
         querySelectorAll: () => [],
-        addEventListener() {},
+        addEventListener(type, fn) { (docListeners[type] = docListeners[type] || []).push(fn); },
         body: makeElement('body'),
+        fullscreenElement: null,
     };
+
+    // Les deux vivent dans le corps du document, d'où le module les emmène le
+    // temps d'un plein écran.
+    elements['error-toast'].parentElement = fakeDocument.body;
+    elements['custom-tooltip'].parentElement = fakeDocument.body;
 
     const fakeWindow = { addEventListener() {} };
 
@@ -136,7 +156,13 @@ function mountToast({ touch = true } = {}) {
         [...timers.entries()].forEach(([id, { fn }]) => { timers.delete(id); fn(); });
     };
 
-    return { MP, toast, elements, swipe, runTimers, timers, touchEventAt };
+    /** Passe en plein écran sur `target`, ou en sort si l'on ne donne rien. */
+    const fullscreen = (target = null) => {
+        fakeDocument.fullscreenElement = target;
+        (docListeners.fullscreenchange || []).forEach(fn => fn({}));
+    };
+
+    return { MP, toast, elements, swipe, runTimers, timers, touchEventAt, fakeDocument, fullscreen };
 }
 
 console.log('\n=== The notification swiped away ===\n');
@@ -257,6 +283,57 @@ console.log('\n=== The notification swiped away ===\n');
         `${toast.style.transform || '(none)'} / ${toast.style.opacity || '(none)'}`);
     check('and is no longer marked as flying away',
         !toast.classList.contains('toast-settling'));
+}
+
+// 11. Les trois derniers rangs de la pile sont attribués un par un.
+{
+    /*
+     * Le sélecteur est ancré en début de ligne. Sans cela, la mention de
+     * « #custom-tooltip » dans le commentaire qui décrit l'échelle, en tête de
+     * la règle de la notification, servait de point de départ : on relisait le
+     * rang de la notification en croyant lire celui de l'infobulle, et les deux
+     * paraissaient à égalité.
+     */
+    const rung = (css, selector) => {
+        const block = new RegExp(`^${selector}[^{]*\\{[\\s\\S]*?\\n\\}`, 'm').exec(css);
+        const found = block && /z-index:\s*(\d+)/.exec(block[0]);
+        return found ? Number(found[1]) : NaN;
+    };
+
+    const tooltip = rung(CSS, '#custom-tooltip');
+    const toastRung = rung(CSS, '\\.toast');
+    const video = rung(VIDEO_CSS, '\\.floating-video-window\\.is-fullscreen');
+
+    check('the tooltip outranks the notification it labels',
+        tooltip > toastRung,
+        `${tooltip} > ${toastRung} — sous elle, l'étiquette du bouton de copie n'existait pas`);
+    check('the notification outranks the CSS fullscreen video',
+        toastRung > video, `${toastRung} > ${video}`);
+    check('and none of the three shares a rung with another',
+        new Set([tooltip, toastRung, video]).size === 3,
+        'à rang égal, c\'est l\'ordre du document qui départage — et il change en cours de route');
+    check('all three still tower over the modals',
+        Math.min(tooltip, toastRung, video) > 30000);
+}
+
+// 12. Le vrai plein écran : la notification et son infobulle y montent ensemble.
+{
+    const { MP, elements, fullscreen, fakeDocument } = mountToast();
+    MP.showToast('coucou');
+
+    const screen = makeElement('video-window');
+    fullscreen(screen);
+    check('a real fullscreen takes the notification along',
+        elements['error-toast'].parentElement === screen,
+        'la couche supérieure du navigateur est hors de portée de tout z-index');
+    check('and its tooltip with it',
+        elements['custom-tooltip'].parentElement === screen,
+        'le bouton de copie reste survolable : son étiquette doit suivre');
+
+    fullscreen(null);
+    check('leaving fullscreen puts both back in the document',
+        elements['error-toast'].parentElement === fakeDocument.body
+        && elements['custom-tooltip'].parentElement === fakeDocument.body);
 }
 
 console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);

@@ -84,7 +84,8 @@
 /*
  * Le plein écran est excepté, et il le faut.
  *
- * Il réclame `2147483647` pour passer devant tout le reste. Cette règle-ci,
+ * Il réclame le troisième rang du sommet pour passer devant tout le reste —
+ * voir l'échelle en tête de css/modals.css. Cette règle-ci,
  * plus tardive et `!important`, le ramenait à 9980 : sous les paramètres
  * (20 000) et sous le tiroir d'activité (9999), qui se serait peint par-dessus.
  * En plein écran natif le navigateur élève la fenêtre dans son calque de tête
