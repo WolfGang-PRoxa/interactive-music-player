@@ -20,7 +20,7 @@ const API = 'https://api.github.com';
 const AGENT = 'interactive-music-player';
 
 /** Dépôt par défaut, si ni l'environnement ni package.json ne renseignent mieux. */
-const DEFAULT_REPO = { owner: 'WolfGang-PRoxa', repo: 'interactive_music_player' };
+const DEFAULT_REPO = { owner: 'WolfGang-PRoxa', repo: 'interactive-music-player' };
 
 /** Taille maximale acceptée pour une archive, garde-fou mémoire. */
 const MAX_ARCHIVE_BYTES = 300 * 1024 * 1024;

@@ -267,7 +267,7 @@ async function stageWebSocket(t) {
 // --- Exécution --------------------------------------------------------------
 
 (async () => {
-    console.log('Smoke test — interactive_music_player');
+    console.log('Smoke test — interactive-music-player');
 
     stageLoading();
     if (failed > 0) {

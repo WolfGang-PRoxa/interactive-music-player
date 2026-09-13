@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/WolfGang-PRoxa/interactive_music_player.git"
+    "url": "https://github.com/WolfGang-PRoxa/interactive-music-player.git"
   },
   "scripts": {
     "postinstall": "node tools/keep-voice-receiver.js",

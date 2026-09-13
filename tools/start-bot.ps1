@@ -265,7 +265,7 @@ $DiscordPortal = 'https://discord.com/developers/applications'
 
 # Discord demande un agent utilisateur de cette forme sur les appels à son API,
 # et sa protection de façade écarte ce qui n'en porte pas.
-$ApiUserAgent = 'DiscordBot (https://github.com/WolfGang-PRoxa/interactive_music_player, 1.0)'
+$ApiUserAgent = 'DiscordBot (https://github.com/WolfGang-PRoxa/interactive-music-player, 1.0)'
 
 <#
     Permissions demandées à l'invitation, dans l'ordre du README.

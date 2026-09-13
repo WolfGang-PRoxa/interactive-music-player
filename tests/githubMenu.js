@@ -191,7 +191,7 @@ function makeElement(tag, doc) {
     return el;
 }
 
-const HREF = 'https://github.com/WolfGang-PRoxa/interactive_music_player';
+const HREF = 'https://github.com/WolfGang-PRoxa/interactive-music-player';
 
 /** Monte le vrai module avec une horloge, un presse-papier et des doubles. */
 function mount({ href = HREF, share = null } = {}) {

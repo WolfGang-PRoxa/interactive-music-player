@@ -87,7 +87,7 @@ window.MusicPlayer = window.MusicPlayer || {};
      * Le dépôt, tel que le bouton le désigne.
      *
      * La barre finale et le `.git` sont retirés : un `href` peut les porter, et
-     * « …/interactive_music_player.git/issues/new » ne mène nulle part. Dans cet
+     * « …/interactive-music-player.git/issues/new » ne mène nulle part. Dans cet
      * ordre, parce que l'adresse de clonage porte souvent les deux — « .git/ »,
      * dont un `.git$` seul ne verrait rien.
      */

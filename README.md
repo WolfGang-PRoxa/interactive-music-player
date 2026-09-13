@@ -71,8 +71,8 @@ système.
 ### 1. Récupérer le projet
 
 ```bash
-git clone https://github.com/WolfGang-PRoxa/interactive_music_player
-cd interactive_music_player
+git clone https://github.com/WolfGang-PRoxa/interactive-music-player
+cd interactive-music-player
 ```
 
 Sous Windows, les dépendances sont installées au premier démarrage par la
