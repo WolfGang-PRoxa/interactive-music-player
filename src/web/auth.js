@@ -75,6 +75,9 @@ function getToken() {
         const stored = fs.readFileSync(TOKEN_FILE, 'utf8').trim();
         if (stored) {
             token = stored;
+            // Les installations d'avant ce correctif ont un fichier ouvert :
+            // le refermer ici les rattrape, une fois, au premier démarrage.
+            hardenTokenFile();
             return token;
         }
     } catch (e) {
@@ -85,12 +88,64 @@ function getToken() {
     try {
         fs.mkdirSync(path.dirname(TOKEN_FILE), { recursive: true });
         fs.writeFileSync(TOKEN_FILE, token, { encoding: 'utf8', mode: 0o600 });
+        // `mode` ne vaut que sur les systèmes POSIX ; Windows demande une ACL.
+        hardenTokenFile();
         log.info(`[Auth] Dashboard token generated and saved in ${TOKEN_FILE}`);
     } catch (err) {
         log.error(`[Auth] Cannot save the token: ${err.message}`);
         log.error('[Auth] A new token will be generated on the next startup.');
     }
     return token;
+}
+
+/**
+ * Referme les droits du fichier de jeton sur son seul propriétaire.
+ *
+ * `writeFileSync` reçoit bien `mode: 0o600`, et Windows n'en fait rien : les
+ * bits POSIX n'y ont pas cours, le fichier hérite des droits de son dossier, et
+ * `data/dashboard-token` se retrouvait lisible par tout compte que cette
+ * héritage désigne. Le secret qui ouvre le tableau de bord traînait donc à la
+ * portée de n'importe quelle session ouverte sur la machine.
+ *
+ * `icacls /inheritance:r` coupe l'héritage et `/grant:r` réattribue à zéro : ne
+ * subsistent que le compte qui fait tourner le bot, les administrateurs et le
+ * système — les deux derniers pouvant de toute façon reprendre le fichier.
+ *
+ * **Les groupes sont désignés par leur identifiant, pas par leur nom.** Ce
+ * dernier est traduit : « Administrators » sur un Windows anglais est
+ * « Administrateurs » sur un Windows français, et la commande échouait sur
+ * « le mappage entre les noms de compte et les ID de sécurité n'a pas été
+ * effectué ». Les SID bien connus, eux, sont les mêmes partout.
+ *
+ * L'échec n'interrompt rien. Sur un partage réseau, un système de fichiers sans
+ * ACL ou un Windows bridé, la commande peut refuser ; le bot doit démarrer
+ * quand même, en le disant.
+ */
+function hardenTokenFile() {
+    if (process.platform !== 'win32') return;
+
+    let user;
+    try {
+        user = require('os').userInfo().username;
+    } catch (e) {
+        return;
+    }
+    if (!user) return;
+
+    try {
+        require('child_process').execFileSync('icacls', [
+            TOKEN_FILE,
+            '/inheritance:r',
+            '/grant:r', `${user}:(F)`,
+            // S-1-5-32-544 : groupe Administrateurs. S-1-5-18 : compte Système.
+            '/grant:r', '*S-1-5-32-544:(F)',
+            '/grant:r', '*S-1-5-18:(F)',
+        ], { stdio: 'ignore', timeout: 5000, windowsHide: true });
+    } catch (err) {
+        log.warn('[Auth] Could not restrict the permissions of '
+            + `${TOKEN_FILE}: ${err.message}`);
+        log.warn('[Auth] Any account on this machine may be able to read it.');
+    }
 }
 
 /** Comparaison à temps constant, pour ne pas fuiter le jeton octet par octet. */

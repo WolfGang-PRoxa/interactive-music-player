@@ -117,8 +117,44 @@ function isAllowedMediaFilename(fileName) {
     return typeof fileName === 'string' && hasMediaExtension(fileName);
 }
 
+/**
+ * Ce chemin est-il une racine autorisée, ou quelque chose qu'elle contient ?
+ *
+ * Exposé en plus de `resolveMediaPath` parce que celui-ci exige un *fichier*
+ * média existant : il refuse un dossier, et c'est justement ce qu'il faut
+ * savoir avant de parcourir une bibliothèque locale. Le chemin est rendu
+ * canonique ici, sans quoi un lien symbolique ou un `..` répondrait à côté.
+ *
+ * La racine elle-même est acceptée, à la différence de `isUnderAllowedRoot` :
+ * demander à jouer « data/uploads » désigne un dossier légitime, et le refuser
+ * au prétexte qu'il n'est pas *sous* lui-même n'aurait aucun sens ici.
+ *
+ * @param {string} input Chemin, absolu ou relatif.
+ * @returns {boolean} Faux aussi quand le chemin n'existe pas.
+ */
+function isInsideAllowedRoots(input) {
+    if (!input || typeof input !== 'string') return false;
+    // Un octet nul tronque le chemin au niveau des appels systeme sous-jacents.
+    if (input.indexOf('\0') !== -1) return false;
+
+    let real;
+    try {
+        real = fs.realpathSync(path.resolve(input));
+    } catch (e) {
+        return false;
+    }
+
+    const target = normalizeForCompare(real);
+    return allowedRoots.some((root) => {
+        const rel = path.relative(normalizeForCompare(root), target);
+        // rel vide = le chemin EST la racine, ce qui convient ici.
+        return !rel.startsWith('..') && !path.isAbsolute(rel);
+    });
+}
+
 module.exports = {
     resolveMediaPath,
     isAllowedMediaFilename,
+    isInsideAllowedRoots,
     allowedRoots,
 };

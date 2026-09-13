@@ -11,6 +11,7 @@ const { foldVirtualElapsed } = require('../../../audio/PlaybackSession');
 const { searchLocalAwareTrack, playlistIsSource, addToSetAsideQueue } = require('../handlerUtils');
 const { getCleanFilename } = require('../../../utils/paths');
 const log = require('../../../utils/logger');
+const { isInsideAllowedRoots } = require('../../../utils/mediaPaths');
 
 async function handlePlay(ctx) {
     const { ws, data, webServer, player, currentGuildId } = ctx;
@@ -72,6 +73,33 @@ async function handlePlay(ctx) {
             try {
                 resolvedPath = path.resolve(query);
             } catch (err) { }
+
+            /*
+             * Le disque de l'hôte n'est pas une bibliothèque partagée.
+             *
+             * Ce qui suit parcourt un dossier et en rend les fichiers audio, en
+             * remontant leurs noms dans la file — donc dans le tableau de bord de
+             * qui a demandé. Le chemin étant celui qu'on veut, un invité pourvu
+             * du seul droit d'ajouter à la file pouvait s'en servir pour explorer
+             * la machine, dossier par dossier.
+             *
+             * Les racines de `mediaPaths` disent où la musique habite :
+             * data/uploads, data/cache, et ce que `MEDIA_ROOTS` désigne. C'est
+             * déjà la frontière que `/api/stream` oppose au moment de servir un
+             * fichier ; elle s'applique désormais aussi au moment de l'ajouter,
+             * faute de quoi on ajoutait des pistes qu'on ne pouvait pas écouter.
+             *
+             * Le maître n'est pas concerné : c'est sa machine, et lui interdire
+             * de jouer un dossier qu'il vient de brancher n'y protégerait rien.
+             */
+            if (resolvedPath && fs.existsSync(resolvedPath) && !ws.identity?.master
+                && !isInsideAllowedRoots(resolvedPath)) {
+                log.warn(`[Play] Local path refused to guest `
+                    + `${ws.identity?.session?.userId || '?'}: outside the media roots.`);
+                webServer._sendError(
+                    'Ce dossier est en dehors de la bibliothèque musicale du bot.');
+                return;
+            }
 
             if (resolvedPath && fs.existsSync(resolvedPath)) {
                 const stat = fs.statSync(resolvedPath);

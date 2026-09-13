@@ -119,6 +119,9 @@
     },
     "discord-player-youtubei": {
       "undici": "7.29.1"
-    }
+    },
+    "qs": "^6.16.0",
+    "body-parser": "^2.3.0",
+    "esbuild": "^0.28.2"
   }
 }
