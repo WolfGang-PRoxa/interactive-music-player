@@ -23,9 +23,40 @@ const owner = require('../owner');
 const auth = require('../auth');
 const log = require('../../utils/logger');
 
+/**
+ * Échappe ce qui va être interpolé dans du HTML.
+ *
+ * Le `detail` de la page d'erreur porte la cause du refus, et cette cause vient
+ * parfois de la requête elle-même : Discord renvoie `?error=…` au rappel, dont
+ * la valeur atterrissait telle quelle dans le document. Le chemin étant public
+ * — il faut bien recevoir le retour de Discord avant de savoir qui revient — et
+ * aucune CSP ne couvrant encore ces pages, il suffisait d'un lien à faire
+ * cliquer pour exécuter du script sur l'origine du tableau de bord.
+ *
+ * Les trois arguments y passent, pas seulement celui-là. Les titres et messages
+ * sont aujourd'hui des littéraux de ce fichier, mais rien ne le garantit
+ * demain, et échapper une phrase écrite à la main ne change rien à son rendu.
+ */
+function echapperHtml(valeur) {
+    return String(valeur).replace(/[&<>"']/g, (caractere) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+    })[caractere]);
+}
+
 /** Page d'erreur du trajet, dans le style de celle de web/auth.js. */
-function errorPage(title, message, detail) {
-    const block = detail ? `<p class="detail"><code>${String(detail).slice(0, 300)}</code></p>` : '';
+function errorPage(rawTitle, rawMessage, rawDetail) {
+    const title = echapperHtml(rawTitle);
+    const message = echapperHtml(rawMessage);
+    // Tronqué avant l'échappement, dans cet ordre : couper après trancherait
+    // une entité en deux et laisserait un `&quo` orphelin dans la page. La
+    // borne porte donc sur le texte reçu, comme avant ce correctif ;
+    // l'échappement vient en dernier, ce qui est tout ce que la sûreté exige.
+    const detail = rawDetail ? echapperHtml(String(rawDetail).slice(0, 300)) : '';
+    const block = detail ? `<p class="detail"><code>${detail}</code></p>` : '';
     return `<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><title>${title}</title>
 <style>

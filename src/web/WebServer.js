@@ -17,6 +17,7 @@ const { applyLoudness } = require('../audio/playbackSettings');
 const { activeEngine } = require('../audio/mix');
 const { foldVirtualElapsed } = require('../audio/PlaybackSession');
 const auth = require('./auth');
+const logVisibility = require('./logVisibility');
 const { arePathsOrUrlsEqual } = require('../utils/paths');
 const { readSetAsideQueue } = require('../utils/setAsideQueue');
 const transitions = require('../audio/transitions');
@@ -116,15 +117,34 @@ class WebServer {
 
         WebServer.instance = this;
 
-        // Retransmission des journaux au tableau de bord. L'abonnement remplace
-        // le détournement de console : le logger ignore tout du serveur web.
+        /*
+         * Retransmission des journaux au tableau de bord. L'abonnement remplace
+         * le détournement de console : le logger ignore tout du serveur web.
+         *
+         * **Chacun selon ce qui le regarde.** Le journal ne décrit pas la
+         * lecture en cours : il décrit la machine qui l'héberge — chemins
+         * absolus, adresse publique, identifiants des invités admis comme
+         * refusés. Il partait jusqu'ici vers chaque socket ouverte, celles des
+         * invités comprises, sans que rien ne soit consulté.
+         *
+         * Le maître le reçoit tel quel. Un invité n'en reçoit que les lignes
+         * qui parlent de ce qu'il écoute, caviardées de ce qui nomme l'hôte :
+         * voir `logVisibility.js`, qui porte la règle et son pourquoi. Le filtre
+         * s'applique par socket, d'où la sérialisation à l'intérieur de la
+         * boucle plutôt qu'une charge unique partagée.
+         *
+         * `identity` est posée au handshake (voir plus bas) : une socket qui
+         * n'en aurait pas est traitée en invité, comme partout ailleurs.
+         */
         log.subscribe((entry) => {
             if (!this.wss) return;
-            const payload = JSON.stringify({ type: 'log', data: entry });
             this.wss.clients.forEach((client) => {
-                if (client.readyState === 1) {
-                    try { client.send(payload); } catch (e) {}
-                }
+                if (client.readyState !== 1) return;
+                const visible = logVisibility.forClient(client, entry);
+                if (!visible) return;
+                try {
+                    client.send(JSON.stringify({ type: 'log', data: visible }));
+                } catch (e) {}
             });
         });
 
@@ -171,9 +191,26 @@ class WebServer {
              * se déduire de la machine à cet instant-là, et l'annoncer plus tôt
              * reviendrait à donner l'adresse d'avant la déduction.
              */
+            /*
+             * L'adresse, jamais le jeton.
+             *
+             * Cette ligne a longtemps porté `?token=…`, par commodité : elle se
+             * copiait dans la barre d'adresse. Le prix en était démesuré. Elle
+             * entre dans l'historique du logger, que le tableau de bord sert à
+             * quiconque ouvre une WebSocket, et dans `data/logs/`, qui survit
+             * aux redémarrages. Le secret qui désigne le propriétaire de
+             * l'installation se lisait donc depuis n'importe quel onglet
+             * d'invité.
+             *
+             * Rien n'est perdu au change : le navigateur ouvert juste après
+             * emporte le jeton, `tools/start-bot.ps1` le lit dans le fichier, et
+             * celui qui en a besoin à la main sait désormais où le prendre.
+             */
             const announceEntry = () => {
                 const entry = require('./oauth').publicUrl();
-                log.success(`[WebServer] Dashboard reachable at: ${entry}/?token=${token}`);
+                log.success(`[WebServer] Dashboard reachable at: ${entry}`);
+                log.info('[WebServer] Access token: data/dashboard-token '
+                    + '(the window opened automatically already carries it).');
                 if (entry !== `http://${displayHost}:${port}`) {
                     log.info('[WebServer] The listening address serves the page too, '
                         + 'but holds no sign-in session: use the address above.');
@@ -581,8 +618,17 @@ class WebServer {
         // client qui venait de s'ouvrir, donc affichée avant l'historique — puis
         // une seconde fois à sa place chronologique, l'historique la contenant
         // déjà.
+        //
+        // Filtré selon qui écoute, pour la raison qui gouverne l'abonnement du
+        // constructeur : le journal décrit la machine hôte autant que la lecture
+        // en cours. C'était ici la fuite la plus large — ce `send` était le tout
+        // premier geste envers une socket fraîche, avant même qu'on sache quel
+        // serveur elle regarde.
         try {
-            ws.send(JSON.stringify({ type: 'logsHistory', data: log.getHistory() }));
+            ws.send(JSON.stringify({
+                type: 'logsHistory',
+                data: logVisibility.historyForClient(ws, log.getHistory()),
+            }));
         } catch (err) {}
 
         log.success('[WebServer] Client connected over WebSocket.');
