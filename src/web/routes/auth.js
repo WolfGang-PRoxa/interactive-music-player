@@ -20,6 +20,7 @@ const oauth = require('../oauth');
 const sessions = require('../sessions');
 const guests = require('../guests');
 const owner = require('../owner');
+const ownerTransfer = require('../ownerTransfer');
 const auth = require('../auth');
 const log = require('../../utils/logger');
 const crypto = require('crypto');
@@ -127,6 +128,50 @@ function errorPage(rawTitle, rawMessage, rawDetail) {
   <p>${message}</p>
   ${block}
   <p><a href="/auth/discord">Réessayer</a></p>
+</main></body></html>`;
+}
+
+/**
+ * Page de saisie du code de reprise, dans le style des autres pages du trajet.
+ *
+ * Le nom du demandeur y figure pour qu'on sache de quel compte il s'agit avant
+ * de recopier quoi que ce soit : c'est aussi ce qui permet de s'apercevoir
+ * qu'une demande n'est pas la sienne.
+ */
+function confirmPage(id, username, erreur) {
+    const bloc = erreur ? `<p class="erreur">${echapperHtml(erreur)}</p>` : '';
+    return `<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Reprendre l'installation</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #16161d; color: #e6e6ec;
+         display: grid; place-items: center; height: 100vh; margin: 0; }
+  main { max-width: 34rem; padding: 2rem; line-height: 1.6; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.5rem; }
+  code { background: #26262f; padding: 0.15em 0.4em; border-radius: 4px; }
+  .erreur { color: #ff6b70; }
+  input { font-family: ui-monospace, monospace; font-size: 1.2rem; letter-spacing: .12em;
+          padding: .6em .8em; border-radius: 8px; border: 1px solid #2e2e38;
+          background: #26262f; color: #e6e6ec; width: 11ch; text-transform: uppercase; }
+  button { background: #5865F2; color: #fff; padding: .7em 1.2em; border: 0;
+           border-radius: 8px; font-weight: 600; font-size: 1rem; cursor: pointer; }
+  form { display: flex; gap: .6rem; align-items: center; margin-top: 1.2rem; }
+  .note { opacity: .7; font-size: .9em; }
+</style></head>
+<body><main>
+  <h1>Reprendre l'installation</h1>
+  <p>Le bot vient d'écrire un code dans sa console, sur la machine où il tourne.
+     Recopiez-le pour que <strong>${echapperHtml(username)}</strong> en devienne
+     le propriétaire.</p>
+  ${bloc}
+  <form method="post" action="/auth/owner/confirm">
+    <input type="hidden" name="id" value="${echapperHtml(id)}">
+    <input name="code" placeholder="XXXX-XX" autocomplete="off" autofocus
+           maxlength="10" aria-label="Code de reprise">
+    <button type="submit">Confirmer</button>
+  </form>
+  <p class="note">Le code est valable deux minutes. Si vous n'êtes pas à l'origine
+     de cette demande, fermez cette page : rien ne change tant qu'aucun code
+     n'est saisi.</p>
 </main></body></html>`;
 }
 
@@ -443,18 +488,27 @@ function createAuthRouter(webServer) {
          */
         const holdsToken = route.holdsToken || auth.identify(req).holdsToken;
 
+        /*
+         * Une demande de reprise, jamais une reprise.
+         *
+         * La propriété revient à qui est devant la machine — la règle n'a pas
+         * changé —, mais le jeton a cessé d'en être la preuve : il voyage en
+         * `?token=`, se dépose dans l'historique du navigateur et entre dans le
+         * manifeste de l'application. Le transfert demande donc maintenant un
+         * code que le bot écrit dans sa console, et qu'il faut y aller lire.
+         *
+         * Le jeton reste ce qui ouvre la demande : il en faut deux, et ils ne
+         * se trouvent pas au même endroit. Voir ownerTransfer.js.
+         *
+         * La revendication initiale, elle, ne change pas : elle n'écrase
+         * personne, et l'encombrer d'un code ferait buter le premier démarrage
+         * sur une étape que rien n'annonce.
+         */
+        let transferId = null;
         if (!owner.isClaimed() && holdsToken) {
             owner.claim(user);
         } else if (route.claim && holdsToken && !owner.isOwner({ userId: user.id })) {
-            /*
-             * La propriété suit le compte, parce que la personne est devant la
-             * machine — c'est ce que tenir le jeton veut dire, ici comme dans
-             * `owner.js`. Aucun pouvoir n'est accordé au passage : qui tient le
-             * jeton pouvait déjà supprimer `data/owner.json` et relancer. Le
-             * geste devient seulement visible, et réversible sans toucher au
-             * disque.
-             */
-            owner.transfer(user);
+            transferId = ownerTransfer.open(user);
         }
 
         /*
@@ -475,8 +529,83 @@ function createAuthRouter(webServer) {
         // ce serveur, mais rien n'oblige à ce que la version qui l'a écrit ait
         // filtré comme celle qui le lit — une release installée peut être plus
         // ancienne que le correctif.
+        // La session est ouverte dans les deux cas : le demandeur est connecté,
+        // il lui manque seulement la propriété. S'il renonce à saisir le code, il
+        // reste ce qu'il était avant — un invité, ou le maître déchu de rien.
+        if (transferId) {
+            return res.redirect(302, `/auth/owner/confirm?id=${encodeURIComponent(transferId)}`);
+        }
+
         res.redirect(302, cheminInterne(route.returnTo));
     });
+
+    /**
+     * La saisie du code de reprise.
+     *
+     * Page rendue par le serveur, comme les autres pages de ce trajet : elle
+     * s'affiche au retour de Discord, avant que le tableau de bord n'ait la
+     * main. La faire porter par l'interface aurait demandé de lui apprendre un
+     * état qu'elle ne connaît que deux minutes par an.
+     *
+     * Ces deux adresses ne sont pas publiques : elles arrivent après le rappel,
+     * donc avec la session que celui-ci vient d'ouvrir. C'est cette session qui
+     * dit qui saisit le code, et `ownerTransfer.confirm` refuse un code
+     * présenté par un autre compte que le demandeur.
+     */
+    router.get('/owner/confirm', (req, res) => {
+        const demande = ownerTransfer.peek(String(req.query.id || ''));
+        if (!demande) {
+            return res.status(400).type('html').send(errorPage(
+                'Demande expirée',
+                "Cette demande de reprise n'est plus valable. Relancez le changement "
+                + 'de compte depuis le tableau de bord.'
+            ));
+        }
+        res.type('html').send(confirmPage(String(req.query.id), demande.username, null));
+    });
+
+    router.post('/owner/confirm', express.urlencoded({ extended: false, limit: '4kb' }),
+        (req, res) => {
+            /*
+             * Le corps est analysé ici et non globalement : le routeur de
+             * `/auth` est monté avant `express.urlencoded` dans WebServer, et
+             * c'est le seul formulaire du trajet.
+             */
+            const id = String((req.body && req.body.id) || '');
+            const code = String((req.body && req.body.code) || '');
+
+            const identity = req.identity || auth.identify(req);
+            const sessionUserId = identity.session?.userId || null;
+            if (!sessionUserId) {
+                return res.status(401).type('html').send(errorPage(
+                    'Session absente',
+                    "Reconnectez-vous avant de reprendre l'installation."
+                ));
+            }
+
+            const verdict = ownerTransfer.confirm(id, code, sessionUserId);
+
+            if (verdict.ok) {
+                log.success('[Owner] Transfer confirmed by console code.');
+                return res.redirect(302, '/');
+            }
+
+            if (verdict.reason === 'wrong') {
+                const demande = ownerTransfer.peek(id);
+                return res.status(400).type('html').send(confirmPage(
+                    id,
+                    demande ? demande.username : '',
+                    `Code incorrect. Il vous reste ${verdict.left} essai(s).`
+                ));
+            }
+
+            return res.status(400).type('html').send(errorPage(
+                'Demande close',
+                verdict.reason === 'mismatch'
+                    ? 'Cette demande a été ouverte par un autre compte que celui connecté ici.'
+                    : "Cette demande n'est plus valable. Relancez le changement de compte."
+            ));
+        });
 
     /**
      * Ferme la session de ce navigateur.
