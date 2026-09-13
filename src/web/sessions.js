@@ -43,7 +43,18 @@ const MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
  */
 const SAVE_DEBOUNCE_MS = 5000;
 
-/** sessionId → { userId, username, displayName, avatar, createdAt, lastSeenAt } */
+/**
+ * empreinte(sessionId) → { userId, username, displayName, avatar, createdAt, lastSeenAt }
+ *
+ * La clé est l'empreinte, jamais l'identifiant lui-même — voir `fingerprint`.
+ *
+ * Les sessions ouvertes avant ce changement sont rangées sous leur identifiant
+ * en clair, qu'on ne peut pas distinguer d'une empreinte : les deux sont
+ * soixante-quatre caractères hexadécimaux. Elles ne répondent donc plus, et
+ * s'effacent d'elles-mêmes à l'expiration. Ceux qu'elles portaient repassent
+ * une fois par la reconnaissance muette de `auth.middleware`, qui ne leur
+ * demande rien de visible.
+ */
 let store = null;
 let saveTimer = null;
 
@@ -97,6 +108,29 @@ function purgeExpired() {
 }
 
 /**
+ * Empreinte sous laquelle une session est rangée sur le disque.
+ *
+ * L'identifiant de session est l'équivalent d'un mot de passe : le présenter
+ * suffit à être cette personne. Il était écrit tel quel dans
+ * `data/sessions.json`, si bien qu'une lecture de ce fichier — une sauvegarde,
+ * un dossier synchronisé, une copie du projet sur une seconde machine —
+ * rendait chaque session rejouable telle quelle.
+ *
+ * Le navigateur garde la valeur en clair, dans son cookie ; le disque n'en
+ * garde que l'empreinte. Le serveur hache ce qu'on lui présente et compare.
+ *
+ * SHA-256 nu, sans sel ni étirement, et c'est suffisant ici : ce qu'on hache
+ * n'est pas un secret choisi par un humain mais 32 octets tirés au hasard.
+ * Rien à deviner, donc rien qu'un dictionnaire puisse accélérer.
+ *
+ * @param {string} sessionId
+ * @returns {string}
+ */
+function fingerprint(sessionId) {
+    return crypto.createHash('sha256').update(String(sessionId)).digest('hex');
+}
+
+/**
  * Ouvre une session pour un compte Discord.
  *
  * Un compte en tient plusieurs à la fois, et il le faut : la même personne
@@ -122,9 +156,11 @@ function create(user) {
     keepRecent(String(user.id), MAX_PER_USER - 1);
 
     const id = crypto.randomBytes(32).toString('hex');
+    // Rangée sous son empreinte : c'est elle qui touche le disque, jamais `id`.
+    const key = fingerprint(id);
     const now = Date.now();
 
-    store[id] = {
+    store[key] = {
         userId: String(user.id),
         username: user.username || '',
         displayName: user.global_name || user.username || '',
@@ -136,8 +172,10 @@ function create(user) {
     };
 
     save();
-    log.info(`[Sessions] Session opened for ${store[id].displayName} (${user.id}).`);
-    return { id, session: store[id] };
+    log.info(`[Sessions] Session opened for ${store[key].displayName} (${user.id}).`);
+    // `id` part dans le cookie, `store[key]` reste ici : les deux ne se
+    // rencontrent plus que le temps d'un hachage.
+    return { id, session: store[key] };
 }
 
 /**
@@ -149,11 +187,12 @@ function get(sessionId) {
     if (!sessionId) return null;
     load();
 
-    const session = store[sessionId];
+    const key = fingerprint(sessionId);
+    const session = store[key];
     if (!session) return null;
 
     if (Date.now() - (session.lastSeenAt || 0) > MAX_AGE_MS) {
-        delete store[sessionId];
+        delete store[key];
         save();
         return null;
     }
@@ -174,8 +213,10 @@ function get(sessionId) {
  */
 function destroy(sessionId) {
     load();
-    if (!sessionId || !store[sessionId]) return false;
-    delete store[sessionId];
+    if (!sessionId) return false;
+    const key = fingerprint(sessionId);
+    if (!store[key]) return false;
+    delete store[key];
     save();
     return true;
 }

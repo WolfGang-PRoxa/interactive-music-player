@@ -25,6 +25,15 @@ const zlib = require('zlib');
 
 const BLOCK_SIZE = 512;
 
+/**
+ * Taille maximale de l'archive une fois décompressée.
+ *
+ * Les archives de code source de ce dépôt pèsent quelques mégaoctets ; 512 Mo
+ * laissent donc deux ordres de grandeur de marge avant de gêner une release
+ * légitime, tout en bornant ce qu'une archive malformée peut faire allouer.
+ */
+const MAX_UNCOMPRESSED_BYTES = 512 * 1024 * 1024;
+
 /** Le bloc est-il entièrement nul ? Deux de suite marquent la fin de l'archive. */
 function isEmptyBlock(block) {
     for (let i = 0; i < block.length; i++) {
@@ -109,7 +118,20 @@ function extractTarGz(archive, destination, options = {}) {
     const root = path.resolve(destination);
     fs.mkdirSync(root, { recursive: true });
 
-    const tar = zlib.gunzipSync(archive);
+    /*
+     * Un plafond à la décompression.
+     *
+     * Sans lui, une archive de quelques kilooctets peut en rendre plusieurs
+     * gigaoctets — un taux de mille pour un est banal sur du contenu répétitif —
+     * et `gunzipSync` les alloue d'un bloc avant que la moindre ligne d'ici ne
+     * s'exécute. Le process tombe alors sur un dépassement mémoire, sans trace.
+     *
+     * L'archive vient de GitHub et l'installation est réservée au maître : le
+     * cas est improbable. Mais le garde-fou tient en un argument, et l'absence
+     * de plafond sur une décompression est de celles qui ne se remarquent que
+     * le jour où elles servent.
+     */
+    const tar = zlib.gunzipSync(archive, { maxOutputLength: MAX_UNCOMPRESSED_BYTES });
 
     let position = 0;
     let pendingName = null;

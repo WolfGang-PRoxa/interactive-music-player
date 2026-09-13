@@ -409,11 +409,8 @@ function middleware(req, res, next) {
     req.identity = identity;
 
     if (identity.tokenSource === 'query') {
-        res.cookie(COOKIE_NAME, extractToken(req).value, {
-            httpOnly: true,
-            sameSite: 'lax',
-            maxAge: 1000 * 60 * 60 * 24 * 365,
-        });
+        res.cookie(COOKIE_NAME, extractToken(req).value,
+            cookieOptions(1000 * 60 * 60 * 24 * 365));
 
         if (req.method === 'GET') {
             const url = new URL(req.originalUrl, 'http://localhost');
@@ -423,6 +420,52 @@ function middleware(req, res, next) {
     }
 
     next();
+}
+
+/**
+ * Faut-il poser `Secure` sur les cookies de cette installation ?
+ *
+ * L'attribut interdit au navigateur de renvoyer le cookie sur une connexion en
+ * clair. C'est exactement ce qu'on veut derrière un tunnel — le tableau de bord
+ * y est en HTTPS, et rien ne justifie que le jeton reparte autrement — et
+ * exactement ce qu'il ne faut pas en local, où l'installation est servie en
+ * `http://127.0.0.1` : le cookie y serait posé puis jamais renvoyé, et la
+ * session ne tiendrait pas d'une requête à l'autre.
+ *
+ * La question se tranche donc sur l'adresse publique déclarée, qui est celle où
+ * les cookies se posent réellement — le retour de Discord y revient, et c'est
+ * la seule origine qui porte une session (voir WebServer.start).
+ *
+ * @returns {boolean}
+ */
+function useSecureCookies() {
+    const declared = (process.env.PUBLIC_URL || '').trim();
+    if (!declared) return false;
+    try {
+        return new URL(declared).protocol === 'https:';
+    } catch (e) {
+        return false;
+    }
+}
+
+/**
+ * Options communes aux deux cookies du tableau de bord.
+ *
+ * `httpOnly` les rend invisibles au script de la page : une injection ne peut
+ * pas les lire, seulement agir dans la page. `sameSite: 'lax'` les retient sur
+ * les requêtes inter-sites sans casser le retour de Discord, qui est une
+ * navigation de premier niveau.
+ *
+ * @param {number} maxAge
+ * @returns {object}
+ */
+function cookieOptions(maxAge) {
+    return {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: useSecureCookies(),
+        maxAge,
+    };
 }
 
 /**
@@ -511,6 +554,8 @@ module.exports = {
     getToken,
     parseCookies,
     originAllowed,
+    useSecureCookies,
+    cookieOptions,
     isAuthorized,
     identify,
     isPublicPath,

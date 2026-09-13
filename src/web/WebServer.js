@@ -277,7 +277,7 @@ class WebServer {
                 }
                 if (this.wss.clients.size === 0) {
                     log.success(`[WebServer] No connected client detected. Opening the dashboard automatically.`);
-                    const { exec } = require('child_process');
+                    const { execFile } = require('child_process');
                     /*
                      * Sur l'origine où Discord renvoie, et nulle part ailleurs.
                      *
@@ -298,15 +298,30 @@ class WebServer {
                      * cookie puis nettoie l'URL.
                      */
                     const url = `${require('./oauth').publicUrl()}/?token=${token}`;
-                    let cmd;
-                    if (process.platform === 'win32') {
-                        cmd = `start "" "${url}"`;
-                    } else if (process.platform === 'darwin') {
-                        cmd = `open "${url}"`;
-                    } else {
-                        cmd = `xdg-open "${url}"`;
-                    }
-                    exec(cmd, { windowsHide: true }, (err) => {
+
+                    /*
+                     * Un tableau d'arguments, et non une ligne de commande.
+                     *
+                     * L'adresse était interpolée dans une chaîne remise à
+                     * l'interpréteur — `start "" "${url}"`. Elle porte le jeton
+                     * et se déduit de `PUBLIC_URL`, donc parfois de la sortie de
+                     * Tailscale : un guillemet ou une esperluette qui s'y
+                     * glisserait fermerait la chaîne et ferait exécuter la
+                     * suite. C'était le dernier `exec` du projet, tout le reste
+                     * passant déjà par `spawn` ou `execFile`.
+                     *
+                     * Sous Windows, `start` n'est pas un exécutable mais une
+                     * commande interne de cmd.exe : il faut donc `cmd /c`, dont
+                     * le premier argument vide est le titre de fenêtre que
+                     * `start` réclame avant l'adresse.
+                     */
+                    const [command, args] = process.platform === 'win32'
+                        ? ['cmd', ['/c', 'start', '', url]]
+                        : process.platform === 'darwin'
+                            ? ['open', [url]]
+                            : ['xdg-open', [url]];
+
+                    execFile(command, args, { windowsHide: true }, (err) => {
                         if (err) {
                             log.error(`[WebServer] Cannot open the browser: ${err.message}`);
                         }

@@ -138,6 +138,22 @@ function buildAuthorizeUrl(returnTo = '/', carried = {}) {
          * auquel il doit répondre en rendant la main sans un mot.
          */
         silent: Boolean(carried.silent),
+        /*
+         * L'empreinte du navigateur qui a demandé ce trajet.
+         *
+         * Le `state` se prémunissait de la falsification par son seul
+         * caractère imprévisible, ce qui ne suffit pas : un attaquant peut en
+         * demander un pour lui-même, puis faire charger le rappel à sa victime
+         * avec son propre `code`. La victime se retrouvait alors connectée sous
+         * le compte de l'attaquant, et tout ce qu'elle faisait ensuite lui était
+         * imputé.
+         *
+         * Le `state` dit désormais *à qui* il a été remis. La valeur voyage dans
+         * un cookie que seul ce navigateur-là possède ; le rappel exige que les
+         * deux correspondent. Un `state` obtenu ailleurs ne vaut plus rien
+         * ailleurs.
+         */
+        nonce: carried.nonce || null,
     });
 
     const url = new URL(AUTHORIZE_URL);
@@ -167,7 +183,8 @@ function buildAuthorizeUrl(returnTo = '/', carried = {}) {
  * seconde session.
  *
  * @param {string} state
- * @returns {{ returnTo: string, holdsToken: boolean, claim: boolean, silent: boolean }|null}
+ * @returns {{ returnTo: string, holdsToken: boolean, claim: boolean, silent: boolean,
+ *   nonce: string|null }|null}
  *   null si inconnu, déjà servi ou périmé.
  */
 function consumeState(state) {
@@ -183,6 +200,7 @@ function consumeState(state) {
         holdsToken: Boolean(entry.holdsToken),
         claim: Boolean(entry.claim),
         silent: Boolean(entry.silent),
+        nonce: entry.nonce || null,
     };
 }
 
@@ -264,6 +282,7 @@ function logConfiguration() {
 }
 
 module.exports = {
+    STATE_TTL_MS,
     isConfigured,
     clientId,
     publicUrl,

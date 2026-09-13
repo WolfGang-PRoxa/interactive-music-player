@@ -22,6 +22,24 @@ const guests = require('../guests');
 const owner = require('../owner');
 const auth = require('../auth');
 const log = require('../../utils/logger');
+const crypto = require('crypto');
+
+/**
+ * Cookie qui lie un trajet d'authentification au navigateur qui l'a ouvert.
+ *
+ * Éphémère : il ne vit que le temps d'aller chez Discord et d'en revenir, et
+ * le rappel l'efface. Voir le `nonce` dans oauth.js pour ce qu'il ferme.
+ */
+const OAUTH_COOKIE = 'dashboard_oauth';
+
+/** Comparaison à temps constant, comme celle du jeton dans web/auth.js. */
+function safeEquals(a, b) {
+    if (typeof a !== 'string' || typeof b !== 'string') return false;
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    if (bufA.length !== bufB.length) return false;
+    return crypto.timingSafeEqual(bufA, bufB);
+}
 
 /**
  * Échappe ce qui va être interpolé dans du HTML.
@@ -243,10 +261,28 @@ function createAuthRouter(webServer) {
          */
         const silent = req.query.silent === '1';
 
+        /*
+         * Le trajet est marqué du navigateur qui l'ouvre.
+         *
+         * Sans cela, un `state` valable obtenu par n'importe qui valait pour
+         * n'importe qui : il suffisait d'en demander un, puis de faire charger
+         * le rappel à sa victime avec son propre `code` pour la connecter sous
+         * un compte qui n'est pas le sien.
+         *
+         * Le cookie ne franchit pas la frontière d'origine, et il n'a pas à le
+         * faire : le tableau de bord ne s'ouvre que sur `PUBLIC_URL`, qui est
+         * aussi l'adresse où Discord renvoie — c'est la raison pour laquelle la
+         * fenêtre de démarrage s'y ouvre et nulle part ailleurs (voir
+         * WebServer.start). L'aller et le retour partagent donc le même bocal.
+         */
+        const nonce = crypto.randomBytes(16).toString('hex');
+        res.cookie(OAUTH_COOKIE, nonce, auth.cookieOptions(oauth.STATE_TTL_MS));
+
         res.redirect(302, oauth.buildAuthorizeUrl(safeReturnTo, {
             holdsToken: auth.identify(req).holdsToken,
             claim: switching,
             silent,
+            nonce,
         }));
     });
 
@@ -304,6 +340,41 @@ function createAuthRouter(webServer) {
                 'Ce lien d\'authentification n\'est plus valable. Relancez la connexion.'
             ));
         }
+
+        /*
+         * Ce trajet a-t-il bien été ouvert par ce navigateur-ci ?
+         *
+         * Le `state` seul ne répondait pas : imprévisible, certes, mais valable
+         * pour quiconque le présente. Un attaquant en demandait un, obtenait un
+         * `code` pour son propre compte, puis faisait charger le rappel à sa
+         * victime — qui se retrouvait connectée sous le compte de l'attaquant
+         * sans l'avoir demandé ni s'en apercevoir.
+         *
+         * Le cookie posé à l'aller répond à la question. Il est comparé à temps
+         * constant, comme le jeton : la valeur est un secret de même nature.
+         *
+         * `nonce` absent du `state` : celui-ci a été émis par une version
+         * antérieure à ce correctif, encore dans sa fenêtre de cinq minutes au
+         * moment d'une bascule de version. On le laisse passer plutôt que
+         * d'éconduire quelqu'un en pleine connexion pour un champ qui n'existait
+         * pas quand il a cliqué.
+         */
+        if (route.nonce) {
+            const presente = auth.parseCookies(req.headers.cookie || '')[OAUTH_COOKIE];
+            if (!safeEquals(presente, route.nonce)) {
+                log.warn('[OAuth] Callback refused: this sign-in was opened by another browser.');
+                res.clearCookie(OAUTH_COOKIE, auth.cookieOptions(undefined));
+                if (route.silent) return giveUpSilently(res, route.returnTo);
+                return res.status(400).type('html').send(errorPage(
+                    'Connexion interrompue',
+                    'Cette connexion a été ouverte depuis un autre navigateur. '
+                    + 'Relancez-la depuis celui-ci.'
+                ));
+            }
+        }
+
+        // Consommé : il n'a plus d'usage, et rien ne doit traîner d'un trajet.
+        res.clearCookie(OAUTH_COOKIE, auth.cookieOptions(undefined));
 
         if (typeof code !== 'string' || !code) {
             if (route.silent) return giveUpSilently(res, route.returnTo);
@@ -380,11 +451,7 @@ function createAuthRouter(webServer) {
         guests.remember(user);
 
         const { id } = sessions.create(user);
-        res.cookie(sessions.COOKIE_NAME, id, {
-            httpOnly: true,
-            sameSite: 'lax',
-            maxAge: sessions.MAX_AGE_MS,
-        });
+        res.cookie(sessions.COOKIE_NAME, id, auth.cookieOptions(sessions.MAX_AGE_MS));
 
         // Repassé au filtre, et non repris tel quel : le `state` a été émis par
         // ce serveur, mais rien n'oblige à ce que la version qui l'a écrit ait
@@ -408,7 +475,10 @@ function createAuthRouter(webServer) {
         const cookies = auth.parseCookies(req.headers.cookie || '');
         const closed = sessions.destroy(cookies[sessions.COOKIE_NAME]);
 
-        res.clearCookie(sessions.COOKIE_NAME, { httpOnly: true, sameSite: 'lax' });
+        // Les mêmes attributs qu'à la pose : un navigateur n'efface un cookie
+        // que si `Secure`, `SameSite` et le chemin correspondent. Sans cela la
+        // déconnexion répondait « ok » en laissant la session dans le bocal.
+        res.clearCookie(sessions.COOKIE_NAME, auth.cookieOptions(undefined));
         res.json({ ok: true, closed });
     });
 
