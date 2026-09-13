@@ -426,6 +426,65 @@ function middleware(req, res, next) {
 }
 
 /**
+ * Cette WebSocket vient-elle bien de ce tableau de bord ?
+ *
+ * ## Pourquoi la question se pose
+ *
+ * Les WebSockets échappent à la politique d'origine croisée : une page tierce
+ * peut en ouvrir une vers n'importe quelle adresse, et le navigateur la laisse
+ * faire. Ce qui protégeait ce serveur jusqu'ici n'était pas une décision de sa
+ * part mais un effet de bord — les cookies `SameSite=Lax` ne partent pas sur
+ * une requête inter-site — c'est-à-dire une garantie empruntée au navigateur,
+ * qui tombe dès que le jeton circule autrement qu'en cookie.
+ *
+ * ## Pourquoi une origine absente est acceptée
+ *
+ * Seuls les navigateurs posent `Origin`. Le lanceur (`tools/start-bot.ps1`)
+ * ouvre une WebSocket pour savoir si un tableau de bord est déjà là, et le test
+ * de fumée en ouvre une pour s'assurer que l'état arrive : ni l'un ni l'autre
+ * n'envoie cet en-tête. Les refuser reviendrait à casser le démarrage du bot
+ * pour se prémunir d'une attaque qui, par définition, passe par un navigateur —
+ * et un navigateur pose toujours `Origin`.
+ *
+ * L'absence d'origine n'ouvre donc rien de plus : la requête doit de toute
+ * façon avoir franchi `identify()` juste avant, donc porter le jeton ou une
+ * session valable.
+ *
+ * @param {import('http').IncomingMessage} req
+ * @param {{ holdsToken?: boolean }} identity
+ * @returns {boolean}
+ */
+function originAllowed(req, identity) {
+    const origin = req.headers.origin;
+    // Pas de navigateur derrière : voir plus haut.
+    if (!origin) return true;
+
+    let host;
+    try {
+        host = new URL(origin).host;
+    } catch (e) {
+        // Origine illisible : un navigateur n'en produit pas de telles.
+        return false;
+    }
+
+    // L'hôte par lequel la requête est arrivée. C'est la comparaison qui tient
+    // quelle que soit l'adresse d'entrée — 127.0.0.1, le nom de la machine sur
+    // le réseau local, le tunnel — sans avoir à les énumérer.
+    if (req.headers.host && host === req.headers.host) return true;
+
+    // L'adresse publique déclarée, quand elle diffère de l'hôte d'arrivée :
+    // c'est le cas derrière un tunnel, qui présente son propre `Host`.
+    try {
+        const declared = (process.env.PUBLIC_URL || '').trim();
+        if (declared && new URL(declared).host === host) return true;
+    } catch (e) {
+        // PUBLIC_URL illisible : on s'en tient à l'hôte d'arrivée.
+    }
+
+    return false;
+}
+
+/**
  * Vérification du handshake WebSocket (option verifyClient de `ws`).
  * @param {{ req: import('http').IncomingMessage }} info
  * @returns {boolean}
@@ -434,6 +493,12 @@ function verifyUpgrade(info) {
     const identity = identify(info.req);
     if (!identity.authorized) {
         log.warn('[Auth] WebSocket handshake refused: token missing or invalid.');
+        return false;
+    }
+
+    if (!originAllowed(info.req, identity)) {
+        log.warn(`[Auth] WebSocket handshake refused: origin « ${info.req.headers.origin} » `
+            + 'is not this dashboard.');
         return false;
     }
     // Rangée sur la requête, elle sera relue à l'ouverture de la connexion :
@@ -445,6 +510,7 @@ function verifyUpgrade(info) {
 module.exports = {
     getToken,
     parseCookies,
+    originAllowed,
     isAuthorized,
     identify,
     isPublicPath,

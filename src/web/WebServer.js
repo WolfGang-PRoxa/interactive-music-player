@@ -455,6 +455,61 @@ class WebServer {
         // L'authentification passe avant tout le reste, fichiers statiques compris.
         // Elle laisse passer le trajet OAuth2, seul chemin par lequel un invité
         // peut se présenter : voir PUBLIC_PATHS dans web/auth.js.
+        /*
+         * Les en-têtes de sécurité, avant tout le reste.
+         *
+         * Posés avant l'authentification, et non après : ils doivent couvrir
+         * aussi les pages servies *à la place* du tableau de bord — la page de
+         * refus, celles du trajet OAuth — qui sont précisément celles qu'un
+         * inconnu peut atteindre. C'est sur l'une d'elles qu'une valeur venue
+         * de la requête s'est retrouvée interpolée dans du HTML ; l'échappement
+         * ferme la porte, la politique ci-dessous ferme la pièce.
+         *
+         * Ce que chaque directive doit au tableau de bord tel qu'il est :
+         *
+         *  - `script-src 'self'` sans `unsafe-inline`, parce que la page ne
+         *    porte aucun `<script>` en ligne : tout son code vient de `/js/`.
+         *    C'est la directive qui compte, et elle peut être stricte.
+         *  - `style-src` admet `unsafe-inline` faute de choix : la page compte
+         *    une cinquantaine d'attributs `style=`, et le script en pose
+         *    d'autres au fil de l'exécution (positions, opacités, dégradés).
+         *  - `img-src https:` parce que les pochettes viennent d'où la piste
+         *    vient — iTunes, YouTube, Discord — et que la liste ne se ferme pas.
+         *  - `connect-src` porte `ws:` et `wss:` : la WebSocket du tableau de
+         *    bord, sans laquelle il reste muet.
+         *  - `frame-ancestors 'none'` : rien n'encadre ce tableau de bord, et
+         *    une page tierce qui le ferait pourrait faire cliquer ses commandes
+         *    à l'insu de celui qui croit cliquer ailleurs.
+         *  - `base-uri 'none'` : une balise `<base>` injectée détournerait
+         *    toutes les URL relatives de la page, `/js/` compris.
+         */
+        this.app.use((req, res, next) => {
+            res.set('Content-Security-Policy', [
+                "default-src 'self'",
+                "script-src 'self'",
+                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+                "font-src 'self' https://fonts.gstatic.com data:",
+                "img-src 'self' data: blob: https:",
+                "media-src 'self' blob: data:",
+                "connect-src 'self' ws: wss:",
+                "frame-ancestors 'none'",
+                "base-uri 'none'",
+                "form-action 'self'",
+                "object-src 'none'",
+            ].join('; '));
+            // Un type MIME deviné est un type MIME choisi par l'attaquant :
+            // un fichier envoyé puis servi ne doit pas pouvoir se faire passer
+            // pour du script.
+            res.set('X-Content-Type-Options', 'nosniff');
+            // `frame-ancestors` dit déjà la même chose aux navigateurs récents ;
+            // celui-ci couvre les autres.
+            res.set('X-Frame-Options', 'DENY');
+            // Le jeton a voyagé en query et peut encore le faire sur un lien
+            // partagé : aucune adresse d'ici ne doit partir vers un tiers.
+            res.set('Referrer-Policy', 'no-referrer');
+            next();
+        });
+
         this.app.use(auth.middleware);
 
         const createAuthRouter = require('./routes/auth');

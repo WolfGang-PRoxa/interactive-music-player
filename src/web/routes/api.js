@@ -521,6 +521,19 @@ function pickVideoFormat(formats, targetHeight) {
 }
 
 function createApiRouter(webServer) {
+    /*
+     * Les droits, sur les routes comme sur les messages.
+     *
+     * `auth.middleware` a déjà répondu « qui frappe ? » avant d'arriver ici ;
+     * ce qui suit répond à « que peut-il faire ? », en lisant la table de
+     * `permissions.js` — la même que le WebSocket. Voir `httpGuards.js` pour
+     * ce que `local` et `right` recouvrent.
+     *
+     * Une route sans garde est un choix, pas un oubli : elle décrit l'état,
+     * sert la documentation, ou laisse écouter. Chacune dit laquelle elle est.
+     */
+    const { local, right } = require('../httpGuards').createGuards(webServer);
+
     /**
      * Version en cours d'exécution.
      *
@@ -564,6 +577,10 @@ function createApiRouter(webServer) {
      * Un onglet dont la WebSocket est tombée n'est pas compté : c'est la même
      * approximation que celle du démarrage, et elle penche du bon côté — au
      * pire on ouvre un onglet, jamais on n'en cache un vivant.
+     */
+    /*
+     * Sans garde : elle ne rend qu'un nombre, et le lanceur l'interroge avant
+     * qu'aucune session Discord n'existe (voir tools/start-bot.ps1).
      */
     router.get('/clients', (req, res) => {
         res.json({ count: webServer.wss ? webServer.wss.clients.size : 0 });
@@ -643,6 +660,16 @@ function createApiRouter(webServer) {
         res.json(webServer.getState(targetGuildId, currentChannelId));
     });
 
+    /*
+     * Sans garde, et c'est délibéré.
+     *
+     * C'est par ici que le son arrive à l'oreille : la fermer derrière un droit
+     * rendrait muet un invité qu'on vient d'admettre. Elle ne divulgue rien de
+     * plus que ce que le tableau de bord montre déjà — la piste est dans la
+     * file, l'invité en lit le titre —, et le seul vrai risque qu'elle portait,
+     * servir un fichier arbitraire du disque, est fermé par `resolveMediaPath`
+     * et non par un droit.
+     */
     router.get('/stream', async (req, res) => {
         const { guildId, trackUrl } = req.query;
         const targetGuildId = guildId || webServer._getFirstGuildId();
@@ -828,7 +855,7 @@ function createApiRouter(webServer) {
         }
     });
 
-    router.get('/download', async (req, res) => {
+    router.get('/download', right('queue.download'), async (req, res) => {
         const { guildId, trackUrl, format: reqFormat } = req.query;
         const targetGuildId = guildId || webServer._getFirstGuildId();
         if (!targetGuildId) return res.status(400).send('Guild ID requis');
@@ -1203,7 +1230,7 @@ function createApiRouter(webServer) {
         res.json(outcome.data);
     });
 
-    router.post('/upload', async (req, res) => {
+    router.post('/upload', right('queue.add'), async (req, res) => {
         const { useMainPlayer } = require('discord-player');
         const uploadService = require('../uploadService');
 
@@ -1254,15 +1281,25 @@ function createApiRouter(webServer) {
      * celle qui n'envoie rien au lecteur et écrit sur le disque du bot.
      *
      * Elles laissent le tableau de bord parcourir l'arborescence de la machine
-     * hôte, ce qui est une capacité nouvelle et mérite d'être dit. Elle reste
-     * dans le modèle de menace du projet — le bot tourne chez son propriétaire,
-     * l'authentification couvre déjà toute route montée après elle, et ce même
-     * tableau de bord peut éteindre le processus. Mais l'enfermer dans les
-     * racines de `mediaPaths` reviendrait à retirer la fonction : quelqu'un qui
-     * range sa musique dans « D:\Musique » veut l'y télécharger.
+     * hôte. L'enfermer dans les racines de `mediaPaths` reviendrait à retirer
+     * la fonction : quelqu'un qui range sa musique dans « D:\Musique » veut
+     * l'y télécharger.
+     *
+     * **D'où la garde `local`.** Ces routes ont longtemps tenu sur un
+     * raisonnement qui a cessé d'être vrai : « le bot tourne chez son
+     * propriétaire, et l'authentification couvre tout ce qui est monté après
+     * elle ». La première moitié a été démentie par le partage du contrôle —
+     * l'invité n'est plus quelqu'un qui est déjà dans la maison — et la seconde
+     * confondait deux questions, car `auth.middleware` dit qui frappe et jamais
+     * ce qu'il peut faire. Un invité sans un seul droit coché parcourait donc
+     * le disque de l'hôte, alors que le message WebSocket équivalent lui aurait
+     * été refusé.
+     *
+     * Le jeton, et non la propriété : le lanceur interroge ces routes sans
+     * session Discord. Voir `httpGuards.js`.
      */
 
-    router.get('/download-dir', (req, res) => {
+    router.get('/download-dir', local, (req, res) => {
         const chosen = database.getDownloadDir();
         res.json({
             dir: chosen || downloadDir.DEFAULT_DIR,
@@ -1271,7 +1308,7 @@ function createApiRouter(webServer) {
         });
     });
 
-    router.post('/download-dir', (req, res) => {
+    router.post('/download-dir', local, (req, res) => {
         const wanted = req.body && typeof req.body.dir === 'string' ? req.body.dir : null;
 
         // Chaîne vide ou absente : retour au dossier par défaut.
@@ -1322,7 +1359,7 @@ function createApiRouter(webServer) {
      * et faire défiler dix mille fichiers pour choisir leur dossier parent ne
      * sert personne.
      */
-    router.get('/browse-dirs', (req, res) => {
+    router.get('/browse-dirs', local, (req, res) => {
         const asked = typeof req.query.path === 'string' && req.query.path.trim()
             ? req.query.path.trim()
             : null;

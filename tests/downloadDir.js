@@ -374,6 +374,19 @@ const app = express();
 // Le même analyseur de corps que WebServer monte devant ses routes : sans lui
 // `req.body` reste indéfini, et tout POST se lirait comme un corps vide.
 app.use(express.json({ limit: '1mb' }));
+/*
+ * L'identité que `auth.middleware` poserait, posée à la main.
+ *
+ * Ce banc monte le routeur seul, sans la porte d'entrée : ce qu'il éprouve est
+ * le sélecteur de dossiers, pas le contrôle d'accès. Depuis que ces routes
+ * portent la garde `local` (voir web/httpGuards.js), il faut donc lui dire qui
+ * frappe, sans quoi chaque appel se solderait par un 403 qui ne dit rien du
+ * sujet du test. Le refus, lui, est éprouvé à part dans tests/httpGuards.js.
+ */
+app.use((req, res, next) => {
+    req.identity = { authorized: true, master: true, holdsToken: true, session: null };
+    next();
+});
 app.use('/api', createApiRouter({ client: null, wss: null, inviteLink: () => null }));
 const server = http.createServer(app);
 

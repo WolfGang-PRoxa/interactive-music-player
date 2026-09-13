@@ -47,6 +47,41 @@ function echapperHtml(valeur) {
     })[caractere]);
 }
 
+/**
+ * Ramène une destination de retour à un chemin de ce serveur.
+ *
+ * Une destination ne peut être qu'un chemin d'ici : une URL absolue ferait de
+ * cette adresse un tremplin vers n'importe quel site, et le trajet est d'autant
+ * plus convaincant que la victime vient de traverser une authentification
+ * Discord authentique avant d'atterrir ailleurs.
+ *
+ * Le filtre écartait `//evil.com` et laissait passer `/\evil.com`. La norme
+ * WHATWG assimile la barre inverse à une barre oblique dans les schémas
+ * spéciaux : le navigateur résolvait donc l'en-tête `Location` vers un autre
+ * domaine. Compléter la liste des caractères refusés n'aurait fait que déplacer
+ * la question — c'est l'analyseur d'URL qui connaît ces équivalences, pas nous.
+ *
+ * On lui donne donc la valeur avec une base quelconque, et on ne garde que ce
+ * qui ne peut pas désigner un autre hôte : le chemin et sa requête. `//evil`,
+ * `/\evil`, `https://evil` et `javascript:` retombent tous sur un chemin d'ici.
+ *
+ * @param {unknown} valeur
+ * @returns {string} Un chemin absolu de ce serveur, `/` à défaut.
+ */
+function cheminInterne(valeur) {
+    try {
+        const url = new URL(String(valeur ?? '/'), 'http://localhost');
+        const chemin = (url.pathname || '/') + url.search;
+        // Un schéma que l'analyseur ne tient pas pour « spécial » — `javascript:`
+        // en tête — rend un chemin sans barre oblique de tête, donc relatif à la
+        // page courante. Inoffensif, mais ce n'est pas ce que cette fonction
+        // promet : elle rend un chemin absolu de ce serveur, toujours.
+        return chemin.startsWith('/') ? chemin : `/${chemin}`;
+    } catch (e) {
+        return '/';
+    }
+}
+
 /** Page d'erreur du trajet, dans le style de celle de web/auth.js. */
 function errorPage(rawTitle, rawMessage, rawDetail) {
     const title = echapperHtml(rawTitle);
@@ -171,10 +206,7 @@ function createAuthRouter(webServer) {
             ));
         }
 
-        const returnTo = typeof req.query.returnTo === 'string' ? req.query.returnTo : '/';
-        // Une destination ne peut être qu'un chemin de ce serveur : une URL
-        // absolue ferait de cette adresse un tremplin vers n'importe quel site.
-        const safeReturnTo = returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : '/';
+        const safeReturnTo = cheminInterne(req.query.returnTo);
 
         /*
          * Le jeton est constaté ici, et non au rappel.
@@ -354,7 +386,11 @@ function createAuthRouter(webServer) {
             maxAge: sessions.MAX_AGE_MS,
         });
 
-        res.redirect(302, route.returnTo);
+        // Repassé au filtre, et non repris tel quel : le `state` a été émis par
+        // ce serveur, mais rien n'oblige à ce que la version qui l'a écrit ait
+        // filtré comme celle qui le lit — une release installée peut être plus
+        // ancienne que le correctif.
+        res.redirect(302, cheminInterne(route.returnTo));
     });
 
     /**
