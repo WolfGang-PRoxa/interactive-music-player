@@ -181,6 +181,24 @@ async function isKnownMember(client, userId) {
 function createAuthRouter(webServer) {
     const router = express.Router();
 
+    /*
+     * Un plafond sur les deux chemins ouverts sans authentification.
+     *
+     * Ils ne donnent accès à rien, mais ils font travailler le bot :
+     * `/discord` fait grossir la table des trajets en attente, et le rappel
+     * déclenche un échange chez Discord puis un `members.fetch` par serveur —
+     * des appels dont le quota est celui du bot, pas celui du visiteur.
+     *
+     * Trente tentatives par minute et par adresse : se connecter en coûte deux,
+     * et une rafale s'arrête avant d'épuiser quoi que ce soit. Voir
+     * web/rateLimit.js pour ce que « par adresse » veut dire derrière un tunnel.
+     */
+    const porte = require('../rateLimit').createLimiter({
+        name: 'oauth',
+        limit: 30,
+        windowMs: 60 * 1000,
+    });
+
     /**
      * Ce que le tableau de bord a besoin de savoir avant de s'afficher.
      *
@@ -215,7 +233,7 @@ function createAuthRouter(webServer) {
         });
     });
 
-    router.get('/discord', (req, res) => {
+    router.get('/discord', porte, (req, res) => {
         if (!oauth.isConfigured()) {
             return res.status(503).type('html').send(errorPage(
                 'Partage indisponible',
@@ -300,7 +318,7 @@ function createAuthRouter(webServer) {
         return res.redirect(302, url.pathname + url.search);
     }
 
-    router.get('/discord/callback', async (req, res) => {
+    router.get('/discord/callback', porte, async (req, res) => {
         const { code, state, error } = req.query;
 
         /*

@@ -948,6 +948,28 @@ function createApiRouter(webServer) {
 
         // 2. Sinon, résolution de l'URL directe via youtube-dl-exec
         const targetUrl = (track.url && track.url.includes('music.youtube.com')) ? track.url.replace('music.youtube.com', 'www.youtube.com') : track.url;
+
+        /*
+         * L'adresse doit mener hors de chez l'hôte.
+         *
+         * `yt-dlp` et `ffmpeg` s'exécutent sur la machine du propriétaire, donc
+         * à l'intérieur de son réseau, et suivent l'adresse qu'on leur donne
+         * sans se poser de question. Celle-ci vient de la piste, donc de qui l'a
+         * ajoutée : un invité pourvu du seul droit d'ajouter à la file faisait
+         * ainsi frapper à des portes qu'il n'atteint pas lui-même — l'interface
+         * du routeur, un service sur la boucle locale, un point de métadonnées.
+         *
+         * Le nom est résolu et non seulement lu : `interne.exemple.fr` n'a l'air
+         * de rien et peut pointer sur `10.0.0.1`. Voir utils/outbound.js.
+         */
+        if (!ffmpegInput && /^https?:\/\//i.test(targetUrl)) {
+            const verdict = await require('../../utils/outbound').isFetchable(targetUrl);
+            if (!verdict.ok) {
+                log.warn(`[WebServer Download] Outbound address refused: ${verdict.reason}`);
+                return res.status(403).send('Adresse non autorisée');
+            }
+        }
+
         if (!ffmpegInput && /^https?:\/\//i.test(targetUrl)) {
             try {
                 const youtubedl = require('youtube-dl-exec');
