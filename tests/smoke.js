@@ -201,6 +201,31 @@ async function stageIntegration() {
         check('the dashboard is served', page.code === 200 && page.fakeBody.includes('<title>'),
             `${page.fakeBody.length} octets`);
 
+        /*
+         * La politique de sécurité du contenu, des deux côtés de son arbitrage.
+         *
+         * `script-src` est la directive qui compte contre l'injection, et elle
+         * peut être stricte : la page ne porte aucun `<script>` en ligne.
+         *
+         * `media-src` doit au contraire rester ouverte au distant, et ce
+         * contrôle-là est né d'une panne : fermée à `'self'`, elle bloquait
+         * l'adresse que `/api/video-info` rend au lecteur — un hôte
+         * `*.googlevideo.com` —, et plus aucune vidéo ne se chargeait. Le
+         * navigateur n'annonçait qu'un « code 4 », qui ne dit pas d'où il vient.
+         * Refermer cette directive demande d'abord de faire passer les octets
+         * par le bot.
+         */
+        const csp = page.headers['content-security-policy'] || '';
+        const directive = (name) => (csp.split(';').map((d) => d.trim())
+            .find((d) => d.startsWith(`${name} `)) || '');
+
+        check('the content security policy is served',
+            csp.includes("default-src 'self'"), `${csp.length} caractères`);
+        check('  … scripts stay confined to the dashboard',
+            directive('script-src') === "script-src 'self'", directive('script-src'));
+        check('  … media may come from where the track comes from',
+            directive('media-src').includes('https:'), directive('media-src'));
+
         const state = await request('/api/state', { Cookie: `dashboard_token=${t}` });
         check('/api/state answers', state.code === 200, `HTTP ${state.code}`);
 
