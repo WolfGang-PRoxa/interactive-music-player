@@ -189,6 +189,16 @@ window.MusicPlayer.applyLanguage = async function(lang) {
     if (typeof window.MusicPlayer.refreshDocsLanguage === 'function') {
         window.MusicPlayer.refreshDocsLanguage().catch(() => {});
     }
+
+    /*
+     * Le journal des modifications suit le même chemin, pour la même raison, et
+     * doublement : son contenu n'est écrit qu'en deux langues et peut donc ne pas
+     * changer, mais tout son habillage — les dates en toutes lettres, les
+     * libellés de catégorie, les comptes — change à chaque fois.
+     */
+    if (typeof window.MusicPlayer.refreshChangelogLanguage === 'function') {
+        window.MusicPlayer.refreshChangelogLanguage().catch(() => {});
+    }
 };
 
 window.MusicPlayer.t = function(key) {

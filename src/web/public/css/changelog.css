@@ -1,0 +1,886 @@
+/*
+   Journal des modifications — voir js/changelog.js pour la mécanique, et
+   src/web/changelog.js pour le format du fichier lu.
+
+   Deux principes, les mêmes que pour le lecteur de documentation :
+
+   1. **Rien n'est peint en dur.** Les fonds, l'encre et les accents sortent des
+      variables de thème du tableau de bord ; la fenêtre suit donc le style
+      choisi, et le curseur jour/nuit, sans une règle de plus.
+   2. **La catégorie donne sa couleur à tout ce qui la concerne.** Chaque groupe
+      pose `--kind` une fois ; le badge, la puce de chaque entrée et la pastille
+      de filtre s'y réfèrent. Ajouter une catégorie, c'est ajouter une ligne.
+
+   **Pourquoi ces règles ne sont pas celles de docs.css.** La charpente est la
+   même — voile, fenêtre, en-tête, sommaire qui passe en tiroir, pied — et il
+   aurait été tentant de partager les classes. Deux raisons de ne pas le faire :
+   docs.css est une feuille dense et longuement commentée, dont les règles sont
+   taillées pour une page de livre paginée (hauteurs fixes, colonnes, feuille qui
+   tourne) ; et les deux fenêtres n'ont pas le même contenu, donc pas les mêmes
+   besoins de réglage — la frise veut une largeur de lecture, le livre une
+   hauteur de page. La répétition est ici délibérée, comme celle que device.css
+   assume déjà vis-à-vis de docs.css : chacune reste réglable sans risque pour
+   l'autre.
+*/
+
+.changelog-overlay {
+    /*
+     * `--docs-rule` n'est pas une coquille : les entrées sont rendues par
+     * `renderInline()` de js/docs.js, qui produit des `.docs-code-inline`, et
+     * cette classe lit cette variable pour sa bordure. Le rendu est emprunté,
+     * la variable qu'il attend doit l'être aussi — sans quoi la déclaration de
+     * bordure est invalide et le code littéral perd son cadre.
+     */
+    --docs-rule: var(--border-card);
+
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(10, 9, 15, 0.72);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    /* Même famille que le lecteur de documentation (20020), au-dessus des
+       paramètres (20000) d'où l'un et l'autre s'ouvrent. Les deux ne peuvent
+       pas être ouverts ensemble : la fenêtre qui les lance est dessous. */
+    z-index: 20020;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.changelog-overlay.hidden {
+    display: none !important;
+}
+
+.changelog-window {
+    box-sizing: border-box;
+    /* Plus étroite que la fenêtre de documentation, qui doit loger une double
+       page : ici le contenu est une colonne de texte, et l'étirer sur 1580 px
+       ne donnerait que des lignes trop longues à suivre. */
+    width: min(1180px, 95vw);
+    height: min(940px, 93vh);
+    height: min(940px, 93dvh);
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-dropdown);
+    border: 1px solid var(--border-card-hover);
+    border-radius: 22px;
+    box-shadow: var(--shadow-card), 0 0 60px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+    transform: scale(0.94);
+    opacity: 0;
+}
+
+.changelog-overlay:not(.hidden) .changelog-window {
+    animation: changelogOpening 0.42s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes changelogOpening {
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* ───────────────────────────── En-tête ───────────────────────────── */
+
+.changelog-header {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 1.1rem 1.4rem;
+    border-bottom: 1px solid var(--border-card);
+    flex-shrink: 0;
+}
+
+.changelog-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    min-width: 0;
+    /* Le titre cède la place à la recherche plutôt que l'inverse : son
+       sous-titre porte une ellipse, le champ de saisie n'en a pas. */
+    flex: 0 1 auto;
+}
+
+.changelog-heading-icon {
+    width: 22px;
+    height: 22px;
+    color: var(--c-primary);
+    flex-shrink: 0;
+}
+
+.changelog-heading-text {
+    min-width: 0;
+}
+
+.changelog-heading-text h2 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--text-main);
+    line-height: 1.2;
+}
+
+.changelog-subtitle {
+    display: block;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Recherche */
+
+.changelog-search {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    height: 34px;
+    padding: 0 0.6rem;
+    /* Elle prend ce que le titre et les boutons laissent, sans jamais devenir
+       si étroite qu'on n'y lise plus ce qu'on tape. */
+    flex: 1 1 auto;
+    min-width: 120px;
+    max-width: 320px;
+    margin-left: auto;
+    background: var(--bg-select);
+    border: 1px solid var(--border-card);
+    border-radius: 999px;
+    transition: border-color 0.18s ease;
+}
+
+.changelog-search:focus-within {
+    border-color: color-mix(in srgb, var(--c-primary) 55%, transparent);
+}
+
+.changelog-search-icon {
+    width: 14px;
+    height: 14px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.changelog-search-input {
+    flex: 1;
+    min-width: 0;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text-main);
+    font-family: inherit;
+    font-size: 0.85rem;
+}
+
+.changelog-search-input::placeholder {
+    color: var(--text-muted);
+}
+
+/* La croix n'existe que lorsqu'il y a quelque chose à effacer. */
+.changelog-search-clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: 50%;
+    color: var(--text-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.changelog-search-clear:hover {
+    color: var(--c-accent);
+}
+
+.changelog-search-clear.hidden {
+    display: none;
+}
+
+.changelog-search-clear svg {
+    width: 12px;
+    height: 12px;
+}
+
+.changelog-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.changelog-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 34px;
+    min-width: 34px;
+    padding: 0 0.55rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-card);
+    border-radius: 10px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.changelog-icon-btn:hover {
+    color: var(--text-main);
+    border-color: var(--border-card-hover);
+    background: var(--bg-hover);
+}
+
+.changelog-icon-btn svg {
+    width: 15px;
+    height: 15px;
+}
+
+/* ────────────────────────────── Corps ────────────────────────────── */
+
+.changelog-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+}
+
+/* Sommaire des livraisons */
+
+/*
+ * Deux états, selon la place — la même bascule que le sommaire du lecteur de
+ * documentation. Au large, une colonne posée à gauche de la frise ; sous 860 px,
+ * un tiroir qui ne prend de la place que le temps qu'on s'en serve. Le bouton et
+ * le voile n'existent qu'au palier étroit, qui les rallume plus bas.
+ */
+.changelog-toc-toggle,
+.changelog-toc-scrim {
+    display: none;
+}
+
+.changelog-toc {
+    box-sizing: border-box;
+    width: 234px;
+    flex-shrink: 0;
+    padding: 0.9rem 0.7rem;
+    border-right: 1px solid var(--border-card);
+    overflow-y: auto;
+}
+
+.changelog-toc-group {
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--c-accent);
+    padding: 0.8rem 0.6rem 0.4rem;
+}
+
+.changelog-toc-group:first-child {
+    padding-top: 0.2rem;
+}
+
+.changelog-toc-entry {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+    text-align: left;
+    padding: 0.42rem 0.6rem;
+    margin-bottom: 0.15rem;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.16s ease;
+}
+
+.changelog-toc-entry:hover {
+    background: var(--bg-hover);
+    color: var(--text-main);
+}
+
+/*
+ * La livraison sous les yeux, désignée par le défilement.
+ *
+ * Marquée au trait, là où le sommaire de la documentation marque le document
+ * ouvert d'un aplat dégradé. La différence tient à ce que le repère fait : là il
+ * confirme un choix, et ne bouge qu'au clic suivant ; ici il suit la molette, et
+ * un aplat vif qui saute de ligne en ligne à chaque cran tirerait l'œil hors de
+ * la lecture.
+ */
+.changelog-toc-entry.current {
+    color: var(--text-main);
+    border-color: color-mix(in srgb, var(--c-primary) 45%, transparent);
+    background: color-mix(in srgb, var(--c-primary) 10%, transparent);
+}
+
+.changelog-toc-date {
+    font-size: 0.84rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.changelog-toc-count {
+    font-size: 0.7rem;
+    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
+}
+
+.changelog-toc-empty {
+    padding: 1rem 0.6rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+/* Lecteur */
+
+.changelog-reader {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+/* ─────────────────────────── Filtres ─────────────────────────── */
+
+/*
+ * Ils commandent la frise sans en faire partie : hors du conteneur qui défile,
+ * ils restent sous la main sans qu'aucune règle de position collante n'ait à
+ * lutter contre lui.
+ *
+ * Sous une certaine largeur, sept pastilles ne tiennent plus : elles défilent
+ * alors horizontalement plutôt que de passer à la ligne, ce qui ferait monter et
+ * descendre le haut de la frise selon le nombre de catégories affichées.
+ */
+.changelog-filters {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.7rem 1.4rem;
+    border-bottom: 1px solid var(--border-card);
+    overflow-x: auto;
+    scrollbar-width: none;
+    flex-shrink: 0;
+}
+
+.changelog-filters::-webkit-scrollbar {
+    display: none;
+}
+
+.changelog-chip {
+    --kind: var(--text-muted);
+
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    height: 28px;
+    padding: 0 0.7rem;
+    flex-shrink: 0;
+    background: none;
+    border: 1px solid var(--border-card);
+    border-radius: 999px;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.16s ease;
+}
+
+.changelog-chip:hover {
+    color: var(--text-main);
+    border-color: var(--border-card-hover);
+}
+
+.changelog-chip.active {
+    color: var(--kind);
+    border-color: color-mix(in srgb, var(--kind) 55%, transparent);
+    background: color-mix(in srgb, var(--kind) 14%, transparent);
+}
+
+.changelog-chip-count {
+    font-variant-numeric: tabular-nums;
+    opacity: 0.75;
+    letter-spacing: 0;
+}
+
+/* ─────────────────────────── Frise ─────────────────────────── */
+
+.changelog-stream {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 1.2rem 1.4rem 2rem;
+}
+
+/*
+ * Largeur de lecture. Ligne mesurée plutôt que largeur de fenêtre : au-delà
+ * d'une soixantaine de caractères, l'œil perd le début de la ligne suivante —
+ * et une entrée de journal est faite pour être lue d'un coup d'œil.
+ */
+.changelog-timeline {
+    max-width: 78ch;
+    margin-inline: auto;
+}
+
+/*
+ * L'ouverture du journal, telle qu'elle est écrite dans le fichier.
+ *
+ * Elle ne paraît qu'en vue entière : elle décrit le journal, pas le résultat
+ * d'un filtre ou d'une recherche, et la laisser au-dessus de trois entrées
+ * retenues sur cent quarante-deux serait un faux titre.
+ */
+.changelog-lead {
+    margin: 0 0 1.4rem;
+    padding-bottom: 1.1rem;
+    border-bottom: 1px solid var(--border-card);
+    font-size: 0.88rem;
+    line-height: 1.6;
+    color: var(--text-muted);
+}
+
+.changelog-release {
+    position: relative;
+    padding-left: 1.6rem;
+    padding-bottom: 1.9rem;
+}
+
+/*
+ * Le fil du temps. Il court derrière les pastilles, d'une livraison à l'autre,
+ * et s'arrête sous la dernière : prolongé jusqu'au bas du cadre, il annoncerait
+ * une suite qui n'existe pas — le journal commence là.
+ */
+.changelog-release::before {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 0.5rem;
+    bottom: 0;
+    width: 1px;
+    background: var(--border-card-hover);
+}
+
+.changelog-release:last-child::before {
+    bottom: auto;
+    height: 1.4rem;
+}
+
+.changelog-release-dot {
+    position: absolute;
+    left: 0;
+    top: 0.32rem;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--c-primary) 0%, var(--c-violet) 100%);
+    /* L'anneau détache la pastille du fil qui passe dessous. */
+    box-shadow: 0 0 0 3px var(--bg-dropdown);
+}
+
+/* La livraison la plus récente est la seule à mériter qu'on la remarque. */
+.changelog-release.latest .changelog-release-dot {
+    background: var(--c-accent);
+    box-shadow: 0 0 0 3px var(--bg-dropdown), 0 0 12px color-mix(in srgb, var(--c-accent) 60%, transparent);
+}
+
+.changelog-release-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+/*
+ * La date ouvre chaque livraison, et elle est écrite comme un intertitre : c'est
+ * l'information qu'on cherche en arrivant dans un journal, avant même de savoir
+ * ce que la livraison contient.
+ */
+.changelog-release-date {
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--c-accent);
+}
+
+.changelog-release-badge {
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0.12rem 0.45rem;
+    border-radius: 999px;
+    color: #ffffff;
+    background: linear-gradient(135deg, var(--c-primary) 0%, var(--c-violet) 100%);
+}
+
+.changelog-release-count {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.changelog-release-title {
+    margin: 0 0 0.3rem;
+    font-size: 1.08rem;
+    font-weight: 800;
+    line-height: 1.3;
+    color: var(--text-main);
+}
+
+.changelog-release-summary {
+    margin: 0 0 0.9rem;
+    font-size: 0.87rem;
+    line-height: 1.55;
+    color: var(--text-muted);
+}
+
+/* Catégories */
+
+.changelog-group {
+    --kind: var(--text-muted);
+    margin-bottom: 0.85rem;
+}
+
+.changelog-group:last-child {
+    margin-bottom: 0;
+}
+
+.changelog-group[data-kind="added"] {
+    --kind: var(--c-success);
+}
+
+.changelog-group[data-kind="changed"] {
+    --kind: var(--c-primary);
+}
+
+.changelog-group[data-kind="fixed"] {
+    --kind: var(--c-violet);
+}
+
+.changelog-group[data-kind="security"] {
+    --kind: var(--c-error);
+}
+
+.changelog-group[data-kind="deprecated"] {
+    --kind: var(--c-accent);
+}
+
+/* `removed` garde le gris par défaut : ce qui s'en va n'a pas à se signaler. */
+
+.changelog-kind {
+    display: inline-block;
+    margin-bottom: 0.4rem;
+    padding: 0.14rem 0.5rem;
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-radius: 6px;
+    color: var(--kind);
+    border: 1px solid color-mix(in srgb, var(--kind) 35%, transparent);
+    background: color-mix(in srgb, var(--kind) 12%, transparent);
+}
+
+.changelog-entries {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.changelog-entry {
+    position: relative;
+    padding-left: 0.95rem;
+    margin-bottom: 0.42rem;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: var(--text-main);
+}
+
+.changelog-entry:last-child {
+    margin-bottom: 0;
+}
+
+/* La puce reprend la couleur de sa catégorie : une entrée arrachée à son groupe
+   par un filtre ou une recherche garde de quoi dire d'où elle vient. */
+.changelog-entry::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.62em;
+    width: 5px;
+    height: 5px;
+    border-radius: 2px;
+    background: var(--kind);
+}
+
+/* Ce que la recherche a trouvé. Posé sur les nœuds de texte seulement — voir
+   `highlight()` dans js/changelog.js —, jamais à l'intérieur d'une balise. */
+.changelog-mark {
+    background: color-mix(in srgb, var(--c-primary) 30%, transparent);
+    color: var(--text-main);
+    border-radius: 3px;
+    padding: 0 0.12em;
+}
+
+.changelog-empty {
+    padding: 3rem 1rem;
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+/* ───────────────────────────── Pied ───────────────────────────── */
+
+.changelog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.7rem 1.4rem;
+    border-top: 1px solid var(--border-card);
+    flex-shrink: 0;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.changelog-progress {
+    font-weight: 700;
+    color: var(--text-main);
+    letter-spacing: 0.03em;
+    flex-shrink: 0;
+}
+
+/* La langue réellement affichée, quand elle n'est pas celle du tableau de bord.
+   Au centre du pied, entre l'avancement et l'indication de défilement. */
+.changelog-note {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0.8;
+}
+
+.changelog-note.hidden {
+    display: none;
+}
+
+.changelog-hint {
+    opacity: 0.65;
+    flex-shrink: 0;
+}
+
+/* ═════════════════════════ Fenêtres étroites ═════════════════════════ */
+
+@media (max-width: 860px) {
+    /*
+     * Le sommaire passe en tiroir, posé au-dessus de la frise plutôt qu'à côté.
+     * Mêmes valeurs que dans docs.css, pour que les deux fenêtres se comportent
+     * de la même façon sous le même doigt.
+     */
+    .changelog-body {
+        position: relative;
+    }
+
+    .changelog-toc {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 6;
+        width: min(78vw, 300px);
+        /* Le fond de la fenêtre elle-même : opaque dans tous les thèmes, là où
+           --bg-card est translucide dans plusieurs et laisserait lire la frise
+           au travers du tiroir. */
+        background: var(--bg-dropdown);
+        box-shadow: 14px 0 34px rgba(0, 0, 0, 0.5);
+        /* Rangé hors cadre, et non masqué : il doit pouvoir glisser. */
+        transform: translateX(-100%);
+        transition: transform 0.24s ease;
+        padding-left: max(0.7rem, env(safe-area-inset-left));
+    }
+
+    .changelog-body.changelog-toc-open .changelog-toc {
+        transform: none;
+    }
+
+    .changelog-toc-scrim {
+        display: block;
+        position: absolute;
+        inset: 0;
+        z-index: 5;
+        background: rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.24s ease;
+    }
+
+    .changelog-body.changelog-toc-open .changelog-toc-scrim {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .changelog-toc-toggle {
+        display: inline-flex;
+    }
+
+    .changelog-window {
+        width: 98vw;
+        height: 96vh;
+        height: 96dvh;
+    }
+
+    /* Le sommaire retiré, c'est la frise qui longe le bord gauche : la marge de
+       sécurité lui revient. */
+    .changelog-stream,
+    .changelog-filters {
+        padding-left: max(1rem, env(safe-area-inset-left));
+    }
+
+    .changelog-hint {
+        display: none;
+    }
+}
+
+/*
+ * Téléphone. Le palier précédent a été pensé pour une fenêtre étroite sur un
+ * écran d'ordinateur ; en deçà, l'en-tête et les marges restent calibrés pour
+ * une largeur qui n'existe plus.
+ *
+ * La mise à plein écran, elle, suit le mode de support et non la largeur : elle
+ * est dans css/device.css, avec celle du lecteur de documentation.
+ */
+@media (max-width: 560px) {
+    /*
+     * Deux lignes plutôt que trois. Le titre et les deux boutons partagent la
+     * première — le sous-titre porte une ellipse, il ne poussera personne
+     * dehors —, la recherche prend la seconde sur toute la largeur. Sur une
+     * seule ligne, le champ de saisie se réduisait à un timbre-poste.
+     */
+    .changelog-header {
+        flex-wrap: wrap;
+        gap: 0.55rem;
+        padding: 0.85rem 1rem;
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
+    }
+
+    .changelog-heading {
+        gap: 0.6rem;
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .changelog-heading-text h2 {
+        font-size: 1rem;
+    }
+
+    .changelog-header-actions {
+        order: 2;
+    }
+
+    .changelog-search {
+        order: 3;
+        flex: 1 1 100%;
+        max-width: none;
+        margin-left: 0;
+    }
+
+    .changelog-filters {
+        padding: 0.55rem 1rem;
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
+    }
+
+    .changelog-stream {
+        padding: 1rem 1rem 1.6rem;
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
+    }
+
+    .changelog-release {
+        padding-left: 1.35rem;
+        padding-bottom: 1.6rem;
+    }
+
+    .changelog-release-title {
+        font-size: 1rem;
+    }
+
+    .changelog-entry {
+        font-size: 0.88rem;
+    }
+
+    .changelog-footer {
+        padding: 0.6rem 1rem;
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
+        font-size: 0.72rem;
+    }
+}
+
+/* ═════════════════════════ Fenêtres basses ═════════════════════════ */
+
+/*
+ * Téléphone couché, et tout autre cas où la hauteur vient à manquer. Aucune
+ * requête en largeur ne peut le voir : couché, l'appareil a de la largeur de
+ * reste. On rend donc à la lecture ce que l'habillage prenait — les marges
+ * généreuses, l'icône du titre, et les deux lignes du titre mises bout à bout.
+ *
+ * Les commandes ne bougent pas : leur cible tactile de 44 px, imposée par
+ * device.css, reste intouchée. C'est le décor qui cède.
+ */
+@media (max-height: 520px) {
+    .changelog-header {
+        padding: 0.4rem 1rem;
+        gap: 0.6rem;
+    }
+
+    .changelog-heading {
+        gap: 0.5rem;
+    }
+
+    .changelog-heading-icon {
+        display: none;
+    }
+
+    /* Titre et sous-titre côte à côte : une ligne d'en-tête au lieu de deux. */
+    .changelog-heading-text {
+        display: flex;
+        align-items: baseline;
+        gap: 0.5rem;
+        min-width: 0;
+    }
+
+    .changelog-heading-text h2 {
+        font-size: 0.95rem;
+        flex-shrink: 0;
+    }
+
+    .changelog-filters {
+        padding-top: 0.45rem;
+        padding-bottom: 0.45rem;
+    }
+
+    .changelog-stream {
+        padding-top: 0.8rem;
+    }
+
+    .changelog-footer {
+        padding: 0.3rem 1rem;
+        font-size: 0.72rem;
+    }
+}

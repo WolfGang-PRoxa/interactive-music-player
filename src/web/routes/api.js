@@ -9,6 +9,7 @@ const videoSource = require('../../audio/videoSource');
 const { resolveMediaPath, isAllowedMediaFilename } = require('../../utils/mediaPaths');
 const { arePathsOrUrlsEqual } = require('../../utils/paths');
 const downloadDir = require('../../utils/downloadDir');
+const changelog = require('../changelog');
 const log = require('../../utils/logger');
 
 /** Taille maximale d'un fichier uploadé (Mo). */
@@ -630,6 +631,31 @@ function createApiRouter(webServer) {
             lang,
             source,
         });
+    });
+
+    /**
+     * Journal des modifications, pour sa fenêtre de lecture (voir
+     * js/changelog.js).
+     *
+     * Le Markdown n'est pas servi tel quel comme celui de la documentation : il
+     * arrive découpé en livraisons datées et en catégories, parce que c'est cela
+     * que la fenêtre donne à parcourir. Le pourquoi est dans src/web/changelog.js.
+     *
+     * `langs` accompagne la réponse : le journal n'est écrit qu'en deux langues,
+     * et un tableau de bord réglé sur une troisième doit pouvoir dire dans
+     * laquelle il l'affiche au lieu de laisser croire à une traduction manquante.
+     *
+     * Sans garde, comme `/api/docs` : la route ne commande rien, elle raconte ce
+     * qui a déjà été livré. Voir l'en-tête de httpGuards.js, où l'absence de
+     * garde est un choix motivé route par route.
+     */
+    router.get('/changelog', (req, res) => {
+        try {
+            res.json({ ...changelog.read(req.query.lang), langs: changelog.availableLangs() });
+        } catch (err) {
+            log.error('[WebServer Changelog] Cannot read the changelog:', err.message);
+            res.status(500).json({ error: 'Journal illisible' });
+        }
     });
 
     router.get('/state', (req, res) => {

@@ -1357,8 +1357,13 @@ window.MusicPlayer = window.MusicPlayer || {};
     /**
      * Rendu exposé à part : c'est la seule partie du module qui se teste sans
      * navigateur, et la seule dont on peut avoir besoin ailleurs.
+     *
+     * `inline` sert au journal des modifications (js/changelog.js), dont les
+     * entrées portent le même Markdown de niveau ligne — code littéral, gras,
+     * italique. Deux rendus pour un seul style de texte auraient fini par
+     * diverger ; celui-ci fait autorité.
      */
-    window.MusicPlayer.docsRendu = { markdown: renderMarkdown, source: renderSource };
+    window.MusicPlayer.docsRendu = { markdown: renderMarkdown, source: renderSource, inline: renderInline };
 
     /* ═══════════════════════ Initialisation ═══════════════════════ */
 

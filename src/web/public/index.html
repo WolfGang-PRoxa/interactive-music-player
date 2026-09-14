@@ -1421,6 +1421,111 @@
         </div>
     </div>
 
+    <!--
+        Journal des modifications — ouvert depuis les Paramètres Généraux, juste
+        sous la version dont il raconte l'histoire, et il se superpose à eux
+        comme le lecteur de documentation.
+
+        Même charpente que ce dernier — voile, fenêtre, sommaire en tiroir sous
+        860 px, pied — parce que les deux font la même chose : donner à lire ce
+        que le bot embarque, sans quitter le tableau de bord. Ce qui change est
+        la forme du contenu : une frise de livraisons datées plutôt qu'un
+        document, d'où le sommaire par mois, les filtres par catégorie et la
+        recherche. Le contenu vient de /api/changelog déjà découpé ; voir
+        js/changelog.js.
+    -->
+    <div id="changelog-modal" class="changelog-overlay hidden">
+        <div class="changelog-window">
+            <div class="changelog-header">
+                <div class="changelog-heading">
+                    <svg class="changelog-heading-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="2" x2="12" y2="8.4"></line>
+                        <circle cx="12" cy="12" r="3.4"></circle>
+                        <line x1="12" y1="15.6" x2="12" y2="22"></line>
+                    </svg>
+                    <div class="changelog-heading-text">
+                        <h2 data-i18n="changelog_title">Journal des modifications</h2>
+                        <span class="changelog-subtitle" id="changelog-subtitle"></span>
+                    </div>
+                </div>
+                <!--
+                     La recherche porte sur les entrées, pas sur les dates : on
+                     cherche « sonie » ou « aiguillage », jamais « 9 ». C'est
+                     js/changelog.js qui filtre, sans rien redemander au
+                     serveur — le journal entier est déjà en mémoire.
+
+                     Frère de l'en-tête et non membre du groupe de boutons : en
+                     écran étroit elle descend seule sur une deuxième ligne,
+                     pleine largeur, pendant que le titre et les boutons restent
+                     ensemble sur la première. Rangée parmi les boutons, elle
+                     aurait dû les entraîner avec elle.
+                -->
+                <div class="changelog-search">
+                    <svg class="changelog-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="7"></circle>
+                        <line x1="20.5" y1="20.5" x2="16.6" y2="16.6"></line>
+                    </svg>
+                    <input type="text" id="changelog-search-input" class="changelog-search-input" placeholder="Rechercher" data-i18n-placeholder="changelog_search" autocomplete="off" spellcheck="false">
+                    <button type="button" id="btn-changelog-search-clear" class="changelog-search-clear hidden" data-tooltip="Effacer la recherche" data-i18n-tooltip="changelog_tooltip_search_clear">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="changelog-header-actions">
+                    <!-- Accès au sommaire quand la colonne a disparu, comme
+                         dans le lecteur de documentation : elle s'efface sous
+                         860 px, et le bouton n'existe qu'à ces largeurs-là. -->
+                    <button id="btn-changelog-toc" class="changelog-icon-btn changelog-toc-toggle" aria-expanded="false" aria-controls="changelog-toc" data-tooltip="Sommaire" data-i18n-tooltip="changelog_tooltip_toc">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                            <line x1="8" y1="6" x2="21" y2="6"></line>
+                            <line x1="8" y1="12" x2="21" y2="12"></line>
+                            <line x1="8" y1="18" x2="21" y2="18"></line>
+                        </svg>
+                    </button>
+                    <button id="btn-changelog-close" class="changelog-icon-btn" data-tooltip="Fermer" data-i18n-tooltip="tooltip_close">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="changelog-body" id="changelog-body">
+                <aside class="changelog-toc" id="changelog-toc"></aside>
+                <!-- Voile du tiroir : de quoi le refermer sans viser un bouton,
+                     et de quoi intercepter les appuis destinés à la frise. -->
+                <div class="changelog-toc-scrim" id="changelog-toc-scrim"></div>
+
+                <div class="changelog-reader">
+                    <!-- Les filtres ne défilent pas avec la frise : ils la
+                         commandent. Ils sont donc hors du conteneur qui défile,
+                         plutôt que collés en haut de celui-ci. -->
+                    <div class="changelog-filters" id="changelog-filters"></div>
+                    <div class="changelog-stream" id="changelog-stream"></div>
+                </div>
+            </div>
+
+            <div class="changelog-footer">
+                <span class="changelog-progress" id="changelog-progress"></span>
+                <!--
+                     Le journal n'est écrit qu'en français et en anglais. Réglé
+                     sur une autre langue, le tableau de bord dit ici laquelle il
+                     affiche : sans cela, un lecteur espagnol croirait à une
+                     traduction oubliée plutôt qu'à un choix.
+                -->
+                <span class="changelog-note hidden" id="changelog-note"></span>
+                <span class="changelog-hint" id="changelog-hint" data-i18n="changelog_hint">Molette ou barre de défilement pour remonter le temps</span>
+            </div>
+        </div>
+    </div>
+
     <!-- Playlist Create Modal -->
     <div id="playlist-create-modal" class="maintenance-overlay hidden">
         <div class="maintenance-box">
@@ -1709,6 +1814,30 @@
                         <select id="setting-version-select" class="styled-select header-select">
                             <option value="dev" selected>DEV</option>
                         </select>
+                    </div>
+
+                    <!--
+                        Journal des modifications — sous la ligne de la version,
+                        et pas ailleurs : c'est la question qui suit
+                        immédiatement celle du numéro affiché juste au-dessus —
+                        « qu'est-ce qui a changé depuis ? ». Rangé plus bas, à
+                        côté des réglages d'affichage ou de la documentation, il
+                        aurait perdu ce voisinage qui l'explique.
+                        Voir js/changelog.js.
+                    -->
+                    <div class="setting-item-row">
+                        <div class="setting-item-label">
+                            <span data-i18n="changelog_setting_label">Journal des modifications :</span>
+                            <span class="setting-item-hint" data-i18n="changelog_setting_hint">Tout ce qui a changé, livraison par livraison</span>
+                        </div>
+                        <button id="btn-open-changelog" class="maint-btn primary external-link-btn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="2" x2="12" y2="8.4"></line>
+                                <circle cx="12" cy="12" r="3.4"></circle>
+                                <line x1="12" y1="15.6" x2="12" y2="22"></line>
+                            </svg>
+                            <span data-i18n="changelog_open">Voir le journal</span>
+                        </button>
                     </div>
 
                     <!--
@@ -2791,6 +2920,8 @@
     <script src="js/touchDrawers.js"></script>
     <script src="js/versions.js"></script>
     <script src="js/docs.js"></script>
+    <!-- Après docs.js : il emprunte son rendu du Markdown pour les entrées. -->
+    <script src="js/changelog.js"></script>
     <script src="js/memoryBreakdown.js"></script>
     <!-- Après queue.js et playlists.js : ils traduisent les gestes vers leurs
          gestionnaires de glisser-déposer, qui doivent donc être en place.

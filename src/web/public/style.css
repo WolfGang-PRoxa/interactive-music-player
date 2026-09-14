@@ -8,6 +8,7 @@
 @import './css/quality.css';
 @import './css/modals.css';
 @import './css/docs.css';
+@import './css/changelog.css';
 @import './css/logs.css';
 @import './css/drawer.css';
 /* En dernier : leurs règles doivent primer sur celles des modules ci-dessus,

@@ -881,6 +881,191 @@ body.touch-dragging * {
 }
 
 /*
+ * ─── Le journal des modifications, sur téléphone ───────────────────────────
+ *
+ * La fenêtre du journal est la sœur de celle de la documentation : même
+ * charpente, mêmes bascules, et donc les mêmes besoins ici. Tout ce qui suit
+ * reprend les règles écrites juste au-dessus pour `.docs-*`, appliquées aux
+ * classes du journal — la mise à plein écran, les zones de sécurité, le
+ * sommaire en tiroir debout et en colonne couché, la restitution du couloir que
+ * l'encoche n'occupe pas. Les raisons sont là-haut, et ne sont pas redites ;
+ * seules les différences de forme sont commentées.
+ */
+
+[data-device-mode="phone"] .changelog-window {
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+
+[data-device-mode="phone"] .changelog-header {
+    padding-left: max(1.4rem, env(safe-area-inset-left));
+    padding-right: max(1.4rem, env(safe-area-inset-right));
+}
+
+[data-device-mode="phone"] .changelog-footer {
+    padding-left: max(1.4rem, env(safe-area-inset-left));
+    padding-right: max(1.4rem, env(safe-area-inset-right));
+    padding-bottom: max(0.7rem, env(safe-area-inset-bottom));
+}
+
+/* Le sommaire longe le bord gauche, colonne ou tiroir. */
+[data-device-mode="phone"] .changelog-toc {
+    padding-left: max(0.7rem, env(safe-area-inset-left));
+}
+
+/*
+ * La frise et ses filtres longent le bord droit dans tous les cas, et le bord
+ * gauche dès que le sommaire s'est retiré — ce qui, sur téléphone, est la règle
+ * debout. Les deux reçoivent la même marge : un filtre décalé d'un côté et une
+ * entrée de l'autre se verraient.
+ */
+[data-device-mode="phone"] .changelog-stream,
+[data-device-mode="phone"] .changelog-filters {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+}
+
+[data-device-mode="phone"] .changelog-body {
+    position: relative;
+}
+
+[data-device-mode="phone"] .changelog-toc {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 6;
+    width: min(78vw, 300px);
+    background: var(--bg-dropdown);
+    box-shadow: 14px 0 34px rgba(0, 0, 0, 0.5);
+    transform: translateX(-100%);
+    transition: transform 0.24s ease;
+}
+
+[data-device-mode="phone"] .changelog-body.changelog-toc-open .changelog-toc {
+    transform: none;
+}
+
+[data-device-mode="phone"] .changelog-toc-scrim {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.24s ease;
+}
+
+[data-device-mode="phone"] .changelog-body.changelog-toc-open .changelog-toc-scrim {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+[data-device-mode="phone"] .changelog-toc-toggle {
+    display: inline-flex;
+}
+
+/* Couché, le sommaire reprend sa colonne au lieu de se poser dessus. */
+@media (orientation: landscape) {
+    [data-device-mode="phone"] .changelog-toc {
+        position: static;
+        z-index: auto;
+        width: 0;
+        padding-left: 0;
+        padding-right: 0;
+        border-right-width: 0;
+        overflow: hidden;
+        box-shadow: none;
+        transform: none;
+        transition:
+            width 0.24s ease,
+            padding 0.24s ease,
+            border-right-width 0.24s ease;
+    }
+
+    [data-device-mode="phone"] .changelog-body.changelog-toc-open .changelog-toc {
+        width: min(46vw, 234px);
+        padding-left: max(0.7rem, env(safe-area-inset-left));
+        padding-right: 0.7rem;
+        border-right-width: 1px;
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+
+    [data-device-mode="phone"] .changelog-toc-scrim {
+        display: none;
+    }
+
+    /* Le sommaire déployé prend le bord gauche, et le devoir de s'en écarter
+       avec : la frise, repoussée loin de l'encoche, n'a plus à le faire. */
+    [data-device-mode="phone"] .changelog-body.changelog-toc-open .changelog-stream,
+    [data-device-mode="phone"] .changelog-body.changelog-toc-open .changelog-filters {
+        padding-left: 1rem;
+    }
+}
+
+@media (orientation: landscape) {
+    /* Encoche à gauche : le bord droit n'a qu'un arrondi à dégager. */
+    [data-device-mode="phone"][data-notch="left"] .changelog-header,
+    [data-device-mode="phone"][data-notch="left"] .changelog-footer {
+        padding-right: 1.4rem;
+    }
+
+    [data-device-mode="phone"][data-notch="left"] .changelog-stream,
+    [data-device-mode="phone"][data-notch="left"] .changelog-filters {
+        padding-right: 1rem;
+    }
+
+    /* Encoche à droite : symétrique, plus le sommaire qui longe ce bord-là. */
+    [data-device-mode="phone"][data-notch="right"] .changelog-header,
+    [data-device-mode="phone"][data-notch="right"] .changelog-footer {
+        padding-left: 1.4rem;
+    }
+
+    [data-device-mode="phone"][data-notch="right"] .changelog-stream,
+    [data-device-mode="phone"][data-notch="right"] .changelog-filters {
+        padding-left: 1rem;
+    }
+
+    [data-device-mode="phone"][data-notch="right"] .changelog-toc,
+    [data-device-mode="phone"][data-notch="right"] .changelog-body.changelog-toc-open .changelog-toc {
+        padding-left: 0.7rem;
+    }
+}
+
+/*
+ * Exception de la croix qui efface la recherche.
+ *
+ * Même partage que pour le `.switch` et la bascule du mode de lecture : c'est
+ * l'étui — le champ lui-même — qui prend les 44 px et devient la cible, la croix
+ * se contentant de ce qu'il lui laisse. Sans cela, la cible imposée plus haut la
+ * faisait passer de 18 à 44 px dans un champ haut de 34, qu'elle faisait éclater.
+ *
+ * `min-height` doit être explicitement rendue au plancher : sans cela, la règle
+ * générale continuerait de l'emporter sur la taille donnée juste après.
+ */
+[data-touch-mode="true"] .changelog-search {
+    height: 44px;
+}
+
+[data-touch-mode="true"] .changelog-search-clear {
+    min-width: 0;
+    min-height: 0;
+    width: 30px;
+    height: 30px;
+}
+
+[data-touch-mode="true"] .changelog-search-clear svg {
+    width: 15px;
+    height: 15px;
+}
+
+/*
  * La croix du tiroir, au doigt.
  *
  * Le bouton porte un caractère, `✕`, et non une icône vectorielle : sa taille

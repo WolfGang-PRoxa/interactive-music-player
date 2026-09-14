@@ -3,8 +3,9 @@
  *
  * ## Pourquoi
  *
- * Les paramètres, la doc technique, les confirmations et le tiroir des journaux
- * posent tous un voile sur le tableau de bord. Ce voile arrête les clics, mais
+ * Les paramètres, la doc technique, le journal des modifications, les
+ * confirmations et le tiroir des journaux posent tous un voile sur le tableau de
+ * bord. Ce voile arrête les clics, mais
  * pas le défilement : la molette ou le doigt le traversaient et emportaient la
  * page en dessous. On refermait alors la fenêtre sur un tableau de bord qui
  * n'était plus là où on l'avait laissé, et sur mobile, où la fenêtre occupe tout
@@ -36,6 +37,7 @@
         ['.maintenance-overlay', '.maintenance-overlay:not(.hidden)'],
         ['.restart-overlay', '.restart-overlay:not(.hidden)'],
         ['.docs-overlay', '.docs-overlay:not(.hidden)'],
+        ['.changelog-overlay', '.changelog-overlay:not(.hidden)'],
         ['.drawer-backdrop', '.drawer-backdrop.active'],
     ];
 

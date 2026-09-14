@@ -3747,11 +3747,18 @@
     // Global ESC Key Listener (Close settings, maintenance, playlist, and server delete modals)
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' || e.keyCode === 27) {
-            // Le lecteur de documentation est la fenêtre la plus haute : il
-            // prend la touche avant tout le reste, et la laisse aux autres
-            // quand il n'est pas ouvert.
+            // Les deux lecteurs — la documentation et le journal des
+            // modifications — sont les fenêtres les plus hautes : ils prennent
+            // la touche avant tout le reste, et la laissent aux autres quand ils
+            // ne sont pas ouverts. Ils s'ouvrent tous deux depuis les
+            // paramètres, qui sont dessous : ils ne peuvent pas se superposer,
+            // et l'ordre entre eux n'a donc pas de conséquence.
             if (typeof window.MusicPlayer.closeDocsModal === 'function') {
                 if (window.MusicPlayer.closeDocsModal()) return;
+            }
+
+            if (typeof window.MusicPlayer.closeChangelogModal === 'function') {
+                if (window.MusicPlayer.closeChangelogModal()) return;
             }
 
             // Les pop-ups des versions se ferment par leur propre fonction :
