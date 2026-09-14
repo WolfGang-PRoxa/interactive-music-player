@@ -366,6 +366,44 @@ html[data-theme="light"][data-style="retro-synthwave"] {
     background-clip: padding-box;
 }
 
+/*
+ * L'ascenseur de la page, retiré de la vue — et de la vue seulement.
+ *
+ * La hauteur du tableau de bord suit la disposition des cartes : elle dépasse
+ * l'écran dès qu'on en déploie quelques-unes, et la page doit donc continuer de
+ * défiler. Ce qui s'en va est la barre, pas le mouvement — molette, doigt,
+ * flèches et `Page suiv.` font exactement ce qu'ils faisaient.
+ *
+ * Trois raisons de ne pas la regretter. Le tableau de bord occupe toute la
+ * largeur, et douze pixels de gouttière permanente sur le bord d'une grille qui
+ * s'y ajuste se voient. La position dans la page est déjà dite par ce qu'on y
+ * voit, cartes et en-tête, là où un document a besoin qu'on lui montre où l'on
+ * en est. Et la bande de douze pixels du bord droit sert à autre chose : entre
+ * 30 et 180 px de haut, elle ouvre le tiroir d'activité à l'approche du curseur
+ * (js/drawer.js) — approcher de l'ascenseur pour le saisir ouvrait donc le
+ * tiroir par-dessus.
+ *
+ * `html` et non `*` : le sélecteur universel ci-dessus habille les ascenseurs
+ * des panneaux — la file, les playlists, le terminal de journal, les réglages —,
+ * qui les gardent. Eux sont des cadres à hauteur fixe posés au milieu de la
+ * page, où la barre est le seul indice qu'il reste quelque chose à lire.
+ */
+html,
+body {
+    scrollbar-width: none;
+}
+
+/*
+ * `body` autant que `html` : la barre du navigateur est peinte d'après la racine,
+ * mais `body` porte `overflow-x: hidden` (plus bas), et une boîte dont un seul
+ * axe est masqué voit l'autre calculé en `auto` — elle est donc, elle aussi, un
+ * conteneur de défilement susceptible d'afficher sa propre barre.
+ */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+    display: none;
+}
+
 body {
     background-color: var(--bg-main);
     color: var(--text-main);
