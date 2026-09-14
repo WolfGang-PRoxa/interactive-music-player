@@ -1862,21 +1862,28 @@ window.MusicPlayer.setupFloatingVideoWindow = function() {
             applyVideoOpacity(e.target.value);
         });
 
-        videoOpacitySlider.addEventListener('wheel', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const step = parseInt(videoOpacitySlider.step, 10) || 5;
-            const min = parseInt(videoOpacitySlider.min, 10) || 20;
-            const max = parseInt(videoOpacitySlider.max, 10) || 100;
-            let current = parseInt(videoOpacitySlider.value, 10) || 100;
+        // Un clic dans la zone arme le curseur sans le régler, la molette le
+        // règle ensuite depuis tout son cadre — voir js/rangeArm.js.
+        if (typeof window.MusicPlayer.armRange === 'function') {
+            window.MusicPlayer.armRange(videoOpacitySlider, (e) => {
+                // La fenêtre vidéo flotte au-dessus du tableau de bord : un cran
+                // consommé ici n'a rien à faire remonter à la page, qui
+                // défilerait sous elle.
+                e.stopPropagation();
 
-            if (e.deltaY < 0 || e.deltaX > 0) {
-                current = Math.min(max, current + step);
-            } else {
-                current = Math.max(min, current - step);
-            }
-            applyVideoOpacity(current);
-        }, { passive: false });
+                const step = parseInt(videoOpacitySlider.step, 10) || 5;
+                const min = parseInt(videoOpacitySlider.min, 10) || 20;
+                const max = parseInt(videoOpacitySlider.max, 10) || 100;
+                let current = parseInt(videoOpacitySlider.value, 10) || 100;
+
+                if (e.deltaY < 0 || e.deltaX > 0) {
+                    current = Math.min(max, current + step);
+                } else {
+                    current = Math.max(min, current - step);
+                }
+                applyVideoOpacity(current);
+            });
+        }
     }
 
     // Bring to front on click / interaction

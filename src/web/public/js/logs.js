@@ -397,21 +397,28 @@ window.MusicPlayer.setupFloatingLogsWindow = function() {
             applyOpacity(e.target.value);
         });
 
-        opacitySlider.addEventListener('wheel', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const step = parseInt(opacitySlider.step, 10) || 5;
-            const min = parseInt(opacitySlider.min, 10) || 20;
-            const max = parseInt(opacitySlider.max, 10) || 100;
-            let current = parseInt(opacitySlider.value, 10) || 100;
+        // Un clic dans la zone arme le curseur sans le régler, la molette le
+        // règle ensuite depuis tout son cadre — voir js/rangeArm.js.
+        if (typeof window.MusicPlayer.armRange === 'function') {
+            window.MusicPlayer.armRange(opacitySlider, (e) => {
+                // La fenêtre du journal flotte au-dessus du tableau de bord : un
+                // cran consommé ici n'a rien à faire remonter à la page, qui
+                // défilerait sous elle.
+                e.stopPropagation();
 
-            if (e.deltaY < 0 || e.deltaX > 0) {
-                current = Math.min(max, current + step);
-            } else {
-                current = Math.max(min, current - step);
-            }
-            applyOpacity(current);
-        }, { passive: false });
+                const step = parseInt(opacitySlider.step, 10) || 5;
+                const min = parseInt(opacitySlider.min, 10) || 20;
+                const max = parseInt(opacitySlider.max, 10) || 100;
+                let current = parseInt(opacitySlider.value, 10) || 100;
+
+                if (e.deltaY < 0 || e.deltaX > 0) {
+                    current = Math.min(max, current + step);
+                } else {
+                    current = Math.max(min, current - step);
+                }
+                applyOpacity(current);
+            });
+        }
     }
 
     // Bring to front on click / interaction

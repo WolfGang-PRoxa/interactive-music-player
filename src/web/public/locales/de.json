@@ -227,6 +227,7 @@
     "add_target_download": "Nach {path}",
     "tooltip_pick_download_dir": "Download-Ordner wählen",
     "tooltip_dir_parent": "Übergeordneter Ordner",
+    "settings_range_hint": "Zum Auswählen klicken, dann mit Mausrad, Pfeiltasten oder Klick regeln",
     "download_dir_title": "Download-Ordner",
     "download_dir_downloads": "Downloads",
     "download_dir_manual": "Oder einen Pfad eingeben:",

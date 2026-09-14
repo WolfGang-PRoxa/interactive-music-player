@@ -2933,6 +2933,47 @@ input[type="range"]::-moz-range-thumb:hover {
     box-shadow: 0 0 14px var(--c-primary);
 }
 
+/*
+   Le curseur armé.
+
+   La molette ne règle un curseur qu'une fois qu'il a le focus, et les flèches
+   du clavier ne s'adressent qu'à lui — voir js/settingsModal.js, qui explique
+   pourquoi. Encore faut-il que cet état se voie : `outline: none` plus haut le
+   rendait invisible, et une règle dont rien ne dit à quoi elle s'applique passe
+   pour une panne.
+
+   Deux signaux, parce qu'ils ne se lisent pas à la même distance. Le cadre de la
+   ligne s'éclaire — c'est ce que l'œil trouve sans chercher, en parcourant un
+   panneau qui compte vingt-et-un curseurs. Et la pastille prend un halo, qui
+   désigne précisément la commande qui répondra.
+
+   `:focus` et non `:focus-visible` : le focus pris à la souris arme la molette
+   autant que celui pris au clavier, et doit donc se voir autant. Or
+   `:focus-visible` ne retient, sur plusieurs moteurs, que le second.
+
+   `:has()` plutôt que `:focus-within` sur le cadre : la ligne porte aussi le
+   bouton de remise par défaut, dont le focus n'arme rien. Un moteur qui ne
+   connaîtrait pas `:has()` écarte cette règle-là et garde le halo de la
+   pastille, qui suffit à dire lequel répond.
+*/
+.scroll-input-wrapper:has(.scroll-range:focus) {
+    border-color: color-mix(in srgb, var(--c-primary) 60%, transparent);
+}
+
+.scroll-range:focus::-webkit-slider-thumb {
+    transform: scale(1.28);
+    box-shadow:
+        0 0 14px var(--c-primary),
+        0 0 0 5px color-mix(in srgb, var(--c-primary) 25%, transparent);
+}
+
+.scroll-range:focus::-moz-range-thumb {
+    transform: scale(1.28);
+    box-shadow:
+        0 0 14px var(--c-primary),
+        0 0 0 5px color-mix(in srgb, var(--c-primary) 25%, transparent);
+}
+
 .scroll-val {
     min-width: 42px;
     font-size: 0.88rem;

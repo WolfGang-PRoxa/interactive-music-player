@@ -792,6 +792,36 @@ window.MusicPlayer.initSettingsModal = function() {
             return n < 0 ? max : Math.min(max - 1, Math.max(0, n));
         }
 
+        /**
+         * La valeur qu'un cran de molette donne à un curseur.
+         *
+         * Un cran vaut un pas, borné par les extrémités de la course. Le sens
+         * suit celui de la roue, et un défilement horizontal — pavé tactile,
+         * souris à molette inclinable — est accepté dans le même geste.
+         *
+         * Le formatage n'est pas cosmétique : un pas de 0,5 ajouté en virgule
+         * flottante donne « 5.499999999999999 », que l'attribut `value` retient
+         * tel quel. Deux décimales suffisent à tous les pas en usage, et les
+         * zéros de queue s'en vont pour que la pastille affiche « 5 » et non
+         * « 5.00 ».
+         *
+         * @param {HTMLInputElement} range
+         * @param {{deltaY: number, deltaX: number}} wheel
+         * @returns {string} valeur prête pour l'attribut
+         */
+        function wheelValue(range, wheel) {
+            const step = parseFloat(range.step) || 1;
+            const min = parseFloat(range.min);
+            const max = parseFloat(range.max);
+            const value = parseFloat(range.value);
+
+            const next = (wheel.deltaY < 0 || wheel.deltaX > 0)
+                ? Math.min(max, value + step)
+                : Math.max(min, value - step);
+
+            return next.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+        }
+
         const rangeInputs = settingsModal ? settingsModal.querySelectorAll('.scroll-range') : [];
         rangeInputs.forEach(range => {
             const valSpan = document.getElementById(`val-${range.id}`) || range.nextElementSibling;
@@ -827,25 +857,37 @@ window.MusicPlayer.initSettingsModal = function() {
                 }
             });
 
-            range.addEventListener('wheel', (e) => {
-                e.preventDefault();
-                const step = parseFloat(range.step) || 1;
-                const min = parseFloat(range.min);
-                const max = parseFloat(range.max);
-                let val = parseFloat(range.value);
-                if (e.deltaY < 0 || e.deltaX > 0) {
-                    val = Math.min(max, val + step);
-                } else {
-                    val = Math.max(min, val - step);
-                }
-                range.value = val.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
-                if (valSpan) valSpan.textContent = rangeDisplay(range, unit);
-                paintInfinity(range);
-                updateSettingsFromUI();
-                if (range.id.includes('video') && typeof window.MusicPlayer.applyDefaultVideoWindowGeometry === 'function') {
-                    window.MusicPlayer.applyDefaultVideoWindowGeometry();
-                }
-            }, { passive: false });
+            /*
+             * Les deux gestes de la ligne : un clic arme le curseur sans toucher
+             * à sa valeur, et la molette le règle ensuite depuis n'importe où
+             * dans son cadre. Le pourquoi et le comment sont dans js/rangeArm.js,
+             * qui les tient ensemble parce qu'ils doivent s'accorder sur ce
+             * qu'est la zone.
+             *
+             * Ce qui reste ici est le seul geste propre à ces curseurs :
+             * appliquer un cran. Il passe par l'événement « input », comme les
+             * flèches du clavier qui l'émettent elles-mêmes — la pastille,
+             * l'enregistrement et la géométrie de la fenêtre vidéo y sont déjà
+             * branchés, et n'ont pas à l'être deux fois.
+             *
+             * Les flèches, justement, n'ont jamais demandé une ligne de code :
+             * elles sont natives sur un `<input type="range">`. Il manquait
+             * seulement de quoi voir lequel des vingt-et-un curseurs les
+             * recevrait — c'est le rôle de l'état `:focus` de css/modals.css, et
+             * de l'infobulle posée juste après.
+             */
+            if (typeof window.MusicPlayer.armRange === 'function') {
+                window.MusicPlayer.armRange(range, (e) => {
+                    range.value = wheelValue(range, e);
+                    range.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+            }
+
+            // L'armement ne se devine pas : le curseur le dit lui-même. La clé
+            // est portée par l'élément pour que `applyLanguage()` la retrouve au
+            // changement de langue.
+            range.dataset.tooltip = window.MusicPlayer.t('settings_range_hint');
+            range.setAttribute('data-i18n-tooltip', 'settings_range_hint');
         });
 
         const resetBtns = settingsModal ? settingsModal.querySelectorAll('.btn-default-reset') : [];

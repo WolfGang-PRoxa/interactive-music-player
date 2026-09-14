@@ -227,6 +227,7 @@
     "add_target_download": "Vers {path}",
     "tooltip_pick_download_dir": "Choisir le dossier de téléchargement",
     "tooltip_dir_parent": "Dossier parent",
+    "settings_range_hint": "Cliquez pour sélectionner, puis molette, flèches ou clic pour régler",
     "download_dir_title": "Dossier de téléchargement",
     "download_dir_downloads": "Téléchargements",
     "download_dir_manual": "Ou saisir un chemin :",

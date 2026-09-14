@@ -227,6 +227,7 @@
     "add_target_download": "To {path}",
     "tooltip_pick_download_dir": "Choose the download folder",
     "tooltip_dir_parent": "Parent folder",
+    "settings_range_hint": "Click to select, then wheel, arrows or click to adjust",
     "download_dir_title": "Download folder",
     "download_dir_downloads": "Downloads",
     "download_dir_manual": "Or type a path:",

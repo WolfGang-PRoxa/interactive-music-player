@@ -946,19 +946,28 @@
                 localStorage.setItem('music_player_drawer_blur', blurRange.value);
             });
 
-            blurRange.addEventListener('wheel', (e) => {
-                e.preventDefault();
-                const step = 1;
-                let val = parseInt(blurRange.value, 10) || 0;
-                if (e.deltaY < 0 || e.deltaX > 0) {
-                    val = Math.min(30, val + step);
-                } else {
-                    val = Math.max(0, val - step);
-                }
-                blurRange.value = val;
-                applyDrawerBlur(val);
-                localStorage.setItem('music_player_drawer_blur', val);
-            }, { passive: false });
+            /*
+             * Un clic dans la ligne arme le curseur sans le régler, la molette le
+             * règle ensuite depuis tout son cadre — voir js/rangeArm.js. Le corps
+             * du tiroir défile : une molette qui ne fait que passer ne doit rien
+             * changer.
+             */
+            if (typeof window.MusicPlayer.armRange === 'function') {
+                window.MusicPlayer.armRange(blurRange, (e) => {
+                    const step = 1;
+                    let val = parseInt(blurRange.value, 10) || 0;
+                    if (e.deltaY < 0 || e.deltaX > 0) {
+                        val = Math.min(30, val + step);
+                    } else {
+                        val = Math.max(0, val - step);
+                    }
+                    blurRange.value = val;
+                    // Le chemin de l'écouteur d'« input » ci-dessus, qui applique
+                    // et enregistre : deux fois le même geste finirait par
+                    // diverger.
+                    blurRange.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+            }
         } else {
             applyDrawerBlur(savedBlur);
         }
@@ -974,19 +983,21 @@
                 localStorage.setItem('music_player_drawer_graph_duration', durationRange.value);
             });
 
-            durationRange.addEventListener('wheel', (e) => {
-                e.preventDefault();
-                const step = 5;
-                let val = parseInt(durationRange.value, 10) || 30;
-                if (e.deltaY < 0 || e.deltaX > 0) {
-                    val = Math.min(MAX_DURATION_SEC, val + step);
-                } else {
-                    val = Math.max(MIN_DURATION_SEC, val - step);
-                }
-                durationRange.value = val;
-                applyGraphDuration(val);
-                localStorage.setItem('music_player_drawer_graph_duration', val);
-            }, { passive: false });
+            // Mêmes deux gestes que son voisin du dessus, et pour les mêmes
+            // raisons.
+            if (typeof window.MusicPlayer.armRange === 'function') {
+                window.MusicPlayer.armRange(durationRange, (e) => {
+                    const step = 5;
+                    let val = parseInt(durationRange.value, 10) || 30;
+                    if (e.deltaY < 0 || e.deltaX > 0) {
+                        val = Math.min(MAX_DURATION_SEC, val + step);
+                    } else {
+                        val = Math.max(MIN_DURATION_SEC, val - step);
+                    }
+                    durationRange.value = val;
+                    durationRange.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+            }
         } else {
             applyGraphDuration(savedDuration);
         }

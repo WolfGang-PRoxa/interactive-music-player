@@ -227,6 +227,7 @@
     "add_target_download": "A {path}",
     "tooltip_pick_download_dir": "Elegir la carpeta de descargas",
     "tooltip_dir_parent": "Carpeta superior",
+    "settings_range_hint": "Haga clic para seleccionar; luego rueda, flechas o clic para ajustar",
     "download_dir_title": "Carpeta de descargas",
     "download_dir_downloads": "Descargas",
     "download_dir_manual": "O escriba una ruta:",
