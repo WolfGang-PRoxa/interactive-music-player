@@ -158,6 +158,45 @@ async function initPlayer() {
     await player.extractors.register(SpotifyExtractor, {});
     await player.extractors.register(SoundCloudExtractor, {});
     await player.extractors.register(AppleMusicExtractor, {});
+
+    /*
+     * AttachmentExtractor : une vulnérabilité connue, et laissée là sciemment.
+     *
+     * Cet extracteur appelle `fileType.fromFile()` sur tout fichier local, avant
+     * même de regarder son extension. La version de `file-type` qu'il impose
+     * (^16.5.4) boucle indéfiniment sur un ASF malformé à sous-en-tête de taille
+     * nulle — GHSA-5v7r-6r5c-r473. Une boucle infinie bloque la boucle
+     * d'événements : le bot cesse alors de répondre, audio et tableau de bord
+     * compris, et il faut le tuer.
+     *
+     * Le chemin est atteignable : `.wma` et `.wmv` sont des conteneurs ASF et
+     * figurent dans `config.supportedExtensions`. Le reniflage portant sur les
+     * octets et non sur le nom, renommer le fichier n'y change rien non plus.
+     *
+     * **Aucune des corrections disponibles n'est acceptable**, et c'est ce qui
+     * motive de ne rien faire :
+     *
+     *  - `file-type` est corrigé en 21.3.1, mais y forcer l'override casse cet
+     *    extracteur : l'API a été renommée (`fromFile` → `fileTypeFromFile`).
+     *    Le chargement, lui, passerait — Node 24 sait faire `require()` d'un
+     *    module ESM, contrairement à ce qu'on lit souvent ;
+     *  - ce que propose `npm audit` est une **rétrogradation** de discord-player
+     *    en 6.2.1, dont ce projet n'utilise plus l'API ;
+     *  - `@discord-player/extractor` 7.2.0 est la dernière publiée et demande
+     *    toujours `^16.5.4` : il n'y a rien à attendre en amont aujourd'hui.
+     *
+     * ⚠ **Ne jamais lancer `npm audit fix --force` sur ce dépôt** : c'est la
+     * seule commande qui ferait taire les trois lignes de l'audit, et elle le
+     * ferait par la rétrogradation ci-dessus.
+     *
+     * Une garde de quelques lignes refusant la signature ASF (30 26 B2 75) avant
+     * `player.search` fermerait le chemin. Elle a été écartée le 2026-09-14 : ne
+     * pouvant distinguer un ASF sain d'un ASF corrompu sans l'analyser — l'acte
+     * précisément vulnérable —, elle refuserait les deux, et ferait perdre un
+     * format que ce projet supporte. Le déclencheur suppose par ailleurs un
+     * droit que le propriétaire accorde lui-même. À rouvrir si le tunnel
+     * s'ouvre à un cercle plus large.
+     */
     await player.extractors.register(AttachmentExtractor, {});
 
     // Enregistrer les écouteurs d'événements du lecteur
