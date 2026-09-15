@@ -167,6 +167,7 @@
     "preload_title": "Audio preloading",
     "preload_enable": "Enable audio preloading",
     "preload_count_sub": "Number of tracks to preload:",
+    "preload_all_label": "All tracks",
     "in_queue_label": "In Queue:",
     "in_history_label": "In History:",
     "in_playlists_label": "In Playlists:",

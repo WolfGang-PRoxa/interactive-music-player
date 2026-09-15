@@ -97,18 +97,37 @@ check('  … et le rail se fond avec le reste du tableau de bord',
     'le gris de la piste va du sombre au clair comme les autres surfaces');
 
 /*
- * Le symbole remplace un nombre, et à taille égale il pèse moins que lui : bas,
- * sans hampe ni jambage, il se perd dans une rangée de chiffres.
+ * Le symbole est un tracé, plus un caractère : le « ∞ » de la police, bas et
+ * sans hampe, se perdait dans une rangée de chiffres et dépendait de la police.
  */
+check('le symbole est dessiné, pas écrit',
+    /const INFINITY_PATH = 'M20\.288 9\.463/.test(SETTINGS)
+    && /createElementNS\(ns, 'svg'\)/.test(SETTINGS)
+    && !/'∞'/.test(SETTINGS),
+    'le tracé fourni, construit dans l\'espace de noms SVG');
+check('  … dans la teinte de la pastille', /setAttribute\('fill', 'currentColor'\)/.test(SETTINGS),
+    'il suit le thème et le mode jour/nuit');
+check('  … avec un nom pour qui ne le voit pas', /setAttribute\('aria-label'/.test(SETTINGS));
+
+const iconRule = /\.scroll-val-infinity \{([^}]*)\}/.exec(CSS);
 const badgeRule = /\.scroll-val\.is-infinity \{([^}]*)\}/.exec(CSS);
-const baseBadge = /\.scroll-val \{([^}]*)\}/.exec(CSS);
-const size = (rule) => parseFloat((/font-size: ([\d.]+)rem/.exec(rule) || [])[1]);
-check('le symbole est plus grand que les nombres qu\'il remplace',
-    Boolean(badgeRule) && Boolean(baseBadge) && size(badgeRule[1]) > size(baseBadge[1]),
-    `${size(baseBadge[1])}rem pour un nombre, ${size(badgeRule[1])}rem pour « ∞ »`);
+check('  … à la hauteur des chiffres voisins', Boolean(iconRule) && /width: 1\.7em/.test(iconRule[1]),
+    'le tracé n\'occupe qu\'une bande de sa boîte carrée');
 check('  … sans faire grandir la rangée',
-    Boolean(badgeRule) && /line-height: 1;/.test(badgeRule[1]),
-    'la pastille suivrait sinon la taille du glyphe');
+    Boolean(badgeRule) && /line-height: 1;/.test(badgeRule[1])
+    && Boolean(iconRule) && /margin: -0\.45em/.test(iconRule[1]),
+    'la boîte, plus haute que la ligne, déborde en marges négatives');
+
+/*
+ * Un seul peintre pour la pastille, partout où elle est écrite : ouverture,
+ * glissement, remise d'un curseur, remise générale. Cette dernière écrivait le
+ * nombre à la main, et un curseur ramené de l'infini à trois gardait sa piste
+ * teintée.
+ */
+check('la pastille n\'a qu\'un peintre', (SETTINGS.match(/paintRangeValue\(/g) || []).length === 5,
+    `${(SETTINGS.match(/paintRangeValue\(/g) || []).length} occurrence(s), définition comprise`);
+check('  … que la remise générale emprunte aussi',
+    /const setRange = [\s\S]{0,500}paintRangeValue\(valSpan, el, unit\);\s*paintInfinity\(el\);/.test(SETTINGS));
 
 /* ══════════════════ La conversion, dans les deux sens ══════════════════ */
 

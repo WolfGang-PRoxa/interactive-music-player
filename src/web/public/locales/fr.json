@@ -167,6 +167,7 @@
     "preload_title": "Chargement anticipé des musiques",
     "preload_enable": "Activer le chargement anticipé des musiques",
     "preload_count_sub": "Nombre de musiques à précharger :",
+    "preload_all_label": "Toutes les pistes",
     "in_queue_label": "En file d'attente :",
     "in_history_label": "Dans l'historique :",
     "in_playlists_label": "Dans les playlists :",

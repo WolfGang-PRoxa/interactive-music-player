@@ -167,6 +167,7 @@
     "preload_title": "Precarga de audio",
     "preload_enable": "Activar precarga de música",
     "preload_count_sub": "Número de canciones a precargar:",
+    "preload_all_label": "Todas las canciones",
     "in_queue_label": "En la cola:",
     "in_history_label": "En el historial:",
     "in_playlists_label": "En las listas:",

@@ -167,6 +167,7 @@
     "preload_title": "Audio-Vorladen",
     "preload_enable": "Audio-Vorladen aktivieren",
     "preload_count_sub": "Anzahl vorzuladender Titel:",
+    "preload_all_label": "Alle Titel",
     "in_queue_label": "In Warteschlange:",
     "in_history_label": "Im Verlauf:",
     "in_playlists_label": "In Wiedergabelisten:",

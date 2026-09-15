@@ -3268,18 +3268,26 @@ input[type="range"]::-moz-range-thumb:hover {
 /*
    Le symbole de l'infini, dans la pastille de valeur.
 
-   Il remplace un nombre, et à taille égale il pèse moins que lui : le glyphe
-   est bas, sans hampe ni jambage, et se perd dans une ligne où tous les autres
-   curseurs affichent des chiffres. Agrandi d'un tiers, il retrouve la présence
-   d'un « 3 » — c'est le réglage le plus marquant des trois, il doit se
-   remarquer.
+   Un tracé et non plus un caractère : le « ∞ » de la police, bas et sans
+   hampe, se perdait dans une rangée de chiffres, et il fallait l'agrandir d'un
+   tiers pour lui rendre la présence d'un « 3 ». Le tracé tient dans une boîte
+   carrée où il n'occupe qu'une bande horizontale ; à 1,7 fois la taille du
+   texte, sa hauteur rejoint celle des chiffres voisins.
 
-   La hauteur de ligne est ramenée à un : sans elle, la pastille grandirait avec
-   le glyphe et pousserait toute la rangée.
+   Il est aligné à droite comme les nombres qu'il remplace, et ne fait pas
+   grandir la rangée : la boîte, plus haute que la ligne, déborde en marges
+   négatives plutôt qu'en hauteur de pastille.
 */
 .scroll-val.is-infinity {
-    font-size: 1.25rem;
     line-height: 1;
+}
+
+.scroll-val-infinity {
+    display: inline-block;
+    width: 1.7em;
+    height: 1.7em;
+    margin: -0.45em -0.12em -0.45em 0;
+    vertical-align: middle;
 }
 
 .btn-default-reset {

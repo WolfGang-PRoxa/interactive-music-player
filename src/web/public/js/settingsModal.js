@@ -761,15 +761,60 @@ window.MusicPlayer.initSettingsModal = function() {
         }
 
         /**
-         * Ce qu'affiche la pastille d'un curseur.
+         * Le symbole de l'infini, dessiné plutôt qu'écrit.
+         *
+         * Le caractère « ∞ » dépend de la police : bas, sans hampe ni jambage, il
+         * se perdait dans une rangée de chiffres, et il fallait l'agrandir d'un
+         * tiers pour lui rendre la présence d'un « 3 ». Un tracé a le poids qu'on
+         * lui donne, et le même partout.
+         *
+         * Le tracé seul est gardé : l'export portait des groupes d'habillage vides
+         * et un noir écrit en dur. `currentColor` à la place, pour que l'icône
+         * suive la teinte de la pastille, donc le thème et le mode jour/nuit.
+         * Construit nœud par nœud, dans l'espace de noms SVG, sans `innerHTML`.
+         */
+        const INFINITY_PATH = 'M20.288 9.463a4.856 4.856 0 0 0-4.336-2.3 4.586 4.586 0 0 0-3.343 1.767'
+            + 'c.071.116.148.226.212.347l.879 1.652.134-.254a2.71 2.71 0 0 1 2.206-1.519'
+            + ' 2.845 2.845 0 1 1 0 5.686 2.708 2.708 0 0 1-2.205-1.518L13.131 12l-1.193-2.26'
+            + 'a4.709 4.709 0 0 0-3.89-2.581 4.845 4.845 0 1 0 0 9.682 4.586 4.586 0 0 0 3.343-1.767'
+            + 'c-.071-.116-.148-.226-.212-.347l-.879-1.656-.134.254a2.71 2.71 0 0 1-2.206 1.519'
+            + ' 2.855 2.855 0 0 1-2.559-1.369 2.825 2.825 0 0 1 0-2.946 2.862 2.862 0 0 1 2.442-1.374'
+            + 'h.121a2.708 2.708 0 0 1 2.205 1.518l.7 1.327 1.193 2.26a4.709 4.709 0 0 0 3.89 2.581'
+            + 'h.209a4.846 4.846 0 0 0 4.127-7.378z';
+
+        function infinityIcon() {
+            const ns = 'http://www.w3.org/2000/svg';
+            const svg = document.createElementNS(ns, 'svg');
+            svg.setAttribute('viewBox', '0 0 24 24');
+            svg.setAttribute('class', 'scroll-val-infinity');
+            svg.setAttribute('role', 'img');
+            svg.setAttribute('aria-label', window.MusicPlayer.t
+                ? window.MusicPlayer.t('preload_all_label')
+                : 'Toutes les pistes');
+            const path = document.createElementNS(ns, 'path');
+            path.setAttribute('d', INFINITY_PATH);
+            path.setAttribute('fill', 'currentColor');
+            svg.appendChild(path);
+            return svg;
+        }
+
+        /**
+         * Peint la pastille d'un curseur : un nombre, ou l'infini.
          *
          * Centralisé : la valeur est peinte à l'ouverture, au glissement, à la
-         * molette et à la remise par défaut. Écrire le symbole à trois de ces
-         * quatre endroits donnerait un curseur qui affiche « 6 » selon la façon
-         * dont on l'a atteint.
+         * molette et aux remises par défaut. Dessiner le symbole à trois de ces
+         * endroits seulement donnerait un curseur qui affiche « 6 » selon la
+         * façon dont on l'a atteint.
          */
-        function rangeDisplay(range, unit) {
-            return atInfinity(range) ? '∞' : `${range.value}${unit}`;
+        function paintRangeValue(badge, range, unit) {
+            if (!badge) return;
+            if (atInfinity(range)) {
+                // Déjà dessiné : ne pas reconstruire à chaque cran de glissement.
+                if (!badge.querySelector('.scroll-val-infinity')) badge.replaceChildren(infinityIcon());
+                return;
+            }
+            const text = `${range.value}${unit}`;
+            if (badge.textContent !== text || badge.firstElementChild) badge.textContent = text;
         }
 
         /**
@@ -852,11 +897,11 @@ window.MusicPlayer.initSettingsModal = function() {
             else if (range.id === 'preload-playlist-count') range.value = preloadPosition(dashboardSettings.preloading && dashboardSettings.preloading.playlistCount, range);
 
             const unit = (range.id.includes('duration') || range.id.includes('hold') || range.id.includes('delay') || range.id.startsWith('setting-toast-')) ? 's' : (range.id.includes('video') ? 'px' : '');
-            if (valSpan) valSpan.textContent = rangeDisplay(range, unit);
+            paintRangeValue(valSpan, range, unit);
             paintInfinity(range);
 
             range.addEventListener('input', () => {
-                if (valSpan) valSpan.textContent = rangeDisplay(range, unit);
+                paintRangeValue(valSpan, range, unit);
                 paintInfinity(range);
                 updateSettingsFromUI();
                 if (range.id.includes('video') && typeof window.MusicPlayer.applyDefaultVideoWindowGeometry === 'function') {
@@ -914,8 +959,8 @@ window.MusicPlayer.initSettingsModal = function() {
                     // Passé par le même formateur que les autres peintures : la
                     // valeur par défaut d'un curseur de préchargement pourrait
                     // un jour être son cran d'infini, et elle s'afficherait
-                    // « 6 » ici alors qu'elle vaut « ∞ » partout ailleurs.
-                    if (valDisplay) valDisplay.textContent = rangeDisplay(targetInput, unit);
+                    // « 6 » ici alors qu'elle vaut l'infini partout ailleurs.
+                    paintRangeValue(valDisplay, targetInput, unit);
                     paintInfinity(targetInput);
                     updateSettingsFromUI();
                     if (targetId && targetId.includes('video') && typeof window.MusicPlayer.applyDefaultVideoWindowGeometry === 'function') {
@@ -1157,7 +1202,15 @@ window.MusicPlayer.initSettingsModal = function() {
                 const el = document.getElementById(id);
                 const valSpan = document.getElementById(`val-${id}`) || el?.nextElementSibling;
                 if (el) el.value = val;
-                if (valSpan) valSpan.textContent = `${val}${unit}`;
+                // Par le même peintre que les autres : un curseur de
+                // préchargement posé sur l'infini gardait son symbole, et sa
+                // piste restait teintée, une fois ramené à trois.
+                if (el) {
+                    paintRangeValue(valSpan, el, unit);
+                    paintInfinity(el);
+                } else if (valSpan) {
+                    valSpan.textContent = `${val}${unit}`;
+                }
             };
 
             setRange('setting-fadeout-duration', 5, 's');
