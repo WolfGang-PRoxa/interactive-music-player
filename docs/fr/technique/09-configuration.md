@@ -157,6 +157,8 @@ chaque lecture.
 | `presenceDepartureDelay` | `30` | Délai avant de quitter un salon vidé, **en secondes** |
 | `ignoredVoiceUsers` | `{}` | Exclusions de ducking, par salon |
 | `sharedControl` | `{}` | Droits accordés aux invités, par compte Discord |
+| `rightRequests` | `{}` | Droits demandés par les invités, en attente de réponse : compte → droit → horodatage |
+| `mutedRightRequests` | `[]` | Invités dont les demandes de droit sont en sourdine |
 | `preloading` | voir ci-dessous | Préchargement : `enabled`, `queueCount`, `historyCount`, `playlistCount` |
 | `activePlaybackSource` | `'queue'` | `'queue'` ou identifiant de playlist |
 | `playlistCurrentIndex` | `0` | Position dans la playlist active |

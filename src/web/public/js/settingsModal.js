@@ -121,8 +121,12 @@ function hideToast() {
  * précédent porte l'action de la précédente, et doit partir avec elle — sans
  * quoi un clic déclencherait toutes celles qui l'ont précédé.
  *
+ * Un bouton grisé (`disabled`) reste affiché : il dit qu'une action existe et
+ * qu'elle n'est pas possible maintenant — une demande déjà envoyée, un invité
+ * mis en sourdine —, ce que son absence tairait.
+ *
  * @param {string} message
- * @param {{ label: string, onClick: function }} [action] - Bouton d'action.
+ * @param {{ label: string, onClick: function, disabled?: boolean }} [action] - Bouton d'action.
  */
 window.MusicPlayer.showToast = function(message, action) {
     const toast = document.getElementById('error-toast');
@@ -139,8 +143,9 @@ window.MusicPlayer.showToast = function(message, action) {
         const usable = action && action.label && typeof action.onClick === 'function';
         actionBtn.classList.toggle('hidden', !usable);
         actionBtn.textContent = usable ? action.label : '';
+        actionBtn.disabled = Boolean(usable && action.disabled);
 
-        if (usable) {
+        if (usable && !action.disabled) {
             actionBtn._toastHandler = () => {
                 // La notification se retire d'elle-même : son message ne vaut
                 // plus rien une fois qu'on a répondu à ce qu'il proposait.

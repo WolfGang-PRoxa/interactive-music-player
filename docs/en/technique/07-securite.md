@@ -152,9 +152,10 @@ Three special values complete the catalogue:
   different right. The message goes through, and `filterSettings()` keeps only
   the permitted settings; a guest with no rights sees their request emptied of
   all content, which the caller treats as a refusal.
-- `MASTER_ONLY` — fifteen messages that stay with the master: shutting down or
+- `MASTER_ONLY` — seventeen messages that stay with the master: shutting down or
   restarting the bot, changing its version, making it leave a server, mounting
-  the tunnel, and handing out the rights themselves.
+  the tunnel, handing out the rights themselves, answering rights requests and
+  muting them.
 
 **A message unknown to the table is treated as `MASTER_ONLY`.** That is
 deliberate: a command added later without thinking will be closed by default
@@ -167,6 +168,16 @@ gestures do not say the same thing, and confusing them is costly:
 recognised, simply without power, and their rights can be handed back a moment
 later; `revokeControl` dismisses for good — rights erased, admission withdrawn,
 sessions closed, book entry deleted.
+
+A guest can **request** a refused right through `requestRight`, open to all since
+it is precisely the one without the right who asks. Requesting grants nothing,
+and the handler sorts: a recognised guest already admitted, a catalogue right
+they do not have, no mute, no duplicate, at least three seconds between two
+requests. Requests wait in the server settings, under `rightRequests`, and the
+administrator answers them through `answerRightRequest` — granting adds only the
+requested right. `muteRightRequests` mutes a guest, under `mutedRightRequests`,
+and erases what they had requested; a dismissed guest leaves with neither
+requests nor mute.
 
 ### Origin of the token
 

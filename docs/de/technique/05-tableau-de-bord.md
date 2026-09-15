@@ -147,6 +147,7 @@ könnte — genau das kommt er holen. Siehe
 | `speakers` | Wer gerade spricht, für das Feld der Sprachaktivität |
 | `permissionDenied` | Eine Nachricht wurde einem Gast verweigert — das fehlende Recht |
 | `shareResult`, `controlRevoked` | Folgen einer Teilungsgeste, für den Meister und den Gast |
+| `rightRequestResult`, `rightRequestAnswered`, `rightRequested` | Eine Rechteanfrage: die Antwort an den anfragenden Gast, die Entscheidung des Administrators und der Hinweis auf dessen Seite |
 | `tunnelState` | Zustand des Tunnels, beim Öffnen seines Fensters |
 | `versionCatalog` | Katalog der Versionen, bei jedem Öffnen des Menüs neu von GitHub gelesen |
 | `trackFormats` | Für einen Titel tatsächlich verfügbare Formate und Raten |
@@ -164,7 +165,7 @@ Bereich entspricht einem Modul von `handlers/`:
 | Wiedergabelisten | `createPlaylist`, `renamePlaylist`, `deletePlaylist`, `reorderPlaylists`, `addPlaylistTrack`, `addTrackToPlaylist`, `removeTrackFromPlaylist`, `movePlaylistTrack`, `setActivePlaybackSource`, `insertTransition`, `setTransitionTarget` |
 | Discord-Server | `selectChannel`, `setDefaultChannel`, `updateSettings`, `toggleVoiceDetection`, `leaveGuild` |
 | Titel | `setTrackQuality`, `requestTrackFormats`, `requestTrackLoudness`, `setTrackLoudness`, `downloadTrack` |
-| Teilung der Steuerung | `sendInviteLink`, `admitGuest`, `shareControl`, `revokeControl` |
+| Teilung der Steuerung | `sendInviteLink`, `admitGuest`, `shareControl`, `revokeControl`, `requestRight`, `answerRightRequest`, `muteRightRequests` |
 | Tunnel | `tunnelState`, `tunnelLogin`, `tunnelMount`, `tunnelUnmount` |
 | Versionen | `listVersions`, `installVersion`, `uninstallVersion` |
 | System | `requestState`, `clientLog`, `memoryStream`, `startupFadeinConsumed`, `restartBot`, `shutdownBot` |

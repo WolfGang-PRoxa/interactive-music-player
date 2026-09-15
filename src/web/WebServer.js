@@ -980,6 +980,10 @@ class WebServer {
                     knownUsers: this._knownGuests(),
                     pending: this._pendingGuests(guildId),
                     admitted: database.getAdmittedGuests(guildId),
+                    // userId → droit → horodatage : ce que chacun a demandé.
+                    requests: database.getRightRequests(guildId),
+                    // Les invités dont les demandes sont en sourdine.
+                    mutedRequests: database.getMutedRightRequests(guildId),
                     /*
                      * Le catalogue des droits voyage avec l'état.
                      *
@@ -1009,6 +1013,14 @@ class WebServer {
             permissions: userId
                 ? database.getUserPermissions(guildId, userId)
                 : permissions.noPermissions(),
+            // Ce qu'il a déjà demandé, pour que son bouton dise « envoyée »
+            // plutôt que d'offrir de redemander ; et s'il peut encore demander.
+            rightRequests: userId
+                ? Object.keys(database.getRightRequests(guildId)[userId] || {})
+                : [],
+            requestsMuted: userId
+                ? database.getMutedRightRequests(guildId).includes(String(userId))
+                : false,
         };
     }
 

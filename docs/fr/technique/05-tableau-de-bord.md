@@ -139,6 +139,7 @@ justement ce qu'il vient chercher. Voir
 | `speakers` | Qui parle à l'instant, pour l'encadré d'activité vocale |
 | `permissionDenied` | Un message a été refusé à un invité — le droit qui manquait |
 | `shareResult`, `controlRevoked` | Suites d'un geste de partage, pour le maître et pour l'invité |
+| `rightRequestResult`, `rightRequestAnswered`, `rightRequested` | Une demande de droit : la réponse à l'invité qui demande, la décision de l'administrateur, et la sonnerie chez celui-ci |
 | `tunnelState` | État du tunnel, à l'ouverture de sa fenêtre |
 | `versionCatalog` | Catalogue des versions, relu sur GitHub à chaque ouverture du menu |
 | `trackFormats` | Formats et débits réellement disponibles pour une piste |
@@ -156,7 +157,7 @@ domaine correspond à un module de `handlers/` :
 | Playlists | `createPlaylist`, `renamePlaylist`, `deletePlaylist`, `reorderPlaylists`, `addPlaylistTrack`, `addTrackToPlaylist`, `removeTrackFromPlaylist`, `movePlaylistTrack`, `setActivePlaybackSource`, `insertTransition`, `setTransitionTarget` |
 | Serveur Discord | `selectChannel`, `setDefaultChannel`, `updateSettings`, `toggleVoiceDetection`, `leaveGuild` |
 | Piste | `setTrackQuality`, `requestTrackFormats`, `requestTrackLoudness`, `setTrackLoudness`, `downloadTrack` |
-| Partage du contrôle | `sendInviteLink`, `admitGuest`, `shareControl`, `revokeControl` |
+| Partage du contrôle | `sendInviteLink`, `admitGuest`, `shareControl`, `revokeControl`, `requestRight`, `answerRightRequest`, `muteRightRequests` |
 | Tunnel | `tunnelState`, `tunnelLogin`, `tunnelMount`, `tunnelUnmount` |
 | Versions | `listVersions`, `installVersion`, `uninstallVersion` |
 | Système | `requestState`, `clientLog`, `memoryStream`, `startupFadeinConsumed`, `restartBot`, `shutdownBot` |

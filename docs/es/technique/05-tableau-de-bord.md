@@ -141,6 +141,7 @@ es justamente lo que viene a buscar. Véase
 | `speakers` | Quién habla en este instante, para el recuadro de actividad vocal |
 | `permissionDenied` | Un mensaje ha sido rechazado a un invitado — el derecho que faltaba |
 | `shareResult`, `controlRevoked` | Consecuencias de un gesto de compartición, para el maestro y el invitado |
+| `rightRequestResult`, `rightRequestAnswered`, `rightRequested` | Una solicitud de derecho: la respuesta al invitado que la pide, la decisión del administrador, y el aviso en el lado de este |
 | `tunnelState` | Estado del túnel, al abrirse su ventana |
 | `versionCatalog` | Catálogo de versiones, releído de GitHub cada vez que se abre el menú |
 | `trackFormats` | Formatos y tasas realmente disponibles para una pista |
@@ -158,7 +159,7 @@ dominio corresponde a un módulo de `handlers/`:
 | Listas de reproducción | `createPlaylist`, `renamePlaylist`, `deletePlaylist`, `reorderPlaylists`, `addPlaylistTrack`, `addTrackToPlaylist`, `removeTrackFromPlaylist`, `movePlaylistTrack`, `setActivePlaybackSource`, `insertTransition`, `setTransitionTarget` |
 | Servidor de Discord | `selectChannel`, `setDefaultChannel`, `updateSettings`, `toggleVoiceDetection`, `leaveGuild` |
 | Pista | `setTrackQuality`, `requestTrackFormats`, `requestTrackLoudness`, `setTrackLoudness`, `downloadTrack` |
-| Compartición del control | `sendInviteLink`, `admitGuest`, `shareControl`, `revokeControl` |
+| Compartición del control | `sendInviteLink`, `admitGuest`, `shareControl`, `revokeControl`, `requestRight`, `answerRightRequest`, `muteRightRequests` |
 | Túnel | `tunnelState`, `tunnelLogin`, `tunnelMount`, `tunnelUnmount` |
 | Versiones | `listVersions`, `installVersion`, `uninstallVersion` |
 | Sistema | `requestState`, `clientLog`, `memoryStream`, `startupFadeinConsumed`, `restartBot`, `shutdownBot` |

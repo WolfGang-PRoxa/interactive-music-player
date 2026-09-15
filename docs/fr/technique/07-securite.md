@@ -154,9 +154,10 @@ Trois valeurs particulières complètent le catalogue :
   différent. Le message passe, et `filterSettings()` ne garde que les réglages
   permis ; un invité sans droit voit sa demande vidée de tout contenu, ce que
   l'appelant traite comme un refus.
-- `MASTER_ONLY` — quinze messages qui restent au maître : éteindre ou
+- `MASTER_ONLY` — dix-sept messages qui restent au maître : éteindre ou
   redémarrer le bot, changer sa version, le faire quitter un serveur, monter le
-  tunnel, et distribuer les droits eux-mêmes.
+  tunnel, distribuer les droits eux-mêmes, répondre aux demandes de droit et les
+  mettre en sourdine.
 
 **Un message inconnu de la table est assimilé à `MASTER_ONLY`.** C'est
 délibéré : une commande ajoutée plus tard sans y penser sera fermée par défaut
@@ -169,6 +170,16 @@ gestes voisins ne disent pas la même chose et les confondre coûte cher :
 simplement sans pouvoir, et on peut lui rendre ses droits l'instant d'après ;
 `revokeControl` congédie pour de bon — droits effacés, admission retirée,
 sessions fermées, fiche du carnet supprimée.
+
+Un invité peut **demander** un droit refusé par `requestRight`, ouvert à tous
+puisque c'est précisément celui qui n'a pas le droit qui demande. Demander
+n'accorde rien, et le handler trie : un invité reconnu et déjà admis, un droit
+du catalogue qu'il n'a pas, pas de sourdine, pas de doublon, trois secondes au
+moins entre deux demandes. Les demandes attendent dans les réglages du serveur,
+sous `rightRequests`, et l'administrateur y répond par `answerRightRequest` —
+accorder n'ajoute que le droit demandé. `muteRightRequests` met un invité en
+sourdine, sous `mutedRightRequests`, et efface ce qu'il avait demandé ; un
+invité congédié repart sans demandes ni sourdine.
 
 ### Origine du jeton
 

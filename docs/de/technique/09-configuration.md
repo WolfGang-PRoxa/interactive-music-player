@@ -160,6 +160,8 @@ Schlüssel zu ergänzen genügt: alle bestehenden Server erben ihn, da
 | `presenceDepartureDelay` | `30` | Frist vor dem Verlassen eines geleerten Kanals, **in Sekunden** |
 | `ignoredVoiceUsers` | `{}` | Ausschlüsse vom Ducking, je Kanal |
 | `sharedControl` | `{}` | Gästen gewährte Rechte, je Discord-Konto |
+| `rightRequests` | `{}` | Von Gästen angefragte Rechte, die auf Antwort warten: Konto → Recht → Zeitstempel |
+| `mutedRightRequests` | `[]` | Gäste, deren Rechteanfragen stummgeschaltet sind |
 | `preloading` | siehe unten | Vorladen: `enabled`, `queueCount`, `historyCount`, `playlistCount` |
 | `activePlaybackSource` | `'queue'` | `'queue'` oder Kennung einer Wiedergabeliste |
 | `playlistCurrentIndex` | `0` | Position in der aktiven Wiedergabeliste |

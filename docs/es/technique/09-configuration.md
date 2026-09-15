@@ -158,6 +158,8 @@ valores predeterminados en cada lectura.
 | `presenceDepartureDelay` | `30` | Plazo antes de abandonar un canal vaciado, **en segundos** |
 | `ignoredVoiceUsers` | `{}` | Exclusiones de ducking, por canal |
 | `sharedControl` | `{}` | Derechos concedidos a los invitados, por cuenta de Discord |
+| `rightRequests` | `{}` | Derechos solicitados por los invitados, a la espera de respuesta: cuenta → derecho → marca de tiempo |
+| `mutedRightRequests` | `[]` | Invitados cuyas solicitudes de derechos están silenciadas |
 | `preloading` | véase más abajo | Precarga: `enabled`, `queueCount`, `historyCount`, `playlistCount` |
 | `activePlaybackSource` | `'queue'` | `'queue'` o identificador de lista de reproducción |
 | `playlistCurrentIndex` | `0` | Posición en la lista de reproducción activa |

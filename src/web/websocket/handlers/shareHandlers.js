@@ -126,6 +126,10 @@ function handleShareControl(ctx) {
 
     const granted = database.setUserPermissions(currentGuildId, userId, data.permissions);
     const names = permissions.granted(granted);
+
+    // Un droit coché à la main répond aussi à la demande qui le réclamait :
+    // la laisser en attente ferait proposer d'accorder ce qui l'est déjà.
+    for (const action of names) database.removeRightRequests(currentGuildId, userId, action);
     log.info(`[Share] Rights of ${userId}: `
         + (names.length ? `${names.length} — ${names.join(', ')}` : 'none'));
 
@@ -172,6 +176,10 @@ function handleRevokeControl(ctx) {
 
     database.revokeUserPermissions(currentGuildId, userId);
     database.dismissGuest(currentGuildId, userId);
+    // Ses demandes et sa mise en sourdine partent avec lui : il redevient un
+    // inconnu, et un inconnu n'a rien demandé.
+    database.removeRightRequests(currentGuildId, userId);
+    database.setRightRequestsMuted(currentGuildId, userId, false);
     const closed = sessions.revokeUser(userId);
     /*
      * Le carnet oublie aussi.
@@ -203,6 +211,151 @@ function handleRevokeControl(ctx) {
     webServer.broadcastState(currentGuildId);
 }
 
+/* ═════════════════════ Les demandes de droit ═════════════════════ */
+
+/**
+ * Délai minimal entre deux demandes d'un même invité.
+ *
+ * Chaque demande sonne chez l'administrateur. Rien n'empêcherait sinon un invité
+ * de faire défiler vingt-neuf notifications en autant de clics — ni la console
+ * du navigateur d'en envoyer mille.
+ */
+const REQUEST_COOLDOWN_MS = 3000;
+
+/** userId → horodatage de la dernière demande acceptée. En mémoire seulement. */
+const lastRequestAt = new Map();
+
+/** Envoie un message à chaque onglet d'un compte, sur ce serveur. */
+function tellUser(webServer, guildId, userId, type, data) {
+    for (const client of webServer.wss?.clients || []) {
+        if (client.readyState !== 1 || client.selectedGuildId !== guildId) continue;
+        if (client.identity?.session?.userId !== String(userId)) continue;
+        try { client.send(JSON.stringify({ type, data })); } catch (e) {}
+    }
+}
+
+/** Envoie un message à chaque onglet de l'administrateur, sur ce serveur. */
+function tellMaster(webServer, guildId, type, data) {
+    for (const client of webServer.wss?.clients || []) {
+        if (client.readyState !== 1 || client.selectedGuildId !== guildId) continue;
+        if (!client.identity?.master) continue;
+        try { client.send(JSON.stringify({ type, data })); } catch (e) {}
+    }
+}
+
+/**
+ * Un invité demande un droit qui lui a été refusé.
+ *
+ * Ouvert à tous par la table des messages — c'est précisément celui qui n'a
+ * pas le droit qui demande —, le tri se fait donc ici :
+ *
+ *  - il faut être un invité reconnu : l'administrateur n'a rien à demander, et
+ *    un porteur de jeton sans compte n'a pas de nom sous lequel être notifié ;
+ *  - et déjà admis : pour qui attend encore à la porte, la question en cours
+ *    est son admission, pas un droit ;
+ *  - le droit doit exister au catalogue, et ne pas être déjà accordé ;
+ *  - l'invité ne doit pas avoir été mis en sourdine ;
+ *  - une demande déjà en attente n'en crée pas une seconde ;
+ *  - deux demandes se suivent d'au moins `REQUEST_COOLDOWN_MS`.
+ *
+ * L'invité reçoit toujours une réponse, `rightRequestResult`, qui dit ce qu'il
+ * en est : son bouton ne doit pas rester sur un « Envoi… » que rien ne lève.
+ */
+function handleRequestRight(ctx) {
+    const { ws, data, webServer, currentGuildId } = ctx;
+    const identity = ws && ws.identity;
+    const session = identity && identity.session;
+    const userId = session && session.userId ? String(session.userId) : null;
+    const action = data && data.action;
+
+    const answer = (ok, reason) => {
+        try {
+            ws.send(JSON.stringify({ type: 'rightRequestResult', data: { action, ok, reason } }));
+        } catch (e) {}
+    };
+
+    if (!userId || identity.master) return answer(false, 'not_guest');
+    if (!permissions.ACTIONS.includes(action)) return answer(false, 'unknown_right');
+    // Un invité qui frappe encore à la porte n'a pas de droit à réclamer : la
+    // question posée à l'administrateur est d'abord celle de son admission.
+    const current = database.getUserPermissions(currentGuildId, userId);
+    if (!permissions.hasAny(current) && !database.getAdmittedGuests(currentGuildId).includes(userId)) {
+        return answer(false, 'not_admitted');
+    }
+    if (database.getMutedRightRequests(currentGuildId).includes(userId)) return answer(false, 'muted');
+    if (current[action]) return answer(false, 'already_granted');
+
+    const pending = database.getRightRequests(currentGuildId)[userId] || {};
+    if (pending[action]) return answer(true, 'already_pending');
+
+    const now = Date.now();
+    if (now - (lastRequestAt.get(userId) || 0) < REQUEST_COOLDOWN_MS) return answer(false, 'too_soon');
+
+    database.addRightRequest(currentGuildId, userId, action);
+    lastRequestAt.set(userId, now);
+    log.info(`[Share] Guest ${userId} asks for the right « ${action} ».`);
+
+    // L'état diffusé porte la demande ; ce message-ci ne sert qu'à sonner, pour
+    // que l'administrateur qui n'a pas la fenêtre ouverte l'apprenne.
+    tellMaster(webServer, currentGuildId, 'rightRequested', {
+        userId,
+        displayName: session.displayName || session.username || userId,
+        avatar: session.avatar || null,
+        action,
+    });
+
+    answer(true, null);
+    webServer.broadcastState(currentGuildId);
+}
+
+/**
+ * L'administrateur répond à une demande : il accorde, ou il refuse.
+ *
+ * Accorder ajoute ce seul droit à ceux que l'invité a déjà, et l'admet s'il ne
+ * l'était pas — comme cocher la case à la main (voir `handleShareControl`).
+ * Refuser retire la demande, sans rien retirer d'autre. Dans les deux cas
+ * l'invité l'apprend, par `rightRequestAnswered`.
+ */
+function handleAnswerRightRequest(ctx) {
+    const { ws, data, webServer, currentGuildId } = ctx;
+    const userId = data && data.userId ? String(data.userId) : null;
+    const action = data && data.action;
+    if (!userId || !permissions.ACTIONS.includes(action)) return;
+
+    const grant = Boolean(data.grant);
+    if (grant) {
+        database.admitGuest(currentGuildId, userId);
+        const current = database.getUserPermissions(currentGuildId, userId);
+        database.setUserPermissions(currentGuildId, userId, { ...current, [action]: true });
+    }
+    database.removeRightRequests(currentGuildId, userId, action);
+    log.info(`[Share] Request of ${userId} for « ${action} »: ${grant ? 'granted' : 'refused'}.`);
+
+    tellUser(webServer, currentGuildId, userId, 'rightRequestAnswered', { action, granted: grant });
+    reply(ws, true, null, { userId, action, granted: grant });
+    webServer.broadcastState(currentGuildId);
+}
+
+/**
+ * Met en sourdine, ou rétablit, les demandes d'un invité.
+ *
+ * L'invité ne l'apprend pas par un message à part : son état porte
+ * `requestsMuted`, et c'est lui qui grise le bouton de demande et en dit la
+ * raison.
+ */
+function handleMuteRightRequests(ctx) {
+    const { ws, data, webServer, currentGuildId } = ctx;
+    const userId = data && data.userId ? String(data.userId) : null;
+    if (!userId) return;
+
+    const muted = Boolean(data.muted);
+    database.setRightRequestsMuted(currentGuildId, userId, muted);
+    log.info(`[Share] Requests of ${userId}: ${muted ? 'muted' : 'allowed'}.`);
+
+    reply(ws, true, null, { userId, muted });
+    webServer.broadcastState(currentGuildId);
+}
+
 /** Réponse au tableau de bord du maître, pour qu'il sache quoi afficher. */
 function reply(ws, ok, reason, extra = {}) {
     try {
@@ -220,4 +373,7 @@ module.exports = {
     handleSendInviteLink,
     handleShareControl,
     handleRevokeControl,
+    handleRequestRight,
+    handleAnswerRightRequest,
+    handleMuteRightRequests,
 };

@@ -953,6 +953,106 @@ class GuildDatabase {
     }
 
     /**
+     * Enregistre la demande d'un droit par un invité.
+     *
+     * Rangée avec les droits, et donc écrite sur le disque : une demande faite
+     * pendant que le maître est absent doit l'attendre, y compris à travers un
+     * redémarrage du bot. Une demande déjà en attente n'est pas refaite — ni
+     * rajeunie, pour que l'ordre d'arrivée reste celui des premières.
+     *
+     * @param {string} guildId
+     * @param {string} userId
+     * @param {string} action Droit du catalogue.
+     * @returns {boolean} Vrai si la demande est nouvelle.
+     */
+    addRightRequest(guildId, userId, action) {
+        const settings = this.getSettings(guildId);
+        const all = settings.rightRequests && typeof settings.rightRequests === 'object'
+            ? settings.rightRequests : {};
+        const id = String(userId);
+        const mine = all[id] && typeof all[id] === 'object' ? all[id] : {};
+        if (mine[action]) return false;
+
+        settings.rightRequests = { ...all, [id]: { ...mine, [action]: Date.now() } };
+        this.cache.set(guildId, settings);
+        this._save();
+        return true;
+    }
+
+    /**
+     * Retire des demandes : une seule si `action` est donnée, toutes sinon.
+     * @param {string} guildId
+     * @param {string} userId
+     * @param {string} [action]
+     */
+    removeRightRequests(guildId, userId, action) {
+        const settings = this.getSettings(guildId);
+        const all = settings.rightRequests;
+        const id = String(userId);
+        if (!all || !all[id]) return;
+
+        const rest = { ...all };
+        if (action) {
+            const mine = { ...all[id] };
+            if (!mine[action]) return;
+            delete mine[action];
+            if (Object.keys(mine).length) rest[id] = mine;
+            else delete rest[id];
+        } else {
+            delete rest[id];
+        }
+
+        settings.rightRequests = rest;
+        this.cache.set(guildId, settings);
+        this._save();
+    }
+
+    /**
+     * Les demandes en attente sur un serveur.
+     * @param {string} guildId
+     * @returns {Object<string, Object<string, number>>} userId → droit → horodatage.
+     */
+    getRightRequests(guildId) {
+        const all = this.getSettings(guildId).rightRequests;
+        return all && typeof all === 'object' ? all : {};
+    }
+
+    /**
+     * Met en sourdine, ou non, les demandes d'un invité.
+     *
+     * Un invité en sourdine voit toujours ce qui lui est refusé, mais ne peut
+     * plus rien demander. Ses demandes déjà en attente partent avec la mise en
+     * sourdine : c'est précisément ce que le maître ne veut plus voir.
+     *
+     * @param {string} guildId
+     * @param {string} userId
+     * @param {boolean} muted
+     */
+    setRightRequestsMuted(guildId, userId, muted) {
+        const settings = this.getSettings(guildId);
+        const list = Array.isArray(settings.mutedRightRequests) ? settings.mutedRightRequests.map(String) : [];
+        const id = String(userId);
+        const next = muted
+            ? (list.includes(id) ? list : [...list, id])
+            : list.filter((u) => u !== id);
+
+        settings.mutedRightRequests = next;
+        this.cache.set(guildId, settings);
+        this._save();
+        if (muted) this.removeRightRequests(guildId, id);
+    }
+
+    /**
+     * Les invités dont les demandes sont en sourdine sur ce serveur.
+     * @param {string} guildId
+     * @returns {string[]}
+     */
+    getMutedRightRequests(guildId) {
+        const list = this.getSettings(guildId).mutedRightRequests;
+        return Array.isArray(list) ? list.map(String) : [];
+    }
+
+    /**
      * Vérifie si la détection vocale est désactivée pour un utilisateur dans un salon.
      * @param {string} guildId
      * @param {string} channelId

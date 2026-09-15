@@ -156,6 +156,8 @@ read.
 | `presenceDepartureDelay` | `30` | Delay before leaving an emptied channel, **in seconds** |
 | `ignoredVoiceUsers` | `{}` | Ducking exclusions, per channel |
 | `sharedControl` | `{}` | Rights granted to guests, per Discord account |
+| `rightRequests` | `{}` | Rights requested by guests, awaiting an answer: account → right → timestamp |
+| `mutedRightRequests` | `[]` | Guests whose rights requests are muted |
 | `preloading` | see below | Preloading: `enabled`, `queueCount`, `historyCount`, `playlistCount` |
 | `activePlaybackSource` | `'queue'` | `'queue'` or a playlist identifier |
 | `playlistCurrentIndex` | `0` | Position in the active playlist |

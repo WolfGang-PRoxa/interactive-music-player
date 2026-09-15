@@ -51,13 +51,19 @@ function identityOf(ws, guildId) {
     };
 }
 
-/** Prévient l'invité que le maître ne lui a pas accordé ce droit. */
-function denied(ws, type, identity) {
+/**
+ * Prévient l'invité que le maître ne lui a pas accordé ce droit.
+ *
+ * `right` nomme le droit du catalogue en cause, quand il y en a un : c'est ce
+ * qui permet au tableau de bord de dire lequel manque et d'offrir de le
+ * demander. Il est nul pour ce qui n'appartient qu'au maître.
+ */
+function denied(ws, type, identity, refusedFields = []) {
     log.warn(`[WebServer] Message « ${type} » refused to guest ${identity.userId || '?'}: right not granted.`);
     try {
         ws.send(JSON.stringify({
             type: 'permissionDenied',
-            data: { action: type },
+            data: { action: type, right: permissions.rightOf(type, refusedFields) },
         }));
     } catch (e) {
         // La socket vient de se fermer : rien à signaler.
@@ -104,7 +110,7 @@ async function handleMessage(ws, payload, webServer, options = {}) {
             if (refused.length) {
                 log.warn(`[WebServer] Settings dropped for guest ${identity.userId || '?'}: ${refused.join(', ')}.`);
                 if (!Object.keys(allowed).length) {
-                    denied(ws, type, identity);
+                    denied(ws, type, identity, refused);
                     return;
                 }
             }

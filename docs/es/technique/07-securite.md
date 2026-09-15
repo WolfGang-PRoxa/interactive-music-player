@@ -152,9 +152,10 @@ Tres valores particulares completan el catálogo:
   distinto. El mensaje pasa, y `filterSettings()` solo conserva los ajustes
   permitidos; un invitado sin ningún derecho ve su petición vaciada de todo
   contenido, lo que el llamante trata como un rechazo.
-- `MASTER_ONLY` — quince mensajes que quedan para el maestro: apagar o reiniciar
-  el bot, cambiar su versión, hacerlo salir de un servidor, montar el túnel y
-  repartir los derechos mismos.
+- `MASTER_ONLY` — diecisiete mensajes que quedan para el maestro: apagar o
+  reiniciar el bot, cambiar su versión, hacerlo salir de un servidor, montar el
+  túnel, repartir los derechos mismos, responder a las solicitudes de derechos y
+  silenciarlas.
 
 **Un mensaje desconocido para la tabla se asimila a `MASTER_ONLY`.** Es
 deliberado: una orden añadida más tarde sin pensarlo estará cerrada por defecto
@@ -167,6 +168,16 @@ vacío desmarca todo — el invitado sigue admitido, reconocido, simplemente sin
 poder, y se le pueden devolver los derechos al instante siguiente;
 `revokeControl` despide de verdad — derechos borrados, admisión retirada,
 sesiones cerradas, ficha del libro suprimida.
+
+Un invitado puede **solicitar** un derecho rechazado mediante `requestRight`,
+abierto a todos, puesto que es precisamente quien no tiene el derecho quien lo
+pide. Solicitar no concede nada, y el handler filtra: un invitado reconocido y ya
+admitido, un derecho del catálogo que no tiene, sin silencio, sin duplicado, al
+menos tres segundos entre dos solicitudes. Las solicitudes esperan en los ajustes
+del servidor, bajo `rightRequests`, y el administrador las responde mediante
+`answerRightRequest` — conceder solo añade el derecho solicitado.
+`muteRightRequests` silencia a un invitado, bajo `mutedRightRequests`, y borra lo
+que había solicitado; un invitado despedido se va sin solicitudes ni silencio.
 
 ### Origen del testigo
 

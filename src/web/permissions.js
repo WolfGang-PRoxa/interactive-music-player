@@ -288,6 +288,10 @@ const MESSAGE_RIGHTS = {
     syncProgress: ALWAYS,
     startupFadeinConsumed: ALWAYS,
 
+    // Demander un droit ne l'accorde pas : c'est le maître qui répond, et le
+    // handler refuse ce qui n'a pas lieu d'être demandé (voir shareHandlers).
+    requestRight: ALWAYS,
+
     // Réparti champ par champ — voir SETTINGS_RIGHTS
     updateSettings: FIELD_FILTERED,
 
@@ -310,6 +314,8 @@ const MESSAGE_RIGHTS = {
     shareControl: MASTER_ONLY,
     revokeControl: MASTER_ONLY,
     sendInviteLink: MASTER_ONLY,
+    answerRightRequest: MASTER_ONLY,
+    muteRightRequests: MASTER_ONLY,
 };
 
 for (const def of ACTION_DEFS) {
@@ -538,6 +544,26 @@ function filterSettings(identity, data) {
     return { allowed, refused };
 }
 
+/**
+ * Le droit du catalogue qu'un refus concerne, s'il en est un.
+ *
+ * Le tableau de bord de l'invité en a besoin pour nommer ce qui lui manque et
+ * lui offrir de le demander. Un message réservé au maître n'en désigne aucun —
+ * on ne demande pas d'éteindre le bot —, ni un message inconnu.
+ *
+ * @param {string} type Type du message refusé.
+ * @param {string[]} [refusedFields] Champs retirés d'un `updateSettings`.
+ * @returns {string|null}
+ */
+function rightOf(type, refusedFields = []) {
+    if (type === 'updateSettings') {
+        const rights = refusedFields.map((field) => SETTINGS_RIGHTS[field]).filter(Boolean);
+        return rights.length ? rights[0] : null;
+    }
+    const required = MESSAGE_RIGHTS[type];
+    return typeof required === 'string' ? required : null;
+}
+
 module.exports = {
     GROUPS,
     GROUP_ACTIONS,
@@ -559,4 +585,5 @@ module.exports = {
     matchPreset,
     canSend,
     filterSettings,
+    rightOf,
 };

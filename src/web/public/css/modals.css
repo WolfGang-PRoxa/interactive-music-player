@@ -12,8 +12,13 @@
        Les trois derniers rangs de la pile, de haut en bas :
 
          2147483647  l'infobulle    (#custom-tooltip, plus bas dans ce fichier)
-         2147483646  la notification
+         2147483646  la notification, et la bulle de refus (#perm-refusal)
          2147483645  la vidéo en plein écran de pure CSS (css/video.css)
+
+       La bulle de refus partage le rang de la notification : toutes deux
+       répondent au geste qu'on vient de faire, et doivent passer devant la
+       vidéo en plein écran, dont une commande peut être refusée. Elles ne se
+       recouvrent pas — l'une est ancrée sur la commande, l'autre dans le coin.
 
        Tout le reste est loin dessous : modales à 30 000, tiroir à 9 999,
        fenêtres flottantes distribuées par `bringToFront()` à partir de 9 990.
@@ -170,6 +175,14 @@
 
 .toast-action-btn:active {
     transform: scale(0.95);
+}
+
+/* Une action qui existe mais ne peut servir maintenant : visible, et inerte. */
+.toast-action-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: none;
+    transform: none;
 }
 
 .toast-copy-btn {
@@ -1930,6 +1943,205 @@
     background: var(--bg-select, rgba(255, 255, 255, 0.03));
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
+}
+
+/*
+ * La bulle de refus.
+ *
+ * Cousine de l'infobulle — même verre, mêmes jetons — et pourtant autre chose :
+ * elle s'ouvre au clic et non au survol, elle se clique, et elle reste tant
+ * qu'on ne la ferme pas. D'où un bouton, une flèche qui désigne la commande
+ * refusée, et une ombre plus franche qui la détache de ce qu'elle recouvre.
+ */
+.perm-refusal {
+    position: fixed;
+    z-index: 2147483646;
+    width: max-content;
+    max-width: min(290px, calc(100vw - 16px));
+    padding: 0.75rem 0.85rem 0.8rem;
+    border-radius: 12px;
+    font-family: var(--font-primary);
+    color: var(--text-main);
+    background: var(--bg-dropdown);
+    border: 1px solid var(--border-card-hover);
+    backdrop-filter: blur(var(--blur-val));
+    -webkit-backdrop-filter: blur(var(--blur-val));
+    box-shadow: var(--shadow-card), 0 6px 22px rgba(0, 0, 0, 0.32);
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+    transition: opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.perm-refusal[data-side="above"] {
+    transform: translateY(-4px) scale(0.97);
+}
+
+.perm-refusal.is-open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+/* La flèche, calée sur le centre de la commande et non de la bulle. */
+.perm-refusal::before {
+    content: "";
+    position: absolute;
+    left: var(--perm-refusal-arrow, 50%);
+    width: 10px;
+    height: 10px;
+    background: inherit;
+    border: inherit;
+    border-right: none;
+    border-bottom: none;
+    transform: translateX(-50%) rotate(45deg);
+    /* Le verre de la bulle ne se répète pas sur la flèche : deux flous
+       superposés font une tache plus sombre à la jointure. */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.perm-refusal[data-side="below"]::before {
+    top: -6px;
+}
+
+.perm-refusal[data-side="above"]::before {
+    bottom: -6px;
+    transform: translateX(-50%) rotate(225deg);
+}
+
+.perm-refusal p {
+    margin: 0;
+}
+
+.perm-refusal-title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.perm-refusal-feature {
+    margin-top: 0.2rem !important;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--c-violet);
+}
+
+.perm-refusal-hint {
+    margin-top: 0.45rem !important;
+    font-size: 0.74rem;
+    line-height: 1.4;
+    color: var(--text-muted);
+}
+
+.perm-refusal-btn {
+    margin-top: 0.6rem;
+    width: 100%;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 0.45em 0.9em;
+    border: none;
+    border-radius: 8px;
+    color: #ffffff;
+    background: linear-gradient(135deg, var(--c-primary) 0%, var(--c-violet) 100%);
+    cursor: pointer;
+    transition: filter 0.18s ease, transform 0.15s ease, opacity 0.18s ease;
+}
+
+.perm-refusal-btn:hover:not(:disabled) {
+    filter: brightness(1.1);
+}
+
+.perm-refusal-btn:active:not(:disabled) {
+    transform: scale(0.97);
+}
+
+/* Grisé pour de bon : un dégradé atténué se lit encore comme une invitation. */
+.perm-refusal-btn:disabled {
+    background: var(--bg-hover);
+    color: var(--text-muted);
+    border: 1px solid var(--border-card);
+    cursor: not-allowed;
+}
+
+/* En sourdine, la raison est la nouvelle : elle prend la teinte d'un avertissement. */
+.perm-refusal.is-muted .perm-refusal-hint {
+    color: var(--c-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .perm-refusal,
+    .perm-refusal[data-side="above"],
+    .perm-refusal.is-open {
+        transition: none;
+        transform: none;
+    }
+}
+
+/* ── Les demandes de droit, chez l'administrateur ───────────────── */
+
+/*
+ * Sous l'en-tête de l'invité, et visibles repliée : une demande attend une
+ * réponse, et la fenêtre s'ouvre justement sur des lignes repliées.
+ */
+.share-requests {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin: 0 0.9rem 0.75rem;
+    padding: 0.55rem 0.65rem;
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--c-accent) 40%, transparent);
+    background: color-mix(in srgb, var(--c-accent) 8%, transparent);
+}
+
+.share-requests-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--c-accent);
+}
+
+.share-request {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    transition: opacity 0.2s ease;
+}
+
+.share-request-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.8rem;
+    color: var(--text-main);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Répondue, en attendant que l'état la retire : on ne la reclique pas. */
+.share-request.is-answered {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.share-person.has-requests {
+    border-color: color-mix(in srgb, var(--c-accent) 55%, transparent);
+}
+
+.share-person-muted {
+    font-size: 0.68rem;
+    padding: 0.15em 0.5em;
+    border-radius: 20px;
+    background: color-mix(in srgb, var(--c-accent) 14%, transparent);
+    color: var(--c-accent);
+    white-space: nowrap;
+}
+
+.share-person-btn.mute.is-muted {
+    color: var(--c-accent);
+    border-color: color-mix(in srgb, var(--c-accent) 45%, transparent);
 }
 
 /* Play Mode Switch Selector */

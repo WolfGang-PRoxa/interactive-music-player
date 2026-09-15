@@ -158,9 +158,10 @@ Drei besondere Werte ergänzen den Katalog:
   unterstehen. Die Nachricht geht durch, und `filterSettings()` behält nur die
   erlaubten Einstellungen; ein Gast ohne jedes Recht sieht seine Anfrage von
   allem Inhalt geleert, was der Aufrufer als Ablehnung behandelt.
-- `MASTER_ONLY` — fünfzehn Nachrichten, die beim Meister bleiben: den Bot
+- `MASTER_ONLY` — siebzehn Nachrichten, die beim Meister bleiben: den Bot
   abschalten oder neu starten, seine Version wechseln, ihn einen Server
-  verlassen lassen, den Tunnel aufbauen und die Rechte selbst verteilen.
+  verlassen lassen, den Tunnel aufbauen, die Rechte selbst verteilen sowie
+  Rechteanfragen beantworten und stummschalten.
 
 **Eine der Tabelle unbekannte Nachricht wird `MASTER_ONLY` gleichgestellt.** Das
 ist gewollt: ein später gedankenlos hinzugefügter Befehl ist von vornherein
@@ -173,6 +174,17 @@ benachbarte Gesten sagen nicht dasselbe, und sie zu verwechseln kostet:
 erkannt, nur ohne Macht, und man kann ihm die Rechte im nächsten Augenblick
 zurückgeben; `revokeControl` verabschiedet endgültig — Rechte gelöscht,
 Zulassung entzogen, Sitzungen geschlossen, Eintrag im Buch getilgt.
+
+Ein Gast kann ein verweigertes Recht mit `requestRight` **anfragen**, das allen
+offensteht, da gerade derjenige fragt, der das Recht nicht hat. Anfragen gewährt
+nichts, und der Handler sortiert: ein erkannter, bereits zugelassener Gast, ein
+Recht aus dem Katalog, das er nicht hat, keine Stummschaltung, kein Duplikat,
+mindestens drei Sekunden zwischen zwei Anfragen. Die Anfragen warten in den
+Servereinstellungen unter `rightRequests`, und der Administrator beantwortet sie
+mit `answerRightRequest` — Gewähren fügt nur das angefragte Recht hinzu.
+`muteRightRequests` schaltet einen Gast stumm, unter `mutedRightRequests`, und
+löscht seine Anfragen; ein verabschiedeter Gast geht ohne Anfragen und ohne
+Stummschaltung.
 
 ### Herkunft des Tokens
 

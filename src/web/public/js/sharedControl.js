@@ -140,6 +140,13 @@ window.MusicPlayer = window.MusicPlayer || {};
     let permissions = null;
     let sharing = null;
 
+    /** Côté invité : les droits qu'il a déjà demandés, selon le serveur. */
+    let requestedRights = new Set();
+    /** Côté invité : l'administrateur a-t-il mis ses demandes en sourdine ? */
+    let requestsMuted = false;
+    /** Côté invité : demandes parties, dont la réponse n'est pas encore arrivée. */
+    const sendingRequests = new Set();
+
     /**
      * Ce que le maître vient de cocher, en attendant que le serveur le confirme.
      *
@@ -227,10 +234,11 @@ window.MusicPlayer = window.MusicPlayer || {};
      * survolable — c'est `bindLock()` qui arrête les gestes, pas un
      * `pointer-events: none` qui emporterait l'infobulle avec le clic.
      */
-    function mark(element, denied, reason) {
+    function mark(element, denied, reason, action) {
         if (!element) return;
 
         if (!denied) {
+            delete element.dataset.permAction;
             if (element.classList.contains('perm-denied')) {
                 element.classList.remove('perm-denied');
                 // Ne restituer que ce qu'on avait soi-même remplacé.
@@ -248,6 +256,9 @@ window.MusicPlayer = window.MusicPlayer || {};
             element.classList.add('perm-denied');
         }
         element.dataset.tooltip = reason;
+        // Le droit en cause, relu au clic pour nommer ce qui manque — ou
+        // « master » pour ce qui ne se demande pas.
+        if (action) element.dataset.permAction = action;
     }
 
     /**
@@ -265,22 +276,34 @@ window.MusicPlayer = window.MusicPlayer || {};
      * est construit par app.js, qui peut passer après le premier voile.
      */
     function targetsOf(element) {
+        const targets = [element];
         const custom = element._customSelect && element._customSelect.container;
-        return custom ? [element, custom] : [element];
+        if (custom) targets.push(custom);
+        /*
+         * Même écart pour les interrupteurs : la case est invisible, et c'est
+         * son `label.switch` qu'on voit et qu'on touche. Voilée seule, la case
+         * ne se grisait pas à l'œil, et un clic sur le rail ne rencontrait
+         * `.perm-denied` qu'à la bascule relayée par le label.
+         */
+        if (element.matches && element.matches('input[type="checkbox"]')) {
+            const label = element.closest('label.switch');
+            if (label) targets.push(label);
+        }
+        return targets;
     }
 
     /** Repasse sur toutes les commandes et accorde le voile aux droits courants. */
     function applyRights() {
         const isMaster = role === 'master';
-        const reason = t('perm_denied_tooltip', 'Droit non accordé par le maître de la session');
-        const masterReason = t('perm_master_only_tooltip', 'Réservé au maître de la session');
+        const reason = t('perm_denied_tooltip', 'Droit non accordé par l\'administrateur');
+        const masterReason = t('perm_master_only_tooltip', 'Réservé à l\'administrateur');
 
         for (const [action, selectors] of Object.entries(CONTROLS)) {
             const denied = isMaster ? false : !(permissions && permissions[action]);
             for (const selector of selectors) {
                 document.querySelectorAll(selector).forEach((element) => {
                     for (const target of targetsOf(element)) {
-                        mark(target, denied, reason);
+                        mark(target, denied, reason, action);
                         // Un droit retiré pendant que la liste est ouverte : elle
                         // se referme, sans quoi un dernier choix passerait encore.
                         if (denied) target.classList.remove('open');
@@ -291,7 +314,7 @@ window.MusicPlayer = window.MusicPlayer || {};
 
         for (const selector of MASTER_CONTROLS) {
             document.querySelectorAll(selector).forEach((element) => {
-                mark(element, !isMaster, masterReason);
+                mark(element, !isMaster, masterReason, 'master');
             });
         }
 
@@ -327,8 +350,269 @@ window.MusicPlayer = window.MusicPlayer || {};
                 e.stopPropagation();
                 // Un seul avertissement par geste : `click` suit `mousedown`, et
                 // deux notifications pour un même clic seraient de trop.
-                if (evtName === 'click' || evtName === 'change') window.MusicPlayer.onPermissionDenied();
+                if (evtName === 'click') showRefusal(denied);
             }, true);
+        }
+    }
+
+    /* ═════════════════════ Le refus, dit et discutable ═════════════════════ */
+
+    /*
+     * Un invité qui touchait une commande refusée recevait une notification —
+     * « l'administrateur ne vous a pas accordé ce droit » — et rien d'autre : ni
+     * lequel, ni quoi faire. Il apprend désormais les deux, là où il a cliqué :
+     * une bulle s'ouvre sur la commande, dit ce qui lui manque, et lui offre de
+     * le demander. La notification reste, et dit la même chose.
+     *
+     * La bulle n'est pas l'infobulle du survol : elle se clique, elle attend
+     * qu'on la ferme, et elle suit l'état de la demande — envoyée, en attente,
+     * ou impossible parce que l'administrateur a mis l'invité en sourdine.
+     */
+
+    /** Libellés de repli de la bulle, dans la langue du fichier source. */
+    const REFUSAL_FALLBACK = {
+        button: 'Vous n\'avez pas accès à ce bouton.',
+        slider: 'Vous n\'avez pas accès à ce curseur.',
+        menu: 'Vous n\'avez pas accès à ce menu.',
+        switch: 'Vous n\'avez pas accès à cet interrupteur.',
+        field: 'Vous n\'avez pas accès à ce champ.',
+        feature: 'Vous n\'avez pas accès à cette fonctionnalité.',
+    };
+
+    /** La bulle ouverte : { element, anchor, action }, ou null. */
+    let refusal = null;
+
+    /**
+     * La nature d'une commande, pour lui parler de ce qu'elle est.
+     *
+     * Lue sur l'élément voilé plutôt que déclarée dans la carte des commandes :
+     * la carte désigne des fonctionnalités, et une même fonctionnalité peut
+     * tenir dans un curseur ici et dans un bouton là.
+     */
+    function kindOf(element) {
+        if (!element || !element.matches) return 'feature';
+        if (element.matches('.custom-select-container, select')) return 'menu';
+        if (element.matches('label.switch, input[type="checkbox"]')) return 'switch';
+        if (element.matches('input[type="range"], #progress-bar-wrapper, #speed-pad-container')
+            || element.querySelector('input[type="range"]')) return 'slider';
+        if (element.matches('form, input[type="text"], input[type="search"], textarea')) return 'field';
+        if (element.matches('button, .play-mode-switch')) return 'button';
+        return 'feature';
+    }
+
+    /** Le nom d'un droit, tel que la fenêtre de partage le montre. */
+    function featureName(action) {
+        return t(actionKey(action), ACTION_FALLBACK[action] || action);
+    }
+
+    /**
+     * Ce qu'il faut dire d'une demande, et si le bouton peut encore servir.
+     * @returns {{ hint: string, label: string, disabled: boolean }}
+     */
+    function requestStatus(action) {
+        if (requestsMuted) {
+            return {
+                hint: t('perm_refusal_muted_hint',
+                    'L\'administrateur a mis vos demandes en sourdine : vous ne pouvez plus lui en envoyer.'),
+                label: t('perm_refusal_ask', 'Demander l\'accès'),
+                disabled: true,
+            };
+        }
+        if (requestedRights.has(action)) {
+            return {
+                hint: t('perm_refusal_pending_hint', 'Votre demande attend la réponse de l\'administrateur.'),
+                label: t('perm_refusal_sent', 'Demande envoyée'),
+                disabled: true,
+            };
+        }
+        if (sendingRequests.has(action)) {
+            return {
+                hint: t('perm_refusal_ask_hint',
+                    'Vous pouvez demander à l\'administrateur de vous en donner le droit.'),
+                label: t('perm_refusal_sending', 'Envoi…'),
+                disabled: true,
+            };
+        }
+        return {
+            hint: t('perm_refusal_ask_hint',
+                'Vous pouvez demander à l\'administrateur de vous en donner le droit.'),
+            label: t('perm_refusal_ask', 'Demander l\'accès'),
+            disabled: false,
+        };
+    }
+
+    /** Envoie la demande d'un droit, une seule fois tant qu'elle est en vol. */
+    function requestRight(action) {
+        if (!action || action === 'master' || requestsMuted) return;
+        if (requestedRights.has(action) || sendingRequests.has(action)) return;
+        sendingRequests.add(action);
+        window.MusicPlayer.sendWS({ type: 'requestRight', data: { action } });
+        refreshRefusal();
+    }
+
+    /** Le texte commun à la bulle et à la notification. */
+    function refusalText(kind, action) {
+        if (action === 'master') {
+            return {
+                title: t('perm_refusal_master_only', 'Cette commande est réservée à l\'administrateur.'),
+                feature: '',
+                status: null,
+            };
+        }
+        return {
+            title: t(`perm_refusal_${kind}`, REFUSAL_FALLBACK[kind]),
+            feature: action ? featureName(action) : '',
+            status: action ? requestStatus(action) : null,
+        };
+    }
+
+    /** Construit la bulle une fois, et la resservira. */
+    function refusalElement() {
+        let bubble = el('perm-refusal');
+        if (bubble) return bubble;
+
+        bubble = document.createElement('div');
+        bubble.id = 'perm-refusal';
+        bubble.className = 'perm-refusal';
+        bubble.setAttribute('role', 'dialog');
+        bubble.hidden = true;
+        bubble.innerHTML = '<p class="perm-refusal-title"></p>'
+            + '<p class="perm-refusal-feature"></p>'
+            + '<p class="perm-refusal-hint"></p>'
+            + '<button type="button" class="perm-refusal-btn"></button>';
+
+        bubble.querySelector('.perm-refusal-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (refusal) requestRight(refusal.action);
+        });
+        document.body.appendChild(bubble);
+
+        // Se ferme comme on ferme ce qui flotte : un clic ailleurs, Échap, un
+        // défilement qui emporterait la commande sous la bulle.
+        document.addEventListener('pointerdown', (e) => {
+            if (refusal && !bubble.contains(e.target) && !refusal.anchor.contains(e.target)) hideRefusal();
+        }, true);
+        document.addEventListener('keydown', (e) => {
+            if (refusal && e.key === 'Escape') hideRefusal();
+        });
+        window.addEventListener('scroll', () => { if (refusal) hideRefusal(); }, true);
+        window.addEventListener('resize', () => { if (refusal) hideRefusal(); });
+        return bubble;
+    }
+
+    /** Remplit la bulle d'après l'état courant de la demande. */
+    function fillRefusal() {
+        if (!refusal) return;
+        const bubble = refusal.element;
+        const text = refusalText(refusal.kind, refusal.action);
+
+        bubble.querySelector('.perm-refusal-title').textContent = text.title;
+
+        const feature = bubble.querySelector('.perm-refusal-feature');
+        feature.textContent = text.feature ? `« ${text.feature} »` : '';
+        feature.hidden = !text.feature;
+
+        const hint = bubble.querySelector('.perm-refusal-hint');
+        const btn = bubble.querySelector('.perm-refusal-btn');
+        hint.hidden = !text.status;
+        btn.hidden = !text.status;
+        if (text.status) {
+            hint.textContent = text.status.hint;
+            btn.textContent = text.status.label;
+            btn.disabled = text.status.disabled;
+            bubble.classList.toggle('is-muted', requestsMuted);
+        }
+    }
+
+    /**
+     * Place la bulle sous la commande, ou au-dessus faute de place, centrée
+     * sur elle et gardée dans la fenêtre.
+     */
+    function placeRefusal() {
+        if (!refusal) return;
+        const bubble = refusal.element;
+        const rect = refusal.anchor.getBoundingClientRect();
+        const margin = 8;
+        const gap = 10;
+
+        bubble.style.left = '0px';
+        bubble.style.top = '0px';
+        const box = bubble.getBoundingClientRect();
+
+        const below = rect.bottom + gap + box.height <= window.innerHeight - margin;
+        const top = below ? rect.bottom + gap : Math.max(margin, rect.top - gap - box.height);
+        const centre = rect.left + rect.width / 2;
+        const left = Math.min(window.innerWidth - margin - box.width, Math.max(margin, centre - box.width / 2));
+
+        bubble.style.left = `${Math.round(left)}px`;
+        bubble.style.top = `${Math.round(top)}px`;
+        bubble.dataset.side = below ? 'below' : 'above';
+        bubble.style.setProperty('--perm-refusal-arrow', `${Math.round(centre - left)}px`);
+    }
+
+    /** Ouvre la bulle sur une commande refusée, et répète le refus en notification. */
+    function showRefusal(denied) {
+        const action = denied.dataset.permAction || null;
+        const kind = kindOf(denied);
+        const element = refusalElement();
+
+        if (window.TooltipSystem && typeof window.TooltipSystem.hide === 'function') {
+            window.TooltipSystem.hide();
+        }
+
+        refusal = { element, anchor: denied, action, kind };
+        fillRefusal();
+        element.hidden = false;
+        placeRefusal();
+        element.classList.remove('is-open');
+        void element.offsetWidth;
+        element.classList.add('is-open');
+
+        toastRefusal(kind, action);
+    }
+
+    function hideRefusal() {
+        if (!refusal) return;
+        refusal.element.classList.remove('is-open');
+        refusal.element.hidden = true;
+        refusal = null;
+    }
+
+    /** La bulle ouverte suit l'état de la demande — envoyée, accordée, en sourdine. */
+    function refreshRefusal() {
+        if (!refusal) return;
+        // Le droit vient d'être accordé : il n'y a plus rien à refuser.
+        if (refusal.action && refusal.action !== 'master' && permissions && permissions[refusal.action]) {
+            hideRefusal();
+            return;
+        }
+        fillRefusal();
+        placeRefusal();
+    }
+
+    /**
+     * La notification du refus, au même texte que la bulle.
+     *
+     * Elle sert aussi seule, quand le refus vient du serveur pour un geste que
+     * rien n'avait grisé — un menu contextuel, un glisser-déposer.
+     */
+    function toastRefusal(kind, action) {
+        const text = refusalText(kind, action);
+        const parts = [text.title];
+        if (text.feature) parts.push(`« ${text.feature} »`);
+        if (text.status) parts.push(text.status.hint);
+        const message = parts.join(' ');
+
+        if (!text.status) {
+            toast(message);
+            return;
+        }
+        if (typeof window.MusicPlayer.showToast === 'function') {
+            window.MusicPlayer.showToast(message, {
+                label: text.status.label,
+                disabled: text.status.disabled,
+                onClick: () => requestRight(action),
+            });
         }
     }
 
@@ -696,18 +980,85 @@ window.MusicPlayer = window.MusicPlayer || {};
         return block;
     }
 
+    /** Les droits qu'un invité a demandés, du plus ancien au plus récent. */
+    function requestsOf(userId) {
+        const mine = (sharing?.requests || {})[userId] || {};
+        return Object.entries(mine)
+            .sort((a, b) => a[1] - b[1])
+            .map(([action]) => action);
+    }
+
+    function isMuted(userId) {
+        return (sharing?.mutedRequests || []).includes(String(userId));
+    }
+
+    /**
+     * Les demandes d'un invité, sous son en-tête et hors du détail.
+     *
+     * Hors du détail parce qu'une demande attend une réponse : repliée, la ligne
+     * la cacherait, et c'est justement l'état où la fenêtre s'ouvre. Deux
+     * boutons par demande, comme pour une admission — c'est le moment de dire
+     * oui ou non, pas de parcourir vingt-neuf interrupteurs.
+     */
+    function requestsBlock(person) {
+        const block = document.createElement('div');
+        block.className = 'share-requests';
+
+        const title = document.createElement('div');
+        title.className = 'share-requests-title';
+        title.textContent = t('share_requests_title', 'Demandes d\'accès');
+        block.appendChild(title);
+
+        for (const action of requestsOf(person.userId)) {
+            const line = document.createElement('div');
+            line.className = 'share-request';
+
+            const name = document.createElement('span');
+            name.className = 'share-request-name';
+            name.textContent = featureName(action);
+            line.appendChild(name);
+
+            const answer = (grantIt) => {
+                window.MusicPlayer.sendWS({
+                    type: 'answerRightRequest',
+                    data: { userId: person.userId, action, grant: grantIt },
+                });
+                // Le geste se voit tout de suite ; l'état qui suit le confirme.
+                line.classList.add('is-answered');
+            };
+
+            const accept = document.createElement('button');
+            accept.className = 'share-pending-btn accept';
+            accept.textContent = t('share_request_grant', 'Accorder');
+            accept.addEventListener('click', () => answer(true));
+            line.appendChild(accept);
+
+            const refuse = document.createElement('button');
+            refuse.className = 'share-pending-btn refuse';
+            refuse.textContent = t('share_request_refuse', 'Refuser');
+            refuse.addEventListener('click', () => answer(false));
+            line.appendChild(refuse);
+
+            block.appendChild(line);
+        }
+        return block;
+    }
+
     /** Construit la ligne d'un auditeur. */
     function listenerRow(person) {
         const rights = rightsOf(person);
         const actions = allActions();
         const total = actions.filter((a) => rights[a]).length;
         const open = unfolded.has(person.userId);
+        const requests = requestsOf(person.userId);
+        const muted = isMuted(person.userId);
 
         const row = document.createElement('div');
         row.className = 'share-person'
             + (total ? ' has-grants' : '')
             + (person.authenticated ? '' : ' pending')
-            + (open ? ' is-open' : '');
+            + (open ? ' is-open' : '')
+            + (requests.length ? ' has-requests' : '');
         row.dataset.userId = person.userId;
 
         /* ── L'en-tête : qui, où, et combien de droits ──────────────── */
@@ -757,6 +1108,15 @@ window.MusicPlayer = window.MusicPlayer || {};
             here.className = 'share-person-here';
             here.textContent = t('share_in_channel', 'dans le salon');
             identity.appendChild(here);
+        }
+
+        // La sourdine se lit sans déplier : c'est ce qui explique qu'un invité
+        // à qui tout est refusé ne demande jamais rien.
+        if (muted) {
+            const quiet = document.createElement('span');
+            quiet.className = 'share-person-muted';
+            quiet.textContent = t('share_muted_badge', 'demandes en sourdine');
+            identity.appendChild(quiet);
         }
 
         head.appendChild(identity);
@@ -817,6 +1177,8 @@ window.MusicPlayer = window.MusicPlayer || {};
         head.appendChild(tools);
         row.appendChild(head);
 
+        if (requests.length) row.appendChild(requestsBlock(person));
+
         if (!open) return row;
 
         /* ── Le détail, une fois déplié ─────────────────────────────── */
@@ -847,6 +1209,28 @@ window.MusicPlayer = window.MusicPlayer || {};
 
         const footer = document.createElement('div');
         footer.className = 'share-person-actions';
+
+        /*
+         * La sourdine, par invité.
+         *
+         * Pour celui qui demande trop, ou dont on sait déjà la réponse. Il voit
+         * toujours ce qui lui est refusé et pourquoi, mais son bouton de demande
+         * est grisé et lui dit que l'administrateur ne l'écoute plus. Ses
+         * demandes en attente partent avec la mise en sourdine.
+         */
+        const mute = document.createElement('button');
+        mute.className = 'share-person-btn mute' + (muted ? ' is-muted' : '');
+        mute.textContent = muted
+            ? t('share_unmute_requests', 'Réactiver ses demandes')
+            : t('share_mute_requests', 'Mettre ses demandes en sourdine');
+        mute.disabled = !person.authenticated;
+        mute.addEventListener('click', () => {
+            window.MusicPlayer.sendWS({
+                type: 'muteRightRequests',
+                data: { userId: person.userId, muted: !muted },
+            });
+        });
+        footer.appendChild(mute);
 
         /*
          * Congédier n'est pas décocher.
@@ -974,7 +1358,10 @@ window.MusicPlayer = window.MusicPlayer || {};
         const badge = el('share-badge');
         if (!badge) return;
 
-        const waiting = (sharing?.pending || []).length;
+        // Une demande de droit attend une réponse au même titre qu'une admission.
+        const requests = Object.values(sharing?.requests || {})
+            .reduce((n, mine) => n + Object.keys(mine || {}).length, 0);
+        const waiting = (sharing?.pending || []).length + requests;
         const granted = Object.keys(sharing?.grants || {}).length;
         const total = waiting || granted;
 
@@ -999,15 +1386,86 @@ window.MusicPlayer = window.MusicPlayer || {};
             // Ce que le serveur confirme n'a plus à être retenu à part.
             settle();
         }
+        if (Array.isArray(state.rightRequests)) {
+            requestedRights = new Set(state.rightRequests);
+            // Une demande que l'état porte n'est plus « en vol ».
+            for (const action of requestedRights) sendingRequests.delete(action);
+        }
+        if (typeof state.requestsMuted === 'boolean') requestsMuted = state.requestsMuted;
 
         applyRights();
         renderBadge();
         renderModal();
+        refreshRefusal();
     };
 
-    /** Le serveur a refusé une commande : le dire plutôt que de rester muet. */
-    window.MusicPlayer.onPermissionDenied = function () {
-        toast(t('perm_denied_toast', 'Le maître de la session ne vous a pas accordé ce droit.'));
+    /**
+     * Le serveur a refusé une commande : le dire plutôt que de rester muet.
+     *
+     * `right` nomme le droit en cause quand il y en a un, et la notification
+     * offre alors de le demander, comme la bulle. Sans lui — un geste réservé à
+     * l'administrateur —, elle dit seulement le refus.
+     */
+    window.MusicPlayer.onPermissionDenied = function (data) {
+        const right = data && typeof data.right === 'string' ? data.right : null;
+        if (right) {
+            toastRefusal('feature', right);
+            return;
+        }
+        toast(t('perm_denied_toast', 'L\'administrateur ne vous a pas accordé ce droit.'));
+    };
+
+    /** Réponse du serveur à une demande de droit. */
+    window.MusicPlayer.onRightRequestResult = function (data) {
+        if (!data || !data.action) return;
+        sendingRequests.delete(data.action);
+
+        if (data.ok) {
+            requestedRights.add(data.action);
+        } else if (data.reason === 'muted') {
+            requestsMuted = true;
+        } else if (data.reason === 'too_soon') {
+            toast(t('perm_request_too_soon', 'Patientez quelques secondes avant une nouvelle demande.'));
+        } else if (data.reason === 'not_admitted') {
+            toast(t('perm_request_not_admitted', 'L\'administrateur n\'a pas encore accepté votre venue.'));
+        } else if (data.reason !== 'already_granted') {
+            toast(t('perm_request_failed', 'La demande n\'a pas pu être envoyée.'));
+        }
+        refreshRefusal();
+    };
+
+    /** L'administrateur a répondu : accordé, ou refusé. */
+    window.MusicPlayer.onRightRequestAnswered = function (data) {
+        if (!data || !data.action) return;
+        requestedRights.delete(data.action);
+        const feature = featureName(data.action);
+        toast(data.granted
+            ? t('perm_request_granted', 'L\'administrateur vous a accordé « {feature} ».').replace('{feature}', feature)
+            : t('perm_request_refused', 'L\'administrateur a refusé votre demande pour « {feature} ».').replace('{feature}', feature));
+        refreshRefusal();
+    };
+
+    /**
+     * Côté administrateur : un invité vient de demander un droit.
+     *
+     * La fenêtre ouverte le montre d'elle-même, sur la ligne de l'invité : une
+     * notification par-dessus ferait double emploi. Fermée, rien d'autre ne
+     * l'annoncerait — d'où la notification, qui y mène d'un clic.
+     */
+    window.MusicPlayer.onRightRequested = function (data) {
+        if (!data || !data.action) return;
+        const modal = el('share-modal');
+        if (modal && !modal.classList.contains('hidden')) return;
+
+        const message = t('share_request_toast', '{name} demande l\'accès à « {feature} ».')
+            .replace('{name}', data.displayName || data.userId)
+            .replace('{feature}', featureName(data.action));
+        if (typeof window.MusicPlayer.showToast === 'function') {
+            window.MusicPlayer.showToast(message, {
+                label: t('share_request_view', 'Voir'),
+                onClick: () => openShareOn(data.userId),
+            });
+        }
     };
 
     /** Le maître vient de tout retirer : l'invité doit le savoir. */
@@ -1064,20 +1522,31 @@ window.MusicPlayer = window.MusicPlayer || {};
         toast(reasons[data.reason] || t('share_err_generic', 'Le partage a échoué.'));
     };
 
+    /** Ouvre la fenêtre de partage, dépliée sur un invité si on le nomme. */
+    function openShareOn(userId) {
+        const modal = el('share-modal');
+        if (!modal) return;
+        if (userId) unfolded.add(String(userId));
+        modal.classList.remove('hidden');
+        renderModal();
+        // L'état du tunnel se demande en ouvrant, jamais en continu.
+        if (typeof window.MusicPlayer.refreshTunnel === 'function') {
+            window.MusicPlayer.refreshTunnel();
+        }
+        if (userId) {
+            const row = [...document.querySelectorAll('.share-person')]
+                .find((r) => r.dataset.userId === String(userId));
+            if (row && typeof row.scrollIntoView === 'function') row.scrollIntoView({ block: 'nearest' });
+        }
+    }
+
     function initShare() {
         const openBtn = el('btn-open-share');
         const closeBtn = el('btn-close-share');
         const modal = el('share-modal');
 
         if (openBtn && modal) {
-            openBtn.addEventListener('click', () => {
-                modal.classList.remove('hidden');
-                renderModal();
-                // L'état du tunnel se demande en ouvrant, jamais en continu.
-                if (typeof window.MusicPlayer.refreshTunnel === 'function') {
-                    window.MusicPlayer.refreshTunnel();
-                }
-            });
+            openBtn.addEventListener('click', () => openShareOn(null));
         }
 
         if (closeBtn && modal) {

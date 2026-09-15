@@ -551,6 +551,18 @@
             if (typeof window.MusicPlayer.onControlRevoked === 'function') {
                 window.MusicPlayer.onControlRevoked(data);
             }
+        } else if (type === 'rightRequestResult' || type === 'rightRequestAnswered' || type === 'rightRequested') {
+            // Les demandes de droit : la réponse à l'invité qui demande, la
+            // décision qui lui revient, et la sonnerie chez l'administrateur.
+            // Toutes trois vivent dans js/sharedControl.js.
+            const handler = {
+                rightRequestResult: 'onRightRequestResult',
+                rightRequestAnswered: 'onRightRequestAnswered',
+                rightRequested: 'onRightRequested',
+            }[type];
+            if (typeof window.MusicPlayer[handler] === 'function') {
+                window.MusicPlayer[handler](data);
+            }
         } else if (type === 'trackFormats') {
             // Inventaire des qualités que porte réellement une source,
             // demandé par le menu contextuel à l'ouverture d'un sous-menu.
