@@ -160,6 +160,7 @@ window.MusicPlayer = window.MusicPlayer || {};
         // suppression, lui, passe par le même chemin qu'un titre — un
         // aiguillage n'est jamais qu'un élément de la liste.
         const remove = document.createElement('button');
+        remove.dataset.perm = dansLaFile ? 'queue.remove' : 'playlists.removeTrack';
         remove.className = 'track-remove-btn';
         remove.dataset.tooltip = t('transition_remove', 'Retirer cette transition');
         remove.dataset.i18nTooltip = 'transition_remove';

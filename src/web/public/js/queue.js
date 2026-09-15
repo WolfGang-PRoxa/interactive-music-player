@@ -577,6 +577,7 @@ window.MusicPlayer.updateQueueUI = function() {
                 rightArea.appendChild(durSpan);
 
                 const playNowBtn = document.createElement('button');
+                playNowBtn.dataset.perm = 'queue.playNow';
                 playNowBtn.className = 'queue-play-now-btn';
                 playNowBtn.dataset.tooltip = (window.MusicPlayer.t && window.MusicPlayer.t('tooltip_play_now')) || 'Jouer maintenant';
         playNowBtn.dataset.i18nTooltip = 'tooltip_play_now';
@@ -594,6 +595,7 @@ window.MusicPlayer.updateQueueUI = function() {
                 rightArea.appendChild(playNowBtn);
 
                 const deleteBtn = document.createElement('button');
+                deleteBtn.dataset.perm = 'queue.remove';
                 deleteBtn.className = 'queue-remove-btn';
                 deleteBtn.dataset.tooltip = (window.MusicPlayer.t && window.MusicPlayer.t('tooltip_delete_from_queue')) || 'Supprimer de la file';
         deleteBtn.dataset.i18nTooltip = 'tooltip_delete_from_queue';
@@ -739,6 +741,7 @@ window.MusicPlayer.updateHistoryUI = function() {
                 rightArea.appendChild(durSpan);
 
                 const playNowBtn = document.createElement('button');
+                playNowBtn.dataset.perm = 'queue.playNow';
                 playNowBtn.className = 'queue-play-now-btn';
                 playNowBtn.dataset.tooltip = (window.MusicPlayer.t && window.MusicPlayer.t('tooltip_play_now')) || 'Jouer maintenant';
         playNowBtn.dataset.i18nTooltip = 'tooltip_play_now';
@@ -757,6 +760,7 @@ window.MusicPlayer.updateHistoryUI = function() {
                 rightArea.appendChild(playNowBtn);
 
                 const deleteBtn = document.createElement('button');
+                deleteBtn.dataset.perm = 'queue.history';
                 deleteBtn.className = 'queue-remove-btn';
                 deleteBtn.dataset.tooltip = (window.MusicPlayer.t && window.MusicPlayer.t('tooltip_delete_from_history')) || 'Supprimer de l\'historique';
         deleteBtn.dataset.i18nTooltip = 'tooltip_delete_from_history';
@@ -904,6 +908,7 @@ window.MusicPlayer.updateSpeakersUI = function() {
                 controls.appendChild(mute);
 
                 const switchLabel = document.createElement('label');
+                switchLabel.dataset.perm = 'volume.ducking';
                 switchLabel.className = 'switch switch-mini';
                 
                 const switchInput = document.createElement('input');

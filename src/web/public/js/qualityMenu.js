@@ -313,6 +313,9 @@ function buildButton(type, displayedValue, isReal) {
     const btn = document.createElement('button');
     btn.className = 'quality-menu-item';
     btn.dataset.qualityType = type;
+    // Voir `refusedTarget` dans js/sharedControl.js : le sous-menu s'ouvre au
+    // clic sur cette entrée, la refuser suffit à tout refuser.
+    btn.dataset.perm = 'volume.quality';
 
     const icon = document.createElement('span');
     icon.className = 'quality-menu-icon';
@@ -383,6 +386,7 @@ function buildTransitionButton() {
     const btn = document.createElement('button');
     btn.className = 'quality-menu-item';
     btn.dataset.qualityType = 'transition';
+    btn.dataset.perm = 'playlists.transitions';
 
     const icon = document.createElement('span');
     icon.className = 'quality-menu-icon';
@@ -698,6 +702,7 @@ function buildLoudnessButton(track) {
     const btn = document.createElement('button');
     btn.className = 'quality-menu-item';
     btn.dataset.qualityType = 'loudness';
+    btn.dataset.perm = 'volume.trackGain';
 
     const icon = document.createElement('span');
     icon.className = 'quality-menu-icon';
@@ -1410,6 +1415,8 @@ window.MusicPlayer.showTransitionMenu = function (e, transition, context) {
 
     menuEl = document.createElement('div');
     menuEl.className = 'quality-menu glass-card transition-menu';
+    // Le menu d'un aiguillage ne sert qu'à en changer la cible.
+    menuEl.dataset.perm = 'playlists.transitions';
     menuEl.addEventListener('click', (ev) => ev.stopPropagation());
     menuEl.addEventListener('contextmenu', (ev) => ev.preventDefault());
 

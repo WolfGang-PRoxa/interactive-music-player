@@ -1931,12 +1931,12 @@
                     <div class="setting-item-row vertical">
                         <div class="setting-item-row" style="width: 100%; margin-bottom: 0.4rem;">
                             <span data-i18n="fadeout_shutdown">Fade-out du volume à l'extinction du bot</span>
-                            <label class="switch">
+                            <label class="switch" data-perm="master">
                                 <input type="checkbox" id="setting-fadeout-enable" checked>
                                 <span class="switch-slider"></span>
                             </label>
                         </div>
-                        <div class="scroll-input-wrapper">
+                        <div class="scroll-input-wrapper" data-perm="master">
                             <input type="range" id="setting-fadeout-duration" min="1" max="15" step="0.5" value="5" class="scroll-range">
                             <span class="scroll-val" id="val-fadeout-duration">5s</span>
                             <button class="btn-default-reset" data-target="setting-fadeout-duration" data-val-id="val-fadeout-duration" data-default="5" data-unit="s">5s</button>
@@ -1947,12 +1947,12 @@
                     <div class="setting-item-row vertical">
                         <div class="setting-item-row" style="width: 100%; margin-bottom: 0.4rem;">
                             <span data-i18n="fadein_startup">Fade-in du volume au démarrage du bot</span>
-                            <label class="switch">
+                            <label class="switch" data-perm="master">
                                 <input type="checkbox" id="setting-fadein-enable">
                                 <span class="switch-slider"></span>
                             </label>
                         </div>
-                        <div class="scroll-input-wrapper">
+                        <div class="scroll-input-wrapper" data-perm="master">
                             <input type="range" id="setting-fadein-duration" min="1" max="15" step="0.5" value="5" class="scroll-range">
                             <span class="scroll-val" id="val-fadein-duration">5s</span>
                             <button class="btn-default-reset" data-target="setting-fadein-duration" data-val-id="val-fadein-duration" data-default="5" data-unit="s">5s</button>
@@ -1965,7 +1965,7 @@
                             <span data-i18n="presence_departure_delay">Délai avant de quitter un salon vide</span>
                         </div>
                         <span class="setting-sub-hint" style="display: block; margin-top: 0; margin-bottom: 0.5rem;" data-i18n="presence_departure_delay_hint">Compté à partir du départ du dernier auditeur. À 0s, le bot s'en va aussitôt.</span>
-                        <div class="scroll-input-wrapper">
+                        <div class="scroll-input-wrapper" data-perm="master">
                             <input type="range" id="setting-departure-delay" min="0" max="300" step="5" value="30" class="scroll-range">
                             <span class="scroll-val" id="val-setting-departure-delay">30s</span>
                             <button class="btn-default-reset" data-target="setting-departure-delay" data-val-id="val-setting-departure-delay" data-default="30" data-unit="s">30s</button>
@@ -2175,7 +2175,7 @@
                         
                         <div class="setting-item-row" style="margin-bottom: 0.8rem;">
                             <span data-i18n="preload_enable">Activer le chargement anticipé des musiques</span>
-                            <label class="switch">
+                            <label class="switch" data-perm="master">
                                 <input type="checkbox" id="preload-enable" checked>
                                 <span class="switch-slider"></span>
                             </label>
@@ -2185,7 +2185,7 @@
                         
                         <div class="setting-item-row">
                             <span data-i18n="in_queue_label">En file d'attente :</span>
-                            <div class="scroll-input-wrapper">
+                            <div class="scroll-input-wrapper" data-perm="master">
                                 <!-- Le dernier cran ne compte plus : il prend tout. Le dégradé au
                                      bout de la piste le signale, la pastille de valeur l'écrit
                                      « ∞ ». Voir js/settingsModal.js et audio/PreloadManager.js. -->
@@ -2197,7 +2197,7 @@
 
                         <div class="setting-item-row">
                             <span data-i18n="in_history_label">Dans l'historique :</span>
-                            <div class="scroll-input-wrapper">
+                            <div class="scroll-input-wrapper" data-perm="master">
                                 <!-- Le dernier cran ne compte plus : il prend tout. Le dégradé au
                                      bout de la piste le signale, la pastille de valeur l'écrit
                                      « ∞ ». Voir js/settingsModal.js et audio/PreloadManager.js. -->
@@ -2209,7 +2209,7 @@
 
                         <div class="setting-item-row">
                             <span data-i18n="in_playlists_label">Dans les playlists :</span>
-                            <div class="scroll-input-wrapper">
+                            <div class="scroll-input-wrapper" data-perm="master">
                                 <!-- Le dernier cran ne compte plus : il prend tout. Le dégradé au
                                      bout de la piste le signale, la pastille de valeur l'écrit
                                      « ∞ ». Voir js/settingsModal.js et audio/PreloadManager.js. -->

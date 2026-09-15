@@ -449,6 +449,7 @@ window.MusicPlayer.updatePlaylistsUI = function() {
         nameContainer.className = 'playlist-name-container';
 
         nameInput = document.createElement('input');
+        nameInput.dataset.perm = 'playlists.rename';
         nameInput.type = 'text';
         nameInput.id = `playlist-name-input-${playlist.id}`;
         nameInput.name = `playlist_name_${playlist.id}`;
@@ -490,6 +491,7 @@ window.MusicPlayer.updatePlaylistsUI = function() {
         nameInput.addEventListener('blur', handleSaveName);
 
         deleteBtn = document.createElement('button');
+        deleteBtn.dataset.perm = 'playlists.delete';
         deleteBtn.className = 'delete-playlist-btn';
         // data-hold-key : le système de tooltip y injecte la durée courante.
         // data-i18n-tooltip : le libellé suit aussi les changements de langue.
@@ -802,6 +804,7 @@ window.MusicPlayer.updatePlaylistsUI = function() {
                 rightDiv.appendChild(durSpan);
 
                 const playBtn = document.createElement('button');
+                playBtn.dataset.perm = 'playback.source';
                 playBtn.className = 'track-play-btn';
                 playBtn.dataset.tooltip = (window.MusicPlayer.t && window.MusicPlayer.t('tooltip_play_from_here')) || 'Jouer maintenant à partir de ce morceau';
         playBtn.dataset.i18nTooltip = 'tooltip_play_from_here';
@@ -822,6 +825,7 @@ window.MusicPlayer.updatePlaylistsUI = function() {
                 rightDiv.appendChild(playBtn);
 
                 const removeBtn = document.createElement('button');
+                removeBtn.dataset.perm = 'playlists.removeTrack';
                 removeBtn.className = 'track-remove-btn';
                 removeBtn.dataset.tooltip = (window.MusicPlayer.t && window.MusicPlayer.t('tooltip_delete_from_playlist')) || 'Supprimer de la playlist';
         removeBtn.dataset.i18nTooltip = 'tooltip_delete_from_playlist';

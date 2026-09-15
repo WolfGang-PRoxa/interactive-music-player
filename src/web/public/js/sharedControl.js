@@ -51,9 +51,12 @@ window.MusicPlayer = window.MusicPlayer || {};
         'playback.mix': ['#mix-enable-toggle', '#mix-options-container'],
         'playback.loudness': ['#lufs-sync-toggle', '#lufs-sync-options'],
 
-        'queue.add': ['#search-form', '#add-target-select'],
+        'queue.add': ['#search-form', '#add-target-select', '#menu-add-queue'],
         'queue.clear': ['#btn-clear-queue'],
-        'queue.history': ['#btn-clear-history'],
+        'queue.history': ['#btn-clear-history', '#menu-delete'],
+        // Le menu contextuel de l'historique : ses entrées existent dans le
+        // balisage, cachées, et se voilent donc comme le reste.
+        'queue.playNow': ['#menu-play-now'],
         // Le bouton de la carte « En cours de lecture » et son format : tous
         // deux mènent à /api/download, que le serveur garde derrière ce droit.
         'queue.download': ['#download-format-select', '#btn-download-track'],
@@ -318,6 +321,8 @@ window.MusicPlayer = window.MusicPlayer || {};
             });
         }
 
+        paintDeclared();
+
         // Le bouton de partage n'a de sens que pour qui a quelque chose à
         // partager. `hidden` plutôt qu'une classe : rien à styler pour cela.
         const wrapper = el('share-controls-wrapper');
@@ -338,13 +343,75 @@ window.MusicPlayer = window.MusicPlayer || {};
      * l'invité de croire son geste passé, et au tableau de bord de se peindre
      * un état qu'il n'obtiendra pas.
      */
+    /**
+     * Ce droit est-il refusé à qui regarde cette page ?
+     * @param {string} perm Droit du catalogue, ou `master`.
+     */
+    function isRefused(perm) {
+        if (!perm || role === 'master') return false;
+        if (perm === 'master') return true;
+        return !(permissions && permissions[perm]);
+    }
+
+    /**
+     * La commande refusée que vise un geste, s'il en vise une.
+     *
+     * Deux façons d'être refusée. La carte des commandes voile ce qu'elle
+     * connaît par son identifiant — `.perm-denied`, posé à chaque état. Et
+     * toute commande peut se déclarer elle-même, par `data-perm="droit"` là où
+     * elle est construite : une ligne de file, un onglet de playlist, un
+     * réglage réservé. Celles-ci sont jugées au moment du geste, et non à la
+     * réception de l'état : un menu contextuel construit à l'ouverture, une
+     * ligne ajoutée entre deux états, sont couverts d'office.
+     *
+     * Le `data-perm` le plus proche décide : un bouton autorisé dans une ligne
+     * qui ne l'est pas reste un bouton autorisé.
+     */
+    function refusedTarget(target) {
+        if (!target || !target.closest) return null;
+        const veiled = target.closest('.perm-denied');
+        if (veiled) return veiled;
+        const declared = target.closest('[data-perm]');
+        return declared && isRefused(declared.dataset.perm) ? declared : null;
+    }
+
+    /**
+     * Le grisage des commandes déclarées.
+     *
+     * Une feuille de style régénérée à chaque état, plutôt qu'une classe posée
+     * élément par élément : elle vaut aussi pour ce qui sera construit après,
+     * sans que rien n'ait à repasser dessus.
+     */
+    function paintDeclared() {
+        let sheet = el('perm-declared-style');
+        if (!sheet) {
+            // Un document de fortune — celui de certains tests — n'a pas de
+            // `<head>` ; il n'a rien à peindre non plus.
+            if (!document.head) return;
+            sheet = document.createElement('style');
+            sheet.id = 'perm-declared-style';
+            document.head.appendChild(sheet);
+        }
+
+        const known = new Set(['master', ...Object.keys(ACTION_FALLBACK), ...Object.keys(permissions || {})]);
+        const refused = [...known].filter(isRefused);
+        sheet.textContent = refused.length
+            ? `${refused.map((perm) => `[data-perm="${perm}"]`).join(',\n')} {\n`
+                + '    opacity: 0.4;\n    filter: saturate(0.4);\n    cursor: not-allowed;\n}\n'
+            : '';
+    }
+
     function bindLock() {
-        const blockedEvents = ['click', 'mousedown', 'pointerdown', 'keydown', 'input', 'change'];
+        const blockedEvents = ['click', 'dblclick', 'mousedown', 'pointerdown', 'keydown', 'input', 'change', 'dragstart'];
 
         for (const evtName of blockedEvents) {
             document.addEventListener(evtName, (e) => {
-                const denied = e.target && e.target.closest && e.target.closest('.perm-denied');
+                const denied = refusedTarget(e.target);
                 if (!denied) return;
+                // Échap et Tab ne commandent rien : ils ferment la bulle et
+                // déplacent le focus. Les arrêter ici, sur une commande
+                // refusée qui garde le focus, enfermait l'invité dans la bulle.
+                if (evtName === 'keydown' && (e.key === 'Escape' || e.key === 'Tab')) return;
 
                 e.preventDefault();
                 e.stopPropagation();
@@ -353,6 +420,26 @@ window.MusicPlayer = window.MusicPlayer || {};
                 if (evtName === 'click') showRefusal(denied);
             }, true);
         }
+
+        /*
+         * Le doigt, à part.
+         *
+         * Plusieurs commandes se déclenchent à l'appui maintenu, sur
+         * `touchstart` — vider la file, supprimer une playlist, faire quitter
+         * un serveur au bot — et le glisser-déposer tactile part du même
+         * événement. Ni `mousedown` ni `pointerdown` ne les arrêtaient.
+         *
+         * Refuser l'appui supprime aussi le clic qui l'aurait suivi : la bulle
+         * s'ouvre donc ici, et non au clic. `passive: false`, sans quoi le
+         * navigateur ignorerait le refus.
+         */
+        document.addEventListener('touchstart', (e) => {
+            const denied = refusedTarget(e.target);
+            if (!denied) return;
+            e.preventDefault();
+            e.stopPropagation();
+            showRefusal(denied);
+        }, { capture: true, passive: false });
     }
 
     /* ═════════════════════ Le refus, dit et discutable ═════════════════════ */
@@ -552,7 +639,7 @@ window.MusicPlayer = window.MusicPlayer || {};
 
     /** Ouvre la bulle sur une commande refusée, et répète le refus en notification. */
     function showRefusal(denied) {
-        const action = denied.dataset.permAction || null;
+        const action = denied.dataset.permAction || denied.dataset.perm || null;
         const kind = kindOf(denied);
         const element = refusalElement();
 
@@ -581,8 +668,9 @@ window.MusicPlayer = window.MusicPlayer || {};
     /** La bulle ouverte suit l'état de la demande — envoyée, accordée, en sourdine. */
     function refreshRefusal() {
         if (!refusal) return;
-        // Le droit vient d'être accordé : il n'y a plus rien à refuser.
-        if (refusal.action && refusal.action !== 'master' && permissions && permissions[refusal.action]) {
+        // Le droit vient d'être accordé, ou la page est passée à
+        // l'administrateur : il n'y a plus rien à refuser.
+        if (refusal.action && !isRefused(refusal.action)) {
             hideRefusal();
             return;
         }
@@ -1397,6 +1485,19 @@ window.MusicPlayer = window.MusicPlayer || {};
         renderBadge();
         renderModal();
         refreshRefusal();
+    };
+
+    /**
+     * Ce tableau de bord est-il celui d'un invité ?
+     *
+     * Pour les envois qui ne partent pas d'un geste mais d'une habitude — le
+     * préchargement recopié à la reconnexion, les réglages du serveur joints à
+     * chaque modification des paramètres. Chez un invité, le serveur les
+     * refusait, et chaque refus devenait une notification pour un geste qu'il
+     * n'avait pas fait.
+     */
+    window.MusicPlayer.isGuest = function () {
+        return role === 'guest';
     };
 
     /**

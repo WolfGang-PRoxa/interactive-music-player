@@ -321,6 +321,97 @@ async function browserSide() {
         win.close();
     }
 
+    console.log('\nLes commandes qui se déclarent\n');
+    {
+        const { win, sent, toasts } = await mount(
+            '<div class="scroll-input-wrapper" data-perm="master"><input type="range" id="reserved" value="30"></div>');
+        const doc = win.document;
+        win.MusicPlayer.applyShareState({ role: 'guest', permissions: {}, rightRequests: [], requestsMuted: false });
+
+        // Construite après l'état, comme une ligne de file ou un menu contextuel.
+        const late = doc.createElement('button');
+        late.dataset.perm = 'queue.remove';
+        let clicks = 0;
+        late.addEventListener('click', () => { clicks++; });
+        doc.body.appendChild(late);
+
+        const sheet = doc.getElementById('perm-declared-style');
+        check('le grisage vaut pour ce qui sera construit après',
+            sheet && sheet.textContent.includes('[data-perm="queue.remove"]')
+            && sheet.textContent.includes('[data-perm="master"]'));
+
+        late.dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }));
+        const bubble = doc.getElementById('perm-refusal');
+        check('une commande construite après l\'état est retenue', clicks === 0);
+        check('  … et sa bulle nomme le droit qu\'elle déclare',
+            !bubble.hidden && bubble.querySelector('.perm-refusal-feature').textContent.includes('Retirer une piste'));
+
+        doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        late.focus();
+        late.dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }));
+        late.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+        check('Échap ferme la bulle même quand le focus est sur la commande refusée', bubble.hidden);
+
+        const touch = new win.Event('touchstart', { bubbles: true, cancelable: true });
+        late.dispatchEvent(touch);
+        check('l\'appui du doigt est refusé aussi, et ouvre la bulle', touch.defaultPrevented && !bubble.hidden);
+
+        doc.getElementById('reserved').dispatchEvent(new win.MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+        doc.getElementById('reserved').dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }));
+        check('un réglage réservé se dit réservé, sans bouton de demande',
+            bubble.querySelector('.perm-refusal-title').textContent.includes('administrateur')
+            && bubble.querySelector('.perm-refusal-btn').hidden);
+
+        win.MusicPlayer.applyShareState({ role: 'guest', permissions: { 'queue.remove': true }, rightRequests: [], requestsMuted: false });
+        late.dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }));
+        check('le droit accordé, la commande répond', clicks === 1 && !sheet.textContent.includes('"queue.remove"'));
+
+        win.MusicPlayer.applyShareState({ role: 'master' });
+        check('l\'administrateur ne voit rien de grisé', sheet.textContent === '');
+        check('isGuest dit qui regarde',
+            win.MusicPlayer.isGuest() === false
+            && (win.MusicPlayer.applyShareState({ role: 'guest', permissions: {} }), win.MusicPlayer.isGuest() === true));
+        void sent; void toasts;
+        win.close();
+
+        // Les envois d'habitude — pas de geste derrière — ne partent pas de chez
+        // un invité : ils revenaient en refus, donc en notifications.
+        const SETTINGS = read('js', 'settingsModal.js');
+        const APP = read('app.js');
+        check('les paramètres ne recopient pas les réglages du serveur chez un invité',
+            (SETTINGS.match(/&& !\(typeof window\.MusicPlayer\.isGuest === 'function' && window\.MusicPlayer\.isGuest\(\)\)\)/g) || []).length === 2);
+        check('  … ni la reconnexion le préchargement', /if \(preloading && !guest\)/.test(APP));
+    }
+
+    {
+        // Les constructeurs déclarent ce qu'ils bâtissent.
+        const declared = {
+            'js/queue.js': ["playNowBtn.dataset.perm = 'queue.playNow'", "deleteBtn.dataset.perm = 'queue.remove'",
+                "deleteBtn.dataset.perm = 'queue.history'", "switchLabel.dataset.perm = 'volume.ducking'"],
+            'js/playlists.js': ["nameInput.dataset.perm = 'playlists.rename'", "deleteBtn.dataset.perm = 'playlists.delete'",
+                "playBtn.dataset.perm = 'playback.source'", "removeBtn.dataset.perm = 'playlists.removeTrack'"],
+            'js/transitions.js': ["remove.dataset.perm = dansLaFile ? 'queue.remove' : 'playlists.removeTrack'"],
+            'js/qualityMenu.js': ["btn.dataset.perm = 'volume.quality'", "btn.dataset.perm = 'playlists.transitions'",
+                "btn.dataset.perm = 'volume.trackGain'", "menuEl.dataset.perm = 'playlists.transitions'"],
+            'js/settingsModal.js': ["trashBtn.dataset.perm = 'master'"],
+        };
+        const missing = [];
+        for (const [file, needles] of Object.entries(declared)) {
+            const source = read(...file.split('/'));
+            for (const needle of needles) if (!source.includes(needle)) missing.push(`${file} : ${needle}`);
+        }
+        check('les lignes, onglets, menus et réglages déclarent leur droit', missing.length === 0, missing.join(' | '));
+
+        const MARKUP = read('index.html');
+        check('les neuf réglages du serveur sont réservés dans le balisage',
+            (MARKUP.match(/data-perm="master"/g) || []).length === 9);
+
+        const permsKnown = new Set([...permissions.ACTIONS, 'master']);
+        const all = [...Object.values(declared).flat().join(' ').matchAll(/'([a-zA-Z.]+)'/g)].map((m) => m[1]);
+        const unknown = all.filter((perm) => !permsKnown.has(perm));
+        check('  … et tous ces droits existent au catalogue', unknown.length === 0, unknown.join(', '));
+    }
+
     console.log('\nChez l\'administrateur\n');
     {
         const { win, sent, toasts } = await mount(

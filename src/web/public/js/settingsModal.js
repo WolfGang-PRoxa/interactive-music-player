@@ -525,6 +525,8 @@ window.MusicPlayer.renderConnectedGuildsList = function() {
         });
 
         const trashBtn = item.querySelector('.guild-trash-btn');
+        // Faire quitter un serveur au bot n'appartient qu'à l'administrateur.
+        if (trashBtn) trashBtn.dataset.perm = 'master';
         const progress = trashBtn.querySelector('.guild-trash-progress');
         let pressTimer = null;
         let startTime = 0;
@@ -1052,7 +1054,10 @@ window.MusicPlayer.initSettingsModal = function() {
 
             window.MusicPlayer.saveDashboardSettings();
 
-            if (typeof window.MusicPlayer.sendWS === 'function') {
+            // Réglages du serveur : ceux de l'administrateur. Voir `isGuest` dans
+            // js/sharedControl.js.
+            if (typeof window.MusicPlayer.sendWS === 'function'
+                && !(typeof window.MusicPlayer.isGuest === 'function' && window.MusicPlayer.isGuest())) {
                 window.MusicPlayer.sendWS({
                     type: 'updateSettings',
                     data: {
@@ -1179,7 +1184,10 @@ window.MusicPlayer.initSettingsModal = function() {
                 window.MusicPlayer.applyDefaultVideoWindowGeometry();
             }
 
-            if (typeof window.MusicPlayer.sendWS === 'function') {
+            // Réglages du serveur : ceux de l'administrateur. Voir `isGuest` dans
+            // js/sharedControl.js.
+            if (typeof window.MusicPlayer.sendWS === 'function'
+                && !(typeof window.MusicPlayer.isGuest === 'function' && window.MusicPlayer.isGuest())) {
                 window.MusicPlayer.sendWS({
                     type: 'updateSettings',
                     data: {

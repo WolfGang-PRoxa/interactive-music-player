@@ -496,8 +496,11 @@
                 // Le préchargement est piloté par le serveur mais réglé ici :
                 // après un redémarrage du bot, il repartirait sur ses valeurs
                 // par défaut tant que l'utilisateur n'a pas touché un curseur.
+                // Réglage du serveur, donc de l'administrateur : un invité n'a
+                // rien à y recopier, et le refus lui reviendrait en notification.
                 const preloading = window.MusicPlayer.dashboardSettings?.preloading;
-                if (preloading) {
+                const guest = typeof window.MusicPlayer.isGuest === 'function' && window.MusicPlayer.isGuest();
+                if (preloading && !guest) {
                     window.MusicPlayer.sendWS({ type: 'updateSettings', data: { preloading } });
                 }
             }
