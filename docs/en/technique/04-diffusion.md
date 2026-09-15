@@ -91,8 +91,11 @@ if (queue.virtualProgressMs >= duration) handleVirtualSkip(queue, guildId);
 ```
 
 The `speed` factor takes up `playbackSpeed`, so that the counter follows the
-browser's sped-up or slowed-down playback. The client periodically sends back its
-real position through the `syncProgress` message, which corrects the drift.
+browser's sped-up or slowed-down playback. The pilot dashboard periodically sends
+back its real position through the `syncProgress` message, which corrects the
+drift; the others follow it, and the server ignores theirs. The pilot is the
+owner's dashboard as soon as one is open on that server, otherwise the first to
+arrive: a guest connected before the host no longer leads the host's playback.
 
 ### End of track
 

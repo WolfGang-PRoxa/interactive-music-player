@@ -94,9 +94,12 @@ if (queue.virtualProgressMs >= Dauer) handleVirtualSkip(queue, guildId);
 ```
 
 Der Faktor `Geschwindigkeit` greift `playbackSpeed` auf, damit der Zähler der
-beschleunigten oder verlangsamten Wiedergabe des Browsers folgt. Der Client
-schickt seine tatsächliche Position regelmäßig mit der Nachricht `syncProgress`
-zurück, was die Drift ausgleicht.
+beschleunigten oder verlangsamten Wiedergabe des Browsers folgt. Das
+Pilot-Dashboard schickt seine tatsächliche Position regelmäßig mit der Nachricht
+`syncProgress` zurück, was die Drift ausgleicht; die anderen folgen ihr, und der
+Server ignoriert ihre. Pilot ist das Dashboard des Eigentümers, sobald eines auf
+diesem Server geöffnet ist, sonst das zuerst verbundene: ein Gast, der sich vor
+dem Gastgeber verbunden hat, führt dessen Wiedergabe nicht mehr.
 
 ### Titelende
 

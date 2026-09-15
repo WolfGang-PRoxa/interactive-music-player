@@ -1206,16 +1206,33 @@ class WebServer {
     /**
      * Désigne un pilote si le serveur n'en a pas, ou si le sien a disparu.
      *
-     * Le premier arrivé l'emporte : rien ne permet de deviner lequel des
-     * appareils connectés l'utilisateur écoute réellement. Ce qui importe est
-     * qu'il n'y en ait qu'un, et qu'il soit remplacé s'il s'en va — sans quoi
-     * la lecture ne s'enchaînerait plus du tout.
+     * Rien ne permet de deviner lequel des appareils connectés l'utilisateur
+     * écoute réellement. Ce qui importe est qu'il n'y en ait qu'un, et qu'il
+     * soit remplacé s'il s'en va — sans quoi la lecture ne s'enchaînerait plus
+     * du tout.
+     *
+     * ## Le maître d'abord
+     *
+     * Le premier arrivé l'emportait, quel qu'il soit. Or le pilote ne fait pas
+     * qu'annoncer les fins de piste : c'est sa position qui fait foi pour tous
+     * (voir `handleSyncProgress`). Un invité connecté avant l'hôte — ce qui
+     * arrive à chaque redémarrage du bot, son onglet se reconnectant le
+     * premier — menait donc la lecture de l'hôte, avec le retard de sa liaison.
+     *
+     * Le tableau de bord du maître prend donc la place dès qu'il regarde cette
+     * guilde, y compris à un invité déjà en place. Entre plusieurs onglets du
+     * maître, ou en son absence, le premier arrivé l'emporte comme avant.
      *
      * @param {string} guildId
      * @returns {import('ws').WebSocket|null}
      */
     _ensurePilot(guildId) {
         if (!guildId) return null;
+
+        const watching = [...this.wss.clients]
+            .filter((client) => client.readyState === 1 && client.selectedGuildId === guildId);
+        const isMaster = (client) => Boolean(client.identity && client.identity.master);
+        const master = watching.find(isMaster);
 
         /*
          * Le pilote en place n'est gardé que s'il est encore sur cette guilde.
@@ -1224,21 +1241,23 @@ class WebServer {
          * serveur reste ouvert, et resterait donc inscrit comme pilote d'une
          * guilde qu'il ne regarde plus. Elle n'aurait alors plus personne pour
          * annoncer ses fins de piste, tout en paraissant pourvue.
+         *
+         * Et un invité ne le reste que tant que le maître n'est pas là.
          */
         const currentPilot = this.pilots.get(guildId);
-        if (currentPilot && currentPilot.readyState === 1
-            && currentPilot.selectedGuildId === guildId) {
+        if (currentPilot && watching.includes(currentPilot)
+            && (isMaster(currentPilot) || !master)) {
             return currentPilot;
         }
 
-        for (const client of this.wss.clients) {
-            if (client.readyState === 1 && client.selectedGuildId === guildId) {
-                this.pilots.set(guildId, client);
-                log.info(`[WebServer] Pilot dashboard designated for guild ${guildId} `
-                    + `(${this._countClients(guildId)} connected).`);
-                this.broadcastState(guildId);
-                return client;
-            }
+        const chosen = master || watching[0];
+        if (chosen) {
+            this.pilots.set(guildId, chosen);
+            log.info(`[WebServer] Pilot dashboard designated for guild ${guildId}: `
+                + `${isMaster(chosen) ? 'the owner' : `guest ${chosen.identity?.session?.userId || '?'}`} `
+                + `(${this._countClients(guildId)} connected).`);
+            this.broadcastState(guildId);
+            return chosen;
         }
 
         this.pilots.delete(guildId);

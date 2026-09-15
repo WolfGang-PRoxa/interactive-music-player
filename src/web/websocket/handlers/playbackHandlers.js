@@ -574,8 +574,27 @@ async function handleSeek(ctx) {
 }
 
 function handleSyncProgress(ctx) {
-    const { data } = ctx;
+    const { data, ws, webServer, currentGuildId } = ctx;
     let queue = ctx.queue;
+
+        /*
+         * Le pilote seul fait foi.
+         *
+         * Chaque tableau de bord remontait sa position chaque seconde, et le
+         * serveur retenait celle du dernier arrivé. Avec un invité distant, la
+         * position partagée oscillait donc entre la sienne et celle de l'hôte,
+         * à la latence près — et tout tableau de bord à plus de deux secondes de
+         * l'écart se voyait recaler dessus. Le message étant ouvert à tous, un
+         * invité sans le moindre droit déplaçait en outre la lecture des autres.
+         *
+         * Les fins de piste obéissent déjà à cette règle (voir
+         * `handleSkip`) ; la position la rejoint. Le refus est muet : le
+         * message part chaque seconde, et ne pas être pilote n'est pas une faute.
+         */
+        if (ws && webServer && typeof webServer.isPilot === 'function'
+            && !webServer.isPilot(ws, currentGuildId)) {
+            return;
+        }
 
         const { progressMs } = data;
         if (queue && typeof progressMs === 'number' && !queue.isPendingTransition) {

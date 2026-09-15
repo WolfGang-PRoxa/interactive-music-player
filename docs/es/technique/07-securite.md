@@ -145,7 +145,9 @@ Tres valores particulares completan el catálogo:
 
 - `ALWAYS` — los mensajes que no ordenan nada (`requestState`, `clientLog`,
   `syncProgress`). Rechazarlos no protegería nada y dejaría ciego el panel del
-  invitado.
+  invitado. `syncProgress` lleva sin embargo la posición que todos siguen: su
+  handler solo escucha al panel piloto; de lo contrario, un invitado sin derechos
+  movería la reproducción de los demás.
 - `FIELD_FILTERED` — `updateSettings`, cuyo cada campo depende de un derecho
   distinto. El mensaje pasa, y `filterSettings()` solo conserva los ajustes
   permitidos; un invitado sin ningún derecho ve su petición vaciada de todo

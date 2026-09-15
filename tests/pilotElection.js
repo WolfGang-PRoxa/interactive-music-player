@@ -28,9 +28,24 @@
  * guilde paraît pourvue alors que personne ne l'écoute.
  */
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
+
+/*
+ * Dans un bac à sable, avant tout `require`.
+ *
+ * Charger WebServer configure le logger sur `data/logs` du répertoire courant :
+ * lancé depuis le projet, ce test écrasait `latest.log` du bot en cours
+ * d'exécution et supprimait ses plus anciens journaux. La base et le carnet des
+ * invités lisent eux aussi `data/` au chargement.
+ */
+const SANDBOX = fs.mkdtempSync(path.join(os.tmpdir(), 'pilot-election-'));
+process.chdir(SANDBOX);
+process.on('exit', () => {
+    try { fs.rmSync(SANDBOX, { recursive: true, force: true }); } catch (e) {}
+});
 
 let failed = 0;
 let passed = 0;
@@ -137,6 +152,84 @@ const socket = (guildId) => ({ readyState: 1, selectedGuildId: guildId });
         s._ensurePilot('G1') === null && !s.pilots.has('G1'));
 }
 
+// ───────────────────── Le maître d'abord ─────────────────────
+
+console.log('\nQui l\'emporte\n');
+
+/*
+ * Le pilote ne fait pas qu'annoncer les fins de piste : sa position fait foi
+ * pour tous. Un invité connecté avant l'hôte — l'ordre ordinaire après un
+ * redémarrage du bot — menait donc la lecture de l'hôte, avec le retard de sa
+ * liaison.
+ */
+{
+    const owner = (guildId) => ({ ...socket(guildId), identity: { master: true } });
+    const guest = (guildId, userId = 'U1') =>
+        ({ ...socket(guildId), identity: { master: false, session: { userId } } });
+
+    const s = makeServer();
+    const g = guest('G1');
+    s.wss.clients.add(g);
+    s._ensurePilot('G1');
+    check('seul, un invité pilote', s.isPilot(g, 'G1'),
+        'la lecture doit s\'enchaîner même sans l\'hôte');
+
+    const m = owner('G1');
+    s.wss.clients.add(m);
+    s._ensurePilot('G1');
+    check('le maître qui arrive prend la place', s.isPilot(m, 'G1') && !s.isPilot(g, 'G1'));
+
+    const before = s.elections.length;
+    const m2 = owner('G1');
+    s.wss.clients.add(m2);
+    s._ensurePilot('G1');
+    check('un second onglet du maître ne la lui reprend pas',
+        s.isPilot(m, 'G1') && s.elections.length === before);
+
+    m.readyState = 3;
+    m2.readyState = 3;
+    s._ensurePilot('G1');
+    check('le maître parti, l\'invité reprend', s.isPilot(g, 'G1'));
+
+    const late = guest('G1', 'U2');
+    s.wss.clients.add(late);
+    s._ensurePilot('G1');
+    check('entre invités, le premier arrivé garde sa place', s.isPilot(g, 'G1'));
+}
+
+// ───────────────────── La position ─────────────────────
+
+console.log('\nQui fait foi pour la position\n');
+
+{
+    const { handleSyncProgress } = require(path.join(ROOT, 'src', 'web', 'websocket', 'handlers', 'playbackHandlers.js'));
+
+    const s = makeServer();
+    const pilot = { ...socket('G1'), identity: { master: true } };
+    const other = { ...socket('G1'), identity: { master: false, session: { userId: 'U1' } } };
+    s.wss.clients.add(other);
+    s.wss.clients.add(pilot);
+    s._ensurePilot('G1');
+
+    const queue = { virtualProgressMs: 0, virtualLastUpdated: 0 };
+    const report = (ws, progressMs) => handleSyncProgress({
+        ws, webServer, queue, currentGuildId: 'G1', data: { progressMs },
+    });
+
+    report(pilot, 61000);
+    check('la position du pilote est retenue', queue.virtualProgressMs === 61000);
+
+    report(other, 59800);
+    check('celle d\'un autre tableau de bord ne l\'est pas', queue.virtualProgressMs === 61000,
+        `${queue.virtualProgressMs} ms`);
+
+    const app = fs.readFileSync(path.join(ROOT, 'src', 'web', 'public', 'app.js'), 'utf8');
+    check('le navigateur ne la remonte plus s\'il se sait non pilote',
+        /if \(state\.pilot !== false && !audio\.pendingInitialPosition/.test(app));
+    check('  … pas même pour se déclarer prioritaire après une coupure',
+        /if \(clientPositionWins\) \{[\s\S]{0,900}if \(state\.pilot !== false\) \{\s*sendWS\(\{\s*type: 'syncProgress'/.test(app));
+}
+
 // ───────────────────── Ce que le code appelle vraiment ─────────────────────
 
 console.log('\nCe qui l\'appelle\n');
@@ -153,8 +246,11 @@ console.log('\nCe qui l\'appelle\n');
         'un autre tableau de bord y est peut-être resté');
 
     const server = fs.readFileSync(path.join(ROOT, 'src', 'web', 'WebServer.js'), 'utf8');
+    // Le pilote n'est gardé que s'il figure parmi ceux qui regardent la guilde,
+    // et ceux-là se trient sur la guilde choisie, pas sur la connexion.
     check('un pilote n\'est gardé que s\'il regarde encore cette guilde',
-        /currentPilot\.selectedGuildId === guildId/.test(server),
+        /client\.readyState === 1 && client\.selectedGuildId === guildId/.test(server)
+        && /currentPilot && watching\.includes\(currentPilot\)/.test(server),
         'sa seule connexion ne prouve rien');
 }
 

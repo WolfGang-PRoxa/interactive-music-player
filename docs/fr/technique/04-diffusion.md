@@ -95,8 +95,11 @@ if (queue.virtualProgressMs >= durée) handleVirtualSkip(queue, guildId);
 ```
 
 Le facteur `vitesse` reprend `playbackSpeed`, afin que le compteur suive la
-lecture accélérée ou ralentie du navigateur. Le client renvoie périodiquement sa
-position réelle par le message `syncProgress`, ce qui corrige la dérive.
+lecture accélérée ou ralentie du navigateur. Le tableau de bord pilote renvoie
+périodiquement sa position réelle par le message `syncProgress`, ce qui corrige
+la dérive ; les autres la suivent, et le serveur ignore la leur. Le pilote est le
+tableau de bord du maître dès qu'il en a un d'ouvert sur ce serveur, à défaut le
+premier arrivé : un invité connecté avant l'hôte ne mène plus sa lecture.
 
 ### Fin de piste
 

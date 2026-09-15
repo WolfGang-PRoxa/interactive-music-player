@@ -92,9 +92,12 @@ if (queue.virtualProgressMs >= duración) handleVirtualSkip(queue, guildId);
 ```
 
 El factor `velocidad` retoma `playbackSpeed`, a fin de que el contador siga la
-reproducción acelerada o ralentizada del navegador. El cliente devuelve
+reproducción acelerada o ralentizada del navegador. El panel piloto devuelve
 periódicamente su posición real mediante el mensaje `syncProgress`, lo que
-corrige la deriva.
+corrige la deriva; los demás la siguen, y el servidor ignora la suya. El piloto es
+el panel del propietario en cuanto tiene uno abierto en ese servidor; si no, el
+primero en llegar: un invitado conectado antes que el anfitrión ya no dirige su
+reproducción.
 
 ### Fin de pista
 

@@ -2161,8 +2161,13 @@
             // Le serveur prend cette valeur pour argent comptant. Tant que la
             // position restaurée n'a pas été appliquée à l'élément, la remonter
             // reviendrait à lui annoncer un retour au début de la piste.
+            //
+            // Et seul le pilote la remonte : le serveur n'écoute que lui (voir
+            // handleSyncProgress). `!== false` et non `=== true` — tant que le
+            // premier état n'est pas arrivé, on ne sait pas encore, et c'est au
+            // serveur de trier.
             const now = Date.now();
-            if (!audio.pendingInitialPosition && now - lastSyncTime >= 1000) {
+            if (state.pilot !== false && !audio.pendingInitialPosition && now - lastSyncTime >= 1000) {
                 lastSyncTime = now;
                 sendWS({
                     type: 'syncProgress',
@@ -3259,10 +3264,18 @@
                     // jamais cessé de jouer, sa position fait foi. Se recaler sur
                     // celle du serveur, figée pendant l'interruption, ferait sauter
                     // la lecture en arrière — c'est lui qu'on recale.
-                    sendWS({
-                        type: 'syncProgress',
-                        data: { progressMs: Math.round(clientSecs * 1000) }
-                    });
+                    //
+                    // Sauf si un autre tableau de bord pilote : sa position à lui
+                    // fera foi, et la nôtre serait refusée. On ne recule pas pour
+                    // autant — le serveur peut encore porter celle d'avant la
+                    // coupure, le temps que le pilote se soit annoncé — et
+                    // l'accord revenu lèvera la priorité, plus bas.
+                    if (state.pilot !== false) {
+                        sendWS({
+                            type: 'syncProgress',
+                            data: { progressMs: Math.round(clientSecs * 1000) }
+                        });
+                    }
                 } else {
                     personalAudio.currentTime = serverSecs;
                     // Le saut vient d'un autre appareil : la ligne revient au

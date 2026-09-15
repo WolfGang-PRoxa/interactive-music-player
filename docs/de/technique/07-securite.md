@@ -151,7 +151,9 @@ Drei besondere Werte ergänzen den Katalog:
 
 - `ALWAYS` — die Nachrichten, die nichts befehlen (`requestState`, `clientLog`,
   `syncProgress`). Sie abzulehnen schützte nichts und ließe das Dashboard des
-  Gastes blind.
+  Gastes blind. `syncProgress` trägt allerdings die Position, der alle folgen:
+  sein Handler hört nur auf das Pilot-Dashboard, sonst verschöbe ein Gast ohne
+  Rechte die Wiedergabe der anderen.
 - `FIELD_FILTERED` — `updateSettings`, dessen Felder je einem anderen Recht
   unterstehen. Die Nachricht geht durch, und `filterSettings()` behält nur die
   erlaubten Einstellungen; ein Gast ohne jedes Recht sieht seine Anfrage von

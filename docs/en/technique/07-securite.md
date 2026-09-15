@@ -145,7 +145,9 @@ Three special values complete the catalogue:
 
 - `ALWAYS` — messages that command nothing (`requestState`, `clientLog`,
   `syncProgress`). Refusing them would protect nothing and would leave the
-  guest's dashboard blind.
+  guest's dashboard blind. `syncProgress` nonetheless carries the position
+  everyone follows: its handler listens only to the pilot dashboard, otherwise a
+  guest with no rights would move everyone else's playback.
 - `FIELD_FILTERED` — `updateSettings`, each field of which falls under a
   different right. The message goes through, and `filterSettings()` keeps only
   the permitted settings; a guest with no rights sees their request emptied of

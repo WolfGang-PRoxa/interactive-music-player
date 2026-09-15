@@ -147,7 +147,9 @@ Trois valeurs particulières complètent le catalogue :
 
 - `ALWAYS` — les messages qui ne commandent rien (`requestState`, `clientLog`,
   `syncProgress`). Les refuser ne protégerait rien et laisserait le tableau de
-  bord de l'invité aveugle.
+  bord de l'invité aveugle. `syncProgress` porte pourtant la position que tous
+  suivent : son handler n'écoute que le tableau de bord pilote, faute de quoi un
+  invité sans droit déplacerait la lecture des autres.
 - `FIELD_FILTERED` — `updateSettings`, dont chaque champ relève d'un droit
   différent. Le message passe, et `filterSettings()` ne garde que les réglages
   permis ; un invité sans droit voit sa demande vidée de tout contenu, ce que
