@@ -58,12 +58,14 @@ const owner = require(path.join(ROOT, 'src', 'web', 'owner.js'));
 const sessions = require(path.join(ROOT, 'src', 'web', 'sessions.js'));
 const oauth = require(path.join(ROOT, 'src', 'web', 'oauth.js'));
 const createAuthRouter = require(path.join(ROOT, 'src', 'web', 'routes', 'auth.js'));
+const createApiRouter = require(path.join(ROOT, 'src', 'web', 'routes', 'api.js'));
 
 const TOKEN = auth.getToken();
 
 const app = express();
 app.use(auth.middleware);
 app.use('/auth', createAuthRouter({ client: null }));
+app.use('/api', createApiRouter({ client: null, wss: null, inviteLink: () => null }));
 app.get('/', (req, res) => res.type('html').send('<html>tableau de bord</html>'));
 
 const server = http.createServer(app);
@@ -334,6 +336,53 @@ server.listen(0, '127.0.0.1', async () => {
             SERVER.indexOf('const announceEntry') < SERVER.indexOf('announceEntry();')
             && (SERVER.match(/\n\s*announceEntry\(\);/g) || []).length === 2,
             'les deux issues du relevé de partage');
+
+        /*
+         * Le lanceur, qui retombait dans le même piège par l'autre porte.
+         *
+         * « Ouvrir le tableau de bord », bot déjà lancé, ouvrait l'interface
+         * d'écoute lue dans `.env` : la porte de connexion, pour un propriétaire
+         * connecté à un onglet de là. Il demande désormais l'adresse au bot, la
+         * seule à connaître une `PUBLIC_URL` déduite de Tailscale.
+         *
+         * Et il la demande avec le jeton en en-tête. En query, un GET est
+         * redirigé vers l'adresse nettoyée — le cookie posé au passage, que
+         * `Invoke-RestMethod` ne garde pas : la question revenait en 401, à
+         * chaque fois, sans que rien ne le signale.
+         */
+        const avantLanceur = process.env.PUBLIC_URL;
+        process.env.PUBLIC_URL = 'https://exemple.ts.net';
+
+        const launcher = await new Promise((resolve, reject) => {
+            http.get({
+                host: '127.0.0.1', port, path: '/api/clients',
+                headers: { Accept: 'application/json', Authorization: `Bearer ${TOKEN}` },
+            }, (res) => {
+                let body = '';
+                res.on('data', (c) => { body += c; });
+                res.on('end', () => {
+                    let json = null;
+                    try { json = JSON.parse(body); } catch (e) {}
+                    resolve({ status: res.statusCode, json });
+                });
+            }).on('error', reject);
+        });
+        check('le lanceur apprend du bot où ouvrir le tableau de bord',
+            launcher.status === 200 && launcher.json && launcher.json.entry === 'https://exemple.ts.net',
+            launcher.json ? launcher.json.entry : String(launcher.status));
+        check('  … le jeton en en-tête y obtient une réponse directe',
+            launcher.status === 200 && typeof launcher.json.count === 'number');
+
+        const viaQuery = await ask(port, `/api/clients?token=${TOKEN}`);
+        check('  … là où le jeton en query est redirigé',
+            viaQuery.status === 302, 'Invoke-RestMethod en perdrait le cookie');
+
+        const LAUNCHER = fs.readFileSync(path.join(ROOT, 'tools', 'start-bot.ps1'), 'utf8');
+        check('  … et le lanceur s\'en sert',
+            /Start-Process \(DashboardUrl -Entry \$info\.Entry\)/.test(LAUNCHER)
+            && /\$headers\.Authorization = "Bearer \$token"/.test(LAUNCHER));
+
+        if (avantLanceur) process.env.PUBLIC_URL = avantLanceur; else delete process.env.PUBLIC_URL;
     }
 
     // ───────── Les traductions ─────────

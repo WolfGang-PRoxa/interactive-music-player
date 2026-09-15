@@ -189,12 +189,13 @@ travers. Le redémarrage, lui, part directement — la lecture reprend où elle 
 port qui tombe, puis qui revient.
 
 Une seule addition côté bot : `GET /api/clients`, qui rend le nombre de
-tableaux de bord connectés. C'est la même mesure que celle par laquelle
-`WebServer.start` décide d'ouvrir ou non le navigateur, et la fenêtre s'en sert
-pour ne pas ouvrir un onglet de plus quand il y en a déjà un. Le compte est
-redemandé à chaque clic plutôt que retenu à l'ouverture : un onglet fermé
-entre-temps condamnerait sinon le bouton. Si la question ne peut pas être posée,
-l'onglet est ouvert — mieux vaut un doublon qu'un tableau de bord inatteignable.
+tableaux de bord connectés et l'adresse où en ouvrir un. Le clic ouvre toujours
+un onglet : le compte, qui ne distingue pas cette machine d'un invité ou d'un
+téléphone, ne fait que renseigner la carte. L'adresse est celle de
+`oauth.publicUrl()`, où vit la session Discord — ouvert sur l'interface
+d'écoute, l'onglet redemandait la connexion à un propriétaire déjà connecté. Le
+jeton voyage en en-tête `Authorization` : passé en query, il vaut une
+redirection vers l'adresse nettoyée, dont `Invoke-RestMethod` perd le cookie.
 
 Quatre pièges de Windows PowerShell 5.1 et de GDI+ sont désamorcés dans ces
 scripts, et doivent le rester :

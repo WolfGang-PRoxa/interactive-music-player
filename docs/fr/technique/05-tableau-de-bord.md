@@ -55,7 +55,7 @@ Toutes sont protégées par le jeton ([07 — Sécurité](07-securite.md)).
 | `POST /api/download-dir` | Choix du dossier, validé avant d'être retenu ; corps vide pour revenir au défaut |
 | `GET /api/browse-dirs` | Sous-dossiers d'un chemin de la machine hôte, pour le sélecteur |
 | `GET /api/version` | Version en cours d'exécution — `dev` ou l'étiquette de la release |
-| `GET /api/clients` | Nombre de tableaux de bord connectés, consulté par la fenêtre de lancement |
+| `GET /api/clients` | Nombre de tableaux de bord connectés, et adresse où ouvrir le tableau de bord ; consulté par la fenêtre de lancement |
 
 `/api/docs` inventorie `docs/` à chaque appel, depuis la **version en cours
 d'exécution** et non depuis la racine partagée : la documentation affichée est

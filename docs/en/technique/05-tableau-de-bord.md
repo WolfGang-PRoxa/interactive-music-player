@@ -55,7 +55,7 @@ All are protected by the token ([07 — Security](07-securite.md)).
 | `POST /api/download-dir` | Choice of folder, validated before being kept; empty body returns to the default |
 | `GET /api/browse-dirs` | Sub-folders of a path on the host machine, for the picker |
 | `GET /api/version` | Running version — `dev` or the release tag |
-| `GET /api/clients` | Number of connected dashboards, consulted by the launch window |
+| `GET /api/clients` | Number of connected dashboards, and address at which to open the dashboard; consulted by the launch window |
 
 `/api/docs` inventories `docs/` on every call, from the **version currently
 running** and not from the shared root: the documentation displayed is therefore

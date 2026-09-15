@@ -129,49 +129,100 @@ function DashboardToken {
     return ''
 }
 
+function WebAddress {
+    <#
+        Une adresse web absolue, sans barre oblique finale — ou une chaîne vide.
+
+        Ce qui sort d'ici finit dans Start-Process, qui ouvre aussi bien un
+        programme qu'une page : seules http et https passent, et une valeur
+        venue du bot ou du fichier .env ne peut donc rien lancer d'autre qu'un
+        navigateur.
+    #>
+    param([string]$Value)
+
+    $parsed = $null
+    if (-not [Uri]::TryCreate($Value, [UriKind]::Absolute, [ref]$parsed)) { return '' }
+    if ($parsed.Scheme -ne 'http' -and $parsed.Scheme -ne 'https') { return '' }
+    return $Value.Trim().TrimEnd('/')
+}
+
 function DashboardUrl {
     <#
         Reconstitue l'adresse du tableau de bord, jeton compris.
 
+        Sur l'origine où vit la session Discord, et pas sur l'interface
+        d'écoute. Un cookie appartient à une origine, et le retour de Discord
+        pose le sien sur PUBLIC_URL : ouvert sur 127.0.0.1, l'onglet n'en
+        trouvait aucun et redemandait la connexion à un propriétaire déjà
+        connecté. Le bot fait la même chose en s'ouvrant lui-même (voir
+        WebServer.start).
+
+        -Entry est l'adresse que le bot a donnée par /api/clients : c'est la
+        seule qui tienne compte d'une PUBLIC_URL déduite de Tailscale au
+        démarrage, que .env ne porte pas. À défaut, celle du fichier, puis
+        l'interface d'écoute comme autrefois.
+
         La machine ne s'appelle surtout pas $host : c'est une variable réservée
         de PowerShell, en lecture seule.
     #>
-    $machine = EnvValue 'HOST' '127.0.0.1'
-    if ($machine -eq '0.0.0.0' -or $machine -eq '::') { $machine = 'localhost' }
-    $port = DashboardPort
+    param([string]$Entry = '')
 
-    $url = "http://${machine}:${port}/"
+    $base = WebAddress $Entry
+    if (-not $base) { $base = WebAddress (EnvValue 'PUBLIC_URL') }
+    if (-not $base) {
+        $machine = EnvValue 'HOST' '127.0.0.1'
+        if ($machine -eq '0.0.0.0' -or $machine -eq '::') { $machine = 'localhost' }
+        $base = "http://${machine}:$(DashboardPort)"
+    }
+
+    $url = "$base/"
     $token = DashboardToken
     if ($token) { $url += "?token=$token" }
     return $url
 }
 
-function DashboardClients {
+function DashboardInfo {
     <#
-        Combien de tableaux de bord sont connectés ? Rend -1 si la question n'a
-        pas pu être posée — le doute ne doit pas se lire comme « aucun onglet ».
+        Combien de tableaux de bord sont connectés, et où ouvrir le suivant.
 
-        Le point d'accès est /api/clients (voir src/web/routes/api.js) ; le
-        jeton passe en query, forme acceptée par auth.extractToken.
+        Count vaut -1 si la question n'a pas pu être posée — le doute ne doit
+        pas se lire comme « aucun onglet ». Entry est vide si le bot ne l'a pas
+        donnée, ce que fait une version antérieure à ce champ.
 
-        L'appel est synchrone et bloque donc le fil de l'interface : le délai
-        reste court, d'autant qu'on ne le pose qu'à un serveur dont le port
-        vient de répondre.
+        Le point d'accès est /api/clients (voir src/web/routes/api.js). Un seul
+        appel pour les deux : l'appel est synchrone et bloque le fil de
+        l'interface, et un bot qui ne répond pas ferait sinon attendre deux
+        fois. Le délai reste court, d'autant qu'on ne le pose qu'à un serveur
+        dont le port vient de répondre.
+
+        Le jeton passe en en-tête Authorization, surtout pas en query. Un GET
+        porteur de ?token= est redirigé vers l'adresse nettoyée, le jeton
+        confié à un cookie (voir auth.middleware) ; Invoke-RestMethod suit la
+        redirection mais jette le cookie, et la seconde requête revenait en
+        401. La question échouait donc à chaque fois : le compte valait -1, et
+        un onglet s'ouvrait même quand il y en avait déjà un.
     #>
     param([int]$TimeoutSec = 2)
 
-    $port = $script:Port
+    $info = @{ Count = -1; Entry = '' }
+
+    $uri = "http://127.0.0.1:$($script:Port)/api/clients"
+    $headers = @{}
     $token = DashboardToken
-    $uri = "http://127.0.0.1:$port/api/clients"
-    if ($token) { $uri += "?token=$token" }
+    if ($token) { $headers.Authorization = "Bearer $token" }
 
     try {
-        $answer = Invoke-RestMethod -Uri $uri -TimeoutSec $TimeoutSec -UseBasicParsing -ErrorAction Stop
-        if ($null -eq $answer.count) { return -1 }
-        return [int]$answer.count
-    } catch {
-        return -1
-    }
+        $answer = Invoke-RestMethod -Uri $uri -Headers $headers -TimeoutSec $TimeoutSec -UseBasicParsing -ErrorAction Stop
+        if ($null -ne $answer.count) { $info.Count = [int]$answer.count }
+        if ($answer.entry) { $info.Entry = WebAddress ([string]$answer.entry) }
+    } catch { }
+
+    return $info
+}
+
+function DashboardClients {
+    param([int]$TimeoutSec = 2)
+    return (DashboardInfo -TimeoutSec $TimeoutSec).Count
 }
 
 function SendBotCommand {
@@ -1783,22 +1834,25 @@ function ConfirmShutdown {
 
 function OpenDashboard {
     <#
-        N'ouvre un onglet que s'il n'y en a pas déjà un. Le compte est redemandé
-        à chaque clic plutôt que retenu à l'ouverture de la fenêtre : l'onglet a
-        pu être fermé entre-temps, et un compte périmé condamnerait le bouton.
+        Ouvre toujours un onglet : le clic le demande, et c'est à lui d'avoir
+        le dernier mot.
+
+        Il ne s'ouvrait autrefois que s'il n'y en avait pas déjà un. Mais le
+        compte ne distingue pas cette machine des autres : un invité, ou le
+        téléphone du propriétaire, suffisaient à condamner le bouton sur le
+        poste où l'on cherchait justement la page. Le compte ne fait donc plus
+        que renseigner. Il est redemandé à chaque clic plutôt que retenu à
+        l'ouverture de la fenêtre — des onglets ont pu se fermer entre-temps.
     #>
     $card = $script:DashboardCard
-    $clients = DashboardClients
+    $info = DashboardInfo
 
-    if ($clients -gt 0) {
-        $card.Detail.Text = "Déjà ouvert : $clients onglet(s) connecté(s). Aucun nouvel onglet n'a été ouvert."
-        return
+    Start-Process (DashboardUrl -Entry $info.Entry)
+    $card.Detail.Text = if ($info.Count -gt 0) {
+        "Ouvert dans votre navigateur. Déjà connecté(s) : $($info.Count) onglet(s), ici ou ailleurs."
+    } else {
+        'Ouvert dans votre navigateur.'
     }
-    if ($clients -lt 0) {
-        $card.Detail.Text = "Impossible de savoir si un onglet est ouvert ; ouverture quand même."
-    }
-    Start-Process (DashboardUrl)
-    if ($clients -eq 0) { $card.Detail.Text = 'Ouvert dans votre navigateur.' }
 }
 
 function ShowRunningChoices {
@@ -1809,7 +1863,7 @@ function ShowRunningChoices {
 
     $clients = DashboardClients
     $detail = if ($clients -gt 0) {
-        "Déjà ouvert : $clients onglet(s) connecté(s)."
+        "Déjà connecté(s) : $clients onglet(s), ici ou ailleurs."
     } else {
         'Dans votre navigateur'
     }
@@ -2108,6 +2162,29 @@ if ($SelfTest) {
         }
     }
     Write-Output 'Jeton : les quatre formes sont correctement jugées.'
+
+    # L'adresse d'entrée finit dans Start-Process : rien d'autre qu'une page web
+    # ne doit pouvoir s'y glisser. L'adresse complète n'est jamais affichée,
+    # elle porte le jeton.
+    $addresses = @(
+        @{ Text = 'https://pc.exemple.ts.net/';            Expect = 'https://pc.exemple.ts.net' },
+        @{ Text = 'http://192.168.1.20:3000';              Expect = 'http://192.168.1.20:3000' },
+        @{ Text = 'calc.exe';                              Expect = '' },
+        @{ Text = 'C:\Windows\System32\calc.exe';          Expect = '' },
+        @{ Text = 'file:///C:/Windows/System32/calc.exe';  Expect = '' },
+        @{ Text = '';                                      Expect = '' }
+    )
+    foreach ($address in $addresses) {
+        if ((WebAddress $address.Text) -ne $address.Expect) {
+            Write-Output "ÉCHEC — adresse d'entrée mal jugée : « $($address.Text) »"
+            exit 1
+        }
+    }
+    if (-not (DashboardUrl -Entry 'https://pc.exemple.ts.net').StartsWith('https://pc.exemple.ts.net/')) {
+        Write-Output "ÉCHEC — le tableau de bord ne s'ouvre pas sur l'adresse donnée par le bot."
+        exit 1
+    }
+    Write-Output "Adresse d'entrée : celle du bot est retenue, et seules http et https passent."
 
     <#
         Écriture du .env, sur un fichier jetable.

@@ -57,7 +57,7 @@ Alle sind durch das Token geschützt ([07 — Sicherheit](07-securite.md)).
 | `POST /api/download-dir` | Wahl des Ordners, vor dem Merken geprüft; leerer Rumpf kehrt zum Standard zurück |
 | `GET /api/browse-dirs` | Unterordner eines Pfades der Host-Maschine, für die Auswahl |
 | `GET /api/version` | Laufende Version — `dev` oder die Kennzeichnung der Release |
-| `GET /api/clients` | Zahl der verbundenen Dashboards, vom Startfenster abgefragt |
+| `GET /api/clients` | Zahl der verbundenen Dashboards und Adresse, unter der das Dashboard zu öffnen ist; vom Startfenster abgefragt |
 
 `/api/docs` erfasst `docs/` bei jedem Aufruf, und zwar aus der **gerade
 laufenden Fassung** und nicht aus dem gemeinsamen Stammverzeichnis: die

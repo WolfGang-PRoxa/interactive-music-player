@@ -191,13 +191,14 @@ Rechenschaft ab, indem sie die Schrittmaschine erneut abspielen: der Port, der
 fällt, und dann wiederkommt.
 
 Nur eine einzige Ergänzung auf der Seite des Bots: `GET /api/clients`, das die
-Zahl der verbundenen Dashboards zurückgibt. Es ist dasselbe Maß, nach dem
-`WebServer.start` entscheidet, ob der Browser geöffnet wird, und das Fenster
-nutzt es, um nicht noch einen Tab zu öffnen, wenn schon einer da ist. Die Zahl
-wird bei jedem Klick neu erfragt statt beim Öffnen gemerkt: ein zwischenzeitlich
-geschlossener Tab würde sonst die Schaltfläche lahmlegen. Kann die Frage nicht
-gestellt werden, wird der Tab geöffnet — lieber ein Duplikat als ein
-unerreichbares Dashboard.
+Zahl der verbundenen Dashboards und die Adresse zurückgibt, unter der eines zu
+öffnen ist. Der Klick öffnet immer einen Tab: die Zahl, die diese Maschine nicht
+von einem Gast oder einem Telefon unterscheiden kann, informiert nur die Karte.
+Die Adresse ist die von `oauth.publicUrl()`, wo die Discord-Sitzung lebt — auf
+der Lauschschnittstelle geöffnet, verlangte der Tab von einem bereits
+angemeldeten Eigentümer eine erneute Anmeldung. Das Token reist im Header
+`Authorization`: als Query übergeben, bringt es eine Weiterleitung auf die
+bereinigte Adresse ein, deren Cookie `Invoke-RestMethod` verliert.
 
 Vier Fallen von Windows PowerShell 5.1 und von GDI+ sind in diesen Skripten
 entschärft und müssen es bleiben:

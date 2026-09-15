@@ -580,11 +580,29 @@ function createApiRouter(webServer) {
      * pire on ouvre un onglet, jamais on n'en cache un vivant.
      */
     /*
-     * Sans garde : elle ne rend qu'un nombre, et le lanceur l'interroge avant
-     * qu'aucune session Discord n'existe (voir tools/start-bot.ps1).
+     * Sans garde : elle ne rend qu'un nombre et une adresse, et le lanceur
+     * l'interroge avant qu'aucune session Discord n'existe (voir
+     * tools/start-bot.ps1). `auth.middleware` exige tout de même le jeton ou
+     * une session, et l'adresse est celle que tout invité a déjà dans son lien.
+     */
+    /*
+     * `entry` : l'adresse où ouvrir le tableau de bord.
+     *
+     * Le lanceur l'ouvrait sur l'interface d'écoute, `127.0.0.1`, qu'il lisait
+     * dans `.env`. Or une session Discord n'existe que sur l'origine où Discord
+     * renvoie — `PUBLIC_URL` —, et l'onglet tombait donc sur la porte de
+     * connexion alors que le propriétaire était connecté, à un onglet de là.
+     * C'est le piège que `WebServer.start` a déjà déjoué pour l'ouverture
+     * automatique ; le lanceur y retombait par l'autre porte.
+     *
+     * Demandée au bot plutôt que relue dans `.env` : `PUBLIC_URL` peut se
+     * déduire de Tailscale au démarrage, sans jamais être écrite nulle part.
      */
     router.get('/clients', (req, res) => {
-        res.json({ count: webServer.wss ? webServer.wss.clients.size : 0 });
+        res.json({
+            count: webServer.wss ? webServer.wss.clients.size : 0,
+            entry: require('../oauth').publicUrl(),
+        });
     });
 
     /**

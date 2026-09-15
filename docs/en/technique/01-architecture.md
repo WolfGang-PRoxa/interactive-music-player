@@ -184,12 +184,13 @@ Both account for themselves by replaying the step engine: the port going down,
 then coming back.
 
 Only one addition on the bot's side: `GET /api/clients`, which returns the
-number of connected dashboards. It is the same measure by which `WebServer.start`
-decides whether or not to open the browser, and the window uses it so as not to
-open one more tab when there is already one. The count is asked again on every
-click rather than remembered at opening: a tab closed in the meantime would
-otherwise condemn the button. If the question cannot be asked, the tab is opened
-— better a duplicate than an unreachable dashboard.
+number of connected dashboards and the address at which to open one. The click
+always opens a tab: the count, which cannot tell this machine from a guest or a
+phone, only informs the card. The address is that of `oauth.publicUrl()`, where
+the Discord session lives — opened on the listening interface, the tab asked an
+owner who was already signed in to sign in again. The token travels in the
+`Authorization` header: passed as a query, it earns a redirect to the cleaned
+address, whose cookie `Invoke-RestMethod` loses.
 
 Four traps of Windows PowerShell 5.1 and of GDI+ are defused in these scripts,
 and must remain so:

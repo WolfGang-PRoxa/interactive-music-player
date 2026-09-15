@@ -56,7 +56,7 @@ Todas están protegidas por el testigo ([07 — Seguridad](07-securite.md)).
 | `POST /api/download-dir` | Elección de la carpeta, validada antes de retenerse; cuerpo vacío para volver al valor por defecto |
 | `GET /api/browse-dirs` | Subcarpetas de una ruta de la máquina anfitriona, para el selector |
 | `GET /api/version` | Versión en ejecución — `dev` o la etiqueta de la release |
-| `GET /api/clients` | Número de paneles conectados, consultado por la ventana de lanzamiento |
+| `GET /api/clients` | Número de paneles conectados, y dirección en la que abrir el panel; consultado por la ventana de lanzamiento |
 
 `/api/docs` inventaría `docs/` en cada llamada, desde la **versión en curso de
 ejecución** y no desde la raíz compartida: la documentación mostrada es, pues, la

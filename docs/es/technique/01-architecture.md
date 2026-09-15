@@ -185,12 +185,13 @@ retoma donde estaba. Ambos dan cuenta de sí mismos reproduciendo el motor de
 etapas: el puerto que cae, y luego que vuelve.
 
 Una sola adición del lado del bot: `GET /api/clients`, que devuelve el número de
-paneles de control conectados. Es la misma medida por la que `WebServer.start`
-decide abrir o no el navegador, y la ventana se sirve de ella para no abrir una
-pestaña de más cuando ya hay una. La cuenta se vuelve a pedir en cada clic en
-lugar de retenerse al abrir: una pestaña cerrada entretanto condenaría si no el
-botón. Si la pregunta no puede plantearse, la pestaña se abre — más vale un
-duplicado que un panel de control inalcanzable.
+paneles de control conectados y la dirección en la que abrir uno. El clic abre
+siempre una pestaña: la cuenta, que no distingue esta máquina de un invitado o
+de un teléfono, solo informa a la tarjeta. La dirección es la de
+`oauth.publicUrl()`, donde vive la sesión de Discord — abierta en la interfaz de
+escucha, la pestaña volvía a pedir la conexión a un propietario ya conectado. El
+token viaja en la cabecera `Authorization`: pasado en la query, provoca una
+redirección a la dirección limpia, cuya cookie pierde `Invoke-RestMethod`.
 
 Cuatro trampas de Windows PowerShell 5.1 y de GDI+ están desactivadas en estos
 scripts, y deben seguir estándolo:
