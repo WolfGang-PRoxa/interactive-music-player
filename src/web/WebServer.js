@@ -55,6 +55,17 @@ const MEM_MIN_GAP_MS = (1000 / MEM_RATE_HZ) * 0.6;
 const MEM_SEND_PERIOD_MS = 50;
 /** Garde-fou : plafonne le lot si un envoi venait à traîner. */
 const MEM_MAX_BATCH = MEM_RATE_HZ * 4;
+/**
+ * Au-delà de ce que la socket garde en attente, la liaison ne suit plus.
+ *
+ * `bufferedAmount` ne compte que ce que le système n'a pas encore accepté : les
+ * tampons du noyau absorbent d'abord, et la valeur ne monte qu'une fois ceux-ci
+ * pleins. Un lot pèse quelques centaines d'octets ; 16 Ko en attente, c'est
+ * déjà plusieurs secondes de retard sur un flux censé être vivant.
+ */
+const MEM_BACKLOG_BYTES = 16 * 1024;
+/** Une trace par socket engorgée, pas une par lot. */
+const MEM_BACKLOG_LOG_EVERY_MS = 30000;
 
 /**
  * Délai laissé au tableau de bord pour annoncer lui-même une fin de piste, en
@@ -1341,6 +1352,29 @@ class WebServer {
             for (const ws of Array.from(this._memorySubscribers)) {
                 if (ws.readyState !== 1) {
                     this._memorySubscribers.delete(ws);
+                    continue;
+                }
+                /*
+                 * Une socket qui n'écoule plus ce qu'on lui confie.
+                 *
+                 * Lui ajouter des lots n'arrangerait rien : ils s'entasseraient
+                 * derrière les précédents et arriveraient d'un bloc, en retard —
+                 * exactement la courbe qui avance par à-coups. On saute donc son
+                 * tour ; l'historique d'une seconde, porté par `progress`,
+                 * comble le trou. Et on le dit : c'est la signature d'une
+                 * liaison qui ne suit pas, à distinguer d'un navigateur qui
+                 * reçoit bien mais peint mal (voir js/drawer.js).
+                 */
+                if (ws.bufferedAmount > MEM_BACKLOG_BYTES) {
+                    const now = Date.now();
+                    if (!ws._memoryBacklogLoggedAt || now - ws._memoryBacklogLoggedAt > MEM_BACKLOG_LOG_EVERY_MS) {
+                        ws._memoryBacklogLoggedAt = now;
+                        const who = ws.identity?.master
+                            ? 'the owner'
+                            : `guest ${ws.identity?.session?.userId || '?'}`;
+                        log.warn(`[WebServer] Memory feed held back for ${who}: `
+                            + `${Math.round(ws.bufferedAmount / 1024)} KB still waiting on the socket.`);
+                    }
                     continue;
                 }
                 try { ws.send(payload); } catch (e) {}

@@ -326,6 +326,41 @@ window.MusicPlayer.requestVideoResync = function() {
     hardResyncRequested = true;
 };
 
+/**
+ * La position sur laquelle caler l'image.
+ *
+ * ## Deux horloges, et une vidéo tirée entre elles
+ *
+ * La boucle d'affichage d'app.js recale la vidéo sur ce qu'on entend : en
+ * diffusion personnelle, l'élément audio de cette page. `updateVideoPlayer`, lui,
+ * la recalait sur `state.progress`, la position que tient le serveur — et il
+ * passe à chaque message `progress`, soit chaque seconde.
+ *
+ * Or cette position-là est celle du tableau de bord pilote, estimée à l'horloge
+ * murale. Chez l'hôte, qui est le pilote, les deux coïncident à une fraction de
+ * seconde près. Chez un invité, son propre élément audio a démarré plus tard,
+ * mis en mémoire tampon à travers le tunnel, et le message lui-même arrive en
+ * retard : l'écart atteint facilement la seconde. La vidéo était donc ramenée
+ * vers le serveur chaque seconde, puis repoussée vers l'audio image après
+ * image — à coups de sauts au-delà d'une seconde d'écart, à coups de ±15 % de
+ * vitesse en deçà. Une image qui saccade et se fige, sur un son qui, lui, ne
+ * bouge pas : exactement ce que l'invité décrivait.
+ *
+ * Une seule référence, donc, celle qu'on entend. Le serveur ne sert plus qu'à
+ * défaut — hors diffusion personnelle, ou tant que l'élément audio ne tient pas
+ * encore de position.
+ *
+ * @param {object} state
+ * @returns {number}
+ */
+function referenceMs(state) {
+    const heard = typeof window.MusicPlayer.heardPositionMs === 'function'
+        ? window.MusicPlayer.heardPositionMs()
+        : null;
+    if (typeof heard === 'number' && isFinite(heard)) return heard;
+    return (state && state.progress && state.progress.currentMs) || 0;
+}
+
 window.MusicPlayer.syncVideoProgress = function(currentMs, isExplicitSeek = false) {
     if (isVideoUserInteracting && !isExplicitSeek) return;
     const state = window.MusicPlayer.state || {};
@@ -782,7 +817,7 @@ window.MusicPlayer.updateVideoPlayer = async function(track) {
 
     if (isSameTrack && sameQuality && videoElement && !videoElement.classList.contains('hidden')
         && videoElement.src && videoElement.readyState >= 1) {
-        window.MusicPlayer.syncVideoProgress(currentMs, false);
+        window.MusicPlayer.syncVideoProgress(referenceMs(state), false);
         window.MusicPlayer.syncVideoPlayState(state.isPlaying, state.isPaused);
         return;
     }
@@ -930,7 +965,7 @@ window.MusicPlayer.updateVideoPlayer = async function(track) {
         window.MusicPlayer.syncVideoSpeed(state.settings.playbackSpeed);
     }
     if (state.progress) {
-        window.MusicPlayer.syncVideoProgress(state.progress.currentMs);
+        window.MusicPlayer.syncVideoProgress(referenceMs(state));
     }
     window.MusicPlayer.syncVideoPlayState(state.isPlaying, state.isPaused);
 };

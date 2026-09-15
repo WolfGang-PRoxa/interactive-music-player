@@ -297,6 +297,10 @@ function mountRenderer({ personal = true, totalMs = 200000 } = {}) {
     };
     context.globalThis = context;
     vm.createContext(context);
+    // La règle « l'élément fait-il foi ? » vit à part depuis que la vidéo la
+    // partage (voir `heardPositionMs`) : elle entre au banc avec la fonction.
+    vm.runInContext(extractFunction(appSource, 'audioHoldsPosition'), context,
+        { filename: 'app.js:audioHoldsPosition' });
     vm.runInContext(extractFunction(appSource, 'renderSmoothProgress'), context,
         { filename: 'app.js:renderSmoothProgress' });
 

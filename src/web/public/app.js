@@ -235,6 +235,28 @@
     let lastProgressTimestamp = 0;
     let isTrackPlaying = false;
 
+    /**
+     * La position qu'on entend, en millisecondes — ou `null` si ce n'est pas
+     * l'élément audio de cette page qui la tient. Voir le commentaire
+     * « Qui dit où en est la lecture » juste en dessous.
+     *
+     * Exposée pour la vidéo, qui doit se caler sur la même référence que la
+     * barre de progression — voir `referenceMs` dans js/video.js.
+     */
+    function heardPositionMs() {
+        const isPersonal = state && state.settings && state.settings.broadcastMode === 'personal';
+        if (!isPersonal || !audioHoldsPosition()) return null;
+        return personalAudio.currentTime * 1000;
+    }
+    window.MusicPlayer.heardPositionMs = heardPositionMs;
+
+    function audioHoldsPosition() {
+        return Boolean(personalAudio
+            && !isNaN(personalAudio.duration) && personalAudio.duration > 0
+            && (!personalAudio.paused
+                || (state.isPaused && personalAudio.currentTime > 0)));
+    }
+
     function renderSmoothProgress() {
         if (!isSeeking && !(window.MusicPlayer && window.MusicPlayer.isVideoUserInteracting)) {
             const isPersonal = state.settings && state.settings.broadcastMode === 'personal';
@@ -266,12 +288,7 @@
              * le serveur qui sait où l'on en était, le temps que le recalage
              * plus bas ait eu lieu.
              */
-            const audioHoldsPosition = personalAudio
-                && !isNaN(personalAudio.duration) && personalAudio.duration > 0
-                && (!personalAudio.paused
-                    || (state.isPaused && personalAudio.currentTime > 0));
-
-            if (isPersonal && audioHoldsPosition) {
+            if (isPersonal && audioHoldsPosition()) {
                 const currentSecs = personalAudio.currentTime;
                 const totalSecs = personalAudio.duration;
                 const ratio = Math.min(1, Math.max(0, currentSecs / totalSecs));

@@ -623,6 +623,7 @@
         const now = typeof timestamp === 'number' ? timestamp : performance.now();
         const dtSec = lastFrameMs > 0 ? (now - lastFrameMs) / 1000 : 1 / 60;
         lastFrameMs = now;
+        reception.frames++;
 
         renderGraph(Math.min(0.5, Math.max(0.001, dtSec)));
 
@@ -687,12 +688,116 @@
      */
     window.MusicPlayer.onMemorySamples = function(data) {
         if (!data || !Array.isArray(data.samples)) return;
+        let newest = 0;
         for (const s of data.samples) {
             if (!Array.isArray(s) || s.length < 4) continue;
             addSample(fineSamples, FINE_WINDOW_SEC * 1000, s[1], s[2], s[3], s[0]);
+            newest = Math.max(newest, Number(s[0]) || 0);
         }
         lastEndReceivedMs = Date.now();
+        noteArrival(lastEndReceivedMs, newest);
     };
+
+    /* ═══════════════════ Mesure de la réception ═══════════════════ */
+
+    /*
+     * Un invité voyait ce tiroir se mettre à jour toutes les deux secondes
+     * environ, là où l'hôte le voyait couler. Le serveur ne fait pourtant aucune
+     * différence : le flux part vers chaque abonné toutes les 50 ms. Restent deux
+     * suspects qu'on ne départage pas d'ici — la liaison, qui livrerait par
+     * paquets, ou le navigateur, qui recevrait bien mais peindrait rarement.
+     *
+     * Le tiroir mesure donc les deux, sur des fenêtres de dix secondes, et ne
+     * dit rien tant que tout va bien. Au-delà d'un seuil, une ligne part dans le
+     * journal du bot par `clientLog`, comme le rapporteur d'erreurs :
+     *
+     *  - le plus long silence entre deux lots, qui trahit une livraison par
+     *    paquets ;
+     *  - l'écart du retard apparent — réception moins horodatage du serveur.
+     *    Son minimum mêle décalage d'horloge et latence, mais sa *variation* ne
+     *    dépend que du trajet : c'est elle qui se lit ;
+     *  - les images réellement peintes par seconde, qui trahissent un affichage
+     *    à la peine ;
+     *  - la visibilité de l'onglet, sans laquelle tout le reste se lirait mal.
+     */
+    const RECEPTION_WINDOW_MS = 10000;
+    const RECEPTION_GAP_ALERT_MS = 600;
+    const RECEPTION_FPS_ALERT = 20;
+    const RECEPTION_REPORT_EVERY_MS = 30000;
+
+    const reception = {
+        start: 0,
+        lastArrival: 0,
+        maxGap: 0,
+        batches: 0,
+        lagMin: Infinity,
+        lagMax: -Infinity,
+        frames: 0,
+        lastReport: 0,
+    };
+
+    function resetReception(now) {
+        reception.start = now;
+        reception.lastArrival = now;
+        reception.maxGap = 0;
+        reception.batches = 0;
+        reception.lagMin = Infinity;
+        reception.lagMax = -Infinity;
+        reception.frames = 0;
+    }
+
+    function noteArrival(now, newestSampleT) {
+        if (!reception.start) return;
+        reception.maxGap = Math.max(reception.maxGap, now - reception.lastArrival);
+        reception.lastArrival = now;
+        reception.batches++;
+        if (newestSampleT) {
+            const lag = now - newestSampleT;
+            reception.lagMin = Math.min(reception.lagMin, lag);
+            reception.lagMax = Math.max(reception.lagMax, lag);
+        }
+    }
+
+    /** Appelé au battement d'une seconde : clôt la fenêtre quand elle est pleine. */
+    function assessReception(now) {
+        if (!isOpen()) {
+            reception.start = 0;
+            return;
+        }
+        if (!reception.start) {
+            resetReception(now);
+            return;
+        }
+        const elapsed = now - reception.start;
+        if (elapsed < RECEPTION_WINDOW_MS) return;
+
+        // Le silence qui court encore compte : un flux tari n'a pas de dernier lot.
+        const maxGap = Math.max(reception.maxGap, now - reception.lastArrival);
+        const fps = reception.frames / (elapsed / 1000);
+        const jitter = reception.batches > 1 ? reception.lagMax - reception.lagMin : null;
+        // Un onglet caché ne peint plus et le navigateur y ralentit tout : ce
+        // n'est pas un défaut, et le signaler noierait le journal.
+        const troubled = document.visibilityState === 'visible'
+            && (maxGap > RECEPTION_GAP_ALERT_MS || fps < RECEPTION_FPS_ALERT);
+
+        if (troubled && now - reception.lastReport > RECEPTION_REPORT_EVERY_MS
+            && typeof window.MusicPlayer.sendWS === 'function') {
+            reception.lastReport = now;
+            window.MusicPlayer.sendWS({
+                type: 'clientLog',
+                data: {
+                    source: 'Drawer',
+                    message: `réception irrégulière sur ${Math.round(elapsed / 1000)} s — `
+                        + `${reception.batches} lot(s), plus long silence ${Math.round(maxGap)} ms, `
+                        + `variation du retard ${jitter === null ? '?' : Math.round(jitter) + ' ms'}, `
+                        + `retard minimal ${Number.isFinite(reception.lagMin) ? Math.round(reception.lagMin) + ' ms' : '?'}, `
+                        + `affichage ${fps.toFixed(1)} ips, onglet ${document.visibilityState}, `
+                        + `rôle ${document.documentElement.dataset.role || '?'} — ${navigator.userAgent}`,
+                },
+            });
+        }
+        resetReception(now);
+    }
 
     // Drawer Open / Close Controls
     function openDrawer() {
@@ -771,6 +876,7 @@
                 && now - lastStreamRequestMs > 2000) {
                 requestMemoryStream(true);
             }
+            assessReception(now);
 
             // Update UI metric text labels
             const rssMB = (stats.memory.rss / BYTES_PER_MB).toFixed(1);
