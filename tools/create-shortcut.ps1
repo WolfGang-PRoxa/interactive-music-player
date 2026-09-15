@@ -587,7 +587,9 @@ $Xaml = @'
       <TranslateTransform x:Name="SurfaceSlide" Y="16"/>
     </Border.RenderTransform>
 
-    <Grid ClipToBounds="True">
+    <!-- Découpée en arrondi depuis le script (SizeChanged de Frame) : ClipToBounds
+         ne rogne qu'en rectangle, et les halos débordaient dans les coins. -->
+    <Grid x:Name="Frame">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto"/>
         <RowDefinition Height="*"/>
@@ -851,6 +853,7 @@ $surface          = Element 'Surface'
 $surfaceSlide     = Element 'SurfaceSlide'
 $titleBar         = Element 'TitleBar'
 $closeButton      = Element 'CloseButton'
+$frame            = Element 'Frame'
 $choicePanel      = Element 'ChoicePanel'
 $resultPanel      = Element 'ResultPanel'
 $startupToggle    = Element 'StartupToggle'
@@ -1133,6 +1136,17 @@ $closeButton.Add_Click({ $window.Close() })
 
 $titleBar.Add_MouseLeftButtonDown({
     try { $window.DragMove() } catch { }
+})
+
+# Les halos débordent du cadre par construction, et ClipToBounds ne rogne qu'en
+# rectangle : leurs couleurs perçaient dans les coins arrondis. Le découpage
+# reprend l'arrondi intérieur de la coque — celui du trait, moins sa
+# demi-épaisseur, là où WPF borde le fond — et suit la hauteur, qui varie.
+$frame.Add_SizeChanged({
+    param($element, $routed)
+    $radius = $surface.CornerRadius.TopLeft - $surface.BorderThickness.Left / 2
+    $bounds = New-Object System.Windows.Rect(0, 0, $element.ActualWidth, $element.ActualHeight)
+    $element.Clip = New-Object System.Windows.Media.RectangleGeometry($bounds, $radius, $radius)
 })
 
 # Les cartes ne sont pas des contrôles focusables : le clavier passe donc par

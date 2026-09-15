@@ -734,11 +734,42 @@ window.MusicPlayer = window.MusicPlayer || {};
 
         head.appendChild(identity);
 
+        // Regroupés pour passer ensemble à la ligne quand la largeur manque,
+        // plutôt que de laisser le chevron seul sous le reste.
+        const tools = document.createElement('div');
+        tools.className = 'share-person-tools';
+
+        /*
+         * Tout retirer, ou tout accorder, sans déplier.
+         *
+         * Le bouton vivait au pied du détail : hors d'atteinte tant que la ligne
+         * restait repliée, si bien que couper les droits de quelqu'un obligeait
+         * d'abord à ouvrir ses vingt-neuf interrupteurs. Il remonte ici, et
+         * change de sens quand il n'y a plus rien à retirer — grisé, il n'aurait
+         * plus servi à rien.
+         */
+        const none = total === 0;
+        const bulk = document.createElement('button');
+        bulk.className = 'share-person-btn bulk' + (none ? ' is-grant' : '');
+        bulk.textContent = none
+            ? t('share_check_all', 'Tout cocher')
+            : t('share_clear_rights', 'Tout décocher');
+        bulk.dataset.tooltip = none
+            ? t('share_check_all_tooltip', 'Accorde tous les droits partageables')
+            : t('share_clear_rights_tooltip', 'Retire tous ses droits, sans le retirer de la liste');
+        bulk.disabled = !person.authenticated;
+        bulk.addEventListener('click', () => {
+            const next = {};
+            if (none) for (const action of actions) next[action] = true;
+            grant(person.userId, next);
+        });
+        tools.appendChild(bulk);
+
         const tally = document.createElement('span');
         tally.className = 'share-person-tally' + (total ? ' has-grants' : '');
         tally.textContent = `${total}/${actions.length}`;
         tally.dataset.tooltip = t('share_tally_tooltip', 'Droits accordés');
-        head.appendChild(tally);
+        tools.appendChild(tally);
 
         const fold = document.createElement('button');
         fold.className = 'share-person-fold';
@@ -754,8 +785,9 @@ window.MusicPlayer = window.MusicPlayer || {};
             else unfolded.add(person.userId);
             renderModal();
         });
-        head.appendChild(fold);
+        tools.appendChild(fold);
 
+        head.appendChild(tools);
         row.appendChild(head);
 
         if (!open) return row;
@@ -784,23 +816,16 @@ window.MusicPlayer = window.MusicPlayer || {};
         for (const group of groups()) list.appendChild(groupBlock(person, group, rights));
         panel.appendChild(list);
 
-        /* ── Les deux gestes de retrait, qui ne disent pas la même chose ── */
+        /* ── Retirer la personne, pas seulement ses droits ───────────── */
 
         const footer = document.createElement('div');
         footer.className = 'share-person-actions';
 
-        const clear = document.createElement('button');
-        clear.className = 'share-person-btn clear';
-        clear.textContent = t('share_clear_rights', 'Tout décocher');
-        clear.disabled = total === 0;
-        clear.addEventListener('click', () => grant(person.userId, {}));
-        footer.appendChild(clear);
-
         /*
          * Congédier n'est pas décocher.
          *
-         * « Tout décocher » laisse la personne dans la liste, admise et
-         * reconnue, prête à recevoir de nouveau des droits d'un clic.
+         * « Tout décocher », dans l'en-tête, laisse la personne dans la liste,
+         * admise et reconnue, prête à recevoir de nouveau des droits d'un clic.
          * « Retirer l'invité » l'efface : droits, admission, sessions ouvertes
          * et fiche du carnet. Elle redevient un inconnu qui devra frapper.
          *

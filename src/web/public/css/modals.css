@@ -1103,8 +1103,14 @@
     background: rgba(255, 71, 87, 0.12);
 }
 
+/*
+ * Aussi large que les paramètres quand l'écran le permet : les libellés des
+ * droits sont des phrases entières, à deux colonnes, et l'en-tête de chaque
+ * invité porte désormais un bouton de plus. En deçà, les 94 % reprennent la
+ * main — rien ne change sur un écran étroit.
+ */
 .share-modal-box {
-    max-width: 720px !important;
+    max-width: 950px !important;
     width: 94% !important;
     padding: 2.2rem !important;
     text-align: left !important;
@@ -1440,11 +1446,25 @@
     border-color: color-mix(in srgb, var(--c-violet) 60%, transparent);
 }
 
+/*
+ * L'en-tête passe à la ligne quand la largeur manque : le bouton de l'ensemble
+ * des droits, le compte et le chevron descendent alors d'un bloc, calés à
+ * droite, et le nom garde de quoi se lire au lieu de fondre en « Yo… ».
+ */
 .share-person-head {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 0.7rem;
+    gap: 0.5rem 0.7rem;
     padding: 0.7rem 0.9rem;
+}
+
+.share-person-tools {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-left: auto;
+    flex-shrink: 0;
 }
 
 .share-person-avatar {
@@ -1484,7 +1504,7 @@
     align-items: baseline;
     flex-wrap: wrap;
     gap: 0.15rem 0.5rem;
-    flex: 1;
+    flex: 1 1 9rem;
     min-width: 0;
 }
 
@@ -1826,6 +1846,20 @@
 .share-person-btn:disabled {
     opacity: 0.35;
     cursor: not-allowed;
+}
+
+/* Dans l'en-tête, le bouton se met à la hauteur du chevron voisin. */
+.share-person-btn.bulk {
+    font-size: 0.74rem;
+    padding: 0.3em 0.8em;
+    white-space: nowrap;
+}
+
+/* Accorder se distingue de retirer par la teinte des droits accordés. */
+.share-person-btn.bulk.is-grant:hover:not(:disabled) {
+    color: var(--c-violet);
+    border-color: color-mix(in srgb, var(--c-violet) 50%, transparent);
+    background: color-mix(in srgb, var(--c-violet) 12%, transparent);
 }
 
 /* Congédier est le geste qu'on ne fait pas par mégarde : il est le seul rouge. */
