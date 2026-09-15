@@ -54,6 +54,9 @@ window.MusicPlayer = window.MusicPlayer || {};
         'queue.add': ['#search-form', '#add-target-select'],
         'queue.clear': ['#btn-clear-queue'],
         'queue.history': ['#btn-clear-history'],
+        // Le bouton de la carte « En cours de lecture » et son format : tous
+        // deux mènent à /api/download, que le serveur garde derrière ce droit.
+        'queue.download': ['#download-format-select', '#btn-download-track'],
 
         'playlists.create': ['#btn-add-playlist'],
 
@@ -247,6 +250,25 @@ window.MusicPlayer = window.MusicPlayer || {};
         element.dataset.tooltip = reason;
     }
 
+    /**
+     * Ce qu'il faut voiler pour qu'une commande le soit vraiment.
+     *
+     * Un menu déroulant n'est pas le `<select>` que désigne la carte : celui-ci
+     * est masqué par js/customSelect.js, qui insère à côté de lui le menu qu'on
+     * voit et qu'on clique. Le voile posé sur le seul `<select>` ne se voyait
+     * donc pas, et ne retenait rien — `bindLock` cherche `.perm-denied` parmi
+     * les ancêtres de la cible, et le menu visible est un voisin. Un invité
+     * sans droit ouvrait la liste, choisissait, et n'apprenait le refus qu'au
+     * retour du serveur.
+     *
+     * Le menu est cherché à chaque passage plutôt qu'une fois pour toutes : il
+     * est construit par app.js, qui peut passer après le premier voile.
+     */
+    function targetsOf(element) {
+        const custom = element._customSelect && element._customSelect.container;
+        return custom ? [element, custom] : [element];
+    }
+
     /** Repasse sur toutes les commandes et accorde le voile aux droits courants. */
     function applyRights() {
         const isMaster = role === 'master';
@@ -257,7 +279,12 @@ window.MusicPlayer = window.MusicPlayer || {};
             const denied = isMaster ? false : !(permissions && permissions[action]);
             for (const selector of selectors) {
                 document.querySelectorAll(selector).forEach((element) => {
-                    mark(element, denied, reason);
+                    for (const target of targetsOf(element)) {
+                        mark(target, denied, reason);
+                        // Un droit retiré pendant que la liste est ouverte : elle
+                        // se referme, sans quoi un dernier choix passerait encore.
+                        if (denied) target.classList.remove('open');
+                    }
                 });
             }
         }

@@ -1917,6 +1917,21 @@
     cursor: not-allowed;
 }
 
+/*
+ * Un menu voilé ne répond pas au survol : s'éclairer sous le pointeur promettrait
+ * une liste qui ne s'ouvrira pas. Et le filtre ci-dessus borne ce que le flou
+ * d'arrière-plan peut voir — sur Safari, c'est le terrain du déclencheur blanc
+ * décrit plus haut, qu'on ne rouvre pas pour les menus de l'en-tête.
+ */
+.perm-denied .custom-select-trigger,
+.perm-denied .custom-select-trigger:hover {
+    cursor: not-allowed;
+    border-color: var(--border-card);
+    background: var(--bg-select, rgba(255, 255, 255, 0.03));
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
 /* Play Mode Switch Selector */
 .play-mode-switch {
     display: flex;
