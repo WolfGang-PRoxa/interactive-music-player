@@ -329,6 +329,28 @@
     font-size: 0.85rem;
 }
 
+/*
+ * Pas de verre dans les cartes.
+ *
+ * Safari 18 sur Mac peignait en blanc les deux menus de « En cours de lecture »
+ * — ceux-là seuls, et chez un invité dont le Chrome de l'hôte ne montrait rien
+ * de tel. C'est la seule carte animée en permanence — la pochette pulse ou
+ * tourne —, et le rendu composé de Safari y remplace le flou d'arrière-plan par
+ * du blanc, sous un fond qui ne couvre que 3 % : le déclencheur en devient une
+ * boîte claire. La liste déroulée, opaque à 96 %, n'en montrait rien, ce
+ * qui désigne bien le flou et non la couleur.
+ *
+ * Le défaut ne se reproduit ni dans Chrome ni dans le WebKit de Windows, dont la
+ * composition diffère : la cause reste une déduction. Le remède, lui, ne coûte
+ * rien — une carte est déjà du verre, et flouter son fond uni derrière un menu
+ * ne se voit pas : mesuré, les deux rendus ne diffèrent qu'à la marge des bords.
+ * Les menus de l'en-tête, posés sur le décor de la page, gardent le leur.
+ */
+.card .custom-select-trigger {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
 .custom-select-trigger:hover {
     border-color: var(--border-card-hover);
     background: var(--bg-hover, rgba(255, 255, 255, 0.06));
