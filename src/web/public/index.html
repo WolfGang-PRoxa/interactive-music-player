@@ -598,6 +598,15 @@
                                 <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
                             </svg>
                         </button>
+                        <button class="mode-switch-btn mode-shuffle" data-mode="shuffle" data-tooltip="Lire les musiques dans un ordre aléatoire" data-i18n-tooltip="tooltip_mode_shuffle">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="16 3 21 3 21 8"></polyline>
+                                <line x1="4" y1="20" x2="21" y2="3"></line>
+                                <polyline points="21 16 21 21 16 21"></polyline>
+                                <line x1="15" y1="15" x2="21" y2="21"></line>
+                                <line x1="4" y1="4" x2="9" y2="9"></line>
+                            </svg>
+                        </button>
                     </div>
                 </div>
                 <div class="card-resize-handle"></div>
@@ -2187,7 +2196,7 @@
                             <span data-i18n="in_queue_label">En file d'attente :</span>
                             <div class="scroll-input-wrapper" data-perm="master">
                                 <!-- Le dernier cran ne compte plus : il prend tout. Le dégradé au
-                                     bout de la piste le signale, la pastille de valeur le dessineen symbole d'infini. Voir js/settingsModal.js et audio/PreloadManager.js. -->
+                                     bout de la piste le signale, la pastille de valeur le dessine en symbole d'infini. Voir js/settingsModal.js et audio/PreloadManager.js. -->
                                 <input type="range" id="preload-queue-count" min="0" max="6" step="1" value="3" class="scroll-range has-infinity-end">
                                 <span class="scroll-val" id="val-preload-queue-count">3</span>
                                 <button class="btn-default-reset" data-target="preload-queue-count" data-val-id="val-preload-queue-count" data-default="3" data-unit="">3</button>
@@ -2198,7 +2207,7 @@
                             <span data-i18n="in_history_label">Dans l'historique :</span>
                             <div class="scroll-input-wrapper" data-perm="master">
                                 <!-- Le dernier cran ne compte plus : il prend tout. Le dégradé au
-                                     bout de la piste le signale, la pastille de valeur le dessineen symbole d'infini. Voir js/settingsModal.js et audio/PreloadManager.js. -->
+                                     bout de la piste le signale, la pastille de valeur le dessine en symbole d'infini. Voir js/settingsModal.js et audio/PreloadManager.js. -->
                                 <input type="range" id="preload-history-count" min="0" max="6" step="1" value="3" class="scroll-range has-infinity-end">
                                 <span class="scroll-val" id="val-preload-history-count">3</span>
                                 <button class="btn-default-reset" data-target="preload-history-count" data-val-id="val-preload-history-count" data-default="3" data-unit="">3</button>
@@ -2209,7 +2218,7 @@
                             <span data-i18n="in_playlists_label">Dans les playlists :</span>
                             <div class="scroll-input-wrapper" data-perm="master">
                                 <!-- Le dernier cran ne compte plus : il prend tout. Le dégradé au
-                                     bout de la piste le signale, la pastille de valeur le dessineen symbole d'infini. Voir js/settingsModal.js et audio/PreloadManager.js. -->
+                                     bout de la piste le signale, la pastille de valeur le dessine en symbole d'infini. Voir js/settingsModal.js et audio/PreloadManager.js. -->
                                 <input type="range" id="preload-playlist-count" min="0" max="6" step="1" value="3" class="scroll-range has-infinity-end">
                                 <span class="scroll-val" id="val-preload-playlist-count">3</span>
                                 <button class="btn-default-reset" data-target="preload-playlist-count" data-val-id="val-preload-playlist-count" data-default="3" data-unit="">3</button>
@@ -2515,6 +2524,15 @@
                                     <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
                                     <polyline points="7 23 3 19 7 15"></polyline>
                                     <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+                                </svg>
+                            </button>
+                            <button class="mode-switch-btn mode-shuffle" data-mode="shuffle" data-tooltip="Lire les musiques dans un ordre aléatoire" data-i18n-tooltip="tooltip_mode_shuffle">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="16 3 21 3 21 8"></polyline>
+                                    <line x1="4" y1="20" x2="21" y2="3"></line>
+                                    <polyline points="21 16 21 21 16 21"></polyline>
+                                    <line x1="15" y1="15" x2="21" y2="21"></line>
+                                    <line x1="4" y1="4" x2="9" y2="9"></line>
                                 </svg>
                             </button>
                         </div>
@@ -2930,6 +2948,7 @@
     <script src="js/touchDragDrop.js"></script>
     <script src="js/searchHistory.js"></script>
     <script src="js/downloadTarget.js"></script>
+    <script src="js/shuffleHint.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

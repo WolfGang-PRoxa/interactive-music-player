@@ -1772,6 +1772,7 @@ class WebServer {
             activePlaybackSource: settings.activePlaybackSource || 'queue',
             playlistCurrentIndex: settings.playlistCurrentIndex || 0,
             loopPlaylist: !!settings.loopPlaylist,
+            shuffle: !!settings.shuffle,
             speakers: activeSpeakers,
             ignoredVoiceUsers: (() => {
                 if (activeVoiceChannelId) {
@@ -2155,6 +2156,57 @@ class WebServer {
         playbackStateManager.saveState(player);
     }
 
+    /**
+     * La piste suivante de la file virtuelle : la première, ou une au hasard.
+     *
+     * En lecture aléatoire, le titre est tiré au moment de l'enchaînement et
+     * retiré de la file comme l'aurait été le premier. La file garde donc son
+     * ordre — ce qui reste s'y lit toujours —, et seul le chemin qu'on y trace
+     * devient imprévisible.
+     *
+     * Le pendant commun de ce tirage est le mélange dynamique de
+     * discord-player, posé par `applyShuffle` : lui aussi choisit à la fin du
+     * morceau, et ne touche pas à l'ordre de la file.
+     *
+     * @param {object} queue
+     * @param {string} guildId
+     * @returns {object|undefined}
+     */
+    drawNextVirtualTrack(queue, guildId) {
+        const tracks = (queue && queue.virtualTracks) || [];
+        if (tracks.length === 0) return undefined;
+        if (!database.getSettings(guildId).shuffle) return tracks.shift();
+
+        const index = Math.floor(Math.random() * tracks.length);
+        return tracks.splice(index, 1)[0];
+    }
+
+    /**
+     * Accorde le mélange de discord-player au réglage du serveur.
+     *
+     * `enableShuffle(true)` est le mélange *dynamique* : la file garde son
+     * ordre, et c'est à la fin de chaque morceau que le suivant est tiré. Le
+     * mélange en place, lui, serait irréversible — et la file cesserait
+     * d'annoncer ce qui vient.
+     *
+     * Appelé au changement de mode et à chaque démarrage de piste : une file
+     * recréée — reprise d'état, changement de salon — naîtrait sinon sans le
+     * mode que le serveur croit actif.
+     *
+     * @param {object} queue
+     * @param {string} guildId
+     */
+    applyShuffle(queue, guildId) {
+        if (!queue || typeof queue.enableShuffle !== 'function') return;
+        const wanted = !!database.getSettings(guildId).shuffle;
+        try {
+            if (wanted && !queue.isShuffling) queue.enableShuffle(true);
+            else if (!wanted && queue.isShuffling) queue.disableShuffle();
+        } catch (err) {
+            log.debug(`[WebServer] Shuffle mode unchanged for guild ${guildId}: ${err.message}`);
+        }
+    }
+
     handleVirtualSkip(queue, guildId, data = {}) {
 
         const startProgressMs = (data && typeof data.startProgressMs === 'number') ? data.startProgressMs : 0;
@@ -2213,7 +2265,7 @@ class WebServer {
             // la piste la plus récente d'abord.
             queue.virtualHistory.unshift(queue.virtualCurrentTrack);
         }
-        const nextTrack = queue.virtualTracks.shift();
+        const nextTrack = this.drawNextVirtualTrack(queue, guildId);
         if (nextTrack) {
             queue.virtualCurrentTrack = nextTrack;
             queue.virtualIsPlaying = true;

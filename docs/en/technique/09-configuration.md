@@ -162,6 +162,7 @@ read.
 | `activePlaybackSource` | `'queue'` | `'queue'` or a playlist identifier |
 | `playlistCurrentIndex` | `0` | Position in the active playlist |
 | `loopPlaylist` | `false` | Replay the active playlist from its first entry |
+| `shuffle` | `false` | Draw the next track at random, at every hand-over |
 | `channelQueues` | `{}` | The queue, filed voice channel by voice channel |
 | `queueBackupPersonal` | `null` | Backup from before the per-channel filing |
 | `queueBackupEveryone` | `null` | Likewise, shared mode |
@@ -185,6 +186,16 @@ playlist occupies the player. The old shapes (`{ tracks }`,
 `loopPlaylist` is distinct from discord-player's repeat mode, which only knows
 the queue actually loaded: replaying "the playlist" means reloading it from its
 first entry, even if playback had started in the middle.
+
+`shuffle` excludes both loops, and the draw happens at the hand-over, never
+ahead of time: shared playback relies on discord-player's **dynamic** shuffle
+(`enableShuffle(true)`), which leaves the queue in its order, and personal
+playback draws for itself in `WebServer.drawNextVirtualTrack()`. Shuffling the
+queue once and for all would be irreversible, and it would stop announcing what
+comes next. In return, nothing can be deduced from the order any more: the
+browser's crossfade no longer prepares a next track, and only a limitless
+`preloading` keeps the hand-over immediate — which the mode's button offers by
+itself, from its tooltip.
 
 `activePlaybackSource` does not go back to `'queue'` on the user's decision
 alone: a playlist that finishes without looping hands back to the queue set

@@ -480,20 +480,28 @@ function handleSetPlayMode(ctx) {
             try {
                 const { QueueRepeatMode } = require('discord-player');
 
-                // Les trois modes s'excluent. Le bouclage de playlist ne passe
+                // Les quatre modes s'excluent. Le bouclage de playlist ne passe
                 // pas par le mode de répétition de discord-player : celui-ci ne
                 // rejouerait que la file réellement chargée, c'est-à-dire la
                 // portion à partir du titre lancé, et non la playlist entière.
                 if (mode === 'loop_track') {
                     queue.setRepeatMode(QueueRepeatMode.TRACK);
-                    database.updateSettings(currentGuildId, { loopPlaylist: false });
+                    database.updateSettings(currentGuildId, { loopPlaylist: false, shuffle: false });
                 } else if (mode === 'loop_playlist') {
                     queue.setRepeatMode(QueueRepeatMode.OFF);
-                    database.updateSettings(currentGuildId, { loopPlaylist: true });
+                    database.updateSettings(currentGuildId, { loopPlaylist: true, shuffle: false });
+                } else if (mode === 'shuffle') {
+                    queue.setRepeatMode(QueueRepeatMode.OFF);
+                    database.updateSettings(currentGuildId, { loopPlaylist: false, shuffle: true });
                 } else if (mode === 'default') {
                     queue.setRepeatMode(QueueRepeatMode.OFF);
-                    database.updateSettings(currentGuildId, { loopPlaylist: false });
+                    database.updateSettings(currentGuildId, { loopPlaylist: false, shuffle: false });
                 }
+
+                // Le mélange de discord-player mène la diffusion commune ; la
+                // diffusion personnelle tire elle-même son titre suivant, dans
+                // `drawNextVirtualTrack`.
+                webServer.applyShuffle(queue, currentGuildId);
                 webServer.broadcastState(currentGuildId);
                 playbackStateManager.saveState(player);
             } catch (err) {
@@ -662,12 +670,14 @@ async function handleStartPlaybackSource(ctx) {
     }
 
     if (isPersonal) {
-        // Le premier titre de la file quitte l'attente pour le lecteur, comme
-        // le fait la fin d'une piste — voir WebServer.handleVirtualSkip.
-        const next = (queue?.virtualTracks || [])[0];
+        // Un titre de la file quitte l'attente pour le lecteur, comme le fait
+        // la fin d'une piste — voir WebServer.handleVirtualSkip. Le tirage est
+        // commun aux deux : en mode aléatoire, le premier morceau l'est autant
+        // que les suivants, sans quoi une file relancée s'ouvrirait toujours
+        // sur la même piste.
+        const next = webServer.drawNextVirtualTrack(queue, currentGuildId);
         if (!next) return;
 
-        queue.virtualTracks.shift();
         queue.virtualCurrentTrack = next;
         queue.virtualProgressMs = 0;
         queue.virtualIsPlaying = true;

@@ -300,6 +300,9 @@ window.MusicPlayer.updatePlayerCard = function(displayedTrack) {
     const sourceIsPlaylist = typeof state.activePlaybackSource === 'string'
         && state.activePlaybackSource.startsWith('playlist_');
     const loopActive = !!state.loopPlaylist && sourceIsPlaylist;
+    // La lecture aléatoire, elle, vaut pour les deux sources : une file et une
+    // playlist se parcourent au hasard de la même façon.
+    const shuffleActive = !!state.shuffle;
 
     document.querySelectorAll('.mode-switch-btn').forEach(btn => {
         const btnMode = btn.getAttribute('data-mode');
@@ -310,9 +313,17 @@ window.MusicPlayer.updatePlayerCard = function(displayedTrack) {
 
         if (btnMode === 'loop_track') btn.classList.toggle('active', repeatMode === 1);
         else if (btnMode === 'loop_playlist') btn.classList.toggle('active', loopActive);
-        else if (btnMode === 'default') btn.classList.toggle('active', repeatMode !== 1 && !loopActive);
-        else btn.classList.remove('active');
+        else if (btnMode === 'shuffle') btn.classList.toggle('active', shuffleActive);
+        else if (btnMode === 'default') {
+            btn.classList.toggle('active', repeatMode !== 1 && !loopActive && !shuffleActive);
+        } else btn.classList.remove('active');
     });
+
+    // Le mode aléatoire tire le titre suivant au moment de l'enchaînement :
+    // le bouton invite alors à tout précharger. Voir js/shuffleHint.js.
+    if (typeof window.MusicPlayer.refreshShuffleHint === 'function') {
+        window.MusicPlayer.refreshShuffleHint();
+    }
 
     // Slider de volume
     if (volumeRange && volumeVal && document.activeElement !== volumeRange) {

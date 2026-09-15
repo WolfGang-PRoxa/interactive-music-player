@@ -83,6 +83,10 @@ function registerPlayerEvents(player, client) {
         const guildId = queue.guild.id;
         const metadata = queue.metadata;
 
+        // Une file recréée — reprise d'état, changement de salon — naît sans
+        // mode de lecture : on lui rend celui du serveur avant tout le reste.
+        webServer.applyShuffle(queue, guildId);
+
         // Synchroniser playlistCurrentIndex et la file d'attente réelle
         const settings = database.getSettings(guildId);
         if (settings.activePlaybackSource && settings.activePlaybackSource !== 'queue' && !queue.transitioningToEveryone) {

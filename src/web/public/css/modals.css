@@ -2185,6 +2185,46 @@
     box-shadow: 0 4px 12px rgba(88, 101, 242, 0.2);
 }
 
+/*
+ * Le mode aléatoire dont le préchargement est à la traîne.
+ *
+ * Le bouton est déjà allumé comme les autres modes : rien n'y dirait qu'il ne
+ * tient qu'à moitié sa promesse. Le titre suivant étant tiré au moment de
+ * l'enchaînement, seul un préchargement sans limite le rend immédiat — l'onde
+ * signale qu'il reste un geste à faire, et l'infobulle le propose.
+ *
+ * Voir js/shuffleHint.js, qui pose la classe et retire l'invitation dès que le
+ * réglage est fait.
+ */
+.mode-switch-btn.needs-preload.active {
+    animation: shuffle-needs-preload 2.6s ease-out infinite;
+}
+
+@keyframes shuffle-needs-preload {
+    0% {
+        box-shadow: 0 4px 12px rgba(88, 101, 242, 0.2),
+                    0 0 0 0 rgba(88, 101, 242, 0.5);
+    }
+    70% {
+        box-shadow: 0 4px 12px rgba(88, 101, 242, 0.2),
+                    0 0 0 6px rgba(88, 101, 242, 0);
+    }
+    100% {
+        box-shadow: 0 4px 12px rgba(88, 101, 242, 0.2),
+                    0 0 0 0 rgba(88, 101, 242, 0);
+    }
+}
+
+/* Sans mouvement, l'anneau reste : c'est la distinction qui compte, pas le
+   battement. */
+@media (prefers-reduced-motion: reduce) {
+    .mode-switch-btn.needs-preload.active {
+        animation: none;
+        box-shadow: 0 4px 12px rgba(88, 101, 242, 0.2),
+                    0 0 0 2px rgba(88, 101, 242, 0.45);
+    }
+}
+
 /* Audio Ducking disabled options styling */
 .ducking-options.disabled {
     opacity: 0.35;
@@ -2829,6 +2869,59 @@
 #custom-tooltip.visible {
     opacity: 1;
     transform: translateY(0) scale(1);
+}
+
+/*
+ * Infobulle agissante.
+ *
+ * Une explication seule laisse l'utilisateur aller chercher le réglage dont on
+ * vient de lui parler, trois clics plus loin. Celle-ci porte le geste : voir
+ * `actionOf` dans js/tooltipSystem.js, et son premier client, js/shuffleHint.js.
+ *
+ * Elle cesse donc d'être décorative — il faut pouvoir y entrer avec le
+ * pointeur, ce que l'infobulle s'interdit partout ailleurs. L'autorisation ne
+ * vaut que visible : repliée, elle se mettrait en travers des clics de la page.
+ */
+#custom-tooltip.has-action {
+    max-width: 300px;
+    padding: 10px 12px;
+}
+
+#custom-tooltip.has-action.visible {
+    pointer-events: auto;
+}
+
+/* Sans vignette au-dessus, le texte est le propos de l'infobulle et non son
+   commentaire : il garde la couleur pleine. */
+#custom-tooltip:not(.has-media) .tooltip-text {
+    color: var(--text-main);
+}
+
+.tooltip-action {
+    display: block;
+    width: 100%;
+    margin-top: 9px;
+    padding: 7px 10px;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--c-primary) 0%, var(--c-violet) 100%);
+    color: #ffffff;
+    font-family: var(--font-primary);
+    font-size: 0.76rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    white-space: normal;
+    cursor: pointer;
+    transition: filter 0.18s ease, transform 0.18s ease;
+}
+
+.tooltip-action:hover {
+    filter: brightness(1.12);
+    transform: translateY(-1px);
+}
+
+.tooltip-action:active {
+    transform: translateY(0);
 }
 
 /*

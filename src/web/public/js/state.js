@@ -145,7 +145,7 @@ window.MusicPlayer.applyLanguage = async function(lang) {
     // détection activée/désactivée…).
     ['updatePlaylistsUI', 'updateQueueUI', 'updateHistoryUI', 'updateSpeakersUI',
      'refreshDrawerLabels', 'refreshMemoryBreakdown',
-     'refreshDownloadTarget'].forEach(nameOf => {
+     'refreshDownloadTarget', 'refreshShuffleHint'].forEach(nameOf => {
         if (typeof window.MusicPlayer[nameOf] === 'function') {
             try { window.MusicPlayer[nameOf](); } catch (e) {}
         }
@@ -257,6 +257,22 @@ window.MusicPlayer.openingFadeMs = function(state, positionSecs) {
  */
 window.MusicPlayer.nextTrackOf = function(state) {
     const snapshot = state || window.MusicPlayer.state || {};
+
+    /*
+     * En lecture aléatoire, il n'y a pas de titre suivant à préparer.
+     *
+     * Le tirage n'a lieu qu'à la fin du morceau, côté serveur : préparer le
+     * premier de la file reviendrait à croiser vers un titre qu'il ne jouera
+     * pas, et le fondu se ferait vers un morceau que personne ne demande. Le
+     * moteur de mixage de la diffusion commune tient déjà ce raisonnement —
+     * voir `_predictableNextTrack` dans audio/mix/MixEngine.js.
+     *
+     * L'enchaînement est donc net, et c'est le préchargement du bot qui fait
+     * qu'il reste immédiat : d'où l'invitation à tout précharger que porte le
+     * bouton du mode aléatoire.
+     */
+    if (snapshot.shuffle) return null;
+
     const source = snapshot.activePlaybackSource;
 
     let candidate = null;

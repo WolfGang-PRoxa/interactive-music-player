@@ -164,6 +164,7 @@ valores predeterminados en cada lectura.
 | `activePlaybackSource` | `'queue'` | `'queue'` o identificador de lista de reproducción |
 | `playlistCurrentIndex` | `0` | Posición en la lista de reproducción activa |
 | `loopPlaylist` | `false` | Volver a leer la lista activa desde su primer título |
+| `shuffle` | `false` | Sortear la siguiente canción en cada enlace |
 | `channelQueues` | `{}` | La cola de espera, ordenada canal de voz por canal de voz |
 | `queueBackupPersonal` | `null` | Guardado de antes del ordenamiento por canal |
 | `queueBackupEveryone` | `null` | Ídem, modo común |
@@ -188,6 +189,16 @@ mientras la lista ocupa el reproductor. Las formas antiguas (`{ tracks }`,
 conoce la cola realmente cargada: volver a reproducir «la lista» supone
 recargarla desde su primer título, aunque la reproducción hubiera empezado por
 la mitad.
+
+`shuffle` excluye ambos bucles, y el sorteo ocurre en el enlace, nunca por
+adelantado: la difusión común se apoya en la mezcla **dinámica** de
+discord-player (`enableShuffle(true)`), que deja la cola en su orden, y la
+difusión personal sortea ella misma en `WebServer.drawNextVirtualTrack()`.
+Barajar la cola de una vez por todas sería irreversible, y dejaría de anunciar
+lo que viene. A cambio, ya nada se deduce del orden: el fundido encadenado del
+navegador deja de preparar la canción siguiente, y solo un `preloading` sin
+límite mantiene el enlace inmediato — lo que el botón del modo propone él mismo,
+desde su información emergente.
 
 `activePlaybackSource` no vuelve a `'queue'` por la sola decisión del usuario:
 una lista de reproducción que termina sin bucle devuelve el mando a la cola

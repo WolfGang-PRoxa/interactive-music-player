@@ -120,11 +120,12 @@ check('  … sans faire grandir la rangée',
 
 /*
  * Un seul peintre pour la pastille, partout où elle est écrite : ouverture,
- * glissement, remise d'un curseur, remise générale. Cette dernière écrivait le
- * nombre à la main, et un curseur ramené de l'infini à trois gardait sa piste
- * teintée.
+ * glissement, remise d'un curseur, remise générale, et le réglage d'un coup que
+ * demande le mode aléatoire (`setPreloadAll`, voir tests/shuffleMode.js). La
+ * remise générale écrivait le nombre à la main, et un curseur ramené de l'infini
+ * à trois gardait sa piste teintée.
  */
-check('la pastille n\'a qu\'un peintre', (SETTINGS.match(/paintRangeValue\(/g) || []).length === 5,
+check('la pastille n\'a qu\'un peintre', (SETTINGS.match(/paintRangeValue\(/g) || []).length === 6,
     `${(SETTINGS.match(/paintRangeValue\(/g) || []).length} occurrence(s), définition comprise`);
 check('  … que la remise générale emprunte aussi',
     /const setRange = [\s\S]{0,500}paintRangeValue\(valSpan, el, unit\);\s*paintInfinity\(el\);/.test(SETTINGS));

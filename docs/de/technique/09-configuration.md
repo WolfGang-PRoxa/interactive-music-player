@@ -166,6 +166,7 @@ Schlüssel zu ergänzen genügt: alle bestehenden Server erben ihn, da
 | `activePlaybackSource` | `'queue'` | `'queue'` oder Kennung einer Wiedergabeliste |
 | `playlistCurrentIndex` | `0` | Position in der aktiven Wiedergabeliste |
 | `loopPlaylist` | `false` | Die aktive Wiedergabeliste ab ihrem ersten Titel erneut abspielen |
+| `shuffle` | `false` | Den nächsten Titel bei jedem Übergang auslosen |
 | `channelQueues` | `{}` | Die Warteschlange, Sprachkanal für Sprachkanal abgelegt |
 | `queueBackupPersonal` | `null` | Sicherung aus der Zeit vor der Ablage je Kanal |
 | `queueBackupEveryone` | `null` | Ebenso, gemeinsamer Modus |
@@ -192,6 +193,17 @@ angenommen.
 tatsächlich geladene Warteschlange kennt: „die Wiedergabeliste“ erneut
 abzuspielen heißt, sie ab ihrem ersten Titel neu zu laden, auch wenn die
 Wiedergabe mittendrin begonnen hatte.
+
+`shuffle` schließt beide Schleifen aus, und die Auslosung findet beim Übergang
+statt, nie im Voraus: Die gemeinsame Wiedergabe verlässt sich auf das
+**dynamische** Mischen von discord-player (`enableShuffle(true)`), das die
+Reihenfolge der Warteschlange unangetastet lässt, und die persönliche Wiedergabe
+lost selbst in `WebServer.drawNextVirtualTrack()`. Die Warteschlange ein für
+alle Mal zu mischen wäre unumkehrbar, und sie würde nicht mehr ankündigen, was
+kommt. Dafür lässt sich aus der Reihenfolge nichts mehr ableiten: Die Überblende
+des Browsers bereitet keinen nächsten Titel mehr vor, und nur ein unbegrenztes
+`preloading` hält den Übergang sofort — was die Schaltfläche des Modus selbst
+anbietet, aus ihrem Tooltip.
 
 `activePlaybackSource` kehrt nicht allein auf Entscheidung des Benutzers zu
 `'queue'` zurück: eine Wiedergabeliste, die ohne Schleife endet, gibt an die

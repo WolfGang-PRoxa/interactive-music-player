@@ -836,6 +836,57 @@ window.MusicPlayer.initSettingsModal = function() {
             if (badge) badge.classList.toggle('is-infinity', infinite);
         }
 
+        /**
+         * Règle le préchargement de la file et des playlists sur « toutes
+         * les pistes ».
+         *
+         * Appelée par le bouton du mode aléatoire (js/shuffleHint.js) : le
+         * titre suivant y étant tiré au sort, seul un préchargement sans
+         * limite le rend immédiat. L'historique n'est pas touché — on ne
+         * revient pas en arrière au hasard.
+         *
+         * Les curseurs sont repositionnés s'ils existent — la fenêtre des
+         * paramètres peut n'avoir jamais été ouverte —, et le réglage part au
+         * serveur comme une modification ordinaire.
+         */
+        window.MusicPlayer.setPreloadAll = function () {
+            for (const id of ['preload-queue-count', 'preload-playlist-count']) {
+                const range = document.getElementById(id);
+                if (!range) continue;
+                range.value = range.max;
+                paintRangeValue(document.getElementById(`val-${id}`), range, '');
+                paintInfinity(range);
+            }
+
+            const preloadEnableBox = document.getElementById('preload-enable');
+            if (preloadEnableBox) preloadEnableBox.checked = true;
+
+            const previous = dashboardSettings.preloading || {};
+            dashboardSettings.preloading = {
+                ...previous,
+                enabled: true,
+                queueCount: PRELOAD_ALL,
+                playlistCount: PRELOAD_ALL,
+                historyCount: previous.historyCount ?? 3,
+            };
+
+            window.MusicPlayer.saveDashboardSettings();
+
+            // Réglage du serveur, comme dans `updateSettingsFromUI` : l'invité
+            // le garde pour sa propre lecture, et ne l'impose pas à la séance.
+            if (typeof window.MusicPlayer.sendWS === 'function'
+                && !(typeof window.MusicPlayer.isGuest === 'function' && window.MusicPlayer.isGuest())) {
+                window.MusicPlayer.sendWS({
+                    type: 'updateSettings',
+                    data: { preloading: dashboardSettings.preloading },
+                });
+            }
+
+            if (typeof window.MusicPlayer.refreshShuffleHint === 'function') {
+                window.MusicPlayer.refreshShuffleHint();
+            }
+        };
+
         /** Du réglage enregistré vers la position du curseur. */
         function preloadPosition(stored, range) {
             const max = Number(range.max);
@@ -1119,6 +1170,12 @@ window.MusicPlayer.initSettingsModal = function() {
                         preloading: dashboardSettings.preloading
                     }
                 });
+            }
+
+            // Le bouton du mode aléatoire s'éteint dès que le préchargement
+            // couvre tout — voir js/shuffleHint.js.
+            if (typeof window.MusicPlayer.refreshShuffleHint === 'function') {
+                window.MusicPlayer.refreshShuffleHint();
             }
         }
 

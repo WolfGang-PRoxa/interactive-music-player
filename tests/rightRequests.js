@@ -378,8 +378,15 @@ async function browserSide() {
         // un invité : ils revenaient en refus, donc en notifications.
         const SETTINGS = read('js', 'settingsModal.js');
         const APP = read('app.js');
+        /*
+         * Comptés l'un par l'autre, et non contre un nombre écrit ici : un envoi
+         * de réglages ajouté sans sa garde doit faire échouer ce test, et un
+         * envoi ajouté avec la sienne ne doit rien demander à personne.
+         */
+        const envois = (SETTINGS.match(/type: 'updateSettings'/g) || []).length;
+        const gardes = (SETTINGS.match(/&& !\(typeof window\.MusicPlayer\.isGuest === 'function' && window\.MusicPlayer\.isGuest\(\)\)\)/g) || []).length;
         check('les paramètres ne recopient pas les réglages du serveur chez un invité',
-            (SETTINGS.match(/&& !\(typeof window\.MusicPlayer\.isGuest === 'function' && window\.MusicPlayer\.isGuest\(\)\)\)/g) || []).length === 2);
+            envois >= 3 && gardes === envois, `${gardes} gardes pour ${envois} envois`);
         check('  … ni la reconnexion le préchargement', /if \(preloading && !guest\)/.test(APP));
     }
 

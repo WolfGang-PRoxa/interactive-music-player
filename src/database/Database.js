@@ -285,6 +285,20 @@ class GuildDatabase {
             loopPlaylist: false,
 
             /**
+             * Lecture aléatoire : la piste suivante est tirée au sort.
+             *
+             * Un mode, et non un mélange : la file garde son ordre, et c'est le
+             * choix du titre suivant qui change. Mélanger pour de bon
+             * demanderait de retenir l'ordre d'avant pour pouvoir le rendre, et
+             * la file cesserait d'annoncer ce qui vient — deux inconvénients
+             * qu'un tirage au moment de l'enchaînement n'a pas.
+             *
+             * Exclusif des deux bouclages, comme ils le sont entre eux : le
+             * tableau de bord n'offre qu'un mode actif à la fois.
+             */
+            shuffle: false,
+
+            /**
              * La file d'attente, rangée salon vocal par salon vocal.
              *
              * `{ "<channelId>": [piste | aiguillage, ...] }`. Un salon

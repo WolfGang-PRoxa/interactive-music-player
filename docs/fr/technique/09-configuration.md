@@ -163,6 +163,7 @@ chaque lecture.
 | `activePlaybackSource` | `'queue'` | `'queue'` ou identifiant de playlist |
 | `playlistCurrentIndex` | `0` | Position dans la playlist active |
 | `loopPlaylist` | `false` | Relire la playlist active depuis son premier titre |
+| `shuffle` | `false` | Tirer le titre suivant au sort, à chaque enchaînement |
 | `channelQueues` | `{}` | La file d'attente, rangée salon vocal par salon vocal |
 | `queueBackupPersonal` | `null` | Sauvegarde d'avant le rangement par salon |
 | `queueBackupEveryone` | `null` | Idem, mode commun |
@@ -188,6 +189,16 @@ lecture.
 connaît que la file réellement chargée : rejouer « la playlist » suppose de la
 recharger depuis son premier titre, même si la lecture avait démarré en plein
 milieu.
+
+`shuffle` s'exclut des deux bouclages, et le tirage a lieu à l'enchaînement,
+jamais d'avance : la diffusion commune s'en remet au mélange **dynamique** de
+discord-player (`enableShuffle(true)`), qui laisse la file dans son ordre, et la
+diffusion personnelle tire elle-même dans `WebServer.drawNextVirtualTrack()`.
+Battre la file une fois pour toutes serait irréversible, et elle cesserait
+d'annoncer ce qui vient. En contrepartie, plus rien ne se déduit de l'ordre :
+le fondu enchaîné du navigateur ne prépare plus de titre suivant, et seul un
+`preloading` sans limite garde l'enchaînement immédiat — ce que le bouton du
+mode propose lui-même, depuis son infobulle.
 
 `activePlaybackSource` ne revient pas à `'queue'` sur la seule décision de
 l'utilisateur : une playlist qui s'achève sans bouclage rend la main à la file
