@@ -16,6 +16,10 @@
     le motif et l'action qui débloque la situation, plutôt que de laisser
     l'utilisateur devant un lancement qui n'a rien produit.
 
+    Elle peut être réduite dans la barre des tâches, où son bouton continue de
+    montrer que le lancement avance ; elle en ressort d'elle-même dès qu'elle
+    attend une réponse.
+
     Encodage : UTF-8 **avec BOM** (voir create-shortcut.ps1).
 #>
 
@@ -419,7 +423,7 @@ function ClipboardText {
 $LaunchXaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Interactive Music Player"
+        Title="{Binding Text, ElementName=Headline, StringFormat={}{0} — Interactive Music Player}"
         Width="452" SizeToContent="Height"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" WindowStartupLocation="Manual" Topmost="True"
@@ -427,6 +431,12 @@ $LaunchXaml = @'
         UseLayoutRounding="True" SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Ideal"
         FontFamily="Segoe UI Variable Text, Segoe UI">
+
+  <!-- Ne se voit que fenêtre réduite : c'est alors le seul bouton qui la
+       représente, et il continue d'annoncer que le lancement avance. -->
+  <Window.TaskbarItemInfo>
+    <TaskbarItemInfo/>
+  </Window.TaskbarItemInfo>
 
   <Window.Resources>
 
@@ -570,6 +580,30 @@ $LaunchXaml = @'
       </Setter>
     </Style>
 
+    <!-- Même gabarit que la croix, sans le rouge : réduire ne ferme rien. -->
+    <Style x:Key="MinimizeButtonStyle" TargetType="Button">
+      <Setter Property="Width" Value="30"/>
+      <Setter Property="Height" Value="30"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Fill" CornerRadius="8" Background="#00FFFFFF">
+              <Path Data="M0,0 L10,0" Stroke="#6F6C80" StrokeThickness="1.4"
+                    x:Name="Dash" HorizontalAlignment="Center" VerticalAlignment="Center"
+                    StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Fill" Property="Background" Value="#1FFFFFFF"/>
+                <Setter TargetName="Dash" Property="Stroke" Value="#FFFFFF"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
   </Window.Resources>
 
   <!-- Coque : marge réservée à l'ombre portée -->
@@ -617,6 +651,8 @@ $LaunchXaml = @'
         </Ellipse.Fill>
       </Ellipse>
 
+      <Button x:Name="MinimizeButton" Style="{StaticResource MinimizeButtonStyle}"
+              HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,42,0"/>
       <Button x:Name="CloseButton" Style="{StaticResource CloseButtonStyle}"
               HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,10,0"/>
 
@@ -626,7 +662,7 @@ $LaunchXaml = @'
              déplacement — voir plus bas pourquoi elle ne peut pas être la
              fenêtre entière. -->
         <StackPanel x:Name="Header" Orientation="Horizontal" Background="#01FFFFFF">
-          <Viewbox Width="42" Height="42" VerticalAlignment="Center">
+          <Viewbox x:Name="Logo" Width="42" Height="42" VerticalAlignment="Center">
             <Grid Width="64" Height="64">
               <Rectangle Width="60" Height="60" RadiusX="16" RadiusY="16"
                          Stroke="#40FFFFFF" StrokeThickness="1.5">
@@ -661,7 +697,10 @@ $LaunchXaml = @'
               </Path>
             </Grid>
           </Viewbox>
-          <StackPanel VerticalAlignment="Center" Margin="15,0,34,0">
+          <!-- Largeur plafonnée pour laisser la place aux deux boutons du coin :
+               dans une pile horizontale, rien d'autre ne ferait passer un long
+               état à la ligne, et il glisserait sous le bouton de réduction. -->
+          <StackPanel VerticalAlignment="Center" Margin="15,0,0,0" MaxWidth="245">
             <TextBlock Text="Interactive Music Player"
                        Foreground="#F5F4F8" FontSize="16.5" FontWeight="SemiBold"/>
             <TextBlock x:Name="Headline" Text="Démarrage en cours…"
@@ -933,7 +972,9 @@ $detailText   = Element 'Detail'
 $actionButton = Element 'ActionButton'
 $dismissButton = Element 'DismissButton'
 $closeButton  = Element 'CloseButton'
+$minimizeButton = Element 'MinimizeButton'
 $frame        = Element 'Frame'
+$logo         = Element 'Logo'
 
 $setupPanel      = Element 'SetupPanel'
 $setupStage1     = Element 'SetupStage1'
@@ -956,6 +997,33 @@ if (Test-Path -LiteralPath $IconPath) {
         $image.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
         $image.EndInit()
         $window.Icon = $image
+    } catch { }
+}
+
+function UseLogoAsIcon {
+    <#
+        À défaut du fichier, le logo de l'en-tête sert d'icône.
+
+        Réduite, la fenêtre n'est plus représentée que par son bouton dans la
+        barre des tâches, et sans icône propre ce bouton prendrait celle de
+        PowerShell — de quoi ne pas reconnaître ce qu'on vient de réduire.
+        icon.ico n'existe que si l'assistant de raccourci est passé.
+
+        Le logo est peint au travers d'un VisualBrush : rendu directement,
+        RenderTargetBitmap le décalerait de sa position dans l'en-tête.
+    #>
+    if ($window.Icon) { return }
+    try {
+        $size = 64
+        $drawing = New-Object System.Windows.Media.DrawingVisual
+        $context = $drawing.RenderOpen()
+        $context.DrawRectangle((New-Object System.Windows.Media.VisualBrush($logo)), $null,
+            (New-Object System.Windows.Rect(0, 0, $size, $size)))
+        $context.Close()
+        $bitmap = [System.Windows.Media.Imaging.RenderTargetBitmap]::new(
+            $size, $size, 96.0, 96.0, [System.Windows.Media.PixelFormats]::Pbgra32)
+        $bitmap.Render($drawing)
+        $window.Icon = $bitmap
     } catch { }
 }
 
@@ -1324,8 +1392,8 @@ function ShowFooter {
     $headline.Text = $Message
 
     # La barre n'a plus rien à annoncer une fois le déroulement interrompu.
-    $barSlide.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $null)
-    $trackBar.Visibility = 'Collapsed'
+    StopBarAnimation
+    RevealWindow
 
     if ($Details) {
         $detailText.Text = $Details
@@ -1431,8 +1499,7 @@ function FinishWithSuccess {
         derrière : la fenêtre reste, et le dit.
     #>
     $headline.Text = $script:SuccessMessage
-    $barSlide.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $null)
-    $trackBar.Visibility = 'Collapsed'
+    StopBarAnimation
 
     if (-not $script:SuccessAutoClose) {
         ShowFooter -Message $script:SuccessMessage
@@ -1489,6 +1556,38 @@ $dismissButton.Add_Click({
 })
 $closeButton.Add_Click({ $window.Close() })
 
+<#
+    Réduire la fenêtre, et pouvoir la retrouver.
+
+    La fenêtre n'a pas de bouton dans la barre des tâches — pour quelques
+    secondes de lancement, il n'y servirait à rien. WPF la rattache pour cela à
+    un propriétaire caché, et c'est ce qui la perdrait : une fenêtre possédée
+    qu'on réduit ne rejoint pas la barre des tâches, elle se range en bas de
+    l'écran sous la forme d'une barre de titre — ici invisible, la fenêtre étant
+    sans cadre et transparente. Plus rien ne permettrait de la rouvrir.
+
+    Le bouton n'existe donc que le temps de la réduction : posé *avant* que la
+    fenêtre ne se réduise, retiré dès qu'elle revient. Il porte entre-temps la
+    progression du lancement, et son titre l'étape en cours.
+#>
+$minimizeButton.Add_Click({
+    $window.ShowInTaskbar = $true
+    $window.WindowState = 'Minimized'
+})
+
+$window.Add_StateChanged({
+    # Réduite par un autre chemin que le bouton, elle doit revenir tout autant.
+    $window.ShowInTaskbar = ($window.WindowState -eq 'Minimized')
+})
+
+function RevealWindow {
+    # Un échec, une question ou l'assistant attendent une réponse : ils ne
+    # restent pas cachés dans la barre des tâches.
+    if ($window.WindowState -ne 'Minimized') { return }
+    $window.WindowState = 'Normal'
+    [void]$window.Activate()
+}
+
 $window.Add_KeyDown({
     param($element, $routed)
     if ($routed.Key -eq [System.Windows.Input.Key]::Escape) { $window.Close() }
@@ -1539,6 +1638,13 @@ function StartBarAnimation {
     $sine.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseInOut
     $slide.EasingFunction = $sine
     $barSlide.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $slide)
+    $window.TaskbarItemInfo.ProgressState = 'Indeterminate'
+}
+
+function StopBarAnimation {
+    $barSlide.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $null)
+    $trackBar.Visibility = 'Collapsed'
+    $window.TaskbarItemInfo.ProgressState = 'None'
 }
 
 function StartSequence {
@@ -1754,8 +1860,8 @@ function StartSetup {
     HideFooter
     $cardList.Children.Clear()
     $stepList.Visibility = 'Collapsed'
-    $barSlide.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $null)
-    $trackBar.Visibility = 'Collapsed'
+    StopBarAnimation
+    RevealWindow
     $script:Outcome = 'stopped'
 
     $headline.Text = 'Première configuration'
@@ -1935,10 +2041,11 @@ $window.Add_Loaded({
     $rise.EasingFunction = $ease
     $surfaceSlide.BeginAnimation([System.Windows.Media.TranslateTransform]::YProperty, $rise)
 
+    UseLogoAsIcon
+
     if ($script:AlreadyRunning) {
         $script:Outcome = 'stopped'
-        $barSlide.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $null)
-        $trackBar.Visibility = 'Collapsed'
+        StopBarAnimation
         ShowRunningChoices
         return
     }
