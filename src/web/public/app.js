@@ -257,6 +257,52 @@
                 || (state.isPaused && personalAudio.currentTime > 0)));
     }
 
+    /**
+     * La durée du morceau qu'on entend, en secondes — ou `null` tant qu'aucune
+     * n'est connue.
+     *
+     * ## Le flux dont on ignore la fin
+     *
+     * Lu avant la fin de son préchargement, un morceau distant arrive transcodé
+     * à la volée, sans taille annoncée : l'élément audio ne sait pas où il
+     * s'arrête, et sa `duration` vaut `Infinity`. La garde ci-dessus l'accepte —
+     * `isNaN` ne refuse pas l'infini —, si bien que la barre restait à zéro et
+     * que le total s'écrivait « Infinity:NaN:NaN ».
+     *
+     * La durée existe pourtant : celle des métadonnées de la piste, que le
+     * serveur envoie avec la position. Elle est exacte d'emblée, là où une
+     * estimation tirée de ce qui est déjà préchargé ne le deviendrait qu'à la
+     * fin, et bougerait sous les yeux d'ici là. Elle sert donc tant que
+     * l'élément ignore la sienne.
+     */
+    function heardDurationSecs() {
+        const own = personalAudio ? personalAudio.duration : NaN;
+        if (Number.isFinite(own) && own > 0) return own;
+        return baseTotalMs > 0 ? baseTotalMs / 1000 : null;
+    }
+
+    /**
+     * Écrit la durée totale, ou montre qu'elle est en attente.
+     *
+     * Sans durée connue — ni par l'élément, ni par les métadonnées —, écrire
+     * « 0:00 » annoncerait un morceau vide. Le compteur garde alors sa place et
+     * s'efface derrière trois points qui respirent (voir `.is-pending` dans
+     * css/player.css) : on attend une valeur, on n'en invente pas.
+     *
+     * @param {number|null} totalMs Durée à l'échelle du morceau, avant vitesse.
+     * @param {number} speed
+     */
+    function paintTotal(totalMs, speed) {
+        if (!timeTotal) return;
+        const known = Number.isFinite(totalMs) && totalMs > 0;
+        timeTotal.classList.toggle('is-pending', !known);
+        if (known) timeTotal.removeAttribute('aria-busy');
+        else timeTotal.setAttribute('aria-busy', 'true');
+
+        const text = known ? formatMs(Math.round(totalMs / speed)) : '0:00';
+        if (timeTotal.textContent !== text) timeTotal.textContent = text;
+    }
+
     function renderSmoothProgress() {
         if (!isSeeking && !(window.MusicPlayer && window.MusicPlayer.isVideoUserInteracting)) {
             const isPersonal = state.settings && state.settings.broadcastMode === 'personal';
@@ -290,8 +336,8 @@
              */
             if (isPersonal && audioHoldsPosition()) {
                 const currentSecs = personalAudio.currentTime;
-                const totalSecs = personalAudio.duration;
-                const ratio = Math.min(1, Math.max(0, currentSecs / totalSecs));
+                const totalSecs = heardDurationSecs();
+                const ratio = totalSecs ? Math.min(1, Math.max(0, currentSecs / totalSecs)) : 0;
                 if (progressBar) {
                     progressBar.style.transform = `scaleX(${ratio})`;
                     window.MusicPlayer.currentProgressRatio = ratio;
@@ -301,10 +347,7 @@
                 if (timeCurrent && timeCurrent.textContent !== formattedCurrent) {
                     timeCurrent.textContent = formattedCurrent;
                 }
-                const formattedTotal = formatMs(Math.round((totalSecs * 1000) / speed));
-                if (timeTotal && timeTotal.textContent !== formattedTotal) {
-                    timeTotal.textContent = formattedTotal;
-                }
+                paintTotal(totalSecs ? totalSecs * 1000 : null, speed);
                 syncVideoProgress(currentSecs * 1000);
                 if (typeof window.MusicPlayer.updateActivePlaylistTrackProgress === 'function') {
                     window.MusicPlayer.updateActivePlaylistTrackProgress(ratio);
@@ -325,10 +368,7 @@
                 if (timeCurrent && timeCurrent.textContent !== formattedCurrent) {
                     timeCurrent.textContent = formattedCurrent;
                 }
-                const formattedTotal = formatMs(Math.round(baseTotalMs / speed));
-                if (timeTotal && timeTotal.textContent !== formattedTotal) {
-                    timeTotal.textContent = formattedTotal;
-                }
+                paintTotal(baseTotalMs, speed);
                 syncVideoProgress(currentMs);
                 if (typeof window.MusicPlayer.updateActivePlaylistTrackProgress === 'function') {
                     window.MusicPlayer.updateActivePlaylistTrackProgress(ratio);
@@ -339,7 +379,12 @@
                     window.MusicPlayer.currentProgressRatio = 0;
                 }
                 if (timeCurrent && timeCurrent.textContent !== '0:00') timeCurrent.textContent = '0:00';
-                if (timeTotal && timeTotal.textContent !== '0:00') timeTotal.textContent = '0:00';
+                // Rien en lecture : « 0:00 » est la vérité, pas une attente.
+                if (timeTotal) {
+                    timeTotal.classList.remove('is-pending');
+                    timeTotal.removeAttribute('aria-busy');
+                    if (timeTotal.textContent !== '0:00') timeTotal.textContent = '0:00';
+                }
                 syncVideoProgress(0);
             }
         }
@@ -2197,7 +2242,11 @@
             // 100 %. Y toucher ici la multipliait par l'échelle appliquée
             // ailleurs, et la laissait ensuite figée à quelques pour cent — la
             // progression paraissait alors cent fois plus lente qu'elle n'était.
-            if (mixTransitionNextTrack && !isSeeking && !isNaN(audio.duration) && audio.duration > 0) {
+            // `Number.isFinite` et non `!isNaN` : un morceau entrant encore
+            // transcodé à la volée n'a pas de fin connue, et l'infini passait —
+            // barre à zéro, total illisible. On laisse alors la boucle
+            // d'affichage, qui connaît la durée des métadonnées.
+            if (mixTransitionNextTrack && !isSeeking && Number.isFinite(audio.duration) && audio.duration > 0) {
                 const currentSecs = audio.currentTime;
                 const totalSecs = audio.duration;
                 const ratio = Math.min(1, Math.max(0, currentSecs / totalSecs));
@@ -2207,7 +2256,7 @@
                 }
                 const speed = parseFloat(state.settings.playbackSpeed || window.MusicPlayer.currentSpeed || '1.0');
                 timeCurrent.textContent = formatMs(Math.round((currentSecs * 1000) / speed));
-                timeTotal.textContent = formatMs(Math.round((totalSecs * 1000) / speed));
+                paintTotal(totalSecs * 1000, speed);
             }
 
             // Client-side Mix transition trigger

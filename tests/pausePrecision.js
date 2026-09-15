@@ -247,7 +247,7 @@ const vm = require('vm');
 
 /** Extrait une fonction de app.js, par équilibrage des accolades. */
 function extractFunction(source, name) {
-    const start = source.indexOf(`function ${name}()`);
+    const start = source.indexOf(`function ${name}(`);
     if (start === -1) throw new Error(`${name} introuvable dans app.js`);
 
     let depth = 0;
@@ -263,6 +263,23 @@ const appSource = fs.readFileSync(
 );
 
 const SERVER_RATIO = 99400 / 200000;
+
+/** Un libellé de fortune : son texte, ses classes, ses attributs. */
+function fakeLabel() {
+    const classes = new Set();
+    const attributes = new Map();
+    return {
+        textContent: '',
+        classList: {
+            toggle: (name, on) => { if (on) classes.add(name); else classes.delete(name); },
+            remove: (name) => classes.delete(name),
+            contains: (name) => classes.has(name),
+        },
+        setAttribute: (name, value) => attributes.set(name, String(value)),
+        removeAttribute: (name) => attributes.delete(name),
+        getAttribute: (name) => (attributes.has(name) ? attributes.get(name) : null),
+    };
+}
 
 /**
  * Un banc minimal autour de la fonction de rendu.
@@ -284,7 +301,7 @@ function mountRenderer({ personal = true, totalMs = 200000 } = {}) {
         personalAudio: { duration: totalMs / 1000, currentTime: 100, paused: false },
         progressBar: { style: {} },
         timeCurrent: { textContent: '' },
-        timeTotal: { textContent: '' },
+        timeTotal: fakeLabel(),
         baseProgressMs: 99400,
         baseTotalMs: totalMs,
         lastProgressTimestamp: 1000,
@@ -301,6 +318,12 @@ function mountRenderer({ personal = true, totalMs = 200000 } = {}) {
     // partage (voir `heardPositionMs`) : elle entre au banc avec la fonction.
     vm.runInContext(extractFunction(appSource, 'audioHoldsPosition'), context,
         { filename: 'app.js:audioHoldsPosition' });
+    // De même pour la durée et son affichage, qui tiennent compte d'un flux
+    // dont la fin n'est pas encore connue.
+    vm.runInContext(extractFunction(appSource, 'heardDurationSecs'), context,
+        { filename: 'app.js:heardDurationSecs' });
+    vm.runInContext(extractFunction(appSource, 'paintTotal'), context,
+        { filename: 'app.js:paintTotal' });
     vm.runInContext(extractFunction(appSource, 'renderSmoothProgress'), context,
         { filename: 'app.js:renderSmoothProgress' });
 
@@ -361,6 +384,57 @@ console.log('=== Précision de la pause — affichage du navigateur ===\n');
     bench.pause();
     check('en diffusion commune, le serveur reste la référence',
         bench.render() === SERVER_RATIO, String(bench.render()));
+}
+
+console.log('\n=== La durée d’un flux dont la fin est inconnue ===\n');
+
+/*
+ * Lu avant la fin de son préchargement, un morceau distant arrive transcodé à
+ * la volée, sans taille : l'élément audio annonce une durée infinie. La barre
+ * restait à zéro, et le total s'écrivait « Infinity:NaN:NaN ».
+ */
+{
+    const bench = mountRenderer();
+    bench.context.formatMs = (ms) => `${Math.round(ms)} ms`;
+    bench.context.personalAudio.duration = Infinity;
+    const ratio = bench.render();
+    check('la barre avance sur la durée des métadonnées',
+        ratio === 100 / 200, String(ratio));
+    check('  … que le total affiche', bench.context.timeTotal.textContent === '200000 ms',
+        bench.context.timeTotal.textContent);
+    check('  … sans se dire en attente', !bench.context.timeTotal.classList.contains('is-pending'));
+}
+
+{
+    // Ni l'élément ni les métadonnées ne la connaissent.
+    const bench = mountRenderer();
+    bench.context.personalAudio.duration = Infinity;
+    bench.context.baseTotalMs = 0;
+    const ratio = bench.render();
+    check('sans durée connue, la barre ne s’invente pas de progression', ratio === 0, String(ratio));
+    check('  … et le total se dit en attente plutôt que « 0:00 » ou « NaN »',
+        bench.context.timeTotal.classList.contains('is-pending')
+        && bench.context.timeTotal.getAttribute('aria-busy') === 'true');
+
+    // La durée arrive : l'attente se lève.
+    bench.context.personalAudio.duration = 200;
+    bench.render();
+    check('  … et se lève quand la durée arrive',
+        !bench.context.timeTotal.classList.contains('is-pending')
+        && bench.context.timeTotal.getAttribute('aria-busy') === null);
+}
+
+{
+    // Le formateur lui-même ne doit plus rien écrire d'illisible.
+    const context = { window: { MusicPlayer: {} } };
+    vm.createContext(context);
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'web', 'public', 'js', 'player.js'), 'utf8')
+        .split('window.MusicPlayer.parseDurationMs')[0], context);
+    const format = context.window.MusicPlayer.formatMs;
+    const { formatMs: serverFormat } = require(path.join(__dirname, '..', 'src', 'utils', 'duration.js'));
+    check('formatMs écrit « 0:00 » pour l’infini, côté navigateur', format(Infinity) === '0:00', format(Infinity));
+    check('  … comme côté serveur', serverFormat(Infinity) === '0:00', serverFormat(Infinity));
+    check('  … et une durée ordinaire comme avant', format(125000) === '2:05' && serverFormat(3725000) === '1:02:05');
 }
 
 console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);

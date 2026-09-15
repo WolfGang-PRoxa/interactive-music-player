@@ -9,7 +9,9 @@ window.MusicPlayer = window.MusicPlayer || {};
  * Doit rester aligné sur src/utils/duration.js côté serveur.
  */
 window.MusicPlayer.formatMs = function(ms) {
-    if (!ms || isNaN(ms) || ms < 0) return '0:00';
+    // `isNaN` laissait passer l'infini — la durée d'un flux dont la fin n'est
+    // pas encore connue —, et l'on écrivait « Infinity:NaN:NaN ».
+    if (!Number.isFinite(ms) || ms <= 0) return '0:00';
     const totalSeconds = Math.floor(ms / 1000);
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);

@@ -145,6 +145,79 @@ html[data-style="retro-synthwave"] .progress-buffer {
     font-weight: 600;
 }
 
+/*
+ * La durée totale, quand personne ne la connaît encore.
+ *
+ * Un flux lu avant la fin de son préchargement n'annonce pas sa fin, et une
+ * piste sans métadonnées n'en porte pas : écrire « 0:00 » dirait un morceau
+ * vide. Le compteur garde sa place — le texte reste là, transparent, pour que
+ * rien ne bouge quand la vraie valeur arrive — et trois points respirent à
+ * l'endroit du nombre, décalés comme une onde qui passe. Discret : la couleur
+ * du compteur, et un souffle d'une seconde et demie.
+ *
+ * `currentColor` pour les points : ils suivent le thème et le mode jour/nuit
+ * comme le texte qu'ils remplacent.
+ */
+#time-total {
+    position: relative;
+}
+
+#time-total.is-pending {
+    color: transparent;
+}
+
+#time-total.is-pending::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 0;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    background: currentColor;
+    box-shadow: -7px 0 0 currentColor, -14px 0 0 currentColor;
+    animation: timeTotalBreath 1.5s ease-in-out infinite;
+}
+
+/*
+ * Une onde de gauche à droite sur les trois points : l'ombre la plus lointaine
+ * s'éclaire la première. Tout se joue sur les ombres, dont l'opacité se règle
+ * par la couleur — un seul pseudo-élément, sans balisage de plus.
+ */
+@keyframes timeTotalBreath {
+    0%, 100% {
+        background: color-mix(in srgb, currentColor 35%, transparent);
+        box-shadow: -7px 0 0 color-mix(in srgb, currentColor 35%, transparent),
+            -14px 0 0 color-mix(in srgb, currentColor 35%, transparent);
+    }
+    20% {
+        background: color-mix(in srgb, currentColor 35%, transparent);
+        box-shadow: -7px 0 0 color-mix(in srgb, currentColor 35%, transparent),
+            -14px 0 0 currentColor;
+    }
+    40% {
+        background: color-mix(in srgb, currentColor 35%, transparent);
+        box-shadow: -7px 0 0 currentColor,
+            -14px 0 0 color-mix(in srgb, currentColor 35%, transparent);
+    }
+    60% {
+        background: currentColor;
+        box-shadow: -7px 0 0 color-mix(in srgb, currentColor 35%, transparent),
+            -14px 0 0 color-mix(in srgb, currentColor 35%, transparent);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #time-total.is-pending::after {
+        animation: none;
+        background: color-mix(in srgb, currentColor 60%, transparent);
+        box-shadow: -7px 0 0 color-mix(in srgb, currentColor 60%, transparent),
+            -14px 0 0 color-mix(in srgb, currentColor 60%, transparent);
+    }
+}
+
 /* Media Controls Area */
 .media-controls {
     display: flex;
