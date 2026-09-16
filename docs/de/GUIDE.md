@@ -573,7 +573,12 @@ Wiedergabezustand, der beim nächsten Start wiederhergestellt wird.
   Verläufe).
 - **Heller / dunkler Modus** — alle Stile passen sich an.
 - **Sprachen** — Französisch, Englisch, Spanisch, Deutsch.
-- **Anordnung** — die Anordnung der Flächen lässt sich umstellen und speichern.
+- **Anordnung** — greifen Sie eine Fläche an ihrem Titel, um sie zu verschieben:
+  Ein gestrichelter Platzhalter zeigt, wo sie landen wird. Auf einer anderen
+  Fläche abgelegt, tauschen beide ihre Plätze; sonst bewegt sich nichts, und ein
+  leerer Platz bleibt leer. Die untere rechte Ecke ändert die Größe, Escape
+  bricht die laufende Geste ab, und das Vorhängeschloss hält eine Fläche an
+  ihrem Platz fest. Die Anordnung lässt sich speichern.
 
 Diese Vorlieben werden in Ihrem Browser aufbewahrt.
 

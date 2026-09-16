@@ -281,16 +281,6 @@
     max-height: none;
 }
 
-/* Custom styles for layout resizing & dragging state */
-.card.layout-dragging {
-    opacity: 0.6;
-    border: 2px dashed var(--c-accent);
-    transform: scale(1.02);
-    z-index: 100;
-    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
-    transition: none !important;
-}
-
 .card-resize-handle {
     position: absolute;
     right: 0;

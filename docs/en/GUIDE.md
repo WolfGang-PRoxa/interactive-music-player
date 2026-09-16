@@ -538,7 +538,11 @@ will be restored at the next startup.
   gradients).
 - **Light / dark mode** — every style adapts.
 - **Languages** — French, English, Spanish, German.
-- **Layout** — the arrangement of the panels can be rearranged and saved.
+- **Layout** — grab a panel by its title to move it: a dashed slot shows where it
+  will land. Dropped on another panel, the two swap places; nothing else moves,
+  and an empty space stays empty. The bottom-right corner resizes, Escape cancels
+  the gesture in progress, and the padlock pins a panel in place. The layout can
+  be saved.
 
 These preferences are kept in your browser.
 

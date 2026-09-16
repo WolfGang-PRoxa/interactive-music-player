@@ -195,6 +195,103 @@
 }
 
 /*
+ * Déplacement et redimensionnement des boîtes — js/layoutPersistence.js.
+ *
+ * Pendant un geste, la grille apparaît à demi : c'est elle qui dit où la boîte
+ * va se caler. Déjà affichée par le réglage, elle reste pleine.
+ *
+ * Les sélecteurs passent par `.dashboard-grid >` : cette feuille est importée
+ * avant components.css, dont `.card:hover` l'emporterait sinon à égalité de
+ * spécificité — une boîte survolée perdrait sa bordure d'échange.
+ */
+.dashboard-grid.layout-active::before {
+    opacity: 0.5;
+}
+
+.dashboard-grid.grid-visible.layout-active::before {
+    opacity: 1;
+}
+
+/*
+ * L'emplacement où la boîte se posera. Élément de la grille placé comme une
+ * carte, il la précède dans le document et se peint donc dessous.
+ */
+.layout-placeholder {
+    position: relative;
+    box-sizing: border-box;
+    border-radius: 20px;
+    border: 2px dashed color-mix(in srgb, var(--c-accent) 75%, transparent);
+    background: color-mix(in srgb, var(--c-accent) 10%, transparent);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.layout-placeholder.is-visible {
+    opacity: 1;
+}
+
+/* Échange : la place est prise à une autre boîte, le trait devient plein. */
+.layout-placeholder.is-swap {
+    border-style: solid;
+    background: color-mix(in srgb, var(--c-accent) 16%, transparent);
+}
+
+/* Visée sur une boîte verrouillée : la boîte lâchée là reviendra d'où elle vient. */
+.layout-placeholder.is-blocked {
+    border-color: color-mix(in srgb, var(--c-error) 80%, transparent);
+    background: color-mix(in srgb, var(--c-error) 12%, transparent);
+}
+
+.dashboard-grid > .card.layout-dragging,
+.dashboard-grid > .card.layout-resizing,
+.dashboard-grid > .card.layout-settling {
+    z-index: 100;
+}
+
+.dashboard-grid > .card.layout-dragging {
+    border-color: var(--c-accent);
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--c-accent);
+}
+
+.dashboard-grid > .card.layout-resizing {
+    border-color: var(--c-accent);
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--c-accent);
+}
+
+.dashboard-grid > .card.layout-swap-partner {
+    border-color: var(--c-accent);
+}
+
+.dashboard-grid > .card.layout-blocker {
+    border-color: var(--c-error);
+}
+
+/* Le curseur ne change pas selon ce qu'il survole pendant le geste. */
+body.layout-gesture-move,
+body.layout-gesture-move * {
+    cursor: grabbing !important;
+    user-select: none !important;
+}
+
+body.layout-gesture-resize,
+body.layout-gesture-resize * {
+    cursor: nwse-resize !important;
+    user-select: none !important;
+}
+
+/*
+ * Un stylet ou un doigt sur un écran tactile d'ordinateur : la poignée et le
+ * coin de redimensionnement saisissent la boîte au lieu de faire défiler la
+ * page. Sur les supports tactiles, la grille est repliée et le geste n'existe
+ * pas — la page doit pouvoir y défiler depuis n'importe où.
+ */
+:root:not([data-touch-mode="true"]) .card-title .icon-drag-handle,
+:root:not([data-touch-mode="true"]) .card-resize-handle {
+    touch-action: none;
+}
+
+/*
  * Repli en une colonne.
  *
  * La largeur seule ne suffit pas. Un téléphone couché annonce couramment 1100

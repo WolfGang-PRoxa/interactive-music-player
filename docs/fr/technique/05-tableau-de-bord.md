@@ -354,7 +354,7 @@ traductions et `app.js` — communiquant par l'espace de noms global
 | `versions.js`, `githubMenu.js` | Menu des versions et gestes GitHub |
 | `settingsModal.js`, `speedPad.js`, `customSelect.js`, `outputLevel.js` | Contrôles d'interface |
 | `deviceMode.js`, `touchDrawers.js`, `touchDragDrop.js`, `dragPreview.js`, `scrollLock.js`, `scrollFade.js` | Adaptation au tactile et au petit écran |
-| `layoutPersistence.js` | Sauvegarde de la disposition |
+| `layoutPersistence.js` | Disposition des boîtes : déplacement, échange, redimensionnement, sauvegarde |
 | `tooltipSystem.js`, `faviconAnimator.js`, `headerButtonAnimations.js`, `particlePath.js`, `themeBlend.js` | Habillage |
 
 Les treize feuilles de style sont assemblées par `@import` dans
@@ -363,6 +363,43 @@ Les treize feuilles de style sont assemblées par `@import` dans
 
 L'ordre de chargement est une dépendance implicite : `state.js` doit précéder
 tous les autres, `app.js` doit venir en dernier.
+
+### Disposition des boîtes
+
+[`layoutPersistence.js`](../../../src/web/public/js/layoutPersistence.js) place
+les boîtes sur une grille de 48 colonnes à cellules carrées. La boîte saisie suit
+le pointeur au pixel près, et un emplacement en pointillés montre, calé sur la
+grille, où elle se posera. Le reste obéit à cinq règles :
+
+- **aucun aimant** — une boîte que rien ne heurte ne bouge pas, et un espace vide
+  reste vide ;
+- **au-dessus d'un espace libre**, la boîte s'y cale, ou glisse vers la place
+  libre la plus proche, sans rien pousser ;
+- **au-dessus d'une autre boîte**, dès que la moitié de la plus petite des deux
+  est recouverte, les deux **échangent leur place** ; si leurs tailles diffèrent,
+  ce qui gêne descend, juste assez ;
+- **une boîte verrouillée ne bouge jamais** — la viser est refusé, et elle arrête
+  un redimensionnement comme un mur ;
+- **tout part de la disposition du début du geste** — rebrousser chemin remet les
+  voisines en place, et Échap annule.
+
+Les voisines ne se réarrangent qu'après 150 ms d'une même décision : traverser
+le tableau d'un geste vif ne le bouscule pas. Le système précédent recalculait
+tout à chaque mouvement depuis la disposition qu'il venait de bousculer, puis
+tassait toutes les boîtes vers le haut — y compris celle qu'on venait de poser.
+
+Le moteur de placement, `MusicPlayer.layoutEngine`, est pur : ni DOM ni
+stockage. [`tests/cardLayout.js`](../../../tests/cardLayout.js) le vérifie hors
+navigateur, dispositions tirées au hasard comprises. Deux pièges tiennent aux
+feuilles de style, et aucun ne se voit dans un diff :
+
+- les animations passent par `translate`, `scale` et l'API Web Animations, jamais
+  par `transform`. `.card` déclare une transition `!important` sur `transform`,
+  qui l'emporte sur toute transition posée en ligne : c'est elle qui rendait les
+  déplacements instantanés ;
+- une boîte redimensionnée s'étire par des marges négatives, jamais par une
+  largeur explicite. Celle-ci compterait dans la taille des colonnes `1fr`, qui
+  s'élargiraient toutes le temps du geste et feraient déborder la grille.
 
 ### Découpage inachevé
 

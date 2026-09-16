@@ -551,8 +551,11 @@ lecture, qui sera restauré au démarrage suivant.
   chauds).
 - **Mode clair / sombre** — l'ensemble des styles s'adapte.
 - **Langues** — français, anglais, espagnol, allemand.
-- **Disposition** — la disposition des panneaux peut être réorganisée et
-  enregistrée.
+- **Disposition** — saisissez un panneau par son titre pour le déplacer : un
+  emplacement en pointillés montre où il se posera. Lâché sur un autre panneau,
+  les deux échangent leur place ; rien d'autre ne bouge, et un espace vide reste
+  vide. Le coin inférieur droit redimensionne, Échap annule le geste en cours, et
+  le cadenas fige un panneau à sa place. La disposition peut être enregistrée.
 
 Ces préférences sont conservées dans votre navigateur.
 

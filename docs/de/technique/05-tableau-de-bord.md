@@ -368,7 +368,7 @@ Namensraum `window.MusicPlayer` miteinander sprechen.
 | `versions.js`, `githubMenu.js` | Versionsmenü und GitHub-Gesten |
 | `settingsModal.js`, `speedPad.js`, `customSelect.js`, `outputLevel.js` | Bedienelemente der Oberfläche |
 | `deviceMode.js`, `touchDrawers.js`, `touchDragDrop.js`, `dragPreview.js`, `scrollLock.js`, `scrollFade.js` | Anpassung an Touch und kleine Bildschirme |
-| `layoutPersistence.js` | Sicherung der Anordnung |
+| `layoutPersistence.js` | Anordnung der Boxen: Verschieben, Tauschen, Größenänderung, Sicherung |
 | `tooltipSystem.js`, `faviconAnimator.js`, `headerButtonAnimations.js`, `particlePath.js`, `themeBlend.js` | Ausstattung |
 
 Die dreizehn Stilvorlagen werden per `@import` in
@@ -377,6 +377,44 @@ von `index.html` referenzierten Vorlage.
 
 Die Ladereihenfolge ist eine stillschweigende Abhängigkeit: `state.js` muss allen
 anderen vorausgehen, `app.js` muss zuletzt kommen.
+
+### Anordnung der Boxen
+
+[`layoutPersistence.js`](../../../src/web/public/js/layoutPersistence.js) setzt
+die Boxen auf ein Raster aus 48 Spalten mit quadratischen Zellen. Die gezogene
+Box folgt dem Zeiger pixelgenau, und ein gestrichelter, am Raster ausgerichteter
+Platzhalter zeigt, wo sie landen wird. Alles Übrige folgt fünf Regeln:
+
+- **kein Magnet** — eine Box, an die nichts stößt, bewegt sich nicht, und ein
+  leerer Platz bleibt leer;
+- **über freiem Platz** rastet die Box dort ein oder gleitet zum nächsten freien
+  Platz, ohne etwas zu verschieben;
+- **über einer anderen Box** tauschen beide **ihre Plätze**, sobald die Hälfte
+  der kleineren der beiden bedeckt ist; sind ihre Größen verschieden, rückt, was
+  im Weg ist, nach unten — gerade so weit wie nötig;
+- **eine gesperrte Box bewegt sich nie** — sie anzuvisieren wird abgelehnt, und
+  sie hält eine Größenänderung auf wie eine Wand;
+- **alles geht von der Anordnung zu Beginn der Geste aus** — wer zurückfährt,
+  bringt die Nachbarn an ihren Platz zurück, und Escape bricht ab.
+
+Die Nachbarn ordnen sich erst nach 150 ms derselben Entscheidung um: Wer das
+Dashboard mit einer schnellen Geste überquert, bringt es nicht durcheinander.
+Das vorige System berechnete bei jeder Bewegung alles neu, ausgehend von der
+Anordnung, die es gerade durcheinandergebracht hatte, und schob dann alle Boxen
+nach oben zusammen — auch die gerade abgelegte.
+
+Die Platzierungslogik, `MusicPlayer.layoutEngine`, ist rein: weder DOM noch
+Speicher. [`tests/cardLayout.js`](../../../tests/cardLayout.js) prüft sie
+außerhalb des Browsers, zufällig gezogene Anordnungen eingeschlossen. Zwei
+Fallen stecken in den Stilvorlagen, und keine ist in einem Diff zu sehen:
+
+- Animationen laufen über `translate`, `scale` und die Web Animations API, nie
+  über `transform`. `.card` deklariert eine `!important`-Transition auf
+  `transform`, die jede inline gesetzte Transition übertrumpft: Sie war es, die
+  Verschiebungen sofortig machte;
+- eine vergrößerte Box dehnt sich über negative Ränder, nie über eine explizite
+  Breite. Diese würde in die Größe der `1fr`-Spalten eingehen, die sich für die
+  Dauer der Geste alle verbreitern und das Raster überlaufen ließen.
 
 ### Unvollendete Aufteilung
 

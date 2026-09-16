@@ -557,8 +557,11 @@ reproducción, que se restaurará en el siguiente arranque.
   (degradados cálidos).
 - **Modo claro / oscuro** — el conjunto de los estilos se adapta.
 - **Idiomas** — francés, inglés, español, alemán.
-- **Disposición** — la disposición de los paneles puede reorganizarse y
-  guardarse.
+- **Disposición** — agarre un panel por su título para moverlo: un hueco
+  punteado muestra dónde se posará. Soltado sobre otro panel, ambos intercambian
+  su sitio; nada más se mueve, y un espacio vacío sigue vacío. La esquina
+  inferior derecha redimensiona, Escape cancela el gesto en curso, y el candado
+  fija un panel en su sitio. La disposición puede guardarse.
 
 Estas preferencias se conservan en su navegador.
 

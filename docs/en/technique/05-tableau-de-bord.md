@@ -354,7 +354,7 @@ namespace.
 | `versions.js`, `githubMenu.js` | Version menu and GitHub gestures |
 | `settingsModal.js`, `speedPad.js`, `customSelect.js`, `outputLevel.js` | Interface controls |
 | `deviceMode.js`, `touchDrawers.js`, `touchDragDrop.js`, `dragPreview.js`, `scrollLock.js`, `scrollFade.js` | Adaptation to touch and small screens |
-| `layoutPersistence.js` | Saving of the layout |
+| `layoutPersistence.js` | Box layout: moving, swapping, resizing, saving |
 | `tooltipSystem.js`, `faviconAnimator.js`, `headerButtonAnimations.js`, `particlePath.js`, `themeBlend.js` | Styling |
 
 The thirteen style sheets are assembled by `@import` in
@@ -363,6 +363,43 @@ The thirteen style sheets are assembled by `@import` in
 
 The loading order is an implicit dependency: `state.js` must come before all the
 others, `app.js` must come last.
+
+### Box layout
+
+[`layoutPersistence.js`](../../../src/web/public/js/layoutPersistence.js) places
+the boxes on a 48-column grid of square cells. The box being dragged follows the
+pointer pixel for pixel, and a dashed slot, snapped to the grid, shows where it
+will land. Everything else follows five rules:
+
+- **no magnet** — a box that nothing bumps into does not move, and an empty space
+  stays empty;
+- **over free space**, the box snaps into it, or slides to the nearest free spot,
+  without pushing anything;
+- **over another box**, as soon as half of the smaller of the two is covered, the
+  two **swap places**; if their sizes differ, whatever is in the way moves down,
+  just enough;
+- **a locked box never moves** — aiming at one is refused, and it stops a resize
+  like a wall;
+- **everything starts from the layout at the beginning of the gesture** — going
+  back puts the neighbours back in place, and Escape cancels.
+
+Neighbours only rearrange after 150 ms of the same decision: sweeping across the
+dashboard in one quick gesture does not jostle it. The previous system
+recomputed everything on every movement from the layout it had just jostled,
+then packed every box towards the top — including the one just dropped.
+
+The placement engine, `MusicPlayer.layoutEngine`, is pure: no DOM, no storage.
+[`tests/cardLayout.js`](../../../tests/cardLayout.js) checks it outside the
+browser, randomly drawn layouts included. Two pitfalls lie in the style sheets,
+and neither shows in a diff:
+
+- animations go through `translate`, `scale` and the Web Animations API, never
+  through `transform`. `.card` declares an `!important` transition on
+  `transform`, which beats any transition set inline: that is what made moves
+  instantaneous;
+- a resized box stretches through negative margins, never through an explicit
+  width. That width would count towards the size of the `1fr` columns, which
+  would all widen for the duration of the gesture and make the grid overflow.
 
 ### Unfinished split
 

@@ -357,7 +357,7 @@ traducciones y `app.js` — que se comunican mediante el espacio de nombres glob
 | `versions.js`, `githubMenu.js` | Menú de versiones y gestos de GitHub |
 | `settingsModal.js`, `speedPad.js`, `customSelect.js`, `outputLevel.js` | Controles de interfaz |
 | `deviceMode.js`, `touchDrawers.js`, `touchDragDrop.js`, `dragPreview.js`, `scrollLock.js`, `scrollFade.js` | Adaptación al táctil y a la pantalla pequeña |
-| `layoutPersistence.js` | Guardado de la disposición |
+| `layoutPersistence.js` | Disposición de las cajas: desplazamiento, intercambio, redimensionado, guardado |
 | `tooltipSystem.js`, `faviconAnimator.js`, `headerButtonAnimations.js`, `particlePath.js`, `themeBlend.js` | Ornamentación |
 
 Las trece hojas de estilo se ensamblan mediante `@import` en
@@ -366,6 +366,44 @@ Las trece hojas de estilo se ensamblan mediante `@import` en
 
 El orden de carga es una dependencia implícita: `state.js` debe preceder a todos
 los demás, `app.js` debe venir en último lugar.
+
+### Disposición de las cajas
+
+[`layoutPersistence.js`](../../../src/web/public/js/layoutPersistence.js) coloca
+las cajas sobre una cuadrícula de 48 columnas de celdas cuadradas. La caja que se
+arrastra sigue al puntero píxel a píxel, y un hueco punteado, ajustado a la
+cuadrícula, muestra dónde se posará. Lo demás obedece a cinco reglas:
+
+- **ningún imán** — una caja con la que nada choca no se mueve, y un espacio
+  vacío sigue vacío;
+- **sobre un espacio libre**, la caja se ajusta a él, o se desliza hacia el hueco
+  libre más cercano, sin empujar nada;
+- **sobre otra caja**, en cuanto queda cubierta la mitad de la más pequeña de las
+  dos, ambas **intercambian su sitio**; si sus tamaños difieren, lo que estorba
+  baja, lo justo;
+- **una caja bloqueada nunca se mueve** — apuntar a ella se rechaza, y detiene un
+  redimensionado como un muro;
+- **todo parte de la disposición del inicio del gesto** — volver atrás devuelve
+  las vecinas a su sitio, y Escape cancela.
+
+Las vecinas solo se reorganizan tras 150 ms de una misma decisión: cruzar el
+panel con un gesto rápido no lo desordena. El sistema anterior lo recalculaba
+todo en cada movimiento a partir de la disposición que acababa de desordenar, y
+luego apretaba todas las cajas hacia arriba — incluida la que se acababa de
+soltar.
+
+El motor de colocación, `MusicPlayer.layoutEngine`, es puro: ni DOM ni
+almacenamiento. [`tests/cardLayout.js`](../../../tests/cardLayout.js) lo verifica
+fuera del navegador, disposiciones sorteadas al azar incluidas. Dos trampas
+dependen de las hojas de estilo, y ninguna se ve en un diff:
+
+- las animaciones pasan por `translate`, `scale` y la API Web Animations, nunca
+  por `transform`. `.card` declara una transición `!important` sobre
+  `transform`, que se impone a toda transición puesta en línea: era ella la que
+  volvía instantáneos los desplazamientos;
+- una caja redimensionada se estira mediante márgenes negativos, nunca mediante
+  una anchura explícita. Esta contaría en el tamaño de las columnas `1fr`, que se
+  ensancharían todas mientras dura el gesto y harían desbordar la cuadrícula.
 
 ### Troceado inacabado
 
