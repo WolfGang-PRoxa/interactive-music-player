@@ -192,7 +192,9 @@ la mitad.
 
 `shuffle` es un interruptor aparte, y no un cuarto modo: convive con el bucle de
 la lista — volver a barajarla en cada vuelta es una petición corriente — y se
-anula con un segundo clic. No convive con la repetición de la canción, que nunca
+Como los otros tres, su botón enciende y no apaga: se sale de él con
+«reproducción seguida», que lo devuelve todo a cero. No convive con la repetición
+de la canción, que nunca
 hace avanzar la cola: no habría ninguna canción siguiente que sortear. El sorteo
 ocurre en el enlace, nunca por
 adelantado: la difusión común se apoya en la mezcla **dinámica** de

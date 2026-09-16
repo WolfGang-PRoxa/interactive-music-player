@@ -349,8 +349,9 @@ window.MusicPlayer.updatePlayerCard = function(displayedTrack) {
  * n'existe que pour que le bouton réponde au doigt sans attendre.
  *
  * Trois modes s'excluent — suivie, piste en boucle, playlist en boucle — et
- * l'aléatoire est un interrupteur à part : il s'ajoute au bouclage de playlist
- * et s'annule lui-même, mais ne tient pas avec la répétition de la piste.
+ * l'aléatoire s'ajoute par-dessus le bouclage de playlist. Son bouton allume et
+ * n'éteint pas, comme les trois autres : on le quitte par « lecture suivie » ou
+ * par la répétition de la piste, avec laquelle il ne tient pas.
  *
  * Les deux sélecteurs de la page sont peints ensemble, celui de la carte comme
  * celui de la fenêtre vidéo : on n'en touche qu'un, ils disent tous les deux la
@@ -369,8 +370,8 @@ window.MusicPlayer.previewPlayMode = function(mode) {
         : (etait('loop_playlist') ? 'loop_playlist' : 'default');
 
     if (mode === 'shuffle') {
-        aleatoire = !aleatoire;
-        if (aleatoire && parcours === 'loop_track') parcours = 'default';
+        aleatoire = true;
+        if (parcours === 'loop_track') parcours = 'default';
     } else {
         parcours = mode;
         if (mode === 'loop_track' || mode === 'default') aleatoire = false;

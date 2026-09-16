@@ -10,8 +10,8 @@
  *    vivent ensemble. Il ne tient pas, en revanche, avec la répétition de la
  *    piste, qui ne fait jamais avancer la file : il n'y aurait aucun titre
  *    suivant à tirer, et deux boutons allumés dont l'un n'agit pas
- *    laisseraient croire le contraire. Étant seul de son espèce, il est aussi
- *    le seul à s'éteindre lui-même — les trois autres s'annulent l'un l'autre.
+ *    laisseraient croire le contraire. Son bouton allume et n'éteint pas, comme
+ *    les trois autres : recliquer dessus ne referme que le menu.
  *
  *  - **Le tirage a lieu à l'enchaînement, jamais d'avance.** Le mélange en
  *    place — battre la file une fois pour toutes — serait irréversible, et la
@@ -146,7 +146,7 @@ check('une file qui ne sait pas mélanger est laissée tranquille',
     (() => { try { webServer.applyShuffle({}, 'G1'); return true; } catch (e) { return false; } })(),
     'la file de discord-player n\'existe pas toujours');
 
-/* ══════════════════ Trois modes, et un interrupteur ══════════════════ */
+/* ══════════════════ Trois modes, et un quatrième par-dessus ══════════════════ */
 
 console.log('\nCe qu\'un clic sur un bouton de mode change\n');
 
@@ -191,9 +191,8 @@ function clic(mode, depart) {
 
 {
     const apres = clic('shuffle', { shuffle: true });
-    check('recliquer dessus l\'éteint', apres.shuffle === false,
-        'il est le seul des quatre à s\'annuler lui-même');
-    check('  … et rend la file à son ordre', apres.queue.isShuffling === false);
+    check('recliquer dessus ne l\'éteint pas', apres.shuffle === true,
+        'son bouton allume, comme les trois autres ; c\'est le menu que ce clic referme');
 }
 
 {
@@ -424,7 +423,7 @@ async function browserSide() {
             s.boutons.length === 2 && s.boutons.every(b => b.classList.contains('needs-preload')));
     }
 
-    console.log('\nLe menu, au clic qui allume le mode\n');
+    console.log('\nLe menu, au clic sur le bouton du mode\n');
 
     {
         const s = await mount(COURT, false);
@@ -471,8 +470,13 @@ async function browserSide() {
             'celui de la fenêtre vidéo comme celui de la carte');
 
         await s.clique(s.boutons[1]);
-        check('un second clic éteint le mode', !s.boutons[1].classList.contains('active'));
-        check('  … et referme le menu', !s.ouvert());
+        check('un second clic ne referme que le menu', !s.ouvert());
+        check('  … le mode restant allumé', s.boutons[1].classList.contains('active'),
+            'le bouton allume, il n\'éteint pas');
+
+        await s.clique(s.boutons[1]);
+        check('  … et le clic d\'après le rouvre', s.ouvert(),
+            'tant qu\'il reste une liste à régler');
     }
 
     {
@@ -481,10 +485,12 @@ async function browserSide() {
         await s.clique(s.win.document.getElementById('ailleurs'));
         check('le clic à côté referme', !s.ouvert());
 
+        check('  … sans avoir touché au mode',
+            s.boutons[0].classList.contains('active'),
+            'refermer le menu n\'éteint rien');
+
         await s.clique(s.boutons[0]);
-        check('  … sans avoir éteint le mode au passage',
-            s.boutons[0].classList.contains('active') === false,
-            'le clic à côté n\'a pas touché au mode ; ce second clic, si');
+        check('  … et le bouton rouvre le menu', s.ouvert());
     }
 
     {
@@ -506,6 +512,13 @@ async function browserSide() {
             parMode('loop_playlist').classList.contains('active')
             && parMode('shuffle').classList.contains('active'));
 
+        await s.clique(parMode('default'));
+        check('la lecture suivie est la porte de sortie',
+            !parMode('shuffle').classList.contains('active')
+            && !parMode('loop_playlist').classList.contains('active'),
+            'le bouton aléatoire n\'éteignant pas, c\'est par là qu\'on le quitte');
+
+        await s.clique(s.boutons[0]);
         await s.clique(parMode('loop_track'));
         check('la répétition de la piste les éteint tous deux',
             parMode('loop_track').classList.contains('active')

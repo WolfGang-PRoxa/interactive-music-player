@@ -189,7 +189,9 @@ first entry, even if playback had started in the middle.
 
 `shuffle` is a switch of its own, not a fourth mode: it holds together with the
 playlist loop — reshuffling it on every round is a common request — and cancels
-itself on a second click. It does not hold with track repeat, which never advances
+Like the other three, its button turns on and never off: you leave it through
+"straight playback", which resets everything. It does not hold with track repeat,
+which never advances
 the queue: there would be no next track to draw. The draw happens at the
 hand-over, never
 ahead of time: shared playback relies on discord-player's **dynamic** shuffle

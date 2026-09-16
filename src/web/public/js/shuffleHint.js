@@ -23,16 +23,16 @@
  *    est à la traîne. La classe est posée ici, l'onde est dans la feuille de
  *    style.
  *
- *  - **Il ouvre le menu au clic qui allume le mode**, avec un bouton par liste
- *    encore à régler. Un bouton disparaît dès que sa liste est faite, et le menu
- *    se ferme quand il ne reste rien à proposer — ou au clic à côté, à la touche
- *    d'échappement, et au second clic sur le bouton du mode, qui éteint le mode
- *    lui-même.
+ *  - **Il ouvre le menu au clic sur le bouton du mode**, avec un bouton par
+ *    liste encore à régler. Un bouton disparaît dès que sa liste est faite, et le
+ *    menu se ferme quand il ne reste rien à proposer — ou au clic à côté, à la
+ *    touche d'échappement, et au clic suivant sur le bouton du mode.
  *
- * Le menu ne s'ouvre jamais tout seul : il naît d'un clic, et c'est pourquoi le
- * geste est intercepté à la capture — l'aperçu optimiste du tableau de bord
- * repeint les boutons avant que le clic n'ait fini de remonter, et on ne saurait
- * plus, après lui, si le mode vient d'être allumé ou éteint.
+ * Ce dernier clic ne ferme que le menu : le bouton du mode allume et n'éteint
+ * pas, comme les trois autres du sélecteur. C'est donc le menu seul qui va et
+ * vient, et c'est pourquoi le geste est intercepté à la capture — l'aperçu
+ * optimiste du tableau de bord repeint les boutons avant que le clic n'ait fini
+ * de remonter, et le menu doit décider avant lui.
  */
 
 window.MusicPlayer = window.MusicPlayer || {};
@@ -248,8 +248,9 @@ window.MusicPlayer = window.MusicPlayer || {};
             const bouton = e.target.closest && e.target.closest('.mode-switch-btn.mode-shuffle');
             if (!bouton) return;
 
-            if (bouton.classList.contains('active')) {
-                // Le mode s'éteint : le menu n'a plus lieu d'être ouvert.
+            if (estOuvert()) {
+                // Le menu est la seule chose que ce clic referme : le mode, lui,
+                // reste allumé.
                 ouvrirAuProchainEtat = false;
                 fermer();
             } else {

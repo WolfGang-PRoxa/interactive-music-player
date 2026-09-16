@@ -196,7 +196,9 @@ Wiedergabe mittendrin begonnen hatte.
 
 `shuffle` ist ein eigener Schalter und kein vierter Modus: Er verträgt sich mit
 der Wiedergabelisten-Schleife — sie bei jeder Runde neu zu mischen ist ein
-häufiger Wunsch — und hebt sich mit einem zweiten Klick selbst auf. Mit der
+häufiger Wunsch. Wie die anderen drei schaltet seine Schaltfläche ein und nie
+aus: Man verlässt ihn über „fortlaufende Wiedergabe“, die alles zurücksetzt. Mit
+der
 Titelwiederholung verträgt er sich nicht, die die Warteschlange nie weiterrücken
 lässt: Es gäbe keinen nächsten Titel zum Auslosen. Die Auslosung findet beim
 Übergang

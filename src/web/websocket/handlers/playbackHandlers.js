@@ -487,8 +487,13 @@ function handleSetPlayMode(ctx) {
                  * playlist » sont trois façons de parcourir la liste, et une
                  * seule peut valoir à la fois. L'aléatoire, lui, ne dit pas
                  * comment on parcourt mais dans quel ordre : il s'ajoute au
-                 * bouclage de playlist — relire la playlist en la rebattant est
-                 * une demande courante — et se retire d'un second clic.
+                 * bouclage de playlist, relire la playlist en la rebattant étant
+                 * une demande courante.
+                 *
+                 * Comme les trois autres, son bouton allume et n'éteint pas :
+                 * recliquer dessus ne fait que refermer le menu qu'il ouvre (voir
+                 * js/shuffleHint.js). On le quitte par « lecture suivie », qui
+                 * remet tout à plat, ou par la répétition de la piste.
                  *
                  * Il reste incompatible avec la répétition de la piste : celle-ci
                  * ne fait jamais avancer la file, il n'y a donc pas de titre
@@ -507,12 +512,10 @@ function handleSetPlayMode(ctx) {
                     queue.setRepeatMode(QueueRepeatMode.OFF);
                     database.updateSettings(currentGuildId, { loopPlaylist: true });
                 } else if (mode === 'shuffle') {
-                    // L'interrupteur : ce qui était allumé s'éteint. C'est le
-                    // seul des quatre à s'annuler lui-même, les trois autres
-                    // s'annulant l'un l'autre.
-                    const allume = !database.getSettings(currentGuildId).shuffle;
-                    if (allume) queue.setRepeatMode(QueueRepeatMode.OFF);
-                    database.updateSettings(currentGuildId, { shuffle: allume });
+                    // Le bouclage de playlist n'est pas touché : c'est là toute
+                    // la différence avec les trois autres branches.
+                    queue.setRepeatMode(QueueRepeatMode.OFF);
+                    database.updateSettings(currentGuildId, { shuffle: true });
                 } else if (mode === 'default') {
                     queue.setRepeatMode(QueueRepeatMode.OFF);
                     database.updateSettings(currentGuildId, { loopPlaylist: false, shuffle: false });

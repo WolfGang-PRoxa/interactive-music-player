@@ -192,7 +192,9 @@ milieu.
 
 `shuffle` est un interrupteur à part, et non un quatrième mode : il tient avec
 le bouclage de playlist — la rebattre à chaque tour est une demande courante — et
-s'annule d'un second clic. Il ne tient pas avec la répétition de la piste, qui ne
+Comme les trois autres, son bouton allume et n'éteint pas : on le quitte par
+« lecture suivie », qui remet tout à plat. Il ne tient pas avec la répétition de
+la piste, qui ne
 fait jamais avancer la file : il n'y aurait aucun titre suivant à tirer. Le tirage
 a lieu à l'enchaînement,
 jamais d'avance : la diffusion commune s'en remet au mélange **dynamique** de
