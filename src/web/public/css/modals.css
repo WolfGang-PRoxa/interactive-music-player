@@ -2210,7 +2210,7 @@
  * réglage est fait.
  */
 .mode-switch-btn.needs-preload.active {
-    animation: shuffle-needs-preload 1.5s ease-out infinite;
+    animation: shuffle-needs-preload 0.5s ease-out infinite;
 }
 
 @keyframes shuffle-needs-preload {
