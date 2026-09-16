@@ -289,6 +289,26 @@ check('l\'infobulle est redevenue une infobulle',
     && !read('src', 'web', 'public', 'js', 'tooltipSystem.js').includes('actionOf'),
     'c\'est le menu qui porte le geste, elle n\'a plus à le faire');
 
+/*
+ * Le glyphe du mode est plein, et ne remplit pas sa boîte : dix unités de haut
+ * sur vingt-quatre, là où les icônes au trait vont d'un bord à l'autre. Sans une
+ * taille à lui, il paraît plus petit que ses voisins — ce que l'œil voit, et
+ * qu'aucune règle générale ne rattrape.
+ */
+{
+    const tailleDe = (css, prefixe) => new RegExp(
+        prefixe + '\\.mode-switch-btn\\.mode-shuffle svg \\{[^}]*width: (\\d+)px').exec(css);
+
+    const carte = tailleDe(read('src', 'web', 'public', 'css', 'modals.css'), '');
+    const video = tailleDe(read('src', 'web', 'public', 'css', 'video.css'),
+        '\\.video-play-mode-switch ');
+
+    check('le symbole a une taille à lui, dans les deux sélecteurs',
+        Boolean(carte) && Boolean(video)
+        && Number(carte[1]) > 16 && Number(video[1]) > 15,
+        carte && video ? `${carte[1]} px dans la carte, ${video[1]} px dans la vidéo` : 'règle absente');
+}
+
 /* ══════════════════ Le menu, dans un vrai document ══════════════════ */
 
 /**

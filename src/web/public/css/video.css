@@ -849,6 +849,13 @@ body.video-fullscreen-active #video-floating-window .video-custom-controls {
     height: 15px;
 }
 
+/* Le symbole plein du mode aléatoire, agrandi comme dans la carte et pour la
+   même raison — voir css/modals.css. */
+.video-play-mode-switch .mode-switch-btn.mode-shuffle svg {
+    width: 18px;
+    height: 18px;
+}
+
 .video-play-mode-switch .mode-switch-btn:hover {
     color: var(--c-accent);
     background: rgba(255, 255, 255, 0.18);

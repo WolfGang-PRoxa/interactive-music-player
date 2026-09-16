@@ -2176,6 +2176,17 @@
     height: 16px;
 }
 
+/*
+ * Le symbole du mode aléatoire est plein, et son tracé n'occupe qu'une bande de
+ * sa boîte carrée — dix unités de haut sur vingt-quatre, là où les icônes au
+ * trait la remplissent d'un bord à l'autre. À boîte égale il paraissait donc
+ * plus petit que ses voisins : la sienne est agrandie d'autant.
+ */
+.mode-switch-btn.mode-shuffle svg {
+    width: 19px;
+    height: 19px;
+}
+
 .mode-switch-btn:hover {
     color: var(--text-main);
     background: var(--bg-hover, rgba(255, 255, 255, 0.03));
