@@ -380,6 +380,12 @@ window.MusicPlayer.previewPlayMode = function(mode) {
     document.querySelectorAll('.mode-switch-btn').forEach(btn => {
         const nom = btn.getAttribute('data-mode');
         if (nom === 'shuffle') btn.classList.toggle('active', aleatoire);
+        // « Lecture suivie » n'est allumée que lorsque rien d'autre ne l'est :
+        // elle nomme l'absence de mode, et l'aléatoire en est un. Cette clause
+        // est celle de la peinture d'après l'état, quelques lignes plus haut —
+        // sans elle, le bouton restait allumé le temps de l'aller-retour, et
+        // clignotait.
+        else if (nom === 'default') btn.classList.toggle('active', parcours === 'default' && !aleatoire);
         else btn.classList.toggle('active', nom === parcours);
     });
 

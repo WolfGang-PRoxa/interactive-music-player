@@ -523,6 +523,27 @@ async function browserSide() {
     console.log('\nL\'aperçu optimiste dit la même chose que le serveur\n');
 
     {
+        /*
+         * Le cas ordinaire : on part de « lecture suivie », le seul mode allumé
+         * quand rien n'a été demandé, et on allume l'aléatoire. Ce bouton-là
+         * nomme l'absence de mode — il doit s'éteindre sur-le-champ, et non
+         * clignoter le temps que l'état revienne du serveur.
+         */
+        const s = await mount(COURT, false);
+        const parMode = (nom) => s.win.document.querySelector(`.mode-switch-btn[data-mode="${nom}"]`);
+
+        await s.clique(parMode('default'));
+        check('la lecture suivie s\'allume quand rien d\'autre ne l\'est',
+            parMode('default').classList.contains('active'));
+
+        await s.clique(s.boutons[0]);
+        check('  … et s\'éteint dès l\'aperçu, sans clignoter',
+            !parMode('default').classList.contains('active')
+            && parMode('shuffle').classList.contains('active'),
+            'la peinture d\'après l\'état l\'éteint : l\'aperçu doit dire pareil');
+    }
+
+    {
         const s = await mount(COURT, false);
         const parMode = (nom) => s.win.document.querySelector(`.mode-switch-btn[data-mode="${nom}"]`);
 
