@@ -194,7 +194,12 @@ tatsächlich geladene Warteschlange kennt: „die Wiedergabeliste“ erneut
 abzuspielen heißt, sie ab ihrem ersten Titel neu zu laden, auch wenn die
 Wiedergabe mittendrin begonnen hatte.
 
-`shuffle` schließt beide Schleifen aus, und die Auslosung findet beim Übergang
+`shuffle` ist ein eigener Schalter und kein vierter Modus: Er verträgt sich mit
+der Wiedergabelisten-Schleife — sie bei jeder Runde neu zu mischen ist ein
+häufiger Wunsch — und hebt sich mit einem zweiten Klick selbst auf. Mit der
+Titelwiederholung verträgt er sich nicht, die die Warteschlange nie weiterrücken
+lässt: Es gäbe keinen nächsten Titel zum Auslosen. Die Auslosung findet beim
+Übergang
 statt, nie im Voraus: Die gemeinsame Wiedergabe verlässt sich auf das
 **dynamische** Mischen von discord-player (`enableShuffle(true)`), das die
 Reihenfolge der Warteschlange unangetastet lässt, und die persönliche Wiedergabe
@@ -203,7 +208,7 @@ alle Mal zu mischen wäre unumkehrbar, und sie würde nicht mehr ankündigen, wa
 kommt. Dafür lässt sich aus der Reihenfolge nichts mehr ableiten: Die Überblende
 des Browsers bereitet keinen nächsten Titel mehr vor, und nur ein unbegrenztes
 `preloading` hält den Übergang sofort — was die Schaltfläche des Modus selbst
-anbietet, aus ihrem Tooltip.
+anbietet, im Menü, das sie öffnet.
 
 `activePlaybackSource` kehrt nicht allein auf Entscheidung des Benutzers zu
 `'queue'` zurück: eine Wiedergabeliste, die ohne Schleife endet, gibt an die

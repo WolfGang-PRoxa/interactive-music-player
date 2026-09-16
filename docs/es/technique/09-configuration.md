@@ -190,7 +190,11 @@ conoce la cola realmente cargada: volver a reproducir «la lista» supone
 recargarla desde su primer título, aunque la reproducción hubiera empezado por
 la mitad.
 
-`shuffle` excluye ambos bucles, y el sorteo ocurre en el enlace, nunca por
+`shuffle` es un interruptor aparte, y no un cuarto modo: convive con el bucle de
+la lista — volver a barajarla en cada vuelta es una petición corriente — y se
+anula con un segundo clic. No convive con la repetición de la canción, que nunca
+hace avanzar la cola: no habría ninguna canción siguiente que sortear. El sorteo
+ocurre en el enlace, nunca por
 adelantado: la difusión común se apoya en la mezcla **dinámica** de
 discord-player (`enableShuffle(true)`), que deja la cola en su orden, y la
 difusión personal sortea ella misma en `WebServer.drawNextVirtualTrack()`.
@@ -198,7 +202,7 @@ Barajar la cola de una vez por todas sería irreversible, y dejaría de anunciar
 lo que viene. A cambio, ya nada se deduce del orden: el fundido encadenado del
 navegador deja de preparar la canción siguiente, y solo un `preloading` sin
 límite mantiene el enlace inmediato — lo que el botón del modo propone él mismo,
-desde su información emergente.
+en el menú que abre.
 
 `activePlaybackSource` no vuelve a `'queue'` por la sola decisión del usuario:
 una lista de reproducción que termina sin bucle devuelve el mando a la cola

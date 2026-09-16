@@ -837,36 +837,45 @@ window.MusicPlayer.initSettingsModal = function() {
         }
 
         /**
-         * Règle le préchargement de la file et des playlists sur « toutes
-         * les pistes ».
+         * Règle le préchargement sur « toutes les pistes », liste par liste.
          *
-         * Appelée par le bouton du mode aléatoire (js/shuffleHint.js) : le
-         * titre suivant y étant tiré au sort, seul un préchargement sans
-         * limite le rend immédiat. L'historique n'est pas touché — on ne
-         * revient pas en arrière au hasard.
+         * Appelée par le menu du mode aléatoire (js/shuffleHint.js) : le titre
+         * suivant y étant tiré au sort, seul un préchargement sans limite le
+         * rend immédiat. Le menu offre un bouton par liste, d'où l'argument —
+         * l'historique n'a pas le sien, on ne revient pas en arrière au hasard,
+         * et sa valeur n'est jamais touchée.
          *
          * Les curseurs sont repositionnés s'ils existent — la fenêtre des
          * paramètres peut n'avoir jamais été ouverte —, et le réglage part au
          * serveur comme une modification ordinaire.
+         *
+         * @param {'queue'|'playlist'} [quoi] La liste à régler ; les deux par défaut.
          */
-        window.MusicPlayer.setPreloadAll = function () {
-            for (const id of ['preload-queue-count', 'preload-playlist-count']) {
-                const range = document.getElementById(id);
+        window.MusicPlayer.setPreloadAll = function (quoi) {
+            const listes = quoi ? [quoi] : ['queue', 'playlist'];
+
+            for (const liste of listes) {
+                const range = document.getElementById(`preload-${liste}-count`);
                 if (!range) continue;
                 range.value = range.max;
-                paintRangeValue(document.getElementById(`val-${id}`), range, '');
+                paintRangeValue(document.getElementById(`val-preload-${liste}-count`), range, '');
                 paintInfinity(range);
             }
 
             const preloadEnableBox = document.getElementById('preload-enable');
             if (preloadEnableBox) preloadEnableBox.checked = true;
 
+            /*
+             * Rallumer le préchargement ne doit pas remettre les autres listes
+             * sur le cran par défaut : ce qui n'est pas réglé ici est repris tel
+             * qu'il était, et ne vaut 3 que s'il n'avait jamais rien valu.
+             */
             const previous = dashboardSettings.preloading || {};
             dashboardSettings.preloading = {
                 ...previous,
                 enabled: true,
-                queueCount: PRELOAD_ALL,
-                playlistCount: PRELOAD_ALL,
+                queueCount: listes.includes('queue') ? PRELOAD_ALL : (previous.queueCount ?? 3),
+                playlistCount: listes.includes('playlist') ? PRELOAD_ALL : (previous.playlistCount ?? 3),
                 historyCount: previous.historyCount ?? 3,
             };
 

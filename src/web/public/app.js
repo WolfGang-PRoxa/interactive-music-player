@@ -1489,9 +1489,11 @@
                 type: 'setPlayMode',
                 data: { mode }
             });
-            document.querySelectorAll('.mode-switch-btn').forEach(b => {
-                b.classList.toggle('active', b.getAttribute('data-mode') === mode);
-            });
+            // Les règles d'exclusion sont celles du serveur, et ne sont pas
+            // réécrites ici : voir `previewPlayMode` dans js/player.js.
+            if (typeof window.MusicPlayer.previewPlayMode === 'function') {
+                window.MusicPlayer.previewPlayMode(mode);
+            }
         });
     });
 

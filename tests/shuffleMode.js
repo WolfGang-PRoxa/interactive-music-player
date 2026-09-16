@@ -1,9 +1,17 @@
 /**
- * Vérifie le mode de lecture aléatoire, et l'invitation qui l'accompagne.
+ * Vérifie le mode de lecture aléatoire, et le menu qui l'accompagne.
  *
- * Le mode s'ajoute aux trois autres — lecture suivie, piste en boucle, playlist
- * en boucle — et s'exclut d'eux. Trois choses le distinguent, et aucune ne se
- * lit dans un diff.
+ * Le mode n'est pas un quatrième parcours : c'est un interrupteur posé à côté
+ * des trois autres. Quatre choses le distinguent, et aucune ne se lit dans un
+ * diff.
+ *
+ *  - **Il tient avec le bouclage de playlist.** Relire une playlist en la
+ *    rebattant à chaque tour est une demande courante, et les deux réglages
+ *    vivent ensemble. Il ne tient pas, en revanche, avec la répétition de la
+ *    piste, qui ne fait jamais avancer la file : il n'y aurait aucun titre
+ *    suivant à tirer, et deux boutons allumés dont l'un n'agit pas
+ *    laisseraient croire le contraire. Étant seul de son espèce, il est aussi
+ *    le seul à s'éteindre lui-même — les trois autres s'annulent l'un l'autre.
  *
  *  - **Le tirage a lieu à l'enchaînement, jamais d'avance.** Le mélange en
  *    place — battre la file une fois pour toutes — serait irréversible, et la
@@ -16,15 +24,12 @@
  *    aléatoire il préparerait le mauvais. `nextTrackOf` le dit — elle ne promet
  *    plus rien.
  *
- *  - **Le préchargement devient la seule préparation possible.** Réglé sur
- *    « toutes les pistes », il met la file et les playlists entières en cache,
- *    et le tirage tombe toujours sur un morceau prêt. Ce réglage vit à trois
- *    clics de là, dans la fenêtre des paramètres : le bouton du mode le dit
- *    lui-même — une onde tant qu'il manque — et l'infobulle le règle.
- *
- * Le dernier point tient à ce que l'infobulle devient agissante, ce qu'aucune
- * des cent autres de la page n'est. Le chemin ordinaire ne doit pas changer
- * d'un iota : c'est la dernière section qui l'éprouve.
+ *  - **Le préchargement devient la seule préparation possible.** Réglé sans
+ *    limite, il met la file ou les playlists entières en cache, et le tirage
+ *    tombe toujours sur un morceau prêt. Ce réglage vit à trois clics de là :
+ *    le bouton ondule tant qu'il manque, et le menu qu'il ouvre le règle, liste
+ *    par liste, sans toucher à l'historique — on ne revient pas en arrière au
+ *    hasard.
  */
 const fs = require('fs');
 const os = require('os');
@@ -66,6 +71,7 @@ const database = require(path.join(ROOT, 'src', 'database', 'Database.js'));
 // à sable, ce qui ne dit rien de plus et coûte un fichier par cas.
 let settings = { shuffle: false };
 database.getSettings = () => settings;
+database.updateSettings = (guildId, champs) => { Object.assign(settings, champs); };
 
 const fileDe = (...noms) => ({ virtualTracks: noms.map(nom => ({ title: nom })) });
 
@@ -140,31 +146,108 @@ check('une file qui ne sait pas mélanger est laissée tranquille',
     (() => { try { webServer.applyShuffle({}, 'G1'); return true; } catch (e) { return false; } })(),
     'la file de discord-player n\'existe pas toujours');
 
-/* ══════════════════ Les quatre modes s'excluent ══════════════════ */
+/* ══════════════════ Trois modes, et un interrupteur ══════════════════ */
 
-console.log('\nUn seul mode actif à la fois\n');
+console.log('\nCe qu\'un clic sur un bouton de mode change\n');
 
-const HANDLERS = read('src', 'web', 'websocket', 'handlers', 'playbackHandlers.js');
-const setPlayMode = HANDLERS.slice(
-    HANDLERS.indexOf('function handleSetPlayMode'),
-    HANDLERS.indexOf('async function handleStop'));
+/**
+ * Le vrai `handleSetPlayMode`, exercé sur une file factice.
+ *
+ * Les réglages sont ceux tenus en mémoire plus haut, et la file ne retient que
+ * le mode de répétition qu'on lui pose : ce qui est mesuré est donc la règle
+ * livrée, et non une copie qui pourrait s'en écarter sans que rien ne le dise.
+ */
+const { handleSetPlayMode } = require(
+    path.join(ROOT, 'src', 'web', 'websocket', 'handlers', 'playbackHandlers.js'));
+const playbackStateManager = require(path.join(ROOT, 'src', 'database', 'PlaybackStateManager.js'));
+playbackStateManager.saveState = () => {};
 
-for (const [mode, loop, shuffle] of [
-    ['loop_track', 'false', 'false'],
-    ['loop_playlist', 'true', 'false'],
-    ['shuffle', 'false', 'true'],
-    ['default', 'false', 'false'],
-]) {
-    const branche = setPlayMode.slice(setPlayMode.indexOf(`mode === '${mode}'`));
-    const ecrit = /updateSettings\(currentGuildId, \{ loopPlaylist: (\w+), shuffle: (\w+) \}\)/
-        .exec(branche);
-    check(`« ${mode} » écrit les deux réglages`,
-        Boolean(ecrit) && ecrit[1] === loop && ecrit[2] === shuffle,
-        ecrit ? `loopPlaylist: ${ecrit[1]}, shuffle: ${ecrit[2]}` : 'écriture introuvable');
+const { QueueRepeatMode } = require('discord-player');
+
+function clic(mode, depart) {
+    settings = { loopPlaylist: false, shuffle: false, ...depart };
+    const queue = {
+        repeatMode: depart && depart.repeatMode !== undefined ? depart.repeatMode : QueueRepeatMode.OFF,
+        isShuffling: false,
+        setRepeatMode(m) { this.repeatMode = m; },
+        enableShuffle() { this.isShuffling = true; },
+        disableShuffle() { this.isShuffling = false; },
+    };
+    handleSetPlayMode({
+        data: { mode },
+        webServer: { applyShuffle: (q, g) => webServer.applyShuffle(q, g), broadcastState: () => {} },
+        player: {},
+        currentGuildId: 'G1',
+        queue,
+    });
+    return { queue, ...settings };
 }
 
+{
+    const apres = clic('shuffle', { shuffle: false });
+    check('cliquer sur l\'aléatoire l\'allume', apres.shuffle === true);
+    check('  … et met la file en mélange dynamique', apres.queue.isShuffling === true);
+}
+
+{
+    const apres = clic('shuffle', { shuffle: true });
+    check('recliquer dessus l\'éteint', apres.shuffle === false,
+        'il est le seul des quatre à s\'annuler lui-même');
+    check('  … et rend la file à son ordre', apres.queue.isShuffling === false);
+}
+
+{
+    const apres = clic('shuffle', { shuffle: false, loopPlaylist: true });
+    check('il n\'éteint pas le bouclage de playlist',
+        apres.shuffle === true && apres.loopPlaylist === true,
+        'relire une playlist en la rebattant est une demande courante');
+}
+
+{
+    const apres = clic('loop_playlist', { shuffle: true });
+    check('et le bouclage de playlist ne l\'éteint pas non plus',
+        apres.loopPlaylist === true && apres.shuffle === true);
+}
+
+{
+    const apres = clic('shuffle', { shuffle: false, repeatMode: QueueRepeatMode.TRACK });
+    check('il éteint la répétition de la piste',
+        apres.queue.repeatMode === QueueRepeatMode.OFF,
+        'une piste répétée ne fait jamais avancer la file : rien à tirer');
+}
+
+{
+    const apres = clic('loop_track', { shuffle: true, loopPlaylist: true });
+    check('la répétition de la piste l\'éteint en retour',
+        apres.shuffle === false && apres.loopPlaylist === false,
+        apres.queue.repeatMode === QueueRepeatMode.TRACK ? 'piste en boucle' : 'mode inattendu');
+}
+
+{
+    const apres = clic('default', { shuffle: true, loopPlaylist: true });
+    check('la lecture suivie éteint tout',
+        apres.shuffle === false && apres.loopPlaylist === false
+        && apres.queue.repeatMode === QueueRepeatMode.OFF);
+}
+
+{
+    // Un mode changé sans file de lecture ne doit pas jeter : le lecteur peut
+    // n'avoir jamais démarré.
+    let jete = false;
+    try {
+        handleSetPlayMode({
+            data: { mode: 'shuffle' }, webServer: {}, player: {}, currentGuildId: 'G1', queue: null,
+        });
+    } catch (e) { jete = true; }
+    check('sans file de lecture, le clic ne casse rien', !jete);
+}
+
+console.log('\nCe que le serveur en garde\n');
+
+const HANDLERS = read('src', 'web', 'websocket', 'handlers', 'playbackHandlers.js');
+
 check('le changement de mode accorde la file au réglage',
-    /webServer\.applyShuffle\(queue, currentGuildId\)/.test(setPlayMode),
+    /webServer\.applyShuffle\(queue, currentGuildId\)/.test(HANDLERS),
     'sans quoi le mélange ne prendrait qu\'au morceau suivant');
 
 check('un démarrage de piste le refait',
@@ -197,15 +280,21 @@ check('les deux sélecteurs de mode portent le bouton',
     (MARKUP.match(/class="mode-switch-btn mode-shuffle" data-mode="shuffle"/g) || []).length === 2,
     'la carte « En cours de lecture » et la fenêtre vidéo flottante');
 
-const PLAYER = read('src', 'web', 'public', 'js', 'player.js');
-check('la lecture suivie n\'est allumée que si aucun autre mode ne l\'est',
-    /repeatMode !== 1 && !loopActive && !shuffleActive/.test(PLAYER));
+check('  … avec le symbole plein, qui suit la couleur du bouton',
+    (MARKUP.match(/d="M8\.7,14\.2C8,14\.7/g) || []).length === 2
+    && (MARKUP.match(/class="mode-switch-btn mode-shuffle"[\s\S]{0,200}?fill="currentColor"/g) || []).length === 2,
+    'reconnu à son tracé : la page compte trente icônes pleines');
 
-/* ══════════════════ L'invitation à tout précharger ══════════════════ */
+check('l\'infobulle est redevenue une infobulle',
+    !MARKUP.includes('data-tooltip-action')
+    && !read('src', 'web', 'public', 'js', 'tooltipSystem.js').includes('actionOf'),
+    'c\'est le menu qui porte le geste, elle n\'a plus à le faire');
+
+/* ══════════════════ Le menu, dans un vrai document ══════════════════ */
 
 /**
- * L'onde sur le bouton, l'infobulle agissante, et le bouton qu'elle porte —
- * avec les vrais tooltipSystem.js et shuffleHint.js dans jsdom.
+ * L'onde, le menu et ses boutons — avec les vrais player.js et shuffleHint.js
+ * dans jsdom.
  *
  * `jsdom` n'est pas une dépendance déclarée : la section se retire d'elle-même
  * s'il manque, comme dans tests/rightRequests.js.
@@ -220,154 +309,213 @@ async function browserSide() {
     }
 
     const fr = JSON.parse(fs.readFileSync(path.join(PUBLIC, 'locales', 'fr.json'), 'utf8'));
+    const SHUFFLE = read('src', 'web', 'public', 'js', 'shuffleHint.js');
 
-    const BOUTON = '<button class="mode-switch-btn mode-shuffle" data-mode="shuffle"'
-        + ' data-tooltip="Lire les musiques dans un ordre aléatoire"'
-        + ' data-i18n-tooltip="tooltip_mode_shuffle"><svg></svg></button>';
+    const groupe = (extra = '') => `<div class="play-mode-switch ${extra}">`
+        + '<button class="mode-switch-btn" data-mode="default"></button>'
+        + '<button class="mode-switch-btn" data-mode="loop_track"></button>'
+        + '<button class="mode-switch-btn" data-mode="loop_playlist"></button>'
+        + '<button class="mode-switch-btn mode-shuffle" data-mode="shuffle"'
+        + ' data-tooltip="Lire les musiques dans un ordre aléatoire"></button>'
+        + '</div>';
 
-    const mount = async (etat, preloading) => {
-        const dom = new JSDOM('<!doctype html><html><body>'
-            + `<div class="play-mode-switch">${BOUTON}</div>`
-            + `<div class="play-mode-switch video-play-mode-switch">${BOUTON}</div>`
-            + '<button id="ordinaire" data-tooltip="Une infobulle comme les autres"></button>'
-            + '</body></html>', { runScripts: 'outside-only', url: 'http://localhost:3000/' });
+    const mount = async (preloading, actif = false) => {
+        const dom = new JSDOM(`<!doctype html><html><body>${groupe()}${groupe('video-play-mode-switch')}`
+            + '<button id="ailleurs">Ailleurs</button></body></html>',
+            { runScripts: 'outside-only', url: 'http://localhost:3000/', pretendToBeVisual: true });
 
         const win = dom.window;
+        const reglees = [];
         win.MusicPlayer = {
-            state: etat,
-            dashboardSettings: { tooltipDelay: 0, preloading },
+            state: { shuffle: actif },
+            // Copié : le réglage est muté par le menu, et deux cas ne
+            // doivent pas se passer le résultat de l'autre.
+            dashboardSettings: { language: 'fr', preloading: { ...preloading } },
             t: (key) => fr[key] || key,
-        };
-        const reglages = [];
-        win.MusicPlayer.setPreloadAll = () => {
-            reglages.push('réglé');
-            win.MusicPlayer.dashboardSettings.preloading =
-                { enabled: true, queueCount: -1, playlistCount: -1, historyCount: 3 };
-        };
-        const toasts = [];
-        win.MusicPlayer.showToast = (message) => toasts.push(message);
-
-        win.eval(read('src', 'web', 'public', 'js', 'tooltipSystem.js'));
-        win.eval(read('src', 'web', 'public', 'js', 'shuffleHint.js'));
-        win.TooltipSystem.init();
-        win.MusicPlayer.refreshShuffleHint();
-
-        const boutons = [...win.document.querySelectorAll('.mode-shuffle')];
-        const survole = async (el) => {
-            el.dispatchEvent(new win.MouseEvent('mouseover', { bubbles: true }));
-            await new Promise(r => setTimeout(r, 30));
-        };
-        const quitte = async (el, vers) => {
-            el.dispatchEvent(new win.MouseEvent('mouseout', { bubbles: true, relatedTarget: vers }));
-            await new Promise(r => setTimeout(r, 30));
+            setPreloadAll: (quoi) => {
+                reglees.push(quoi);
+                const p = win.MusicPlayer.dashboardSettings.preloading;
+                p.enabled = true;
+                if (!quoi || quoi === 'queue') p.queueCount = -1;
+                if (!quoi || quoi === 'playlist') p.playlistCount = -1;
+                win.MusicPlayer.refreshShuffleHint();
+            },
         };
 
-        return { win, boutons, reglages, toasts, survole, quitte,
-            bulle: () => win.document.getElementById('custom-tooltip') };
+        win.eval(SHUFFLE);
+        // Le module attend le chargement du document pour poser ses écouteurs.
+        if (win.document.readyState !== 'complete') {
+            await new Promise((resolve) => win.addEventListener('load', resolve));
+        }
+
+        /*
+         * L'aperçu optimiste du tableau de bord, tel qu'app.js le déclenche :
+         * il peint le bouton puis prévient le module, et c'est ce couple que le
+         * menu suit. La règle elle-même est celle de js/player.js, chargée ici.
+         */
+        win.eval(read('src', 'web', 'public', 'js', 'player.js')
+            .split('// Controller de mode d\'animation')[0]);
+        for (const btn of win.document.querySelectorAll('.mode-switch-btn')) {
+            btn.addEventListener('click', () => {
+                win.MusicPlayer.previewPlayMode(btn.getAttribute('data-mode'));
+            });
+        }
+
+        /*
+         * Un clic, puis l'état que le serveur diffuserait en retour — c'est lui
+         * que le module relit, l'aperçu optimiste ne faisant que peindre. Le
+         * tableau de bord repeint alors sa carte, d'où le second appel.
+         */
+        const clique = async (el) => {
+            el.dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }));
+            await new Promise(r => setTimeout(r, 20));
+
+            if (el.closest && el.closest('.mode-switch-btn')) {
+                const shuffle = win.document.querySelector('.mode-shuffle');
+                win.MusicPlayer.state = { shuffle: shuffle.classList.contains('active') };
+                win.MusicPlayer.refreshShuffleHint();
+                await new Promise(r => setTimeout(r, 20));
+            }
+        };
+
+        return {
+            win, reglees, clique,
+            boutons: [...win.document.querySelectorAll('.mode-shuffle')],
+            menu: () => win.document.getElementById('shuffle-menu'),
+            ouvert: () => {
+                const m = win.document.getElementById('shuffle-menu');
+                return Boolean(m) && !m.hidden;
+            },
+        };
     };
 
     const COURT = { enabled: true, queueCount: 3, playlistCount: 3, historyCount: 3 };
     const TOUT = { enabled: true, queueCount: -1, playlistCount: -1, historyCount: 3 };
 
-    console.log('\nQuand l\'invitation a lieu d\'être\n');
+    console.log('\nQuand le bouton ondule\n');
 
     {
-        const { boutons } = await mount({ shuffle: false }, COURT);
-        check('mode éteint, préchargement court : rien ne bouge',
-            boutons.every(b => !b.classList.contains('needs-preload')
-                && !b.hasAttribute('data-tooltip-action')),
-            'l\'expliquer avant d\'activer le mode n\'apprendrait rien');
+        const s = await mount(COURT, false);
+        s.win.MusicPlayer.refreshShuffleHint();
+        check('mode éteint : rien ne bouge',
+            s.boutons.every(b => !b.classList.contains('needs-preload')));
     }
 
     {
-        const { boutons } = await mount({ shuffle: true }, TOUT);
+        const s = await mount(TOUT, true);
+        s.win.MusicPlayer.refreshShuffleHint();
         check('mode actif, tout préchargé : rien non plus',
-            boutons.every(b => !b.classList.contains('needs-preload')
-                && !b.hasAttribute('data-tooltip-action')),
+            s.boutons.every(b => !b.classList.contains('needs-preload')),
             'il n\'y a plus rien à proposer');
     }
 
     {
-        const { boutons } = await mount({ shuffle: true }, { enabled: false, queueCount: -1, playlistCount: -1 });
+        const s = await mount({ enabled: false, queueCount: -1, playlistCount: -1 }, true);
+        s.win.MusicPlayer.refreshShuffleHint();
         check('le préchargement éteint compte comme absent',
-            boutons.every(b => b.classList.contains('needs-preload')),
+            s.boutons.every(b => b.classList.contains('needs-preload')),
             'deux infinis dans un réglage désactivé ne préchargent rien');
     }
 
     {
-        const { boutons } = await mount({ shuffle: true }, { enabled: true, queueCount: -1, playlistCount: 3 });
-        check('une seule des deux listes ne suffit pas',
-            boutons.every(b => b.classList.contains('needs-preload')),
-            'le tirage puise dans les deux');
-    }
-
-    {
-        const { boutons } = await mount({ shuffle: true }, COURT);
+        const s = await mount(COURT, true);
+        s.win.MusicPlayer.refreshShuffleHint();
         check('mode actif, préchargement à la traîne : les deux boutons ondulent',
-            boutons.length === 2 && boutons.every(b => b.classList.contains('needs-preload')));
-        check('  … et annoncent la seconde ligne de l\'infobulle',
-            boutons.every(b => b.getAttribute('data-tooltip-hint') === 'shuffle_preload_hint'));
-        check('  … et le bouton qu\'elle porte',
-            boutons.every(b => b.getAttribute('data-tooltip-action') === 'shuffle_preload_action'
-                && b.getAttribute('data-tooltip-action-call') === 'preloadAllForShuffle'));
+            s.boutons.length === 2 && s.boutons.every(b => b.classList.contains('needs-preload')));
     }
 
-    console.log('\nL\'infobulle agissante\n');
+    console.log('\nLe menu, au clic qui allume le mode\n');
 
     {
-        const s = await mount({ shuffle: true }, COURT);
-        await s.survole(s.boutons[0]);
+        const s = await mount(COURT, false);
+        await s.clique(s.boutons[0]);
 
-        const bulle = s.bulle();
-        check('le survol ouvre l\'infobulle', bulle.classList.contains('visible'));
-        check('  … qui dit toujours ce qu\'est le mode',
-            bulle.textContent.includes(fr.tooltip_mode_shuffle));
+        check('le clic ouvre le menu', s.ouvert());
+        const menu = s.menu();
+        check('  … qui dit ce qui vient d\'être activé',
+            menu.textContent.includes(fr.shuffle_menu_title));
         check('  … et pourquoi le préchargement compte ici',
-            bulle.textContent.includes(fr.shuffle_preload_hint.slice(0, 40)));
+            menu.textContent.includes(fr.shuffle_menu_text.slice(0, 40)));
 
-        const action = bulle.querySelector('.tooltip-action');
-        check('  … et elle porte le bouton', Boolean(action)
-            && action.textContent === fr.shuffle_preload_action,
-            action ? action.textContent : 'bouton absent');
-        check('  … que le pointeur peut atteindre',
-            bulle.classList.contains('has-action'),
-            'la feuille de style n\'ouvre `pointer-events` qu\'à cette classe');
+        const btns = [...menu.querySelectorAll('.shuffle-menu-btn')];
+        check('  … avec un bouton par liste à régler', btns.length === 2
+            && btns[0].dataset.liste === 'queue' && btns[1].dataset.liste === 'playlist',
+            btns.map(b => b.textContent).join(' / '));
 
-        // Le trajet du bouton vers l'infobulle : sans le pont, elle se fermerait
-        // en chemin et le bouton n'existerait que pour l'œil.
-        await s.quitte(s.boutons[0], bulle);
-        check('quitter le bouton pour l\'infobulle ne la ferme pas',
-            s.bulle().classList.contains('visible'));
+        await s.clique(btns[0]);
+        check('un bouton règle sa liste, et elle seule', s.reglees.join() === 'queue');
+        check('  … après quoi il s\'efface',
+            [...s.menu().querySelectorAll('.shuffle-menu-btn')].map(b => b.dataset.liste).join() === 'playlist');
+        check('  … le menu restant ouvert tant qu\'il reste à faire', s.ouvert());
 
-        action.dispatchEvent(new s.win.MouseEvent('click', { bubbles: true, cancelable: true }));
-        check('le bouton règle le préchargement', s.reglages.length === 1);
-        check('  … le dit', s.toasts.length === 1 && s.toasts[0] === fr.shuffle_preload_done,
-            s.toasts[0]);
-        check('  … et se referme derrière lui', !s.bulle().classList.contains('visible'));
-        check('  … après quoi il n\'y a plus rien à proposer',
-            s.boutons.every(b => !b.classList.contains('needs-preload')
-                && !b.hasAttribute('data-tooltip-action')));
-
-        await s.survole(s.boutons[0]);
-        check('le survol suivant n\'ouvre qu\'une infobulle ordinaire',
-            !s.bulle().classList.contains('has-action')
-            && !s.bulle().querySelector('.tooltip-action'));
+        await s.clique(s.menu().querySelector('.shuffle-menu-btn'));
+        check('la dernière liste réglée ferme le menu', !s.ouvert(),
+            'il n\'a plus rien à proposer');
+        check('  … et l\'onde s\'arrête',
+            s.boutons.every(b => !b.classList.contains('needs-preload')));
     }
 
     {
-        // La centaine d'infobulles de la page ne doit rien sentir de tout cela :
-        // leur chemin reste `textContent`, qui n'interprète rien.
-        const s = await mount({ shuffle: true }, COURT);
-        await s.survole(s.win.document.getElementById('ordinaire'));
-        const bulle = s.bulle();
-        check('une infobulle ordinaire reste du texte nu',
-            bulle.textContent === 'Une infobulle comme les autres'
-            && bulle.children.length === 0
-            && !bulle.classList.contains('has-action'));
+        const s = await mount(TOUT, false);
+        await s.clique(s.boutons[0]);
+        check('tout étant déjà préchargé, le clic n\'ouvre rien', !s.ouvert(),
+            'le mode s\'active sans qu\'on ait rien à dire');
+        check('  … mais le mode s\'active bien',
+            s.boutons.every(b => b.classList.contains('active')));
+    }
 
-        await s.quitte(s.win.document.getElementById('ordinaire'), null);
-        check('  … et se ferme en quittant, sans sursis',
-            !s.bulle().classList.contains('visible'));
+    {
+        const s = await mount(COURT, false);
+        await s.clique(s.boutons[1]);
+        check('le menu naît sous le bouton touché', s.ouvert(),
+            'celui de la fenêtre vidéo comme celui de la carte');
+
+        await s.clique(s.boutons[1]);
+        check('un second clic éteint le mode', !s.boutons[1].classList.contains('active'));
+        check('  … et referme le menu', !s.ouvert());
+    }
+
+    {
+        const s = await mount(COURT, false);
+        await s.clique(s.boutons[0]);
+        await s.clique(s.win.document.getElementById('ailleurs'));
+        check('le clic à côté referme', !s.ouvert());
+
+        await s.clique(s.boutons[0]);
+        check('  … sans avoir éteint le mode au passage',
+            s.boutons[0].classList.contains('active') === false,
+            'le clic à côté n\'a pas touché au mode ; ce second clic, si');
+    }
+
+    {
+        const s = await mount(COURT, false);
+        await s.clique(s.boutons[0]);
+        s.win.document.dispatchEvent(new s.win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        check('la touche d\'échappement referme', !s.ouvert());
+    }
+
+    console.log('\nL\'aperçu optimiste dit la même chose que le serveur\n');
+
+    {
+        const s = await mount(COURT, false);
+        const parMode = (nom) => s.win.document.querySelector(`.mode-switch-btn[data-mode="${nom}"]`);
+
+        await s.clique(parMode('loop_playlist'));
+        await s.clique(s.boutons[0]);
+        check('l\'aléatoire s\'ajoute au bouclage de playlist',
+            parMode('loop_playlist').classList.contains('active')
+            && parMode('shuffle').classList.contains('active'));
+
+        await s.clique(parMode('loop_track'));
+        check('la répétition de la piste les éteint tous deux',
+            parMode('loop_track').classList.contains('active')
+            && !parMode('shuffle').classList.contains('active')
+            && !parMode('loop_playlist').classList.contains('active'));
+
+        await s.clique(s.boutons[0]);
+        check('et l\'aléatoire éteint la répétition de la piste',
+            parMode('shuffle').classList.contains('active')
+            && !parMode('loop_track').classList.contains('active'));
     }
 
     console.log('\nCe que le réglage écrit\n');
@@ -378,14 +526,15 @@ async function browserSide() {
             SETTINGS.indexOf('window.MusicPlayer.setPreloadAll = function'),
             SETTINGS.indexOf('/** Du réglage enregistré vers la position du curseur. */'));
 
-        check('les deux listes passent à « toutes les pistes »',
-            /queueCount: PRELOAD_ALL/.test(setPreloadAll)
-            && /playlistCount: PRELOAD_ALL/.test(setPreloadAll));
-        check('  … et l\'historique garde la sienne',
+        check('chaque liste se règle séparément',
+            /listes\.includes\('queue'\) \? PRELOAD_ALL/.test(setPreloadAll)
+            && /listes\.includes\('playlist'\) \? PRELOAD_ALL/.test(setPreloadAll));
+        check('  … et l\'historique garde sa valeur',
             /historyCount: previous\.historyCount/.test(setPreloadAll),
             'on ne revient pas en arrière au hasard');
-        check('  … avec le préchargement rallumé s\'il ne l\'était pas',
-            /enabled: true/.test(setPreloadAll));
+        check('  … comme la liste qu\'on n\'a pas réglée',
+            /: \(previous\.queueCount \?\? 3\)/.test(setPreloadAll),
+            'rallumer le préchargement ne doit pas remettre l\'autre au cran par défaut');
         check('l\'invité le garde pour lui',
             /window\.MusicPlayer\.isGuest\(\)/.test(setPreloadAll),
             'le préchargement est un réglage du serveur, refusé côté serveur');
@@ -395,11 +544,14 @@ async function browserSide() {
 
     for (const lang of ['fr', 'en', 'es', 'de']) {
         const dict = JSON.parse(fs.readFileSync(path.join(PUBLIC, 'locales', `${lang}.json`), 'utf8'));
-        const clefs = ['tooltip_mode_shuffle', 'shuffle_preload_hint',
-            'shuffle_preload_action', 'shuffle_preload_done'];
+        const clefs = ['tooltip_mode_shuffle', 'shuffle_menu_title', 'shuffle_menu_text',
+            'shuffle_menu_queue', 'shuffle_menu_playlists'];
         const manquantes = clefs.filter(k => !dict[k]);
-        check(`« ${lang} » dit le mode et son invitation`, manquantes.length === 0,
+        check(`« ${lang} » dit le mode et son menu`, manquantes.length === 0,
             manquantes.join(', '));
+        check(`  … et ne garde rien de l'infobulle agissante`,
+            !['shuffle_preload_hint', 'shuffle_preload_action', 'shuffle_preload_done']
+                .some(k => k in dict));
     }
 }
 

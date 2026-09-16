@@ -12,13 +12,15 @@
        Les trois derniers rangs de la pile, de haut en bas :
 
          2147483647  l'infobulle    (#custom-tooltip, plus bas dans ce fichier)
-         2147483646  la notification, et la bulle de refus (#perm-refusal)
+         2147483646  la notification, la bulle de refus (#perm-refusal) et le
+                     menu du mode aléatoire (.shuffle-menu)
          2147483645  la vidéo en plein écran de pure CSS (css/video.css)
 
-       La bulle de refus partage le rang de la notification : toutes deux
-       répondent au geste qu'on vient de faire, et doivent passer devant la
-       vidéo en plein écran, dont une commande peut être refusée. Elles ne se
-       recouvrent pas — l'une est ancrée sur la commande, l'autre dans le coin.
+       Ces trois-là partagent un rang : toutes répondent au geste qu'on vient de
+       faire, et doivent passer devant la vidéo en plein écran, dont une commande
+       peut être refusée et dont le sélecteur de mode porte le bouton aléatoire.
+       Elles ne se recouvrent pas — deux sont ancrées sur la commande touchée, la
+       troisième vit dans le coin.
 
        Tout le reste est loin dessous : modales à 30 000, tiroir à 9 999,
        fenêtres flottantes distribuées par `bringToFront()` à partir de 9 990.
@@ -2197,7 +2199,7 @@
  * réglage est fait.
  */
 .mode-switch-btn.needs-preload.active {
-    animation: shuffle-needs-preload 2.6s ease-out infinite;
+    animation: shuffle-needs-preload 1.5s ease-out infinite;
 }
 
 @keyframes shuffle-needs-preload {
@@ -2872,36 +2874,70 @@
 }
 
 /*
- * Infobulle agissante.
+ * Le menu du mode aléatoire.
  *
- * Une explication seule laisse l'utilisateur aller chercher le réglage dont on
- * vient de lui parler, trois clics plus loin. Celle-ci porte le geste : voir
- * `actionOf` dans js/tooltipSystem.js, et son premier client, js/shuffleHint.js.
+ * Il naît du clic qui allume le mode, sous le bouton qu'on vient de toucher, et
+ * porte un bouton par liste dont le préchargement est encore borné. Voir
+ * js/shuffleHint.js, qui décide quand, et ce qu'il contient.
  *
- * Elle cesse donc d'être décorative — il faut pouvoir y entrer avec le
- * pointeur, ce que l'infobulle s'interdit partout ailleurs. L'autorisation ne
- * vaut que visible : repliée, elle se mettrait en travers des clics de la page.
+ * Il emprunte les couleurs de l'infobulle — même fond, même flou, même bordure —
+ * parce qu'il sort du même geste et du même bouton ; ce qui l'en distingue est
+ * qu'on peut y entrer et y cliquer.
  */
-#custom-tooltip.has-action {
-    max-width: 300px;
-    padding: 10px 12px;
-}
-
-#custom-tooltip.has-action.visible {
-    pointer-events: auto;
-}
-
-/* Sans vignette au-dessus, le texte est le propos de l'infobulle et non son
-   commentaire : il garde la couleur pleine. */
-#custom-tooltip:not(.has-media) .tooltip-text {
+.shuffle-menu {
+    position: fixed;
+    /* Au rang de ce qui répond à un geste : le bouton du mode vit aussi dans la
+       fenêtre vidéo, qui peut être en plein écran. Voir l'échelle en tête de
+       cette feuille. */
+    z-index: 2147483646;
+    width: 268px;
+    max-width: calc(100vw - 16px);
+    padding: 13px 14px 11px;
+    border-radius: 12px;
+    font-family: var(--font-primary);
     color: var(--text-main);
+    background: var(--bg-dropdown);
+    border: 1px solid var(--border-card-hover);
+    backdrop-filter: blur(var(--blur-val));
+    -webkit-backdrop-filter: blur(var(--blur-val));
+    box-shadow: var(--shadow-card), 0 6px 22px rgba(0, 0, 0, 0.32);
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+    transition: opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.tooltip-action {
+/* Ouvert au-dessus du bouton, il entre par le bas : une fenêtre se lève du
+   côté d'où elle vient. */
+.shuffle-menu[data-cote="dessus"] {
+    transform: translateY(6px) scale(0.97);
+}
+
+.shuffle-menu.is-open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.shuffle-menu-title {
+    margin: 0 0 6px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.shuffle-menu-text {
+    margin: 0 0 11px;
+    font-size: 0.76rem;
+    font-weight: 500;
+    line-height: 1.45;
+    color: var(--text-muted);
+}
+
+.shuffle-menu-btn {
     display: block;
     width: 100%;
-    margin-top: 9px;
-    padding: 7px 10px;
+    margin-top: 7px;
+    padding: 8px 10px;
     border: none;
     border-radius: 8px;
     background: linear-gradient(135deg, var(--c-primary) 0%, var(--c-violet) 100%);
@@ -2910,19 +2946,19 @@
     font-size: 0.76rem;
     font-weight: 600;
     letter-spacing: 0.01em;
-    white-space: normal;
     cursor: pointer;
     transition: filter 0.18s ease, transform 0.18s ease;
 }
 
-.tooltip-action:hover {
+.shuffle-menu-btn:hover {
     filter: brightness(1.12);
     transform: translateY(-1px);
 }
 
-.tooltip-action:active {
+.shuffle-menu-btn:active {
     transform: translateY(0);
 }
+
 
 /*
  * Infobulle illustrée.

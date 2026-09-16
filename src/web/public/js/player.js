@@ -340,6 +340,53 @@ window.MusicPlayer.updatePlayerCard = function(displayedTrack) {
     }
 };
 
+/**
+ * Marque tout de suite le mode qu'on vient de choisir, avant la réponse du serveur.
+ *
+ * Les règles sont celles de `handleSetPlayMode` (websocket/handlers/playbackHandlers.js),
+ * et l'écart entre les deux ne durerait qu'un aller-retour : c'est l'état diffusé
+ * qui fait foi, et il repeint tout quelques millisecondes plus tard. L'aperçu
+ * n'existe que pour que le bouton réponde au doigt sans attendre.
+ *
+ * Trois modes s'excluent — suivie, piste en boucle, playlist en boucle — et
+ * l'aléatoire est un interrupteur à part : il s'ajoute au bouclage de playlist
+ * et s'annule lui-même, mais ne tient pas avec la répétition de la piste.
+ *
+ * Les deux sélecteurs de la page sont peints ensemble, celui de la carte comme
+ * celui de la fenêtre vidéo : on n'en touche qu'un, ils disent tous les deux la
+ * même chose.
+ *
+ * @param {string} mode Le `data-mode` du bouton cliqué.
+ */
+window.MusicPlayer.previewPlayMode = function(mode) {
+    const etait = (nom) => {
+        const btn = document.querySelector(`.mode-switch-btn[data-mode="${nom}"]`);
+        return Boolean(btn && btn.classList.contains('active'));
+    };
+
+    let aleatoire = etait('shuffle');
+    let parcours = etait('loop_track') ? 'loop_track'
+        : (etait('loop_playlist') ? 'loop_playlist' : 'default');
+
+    if (mode === 'shuffle') {
+        aleatoire = !aleatoire;
+        if (aleatoire && parcours === 'loop_track') parcours = 'default';
+    } else {
+        parcours = mode;
+        if (mode === 'loop_track' || mode === 'default') aleatoire = false;
+    }
+
+    document.querySelectorAll('.mode-switch-btn').forEach(btn => {
+        const nom = btn.getAttribute('data-mode');
+        if (nom === 'shuffle') btn.classList.toggle('active', aleatoire);
+        else btn.classList.toggle('active', nom === parcours);
+    });
+
+    if (typeof window.MusicPlayer.refreshShuffleHint === 'function') {
+        window.MusicPlayer.refreshShuffleHint({ shuffle: aleatoire });
+    }
+};
+
 // Controller de mode d'animation de la pochette "En cours de lecture"
 (function() {
     const MODES = ['pulse', 'spin', 'none'];

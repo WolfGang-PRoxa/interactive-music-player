@@ -190,7 +190,11 @@ connaît que la file réellement chargée : rejouer « la playlist » suppose de
 recharger depuis son premier titre, même si la lecture avait démarré en plein
 milieu.
 
-`shuffle` s'exclut des deux bouclages, et le tirage a lieu à l'enchaînement,
+`shuffle` est un interrupteur à part, et non un quatrième mode : il tient avec
+le bouclage de playlist — la rebattre à chaque tour est une demande courante — et
+s'annule d'un second clic. Il ne tient pas avec la répétition de la piste, qui ne
+fait jamais avancer la file : il n'y aurait aucun titre suivant à tirer. Le tirage
+a lieu à l'enchaînement,
 jamais d'avance : la diffusion commune s'en remet au mélange **dynamique** de
 discord-player (`enableShuffle(true)`), qui laisse la file dans son ordre, et la
 diffusion personnelle tire elle-même dans `WebServer.drawNextVirtualTrack()`.
@@ -198,7 +202,7 @@ Battre la file une fois pour toutes serait irréversible, et elle cesserait
 d'annoncer ce qui vient. En contrepartie, plus rien ne se déduit de l'ordre :
 le fondu enchaîné du navigateur ne prépare plus de titre suivant, et seul un
 `preloading` sans limite garde l'enchaînement immédiat — ce que le bouton du
-mode propose lui-même, depuis son infobulle.
+mode propose lui-même, dans le menu qu'il ouvre.
 
 `activePlaybackSource` ne revient pas à `'queue'` sur la seule décision de
 l'utilisateur : une playlist qui s'achève sans bouclage rend la main à la file

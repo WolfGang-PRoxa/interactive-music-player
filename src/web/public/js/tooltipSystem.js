@@ -4,7 +4,6 @@
 const TooltipSystem = (() => {
     let tooltipEl = null;
     let showTimer = null;
-    let hideTimer = null;
     let currentTarget = null;
     let mouseX = 0;
     let mouseY = 0;
@@ -24,17 +23,9 @@ const TooltipSystem = (() => {
         // Delegate hover events on the entire document
         document.addEventListener('mouseover', onMouseOver, { passive: true });
         document.addEventListener('mouseout', onMouseOut, { passive: true });
-        document.addEventListener('mousedown', hideUnlessInside, { passive: true });
-        document.addEventListener('wheel', hideUnlessInside, { passive: true });
+        document.addEventListener('mousedown', hide, { passive: true });
+        document.addEventListener('wheel', hide, { passive: true });
         document.addEventListener('keydown', hide, { passive: true });
-
-        /*
-         * L'infobulle qui porte un bouton se garde sous le pointeur : sans
-         * cela, quitter l'élément pour aller la cliquer la ferait disparaître
-         * en chemin, et le bouton n'existerait que pour l'œil.
-         */
-        tooltipEl.addEventListener('mouseenter', () => clearTimeout(hideTimer));
-        tooltipEl.addEventListener('mouseleave', () => { hide(); currentTarget = null; });
 
         // Observe DOM for dynamically-added title attributes → convert them
         const observer = new MutationObserver(mutations => {
@@ -119,52 +110,10 @@ const TooltipSystem = (() => {
         // Check if we moved into a child of the same tooltip target
         if (related && target.contains(related)) return;
         clearTimeout(showTimer);
-        if (currentTarget !== target) return;
-
-        if (tooltipEl && tooltipEl.classList.contains('has-action')) {
-            // Déjà entré dans l'infobulle : il n'y a rien à fermer.
-            if (related && tooltipEl.contains(related)) return;
-            // Sinon un court sursis, le temps de l'atteindre en diagonale.
-            clearTimeout(hideTimer);
-            hideTimer = setTimeout(() => { hide(); currentTarget = null; }, 180);
-            return;
+        if (currentTarget === target) {
+            hide();
+            currentTarget = null;
         }
-
-        hide();
-        currentTarget = null;
-    }
-
-    /** Ferme, sauf si le geste vient de l'infobulle elle-même. */
-    function hideUnlessInside(e) {
-        if (e && e.target && tooltipEl && tooltipEl.contains(e.target)) return;
-        hide();
-        currentTarget = null;
-    }
-
-    /**
-     * Le bouton que l'infobulle doit porter, s'il y en a un.
-     *
-     * Il est déclaré par l'élément survolé : `data-tooltip-action` nomme la
-     * clé de traduction du libellé, `data-tooltip-action-call` la fonction de
-     * `window.MusicPlayer` à appeler. Les deux sont exigées, et la fonction
-     * doit exister — un bouton qui ne fait rien vaut moins que pas de bouton.
-     *
-     * Relu à chaque affichage, comme le reste : celui qui pose ces attributs
-     * les retire quand l'action n'a plus lieu d'être, et l'infobulle suivante
-     * s'ouvre sans bouton sans que personne ait à la prévenir.
-     */
-    function actionOf(target) {
-        const labelKey = target.getAttribute('data-tooltip-action');
-        const callName = target.getAttribute('data-tooltip-action-call');
-        if (!labelKey || !callName) return null;
-
-        const label = translate(labelKey);
-        if (!label) return null;
-
-        const run = window.MusicPlayer && window.MusicPlayer[callName];
-        if (typeof run !== 'function') return null;
-
-        return { label, run };
     }
 
     /** La traduction d'une clé, ou rien si le dictionnaire ne la connaît pas. */
@@ -204,8 +153,7 @@ const TooltipSystem = (() => {
             if (hint) text = text ? `${text}\n${hint}` : hint;
         }
 
-        const action = actionOf(target);
-        if (!text && !action) return;
+        if (!text) return;
 
         // La durée de maintien annoncée est recalculée à chaque affichage : le
         // réglage peut changer sans que la page soit rechargée.
@@ -227,7 +175,7 @@ const TooltipSystem = (() => {
             }
         } catch (e) {}
 
-        renderTooltip(target, text, action);
+        renderTooltip(target, text);
         // Position near cursor
         positionTooltip();
         // Trigger the CSS transition
@@ -241,73 +189,54 @@ const TooltipSystem = (() => {
      * l'élément et n'interprète rien. C'est ce qui protège la centaine
      * d'infobulles de la page : leur chemin ne change pas d'un iota.
      *
-     * L'entête illustrée et le bouton d'action sont deux options, demandées
-     * par `data-tooltip-image` et `data-tooltip-action`. Elles sont bâties
-     * nœud par nœud plutôt que par `innerHTML` : le nom qui s'y affiche est
-     * celui d'un fichier venu d'ailleurs — une balise glissée dans un titre ne
-     * doit pas devenir du balisage.
+     * L'entête illustrée est une option, demandée par `data-tooltip-image`, et
+     * elle est bâtie nœud par nœud plutôt que par `innerHTML` : le nom qui s'y
+     * affiche est celui d'un fichier venu d'ailleurs — une balise glissée dans
+     * un titre ne doit pas devenir du balisage.
      */
-    function renderTooltip(target, text, action) {
+    function renderTooltip(target, text) {
         const image = target.getAttribute('data-tooltip-image');
         const title = target.getAttribute('data-tooltip-title');
 
         tooltipEl.classList.toggle('has-media', !!image);
-        tooltipEl.classList.toggle('has-action', !!action);
 
-        if (!image && !action) {
+        if (!image) {
             tooltipEl.textContent = text;
             return;
         }
 
         tooltipEl.textContent = '';
 
-        if (image) {
-            const header = document.createElement('div');
-            header.className = 'tooltip-media';
+        const header = document.createElement('div');
+        header.className = 'tooltip-media';
 
-            const img = document.createElement('img');
-            img.src = image;
-            img.alt = '';
+        const img = document.createElement('img');
+        img.src = image;
+        img.alt = '';
 
-            // Une vignette distante peut avoir disparu depuis qu'on en a reçu
-            // l'adresse. Le repli reprend alors la main, plutôt que de laisser
-            // l'icône d'image brisée du navigateur au milieu de l'infobulle.
-            const fallback = target.getAttribute('data-tooltip-image-fallback');
-            if (fallback) {
-                img.addEventListener('error', () => { img.src = fallback; }, { once: true });
-            }
-            header.appendChild(img);
-
-            if (title) {
-                const name = document.createElement('span');
-                name.className = 'tooltip-media-title';
-                name.textContent = title;
-                header.appendChild(name);
-            }
-
-            tooltipEl.appendChild(header);
+        // Une vignette distante peut avoir disparu depuis qu'on en a reçu
+        // l'adresse. Le repli reprend alors la main, plutôt que de laisser
+        // l'icône d'image brisée du navigateur au milieu de l'infobulle.
+        const fallback = target.getAttribute('data-tooltip-image-fallback');
+        if (fallback) {
+            img.addEventListener('error', () => { img.src = fallback; }, { once: true });
         }
+        header.appendChild(img);
+
+        if (title) {
+            const name = document.createElement('span');
+            name.className = 'tooltip-media-title';
+            name.textContent = title;
+            header.appendChild(name);
+        }
+
+        tooltipEl.appendChild(header);
 
         if (text) {
             const body = document.createElement('div');
             body.className = 'tooltip-text';
             body.textContent = text;
             tooltipEl.appendChild(body);
-        }
-
-        if (action) {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'tooltip-action';
-            btn.textContent = action.label;
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                try { action.run(); } catch (err) {}
-                hide();
-                currentTarget = null;
-            });
-            tooltipEl.appendChild(btn);
         }
     }
 
@@ -368,7 +297,6 @@ const TooltipSystem = (() => {
             tooltipEl.classList.remove('visible');
         }
         clearTimeout(showTimer);
-        clearTimeout(hideTimer);
     }
 
     return { init, hide, refresh };

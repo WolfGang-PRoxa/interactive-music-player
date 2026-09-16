@@ -293,8 +293,11 @@ class GuildDatabase {
              * la file cesserait d'annoncer ce qui vient — deux inconvénients
              * qu'un tirage au moment de l'enchaînement n'a pas.
              *
-             * Exclusif des deux bouclages, comme ils le sont entre eux : le
-             * tableau de bord n'offre qu'un mode actif à la fois.
+             * Indépendant du bouclage de playlist : relire une playlist en la
+             * rebattant est une demande courante, et les deux réglages tiennent
+             * ensemble. Exclusif, en revanche, de la répétition de la piste —
+             * celle-ci ne fait jamais avancer la file, il n'y aurait donc aucun
+             * titre suivant à tirer.
              */
             shuffle: false,
 

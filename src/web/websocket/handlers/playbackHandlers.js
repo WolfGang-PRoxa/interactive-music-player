@@ -480,19 +480,39 @@ function handleSetPlayMode(ctx) {
             try {
                 const { QueueRepeatMode } = require('discord-player');
 
-                // Les quatre modes s'excluent. Le bouclage de playlist ne passe
-                // pas par le mode de répétition de discord-player : celui-ci ne
-                // rejouerait que la file réellement chargée, c'est-à-dire la
-                // portion à partir du titre lancé, et non la playlist entière.
+                /*
+                 * Trois modes qui s'excluent, et un interrupteur à part.
+                 *
+                 * « Lecture suivie », « répéter la piste » et « répéter la
+                 * playlist » sont trois façons de parcourir la liste, et une
+                 * seule peut valoir à la fois. L'aléatoire, lui, ne dit pas
+                 * comment on parcourt mais dans quel ordre : il s'ajoute au
+                 * bouclage de playlist — relire la playlist en la rebattant est
+                 * une demande courante — et se retire d'un second clic.
+                 *
+                 * Il reste incompatible avec la répétition de la piste : celle-ci
+                 * ne fait jamais avancer la file, il n'y a donc pas de titre
+                 * suivant à tirer, et deux boutons allumés dont l'un n'agit pas
+                 * laisseraient croire le contraire.
+                 *
+                 * Le bouclage de playlist ne passe pas par le mode de répétition
+                 * de discord-player : celui-ci ne rejouerait que la file
+                 * réellement chargée, c'est-à-dire la portion à partir du titre
+                 * lancé, et non la playlist entière.
+                 */
                 if (mode === 'loop_track') {
                     queue.setRepeatMode(QueueRepeatMode.TRACK);
                     database.updateSettings(currentGuildId, { loopPlaylist: false, shuffle: false });
                 } else if (mode === 'loop_playlist') {
                     queue.setRepeatMode(QueueRepeatMode.OFF);
-                    database.updateSettings(currentGuildId, { loopPlaylist: true, shuffle: false });
+                    database.updateSettings(currentGuildId, { loopPlaylist: true });
                 } else if (mode === 'shuffle') {
-                    queue.setRepeatMode(QueueRepeatMode.OFF);
-                    database.updateSettings(currentGuildId, { loopPlaylist: false, shuffle: true });
+                    // L'interrupteur : ce qui était allumé s'éteint. C'est le
+                    // seul des quatre à s'annuler lui-même, les trois autres
+                    // s'annulant l'un l'autre.
+                    const allume = !database.getSettings(currentGuildId).shuffle;
+                    if (allume) queue.setRepeatMode(QueueRepeatMode.OFF);
+                    database.updateSettings(currentGuildId, { shuffle: allume });
                 } else if (mode === 'default') {
                     queue.setRepeatMode(QueueRepeatMode.OFF);
                     database.updateSettings(currentGuildId, { loopPlaylist: false, shuffle: false });

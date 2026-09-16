@@ -390,10 +390,9 @@ console.log('\nCe que les infobulles ajoutent aux deux nombres\n');
         'le titre vient d\'un fichier, pas de nous');
 
     // La centaine d'infobulles textuelles de la page ne doit pas changer de
-    // chemin pour autant — ni pour la vignette, ni pour le bouton d'action que
-    // l'infobulle sait porter depuis (voir tests/shuffleMode.js).
+    // chemin pour autant.
     check('  … et le texte seul repasse par où il passait',
-        /if \(!image && !action\) \{\s*tooltipEl\.textContent = text;/.test(TIPS));
+        /if \(!image\) \{\s*tooltipEl\.textContent = text;/.test(TIPS));
 }
 
 // ───────────────────── Les deux nombres ouvrent le réglage ─────────────────────
