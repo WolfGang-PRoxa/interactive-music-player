@@ -892,7 +892,15 @@ window.MusicPlayer.updateVideoPlayer = async function(track) {
         }
         window.MusicPlayer.syncVideoPlayState(state.isPlaying, state.isPaused);
     } else {
-        // YouTube track: fetch direct video-only stream from /api/video-info
+        /*
+         * Piste YouTube : le bot résout le flux, et le sert lui-même.
+         *
+         * `/api/video-info` rendait jusqu'ici l'adresse `*.googlevideo.com` que
+         * la balise <video> allait chercher elle-même. Elle rend désormais une
+         * adresse du bot — voir src/web/mediaRelay.js pour ce qui l'imposait :
+         * une adresse signée pour le bot ne vaut pas pour l'invité qui la suit
+         * depuis son propre réseau.
+         */
         if (videoCanvas) {
             videoCanvas.classList.remove('hidden');
             startCanvasLoop();

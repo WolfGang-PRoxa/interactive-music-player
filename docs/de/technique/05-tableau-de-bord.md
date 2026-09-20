@@ -50,6 +50,7 @@ Alle sind durch das Token geschützt ([07 — Sicherheit](07-securite.md)).
 | `GET /api/stream` | Audiostrom eines Titels, für den Player des Browsers |
 | `GET /api/download` | Umgewandelter Download, 32 Format-/Qualitätskombinationen (MP3, M4A, FLAC, WAV, OGG, OPUS, WEBM, MP4) |
 | `GET /api/video-info` | Auflösung einer Video-URL über yt-dlp, Speicher-Cache von einer Stunde |
+| `GET /api/video-stream` | Leitet die Videobytes weiter, Bereiche werden beachtet; die aufgelöste Adresse ist für den Bot signiert und nützt einem Gast nichts |
 | `POST /api/upload` | Dateiimport, roher Strom mit Kopfzeile `X-File-Name` |
 | `GET /api/docs` | Inhaltsverzeichnis der eingebetteten Dokumentation, in der angefragten Sprache |
 | `GET /api/docs/content` | Markdown-Quelle eines Dokuments, bezeichnet durch Kennung und Sprache |

@@ -49,6 +49,7 @@ Todas están protegidas por el testigo ([07 — Seguridad](07-securite.md)).
 | `GET /api/stream` | Flujo de audio de una pista, para el reproductor del navegador |
 | `GET /api/download` | Descarga transcodificada, 32 combinaciones formato/calidad (MP3, M4A, FLAC, WAV, OGG, OPUS, WEBM, MP4) |
 | `GET /api/video-info` | Resolución de una URL de vídeo mediante yt-dlp, caché en memoria de una hora |
+| `GET /api/video-stream` | Retransmite los bytes del vídeo, respetando los rangos; la dirección resuelta está firmada para el bot y no sirve a un invitado |
 | `POST /api/upload` | Importación de archivo, flujo en bruto con cabecera `X-File-Name` |
 | `GET /api/docs` | Índice de la documentación embebida, en el idioma pedido |
 | `GET /api/docs/content` | Fuente Markdown de un documento, designado por su identificador y su idioma |

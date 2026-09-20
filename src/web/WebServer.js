@@ -502,19 +502,22 @@ class WebServer {
          *  - `img-src https:` parce que les pochettes viennent d'où la piste
          *    vient — iTunes, YouTube, Discord — et que la liste ne se ferme pas.
          *  - `media-src https:` pour la même raison, et c'est la ligne qui
-         *    manquait à cette liste quand elle a été écrite. La balise <video>
-         *    ne reçoit pas un flux du bot : `/api/video-info` lui rend l'adresse
-         *    qu'il a résolue chez la source, sur un hôte
-         *    `*.googlevideo.com` que rien n'annonce à l'avance. Fermée à
-         *    `'self'`, la politique bloquait donc toute vidéo avant même la
-         *    requête, et le lecteur retombait sur le visualiseur en annonçant
-         *    « erreur de lecture (code 4) » — le code que le navigateur rend
-         *    pour une source qu'il n'a pas pu charger.
+         *    manquait à cette liste quand elle a été écrite. Fermée à `'self'`,
+         *    la politique bloquait toute vidéo avant même la requête, et le
+         *    lecteur retombait sur le visualiseur en annonçant « erreur de
+         *    lecture (code 4) » — le code que le navigateur rend pour une source
+         *    qu'il n'a pas pu charger.
          *
-         *    Élargir ne coûte rien ici : `img-src https:` autorise déjà
-         *    n'importe quel hôte, et une balise média n'exécute pas de code.
-         *    Refermer cette directive supposerait de faire passer les octets
-         *    par le bot, comme le fait déjà `/api/stream` pour l'audio.
+         *    Ce qui l'exigeait alors n'existe plus : les flux résolus chez la
+         *    source passent maintenant par le bot, comme le fait depuis toujours
+         *    `/api/stream` pour l'audio — voir src/web/mediaRelay.js. Ce qui la
+         *    retient encore est plus modeste : une piste peut être l'adresse
+         *    d'un fichier vidéo quelconque, ajoutée telle quelle, et celle-là
+         *    est servie au navigateur sans détour.
+         *
+         *    Élargir ne coûte d'ailleurs pas grand-chose : `img-src https:`
+         *    autorise déjà n'importe quel hôte, et une balise média n'exécute
+         *    pas de code.
          *  - `connect-src` porte `ws:` et `wss:` : la WebSocket du tableau de
          *    bord, sans laquelle il reste muet.
          *  - `frame-ancestors 'none'` : rien n'encadre ce tableau de bord, et

@@ -97,35 +97,9 @@ function mimeFor(filePath) {
     return MIME_TYPES[path.extname(filePath).slice(1).toLowerCase()] || 'application/octet-stream';
 }
 
-/**
- * Analyse un en-tête Range.
- * @returns {{start: number, end: number}|{invalid: true}|null} null si absent ou illisible
- */
-function parseRange(rangeHeader, size) {
-    const m = /^bytes=(\d*)-(\d*)$/.exec(String(rangeHeader || '').trim());
-    if (!m) return null;
-
-    const [, rawStart, rawEnd] = m;
-    if (rawStart === '' && rawEnd === '') return null;
-
-    let start;
-    let end;
-    if (rawStart === '') {
-        // Forme suffixe : les N derniers octets
-        const n = parseInt(rawEnd, 10);
-        if (!Number.isFinite(n) || n <= 0) return null;
-        start = Math.max(0, size - n);
-        end = size - 1;
-    } else {
-        start = parseInt(rawStart, 10);
-        end = rawEnd === '' ? size - 1 : parseInt(rawEnd, 10);
-    }
-
-    if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
-    if (start >= size || start > end) return { invalid: true };
-
-    return { start, end: Math.min(end, size - 1) };
-}
+// La lecture des plages est partie auprès de son lecteur le plus exigeant : le
+// relais vidéo, qui doit satisfaire Safari. Voir src/web/mediaRelay.js.
+const { parseRange, probeRemote, relayRemote } = require('../mediaRelay');
 
 /**
  * Sert un fichier en honorant les requêtes Range.
@@ -1236,8 +1210,21 @@ function createApiRouter(webServer) {
             }
 
             return {
+                /*
+                 * L'adresse résolue et ses en-têtes restent ici.
+                 *
+                 * Ils ne sont d'aucun usage au tableau de bord, qui ne va plus
+                 * chercher la vidéo lui-même — c'est tout l'objet du relais. Les
+                 * lui envoyer quand même ferait sortir une adresse signée par
+                 * une porte qui n'a plus de raison de s'ouvrir.
+                 */
+                source: {
+                    url: optimal.url,
+                    // Ceux que la source a exigés à la résolution, qu'elle peut
+                    // réclamer à nouveau au moment de servir les octets.
+                    headers: optimal.http_headers || {},
+                },
                 data: {
-                    videoUrl: optimal.url,
                     height: optimal.height,
                     // Hauteur demandée : le client peut ainsi signaler l'écart sans
                     // relire les réglages.
@@ -1254,46 +1241,165 @@ function createApiRouter(webServer) {
         }
     }
 
-    router.get('/video-info', async (req, res) => {
+    /**
+     * Ce qu'une requête vidéo désigne, ou pourquoi elle ne désigne rien.
+     *
+     * Les deux routes vidéo partent du même point : la même cible, la même
+     * hauteur, donc la même clé de cache. Les séparer les aurait fait diverger
+     * au premier changement — et une résolution que le relais ne retrouve pas,
+     * c'est une vidéo qui ne vient jamais.
+     *
+     * @returns {{ error: string, status: number } | { targetQuery: string, targetHeight: number, cacheKey: string }}
+     */
+    function videoTarget(req) {
         const { trackUrl, title, author, guildId } = req.query;
         const targetQuery = trackUrl || `${title || ''} ${author || ''}`.trim();
-        if (!targetQuery) return res.status(400).json({ error: 'trackUrl ou titre requis' });
+        if (!targetQuery) return { status: 400, error: 'trackUrl ou titre requis' };
 
         // Reject local files or uploads directly (audio visualizer canvas will be used client-side)
         if (!/^https?:\/\//i.test(targetQuery) || targetQuery.includes('/uploads/') || targetQuery.includes('data\\uploads') || /^[a-zA-Z]:[\\\/]/.test(targetQuery)) {
-            return res.status(404).json({ error: 'Local audio file, no video extraction needed' });
+            return { status: 404, error: 'Local audio file, no video extraction needed' };
         }
 
-        const targetHeight = resolveVideoHeight(guildId || webServer._getFirstGuildId(), { url: trackUrl });
+        /*
+         * La hauteur vient de l'adresse quand elle y est.
+         *
+         * `/api/video-info` la calcule d'après les réglages du salon et l'inscrit
+         * dans l'adresse du relais ; celui-ci la relit telle quelle. Sans cela, un
+         * réglage changé entre la résolution et la lecture enverrait le relais
+         * chercher une autre entrée de cache que celle qui vient d'être annoncée,
+         * et la vidéo se rechargerait en plein milieu.
+         */
+        const demandee = Number(req.query.height);
+        const targetHeight = Number.isFinite(demandee) && demandee > 0
+            ? demandee
+            : resolveVideoHeight(guildId || webServer._getFirstGuildId(), { url: trackUrl });
+
         // La hauteur entre dans la clé : changer de qualité doit relancer une
         // résolution, pas resservir l'entrée mise en cache pour l'ancienne.
-        const cacheKey = `${targetQuery.toLowerCase()}|${targetHeight}`;
+        return { targetQuery, targetHeight, cacheKey: `${targetQuery.toLowerCase()}|${targetHeight}` };
+    }
 
+    /**
+     * La résolution d'une cible, du cache si elle y est, d'une extraction sinon.
+     *
+     * @returns {Promise<{ data?: object, source?: object, status?: number, error?: string }>}
+     */
+    async function videoOutcome({ targetQuery, targetHeight, cacheKey }, fallback) {
         const cached = videoCache.get(cacheKey);
         if (cached) {
             const ttl = cached.error ? VIDEO_FAILURE_TTL_MS : VIDEO_CACHE_TTL_MS;
-            if (Date.now() - cached.timestamp < ttl) {
-                return cached.error
-                    ? res.status(cached.status || 500).json({ error: cached.error })
-                    : res.json(cached.data);
-            }
+            if (Date.now() - cached.timestamp < ttl) return cached;
             videoCache.delete(cacheKey);
         }
 
         let pending = videoInFlight.get(cacheKey);
         if (!pending) {
-            pending = resolveVideoStream(targetQuery, targetHeight, { title, author })
+            pending = resolveVideoStream(targetQuery, targetHeight, fallback)
                 .then((outcome) => {
-                    videoCache.set(cacheKey, { timestamp: Date.now(), ...outcome });
-                    return outcome;
+                    const entry = { timestamp: Date.now(), ...outcome };
+                    videoCache.set(cacheKey, entry);
+                    return entry;
                 })
                 .finally(() => videoInFlight.delete(cacheKey));
             videoInFlight.set(cacheKey, pending);
         }
 
-        const outcome = await pending;
+        return pending;
+    }
+
+    router.get('/video-info', async (req, res) => {
+        const target = videoTarget(req);
+        if (target.error) return res.status(target.status).json({ error: target.error });
+
+        const { trackUrl, title, author, guildId } = req.query;
+        const outcome = await videoOutcome(target, { title, author });
         if (outcome.error) return res.status(outcome.status || 500).json({ error: outcome.error });
-        res.json(outcome.data);
+
+        /*
+         * L'adresse rendue est celle du bot, jamais celle de la source.
+         *
+         * C'est tout le sujet : voir l'en-tête de src/web/mediaRelay.js. Elle ne
+         * dépend que de la piste et de la hauteur, donc elle ne bouge plus d'une
+         * résolution à l'autre — le tableau de bord compare `data-loaded-src`
+         * pour décider s'il recharge, et une adresse signée fraîchement renouvelée
+         * lui faisait recharger la vidéo en pleine lecture, à chaque expiration
+         * du cache.
+         */
+        const params = new URLSearchParams({
+            guildId: guildId || '',
+            trackUrl: trackUrl || '',
+            title: title || '',
+            author: author || '',
+            height: String(target.targetHeight),
+        });
+
+        res.json({ ...outcome.data, videoUrl: `/api/video-stream?${params}` });
+    });
+
+    router.get('/video-stream', async (req, res) => {
+        const target = videoTarget(req);
+        if (target.error) return res.status(target.status).send(target.error);
+
+        const { title, author } = req.query;
+        const outcome = await videoOutcome(target, { title, author });
+        if (outcome.error || !outcome.source) {
+            return res.status(outcome.status || 500).send(outcome.error || 'Flux vidéo introuvable');
+        }
+
+        const { url, headers } = outcome.source;
+
+        try {
+            /*
+             * Le sondage est retenu sur l'entrée de cache elle-même.
+             *
+             * Il coûte une requête, et une balise <video> réclame des dizaines de
+             * plages pour une seule vidéo. Le poser là plutôt que dans une table à
+             * part lui donne la durée de vie qu'il faut sans rien à purger : il
+             * décrit cette adresse-ci, et disparaît avec elle.
+             *
+             * Le garde-fou des adresses sortantes précède le sondage, et c'est ce
+             * relais qui le rend nécessaire. Tant que le tableau de bord allait
+             * chercher la vidéo lui-même, une adresse interne ne menait nulle
+             * part — le navigateur d'un invité n'atteint pas le réseau de l'hôte.
+             * Maintenant que le bot va la chercher *et* rend le corps au client,
+             * la piste ajoutée par un invité pourrait servir de longue-vue sur ce
+             * réseau. Voir utils/outbound.js, et le même contrôle sur /download.
+             */
+            if (!outcome.probe) {
+                outcome.probe = (async () => {
+                    const verdict = await require('../../utils/outbound').isFetchable(url);
+                    if (!verdict.ok) throw new Error(`adresse non autorisée — ${verdict.reason}`);
+                    return probeRemote(url, headers);
+                })();
+            }
+            const { size, contentType } = await outcome.probe;
+
+            if (!size) {
+                // Sans taille, aucune plage ne peut être annoncée, et une balise
+                // <video> ne lit pas ce qu'elle ne peut pas parcourir.
+                log.warn('[WebServer Video-Stream] Source announces no size, video unplayable');
+                return res.status(502).send('Taille du flux vidéo inconnue');
+            }
+
+            relayRemote(req, res, {
+                url,
+                headers,
+                size,
+                contentType,
+                onError: (message) => log.warn(`[WebServer Video-Stream] Relay interrupted: ${message}`),
+            });
+        } catch (err) {
+            /*
+             * Une adresse résolue peut avoir expiré depuis : elles ne valent que
+             * quelques heures. L'entrée est jetée pour que la requête suivante
+             * reparte d'une extraction neuve plutôt que de buter cent fois sur la
+             * même adresse morte.
+             */
+            videoCache.delete(target.cacheKey);
+            log.warn(`[WebServer Video-Stream] Unreachable source, resolution dropped: ${err.message}`);
+            if (!res.headersSent) res.status(502).send('Source vidéo injoignable');
+        }
     });
 
     router.post('/upload', right('queue.add'), async (req, res) => {

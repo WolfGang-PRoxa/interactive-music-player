@@ -48,6 +48,7 @@ All are protected by the token ([07 — Security](07-securite.md)).
 | `GET /api/stream` | Audio stream of a track, for the browser's player |
 | `GET /api/download` | Transcoded download, 32 format/quality combinations (MP3, M4A, FLAC, WAV, OGG, OPUS, WEBM, MP4) |
 | `GET /api/video-info` | Resolution of a video URL through yt-dlp, one-hour memory cache |
+| `GET /api/video-stream` | Relays the video bytes, ranges honoured; the resolved address is signed for the bot and is worthless to a guest |
 | `POST /api/upload` | File import, raw stream with an `X-File-Name` header |
 | `GET /api/docs` | Contents of the embedded documentation, in the requested language |
 | `GET /api/docs/content` | Markdown source of a document, designated by its identifier and its language |

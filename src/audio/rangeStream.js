@@ -151,13 +151,35 @@ function placeLibre(out) {
  * pour reprendre à la bonne place, et une valeur de retour serait perdue avec
  * l'exception.
  *
+ * La fenêtre ne sert qu'au cas du serveur qui ignore les plages : il répond 200
+ * et envoie le fichier entier, à charge pour nous d'en extraire ce qui avait été
+ * demandé. Elle est donc sans effet sur le compteur, dont la reprise ne concerne
+ * que l'autre cas — celui où chaque tranche est bien celle qu'on a réclamée.
+ *
  * @param {import('stream').Readable} res
  * @param {import('stream').Writable} out
  * @param {{ recus: number }} compteur
+ * @param {{ ignorer: number, restant: number|null }} [fenetre]
  */
-async function verser(res, out, compteur) {
-    for await (const morceau of res) {
-        compteur.recus += morceau.length;
+async function verser(res, out, compteur, fenetre = null) {
+    let ignorer = fenetre ? fenetre.ignorer : 0;
+    let restant = fenetre ? fenetre.restant : null;
+
+    for await (const brut of res) {
+        compteur.recus += brut.length;
+
+        let morceau = brut;
+        if (ignorer > 0) {
+            const saute = Math.min(ignorer, morceau.length);
+            ignorer -= saute;
+            morceau = morceau.subarray(saute);
+        }
+        if (restant !== null) {
+            if (restant <= 0) { res.destroy(); return; }
+            morceau = morceau.subarray(0, restant);
+            restant -= morceau.length;
+        }
+        if (!morceau.length) continue;
 
         if (!out.write(morceau)) {
             await placeLibre(out);
@@ -172,32 +194,55 @@ async function verser(res, out, compteur) {
 /**
  * Télécharge une adresse par tranches, et rend le tout comme un flux unique.
  *
+ * `start` et `end` bornent ce qu'on veut du fichier, la fin comprise, comme les
+ * bornes d'un en-tête `Range`. Ils servent au relais vidéo, qui doit rendre
+ * exactement la plage que le navigateur lui a demandée — Safari commence par
+ * réclamer `bytes=0-1` et refuse de lire si on lui sert autre chose.
+ *
  * @param {string} url
  * @param {object} [options]
  * @param {object} [options.headers] - En-têtes ajoutés à chaque tranche.
  * @param {number} [options.chunkBytes] - Taille d'une tranche.
+ * @param {number} [options.start] - Premier octet voulu.
+ * @param {number|null} [options.end] - Dernier octet voulu, lui compris.
  * @returns {import('stream').Readable}
  */
-function chunkedFetch(url, { headers = {}, chunkBytes = CHUNK_BYTES } = {}) {
+function chunkedFetch(url, {
+    headers = {}, chunkBytes = CHUNK_BYTES, start = 0, end = null,
+} = {}) {
     const out = new PassThrough();
 
     (async () => {
-        let debut = 0;
+        let debut = start;
+        // La taille du fichier, apprise du `Content-Range` ; distincte de `end`,
+        // qui dit seulement jusqu'où va la commande.
         let total = null;
         let echecs = 0;
 
         for (;;) {
             const compteur = { recus: 0 };
+            // Jamais au-delà de la borne : la dernière tranche est raccourcie.
+            const fin = end === null ? debut + chunkBytes - 1
+                : Math.min(debut + chunkBytes - 1, end);
+            const demandes = fin - debut + 1;
 
             try {
                 const res = await request(url, Object.assign({}, headers, {
-                    Range: `bytes=${debut}-${debut + chunkBytes - 1}`,
+                    Range: `bytes=${debut}-${fin}`,
                 }));
 
-                // 200 : la source ne sait pas découper et envoie tout. Rien à
-                // recoudre, et rien à demander de plus après celle-ci.
+                /*
+                 * 200 : la source ne sait pas découper et envoie tout, depuis le
+                 * premier octet. Rien à recoudre, et rien à demander de plus
+                 * après celle-ci — mais si l'appelant voulait une plage, c'est
+                 * ici qu'il faut la tailler, faute de quoi il recevrait le
+                 * fichier entier à la place des octets demandés.
+                 */
                 if (res.statusCode === 200) {
-                    await verser(res, out, compteur);
+                    await verser(res, out, compteur, {
+                        ignorer: start,
+                        restant: end === null ? null : end - start + 1,
+                    });
                     break;
                 }
 
@@ -223,9 +268,10 @@ function chunkedFetch(url, { headers = {}, chunkBytes = CHUNK_BYTES } = {}) {
 
             if (out.destroyed) return;
             if (!compteur.recus) break;
+            if (end !== null && debut > end) break;
             if (total !== null && debut >= total) break;
             // Taille inconnue : une tranche plus courte que demandée est la fin.
-            if (total === null && compteur.recus < chunkBytes) break;
+            if (total === null && compteur.recus < demandes) break;
         }
 
         out.end();
@@ -258,4 +304,10 @@ async function fetchToFile(url, dest, options) {
     return dest;
 }
 
-module.exports = { chunkedFetch, fetchToFile, CHUNK_BYTES };
+/*
+ * `openRequest` sort d'ici pour le relais vidéo, qui a besoin de poser une
+ * question à la source — sa taille — sans en tirer le moindre flux. Les
+ * redirections suivies et le délai de garde sont exactement ceux qu'il lui faut,
+ * et les réécrire ailleurs les ferait diverger.
+ */
+module.exports = { chunkedFetch, fetchToFile, openRequest: request, CHUNK_BYTES };

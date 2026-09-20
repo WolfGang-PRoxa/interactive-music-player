@@ -48,6 +48,7 @@ Toutes sont protégées par le jeton ([07 — Sécurité](07-securite.md)).
 | `GET /api/stream` | Flux audio d'une piste, pour le lecteur du navigateur |
 | `GET /api/download` | Téléchargement transcodé, 32 combinaisons format/qualité (MP3, M4A, FLAC, WAV, OGG, OPUS, WEBM, MP4) |
 | `GET /api/video-info` | Résolution d'une URL vidéo via yt-dlp, cache mémoire d'une heure |
+| `GET /api/video-stream` | Relais des octets de la vidéo, plages honorées ; l'adresse résolue est signée pour le bot et ne vaut pas pour un invité |
 | `POST /api/upload` | Import de fichier, flux brut avec en-tête `X-File-Name` |
 | `GET /api/docs` | Sommaire de la documentation embarquée, dans la langue demandée |
 | `GET /api/docs/content` | Source Markdown d'un document, désigné par son identifiant et sa langue |
