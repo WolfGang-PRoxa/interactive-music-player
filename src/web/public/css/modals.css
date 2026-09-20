@@ -937,17 +937,33 @@
     display: none;
 }
 
+/*
+ * Le bouton suit son contenu au lieu de tenir 38 px de large : il se prolonge
+ * vers la droite des photos des invités connectés. Sans invité, le glyphe et
+ * ses marges retombent exactement sur 38 px, et rien ne le distingue de ses
+ * voisins carrés.
+ *
+ * `--share-ring` est la teinte du bouton posée sur le fond de la page : le
+ * liseré de cette couleur détache chaque photo de celle qu'elle recouvre, comme
+ * si le bouton passait entre les deux.
+ */
 .btn-share-control {
     position: relative;
+    box-sizing: border-box;
+    width: auto;
+    min-width: 38px;
+    padding: 0 9px;
     color: var(--c-violet);
     border-color: color-mix(in srgb, var(--c-violet) 35%, transparent);
     background: color-mix(in srgb, var(--c-violet) 8%, transparent);
+    --share-ring: color-mix(in srgb, var(--c-violet) 8%, var(--bg-main));
 }
 
 .btn-share-control:hover {
     color: var(--c-violet);
     border-color: var(--c-violet);
     background: color-mix(in srgb, var(--c-violet) 18%, transparent);
+    --share-ring: color-mix(in srgb, var(--c-violet) 18%, var(--bg-main));
 }
 
 /*
@@ -1001,45 +1017,180 @@
     overflow: visible;
 }
 
-/* Nombre d'invités actuellement pourvus d'au moins un droit. */
-.share-badge {
+/*
+ * Les invités connectés, dans le prolongement du bouton — renderPresence(),
+ * dans js/sharedControl.js.
+ *
+ * C'est la largeur de la rangée qui transitionne, calculée d'après son nombre
+ * de cercles : un `width: auto` ne s'anime pas, une longueur si. Le bouton, lui,
+ * ne fait que la suivre.
+ *
+ * Les deux mouvements n'ont pas la même courbe. L'arrivée dépasse un peu sa
+ * cible avant de s'y poser, comme on fait de la place à quelqu'un ; le départ se
+ * resserre sans rebond — un bouton qui rétrécit en rebondissant paraîtrait
+ * hésiter. La transition retenue est celle de l'état d'arrivée, d'où la classe
+ * `is-shrinking` que le script pose quand le nombre baisse.
+ */
+.share-presence {
+    --presence-size: 24px;
+    /* Chaque photo recouvre le tiers de la suivante. */
+    --presence-step: 16px;
+    position: relative;
+    flex: none;
+    width: 0;
+    height: var(--presence-size);
+    margin-left: 0;
+    transition:
+        width 0.42s cubic-bezier(0.34, 1.45, 0.64, 1),
+        margin-left 0.42s cubic-bezier(0.34, 1.45, 0.64, 1);
+}
+
+.share-presence.has-guests {
+    width: calc(var(--presence-size) + (var(--slots, 1) - 1) * var(--presence-step));
+    margin-left: 8px;
+}
+
+.share-presence.is-shrinking {
+    transition:
+        width 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+        margin-left 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/*
+ * Un cercle : une photo, une initiale, ou le décompte des autres.
+ *
+ * Placé par `translate` plutôt que dans le flux : quand une photo s'en va, les
+ * suivantes glissent vers sa place au lieu d'y sauter. L'entrée et la sortie
+ * jouent sur `scale` et l'opacité, que rien d'autre ne touche. L'ordre de
+ * superposition — le premier par-dessus, le décompte tout en dessous — est posé
+ * par le script.
+ */
+.share-presence-item {
     position: absolute;
-    top: -6px;
-    right: -6px;
-    min-width: 17px;
-    height: 17px;
-    padding: 0 4px;
-    border-radius: 9px;
-    background: var(--c-violet);
-    color: #fff;
-    font-size: 0.62rem;
-    font-weight: 800;
-    line-height: 17px;
-    text-align: center;
+    top: 0;
+    left: 0;
     box-sizing: border-box;
+    width: var(--presence-size);
+    height: var(--presence-size);
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: color-mix(in srgb, var(--c-violet) 55%, var(--bg-main));
+    color: var(--text-main);
+    font-size: 0.66rem;
+    font-weight: 800;
+    line-height: 1;
+    box-shadow: 0 0 0 2px var(--share-ring);
+    translate: calc(var(--i, 0) * var(--presence-step)) 0;
     pointer-events: none;
+    transition:
+        translate 0.36s cubic-bezier(0.2, 0, 0, 1),
+        scale 0.28s ease,
+        opacity 0.28s ease,
+        box-shadow 0.2s ease;
+    /* `backwards` et non `both` : une fois entrée, la photo doit rendre `scale`
+       et l'opacité à la feuille, sans quoi sa sortie ne se jouerait pas. */
+    animation: share-presence-in 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+
+.share-presence-item img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/*
+ * Le décompte n'a de visible que la part que la photo précédente ne recouvre
+ * pas : son texte se centre sur cette part-là, faute de quoi le « + » passerait
+ * sous la photo.
+ */
+.share-presence-item.is-more {
+    padding-left: calc(var(--presence-size) - var(--presence-step));
+    background: color-mix(in srgb, var(--c-violet) 22%, var(--bg-main));
+    color: var(--c-violet);
+    font-size: 0.6rem;
+    letter-spacing: -0.3px;
+    font-variant-numeric: tabular-nums;
+}
+
+.share-presence-item.is-leaving {
+    scale: 0.3;
+    opacity: 0;
+}
+
+@keyframes share-presence-in {
+    from { scale: 0.3; opacity: 0; }
 }
 
 /*
  * Quelqu'un frappe à la porte.
  *
- * Le badge annonce d'ordinaire un décompte tranquille — le nombre d'invités
- * pourvus. Quand il annonce une demande, il change de couleur et respire : le
- * même nombre au même endroit, mais qui appelle un geste plutôt qu'il n'en rend
- * compte, et rien ne le dirait sans cela.
+ * Une admission ou un droit attend une réponse : la photo de celui qui la
+ * demande passe en tête de rangée et se cercle de la couleur d'appel, qu'une
+ * onde traverse. Le décompte en fait autant quand la demande vient de l'un de
+ * ceux qu'il range.
+ *
+ * L'onde est un pseudo-élément du cercle — une `<img>` n'en porte pas, d'où
+ * l'enveloppe — et joue sur son propre `transform`, pour ne pas disputer
+ * `scale` à l'entrée ni à la sortie.
  */
-.share-badge.is-knocking {
+.share-presence-item.is-knocking {
+    box-shadow: 0 0 0 2px var(--share-ring), 0 0 0 3.5px var(--c-accent);
+}
+
+.share-presence-item.is-knocking::after {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 1.5px solid var(--c-accent);
+    pointer-events: none;
+    animation: share-knock-wave 2s ease-out infinite;
+}
+
+@keyframes share-knock-wave {
+    0% { opacity: 0.85; transform: scale(1); }
+    70%, 100% { opacity: 0; transform: scale(1.6); }
+}
+
+/*
+ * La même demande, quand son auteur n'a pas de tableau de bord ouvert : il n'a
+ * pas de photo dans la rangée pour la porter, mais elle attend toujours.
+ */
+.share-knock-dot {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
     background: var(--c-accent);
+    box-shadow: 0 0 0 2px var(--bg-main);
+    pointer-events: none;
+    /* Au-dessus des photos, que le script empile jusqu'à 4. */
+    z-index: 5;
     animation: share-knock 2s ease-in-out infinite;
 }
 
 @keyframes share-knock {
     0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.18); }
+    50% { transform: scale(1.3); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .share-badge.is-knocking { animation: none; }
+    .share-presence,
+    .share-presence.is-shrinking,
+    .share-presence-item {
+        transition: none;
+        animation: none;
+    }
+
+    .share-presence-item.is-knocking::after,
+    .share-knock-dot {
+        animation: none;
+    }
 }
 
 /*

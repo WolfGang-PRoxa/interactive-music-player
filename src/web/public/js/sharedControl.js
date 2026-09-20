@@ -142,6 +142,8 @@ window.MusicPlayer = window.MusicPlayer || {};
     let role = 'master';
     let permissions = null;
     let sharing = null;
+    /** Le compte de ce tableau de bord, tel que le serveur le nomme. */
+    let ownIdentity = null;
 
     /** Côté invité : les droits qu'il a déjà demandés, selon le serveur. */
     let requestedRights = new Set();
@@ -1430,32 +1432,179 @@ window.MusicPlayer = window.MusicPlayer || {};
         people.forEach((person) => list.appendChild(listenerRow(person)));
     }
 
+    /* ═════════════════════ Le bouton de l'en-tête ═════════════════════ */
+
+    /** Photos montrées une à une ; au-delà, un dernier cercle dit combien d'autres. */
+    const PRESENCE_MAX = 3;
+
     /**
-     * Ce que le bouton de l'en-tête annonce.
-     *
-     * Deux nombres se disputent la place, et l'un des deux appelle un geste :
-     * les invités qui attendent une réponse passent donc devant ceux qui sont
-     * déjà pourvus. Un décompte tranquille peut attendre ; quelqu'un derrière la
-     * porte, non.
-     *
-     * La couleur change avec le sens, sans quoi le nombre passerait de « trois
-     * personnes ont le contrôle » à « trois personnes le demandent » sans que
-     * rien ne le signale.
+     * Durée de sortie d'un cercle, celle de sa transition dans modals.css : il
+     * reste dans le document le temps de s'effacer.
      */
-    function renderBadge() {
-        const badge = el('share-badge');
-        if (!badge) return;
+    const PRESENCE_LEAVE_MS = 280;
 
-        // Une demande de droit attend une réponse au même titre qu'une admission.
-        const requests = Object.values(sharing?.requests || {})
-            .reduce((n, mine) => n + Object.keys(mine || {}).length, 0);
-        const waiting = (sharing?.pending || []).length + requests;
-        const granted = Object.keys(sharing?.grants || {}).length;
-        const total = waiting || granted;
+    /** Qui attend une réponse : une admission, ou un droit demandé. */
+    function knockingIds() {
+        const ids = new Set((sharing?.pending || []).map((person) => String(person.userId)));
+        for (const [userId, mine] of Object.entries(sharing?.requests || {})) {
+            if (Object.keys(mine || {}).length) ids.add(String(userId));
+        }
+        return ids;
+    }
 
-        badge.textContent = String(total);
-        badge.classList.toggle('hidden', total === 0);
-        badge.classList.toggle('is-knocking', waiting > 0);
+    /**
+     * Les invités dont un tableau de bord est ouvert en ce moment.
+     *
+     * `online` vient du serveur, qui le lit sur les connexions elles-mêmes — voir
+     * `_onlineGuestIds` dans src/web/WebServer.js. Le maître en est écarté : il
+     * entre au carnet dès qu'il se nomme avec Discord, et se compterait sinon
+     * parmi ses propres invités en ouvrant le tableau de bord depuis un second
+     * poste.
+     *
+     * Ceux qui attendent une réponse passent devant : ce sont eux qu'il ne faut
+     * pas ranger dans le décompte. Les autres gardent l'ordre du carnet, du plus
+     * récemment venu au plus ancien.
+     */
+    function connectedGuests(knocking) {
+        const self = ownIdentity?.userId ? String(ownIdentity.userId) : null;
+        const online = (sharing?.knownUsers || [])
+            .filter((person) => person.online && String(person.userId) !== self);
+        return [
+            ...online.filter((person) => knocking.has(String(person.userId))),
+            ...online.filter((person) => !knocking.has(String(person.userId))),
+        ];
+    }
+
+    /** Le visage d'un cercle : la photo, ou l'initiale si elle manque ou ne charge pas. */
+    function paintFace(item, person) {
+        const face = person.avatar || `initial:${initial(person.displayName)}`;
+        if (item.dataset.face === face) return;
+        item.dataset.face = face;
+        item.textContent = '';
+
+        if (!person.avatar) {
+            item.textContent = initial(person.displayName);
+            return;
+        }
+
+        const img = document.createElement('img');
+        img.src = person.avatar;
+        img.alt = '';
+        img.addEventListener('error', () => {
+            if (item.dataset.face !== face) return;
+            item.textContent = initial(person.displayName);
+        });
+        item.appendChild(img);
+    }
+
+    /**
+     * Ce que le bouton de l'en-tête annonce : qui est là.
+     *
+     * Les photos des invités connectés prolongent le bouton sur sa droite, trois
+     * au plus, légèrement superposées ; au-delà, un quatrième cercle glissé sous
+     * les trois autres dit combien d'autres sont là. Personne, et le bouton
+     * retrouve sa forme carrée.
+     *
+     * Il s'étire à chaque arrivée et se resserre à chaque départ. Aucun script ne
+     * mesure rien : la rangée déclare son nombre de cercles, sa largeur en
+     * découle et transitionne (modals.css), et le bouton ne fait que la suivre.
+     * `is-shrinking` distingue les deux mouvements, qui n'ont pas la même
+     * courbe.
+     *
+     * ## Quelqu'un frappe à la porte
+     *
+     * Le badge chiffré qui occupait ce coin annonçait aussi les demandes — une
+     * admission, un droit — en changeant de couleur et en respirant. Le signal
+     * reste, mais porté par la personne : sa photo passe en tête, cerclée de la
+     * couleur d'appel. Rangée dans le décompte, c'est le décompte qui se cercle.
+     * Sans tableau de bord ouvert, elle n'a pas de photo dans la rangée : un
+     * point respire alors dans le coin du bouton, car une demande enregistrée
+     * attend toujours une réponse, même quand son auteur est parti.
+     *
+     * ## Les cercles sont gardés d'un rendu à l'autre
+     *
+     * Chacun est reconnu par l'identifiant de son invité. Seuls ceux qui arrivent
+     * entrent, seuls ceux qui partent s'effacent, et les autres glissent vers
+     * leur nouvelle place. Tout redessiner rejouerait l'entrée de chaque photo à
+     * chaque état reçu — c'est-à-dire à chaque piste qui change.
+     */
+    function renderPresence() {
+        const row = el('share-presence');
+        if (!row) return;
+
+        const knocking = knockingIds();
+        const guests = connectedGuests(knocking);
+        const shown = guests.slice(0, PRESENCE_MAX);
+        const folded = guests.slice(shown.length);
+
+        const slots = shown.map((person) => ({
+            key: `user:${person.userId}`,
+            person,
+            knocking: knocking.has(String(person.userId)),
+        }));
+        if (folded.length) {
+            slots.push({
+                key: 'more',
+                count: folded.length,
+                knocking: folded.some((person) => knocking.has(String(person.userId))),
+            });
+        }
+
+        const existing = new Map();
+        Array.from(row.children).forEach((item) => {
+            if (!item.classList.contains('is-leaving')) existing.set(item.dataset.key, item);
+        });
+
+        /*
+         * Un nouveau cercle s'insère devant le premier cercle déjà là qui le suit :
+         * le document garde ainsi l'ordre de l'écran dans le cas courant. Un
+         * cercle existant, lui, n'est jamais déplacé — le réinsérer rejouerait
+         * son entrée et couperait net sa transition. L'écran suit `--i`, pas
+         * l'ordre du document.
+         */
+        const kept = slots.map((slot) => existing.get(slot.key) || null);
+
+        slots.forEach((slot, index) => {
+            let item = existing.get(slot.key);
+            if (item) {
+                existing.delete(slot.key);
+            } else {
+                item = document.createElement('span');
+                item.className = 'share-presence-item';
+                item.dataset.key = slot.key;
+                row.insertBefore(item, kept.slice(index + 1).find(Boolean) || null);
+            }
+
+            if (slot.person) {
+                paintFace(item, slot.person);
+            } else {
+                item.classList.add('is-more');
+                const text = `+${slot.count}`;
+                if (item.textContent !== text) item.textContent = text;
+            }
+            item.classList.toggle('is-knocking', slot.knocking);
+            item.style.setProperty('--i', String(index));
+            // Le premier par-dessus, le décompte tout en dessous.
+            item.style.zIndex = String(PRESENCE_MAX + 1 - index);
+        });
+
+        existing.forEach((item) => {
+            item.classList.add('is-leaving');
+            item.classList.remove('is-knocking');
+            setTimeout(() => item.remove(), PRESENCE_LEAVE_MS);
+        });
+
+        const previous = Number(row.dataset.slots || 0);
+        row.dataset.slots = String(slots.length);
+        row.style.setProperty('--slots', String(slots.length));
+        row.classList.toggle('has-guests', slots.length > 0);
+        if (slots.length !== previous) row.classList.toggle('is-shrinking', slots.length < previous);
+
+        const dot = el('share-knock-dot');
+        if (dot) {
+            const present = new Set(guests.map((person) => String(person.userId)));
+            dot.classList.toggle('hidden', ![...knocking].some((userId) => !present.has(userId)));
+        }
     }
 
     /* ═════════════════════ Entrées du module ═════════════════════ */
@@ -1468,6 +1617,7 @@ window.MusicPlayer = window.MusicPlayer || {};
         if (!state) return;
 
         if (state.role) role = state.role;
+        if (state.identity) ownIdentity = state.identity;
         if (state.permissions) permissions = state.permissions;
         if (state.sharing) {
             sharing = state.sharing;
@@ -1482,7 +1632,7 @@ window.MusicPlayer = window.MusicPlayer || {};
         if (typeof state.requestsMuted === 'boolean') requestsMuted = state.requestsMuted;
 
         applyRights();
-        renderBadge();
+        renderPresence();
         renderModal();
         refreshRefusal();
     };

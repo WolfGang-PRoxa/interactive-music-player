@@ -394,7 +394,19 @@
                         <path class="share-grant share-grant-body" d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
                         <circle class="share-grant-spark" cx="11.9" cy="4.2" r="1.15"></circle>
                     </svg>
-                    <span class="share-badge hidden" id="share-badge">0</span>
+                    <!--
+                         Les invités connectés, dans le prolongement du bouton :
+                         leurs photos, trois au plus, puis un cercle qui dit
+                         combien d'autres. Vide, la rangée ne prend aucune place
+                         et le bouton garde sa forme carrée. Voir
+                         renderPresence() dans js/sharedControl.js.
+
+                         Le point, lui, respire quand quelqu'un attend une
+                         réponse sans avoir de tableau de bord ouvert — celui-là
+                         n'a pas de photo dans la rangée pour le dire.
+                    -->
+                    <span class="share-presence" id="share-presence" aria-hidden="true"></span>
+                    <span class="share-knock-dot hidden" id="share-knock-dot" aria-hidden="true"></span>
                 </button>
             </div>
 

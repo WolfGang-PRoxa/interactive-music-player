@@ -423,7 +423,7 @@ async function browserSide() {
     {
         const { win, sent, toasts } = await mount(
             '<div id="share-modal" class="hidden"><div id="share-people-list"></div></div>'
-            + '<span id="share-badge" class="hidden"></span>');
+            + '<span id="share-presence"></span><span id="share-knock-dot" class="hidden"></span>');
         const doc = win.document;
         win.MusicPlayer.state = { role: 'master', identity: { userId: 'OWNER' }, members: [] };
         const sharingState = (requests, muted = []) => ({
@@ -437,9 +437,10 @@ async function browserSide() {
         });
         win.MusicPlayer.applyShareState(sharingState({ U1: { 'playback.source': 1 } }));
 
-        check('une demande compte au bouton de partage, en appel',
-            doc.getElementById('share-badge').textContent === '1'
-            && doc.getElementById('share-badge').classList.contains('is-knocking'));
+        const face = doc.querySelector('#share-presence .share-presence-item[data-key="user:U1"]');
+        check('une demande cercle la photo de son auteur sur le bouton de partage',
+            face && face.classList.contains('is-knocking')
+            && doc.getElementById('share-knock-dot').classList.contains('hidden'));
 
         win.MusicPlayer.onRightRequested({ userId: 'U1', displayName: 'Yoohyeonz', action: 'playback.source' });
         check('fenêtre fermée, la demande sonne', toasts.length === 1

@@ -246,7 +246,7 @@ function mountShare() {
         path.join(ROOT, 'src', 'web', 'public', 'js', 'sharedControl.js'), 'utf8');
 
     const dom = makeDom();
-    for (const id of ['share-modal', 'share-people-list', 'share-badge', 'btn-open-share',
+    for (const id of ['share-modal', 'share-people-list', 'btn-open-share',
         'btn-close-share', 'btn-send-invite', 'share-oauth-warning', 'share-callback-url',
         'share-invite-channel', 'share-controls-wrapper']) {
         dom.mount(id);
