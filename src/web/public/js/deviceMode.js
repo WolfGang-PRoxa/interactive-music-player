@@ -196,6 +196,27 @@
     }
 
     /**
+     * Pose le moteur de rendu sur `<html>`, quand c'est WebKit.
+     *
+     * Une seule famille est nommée, parce qu'une seule est demandée : WebKit
+     * détache la mémoire de peinture des calques éloignés de la fenêtre et ne la
+     * rattache pas toujours, si bien que quelques éléments promus cessent d'être
+     * peints après un aller-retour vers le bas de la page. Voir « Budget de
+     * composition » dans css/device.css pour ce qui en découle.
+     *
+     * `GestureEvent` plutôt que la chaîne d'agent : c'est une interface que seul
+     * WebKit expose — les gestes de pincement du pavé tactile et de l'écran —,
+     * elle ne se déguise pas, et elle répond vrai pour tout navigateur sur iOS,
+     * qui sont tous WebKit quelle que soit leur marque. C'est bien le moteur
+     * qu'on cherche, pas le nom sur la boîte.
+     */
+    function setEngine() {
+        const root = document.documentElement;
+        if (typeof window.GestureEvent !== 'undefined') root.setAttribute('data-engine', 'webkit');
+        else root.removeAttribute('data-engine');
+    }
+
+    /**
      * Pose le mode effectif sur `<html>` et prévient les abonnés s'il a changé.
      * @param {boolean} [notify=true]
      */
@@ -268,6 +289,8 @@
     choice = readStoredChoice();
     apply(false);
     setNotch();
+    // Le moteur ne change pas d'une rotation à l'autre : une fois suffit.
+    setEngine();
 
     // Une rotation ou un redimensionnement peut faire basculer d'un mode à
     // l'autre — mais en `auto` seulement, un choix explicite ne devant jamais

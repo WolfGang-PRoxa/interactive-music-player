@@ -217,7 +217,27 @@ body.touch-dragging * {
  * d'avance. La documentation déconseille d'ailleurs explicitement de la poser
  * sur des éléments répétés, ce qui est exactement le cas ici.
  *
- * L'indication est conservée sur ordinateur, où elle sert sans nuire.
+ * ## Le même budget se trouve épuisé sur un ordinateur
+ *
+ * La pénurie n'appartient pas au téléphone : elle appartient au moteur. Un
+ * invité sur Safari, sur un Mac de bureau, a rapporté le même symptôme —
+ * quelques éléments cessent d'être peints après qu'on les a fait sortir de
+ * l'écran, et ne reviennent pas quand on remonte. WebKit détache la mémoire de
+ * peinture des calques éloignés de la fenêtre pour la rendre au système, et ne
+ * la rattache pas toujours.
+ *
+ * Aucune de ces règles ne se voyait chez lui : toutes sont conditionnées au
+ * mode tactile, et un Mac de bureau est en mode ordinateur. Le moteur devient
+ * donc un second déclencheur, à côté du doigt.
+ *
+ * On ne retire ici que des indications, jamais un mouvement : ces règles-là
+ * sont sans effet visible, et c'est pourquoi elles s'appliquent à tout WebKit
+ * sans plus de précaution. Celles qui suivent, qui coûtent une animation ou un
+ * flou, restent au seul mode tactile tant que rien ne prouve qu'il faille les
+ * étendre — soixante calques rendus à une liste de vingt titres suffisent
+ * peut-être à reloger le reste.
+ *
+ * L'indication est conservée partout ailleurs, où elle sert sans nuire.
  */
 [data-touch-mode="true"] .preload-fill-bar,
 [data-touch-mode="true"] .playback-fill-bar,
@@ -225,7 +245,13 @@ body.touch-dragging * {
 /* Les reflets animés de ces mêmes barres la déclarent aussi. */
 [data-touch-mode="true"] .is-preloading .preload-fill-bar::after,
 [data-touch-mode="true"] .is-playing-now .playback-fill-bar::after,
-[data-touch-mode="true"] .is-requalifying .requalify-fill-bar::after {
+[data-touch-mode="true"] .is-requalifying .requalify-fill-bar::after,
+[data-engine="webkit"] .preload-fill-bar,
+[data-engine="webkit"] .playback-fill-bar,
+[data-engine="webkit"] .requalify-fill-bar,
+[data-engine="webkit"] .is-preloading .preload-fill-bar::after,
+[data-engine="webkit"] .is-playing-now .playback-fill-bar::after,
+[data-engine="webkit"] .is-requalifying .requalify-fill-bar::after {
     will-change: auto;
 }
 
@@ -248,9 +274,17 @@ body.touch-dragging * {
  * Comme pour les barres de liste, `will-change` n'est qu'une indication : la
  * retirer ne change ni le rendu ni les transitions, seulement ce que le
  * navigateur prépare d'avance.
+ *
+ * Ce sont ces deux-là que l'invité sur Safari a nommées en premier : les
+ * chiffres de la roulette de vitesse manquaient après un aller-retour vers le
+ * bas de la page. Le pad avait déjà, de son côté, un observateur qui le
+ * recentre quand il revient dans la fenêtre — voir `initSpeedPad` dans
+ * js/speedPad.js. Il replaçait la roulette ; il ne pouvait pas la repeindre.
  */
 [data-touch-mode="true"] .speed-pad-track,
-[data-touch-mode="true"] .progress-fill {
+[data-touch-mode="true"] .progress-fill,
+[data-engine="webkit"] .speed-pad-track,
+[data-engine="webkit"] .progress-fill {
     will-change: auto;
 }
 
