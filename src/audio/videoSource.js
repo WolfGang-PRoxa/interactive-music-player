@@ -35,6 +35,7 @@
  */
 
 const log = require('../utils/logger');
+const { ytdlp } = require('../utils/youtubeNetwork');
 
 /** Résolution visée par défaut, quand l'appelant n'en demande pas. */
 const DEFAULT_HEIGHT = 1080;
@@ -60,8 +61,7 @@ const inventoryCache = new Map();
  */
 async function dump(url) {
     try {
-        const youtubedl = require('youtube-dl-exec');
-        const info = await youtubedl(url, {
+        const info = await ytdlp(url, {
             dumpSingleJson: true,
             noCheckCertificates: true,
             noWarnings: true,

@@ -9,6 +9,7 @@ const database = require('../../database/Database');
 const { getCleanFilename } = require('../../utils/paths');
 const { readSetAsideQueue, writeSetAsideQueue } = require('../../utils/setAsideQueue');
 const log = require('../../utils/logger');
+const { ytdlp } = require('../../utils/youtubeNetwork');
 
 /**
  * Recherche une piste en distinguant fichiers locaux et sources distantes,
@@ -39,8 +40,7 @@ async function searchLocalAwareTrack(player, url) {
     // Fallback pour YouTube Music & playlists d'albums (ex: OLAK5uy_...) non résolues par l'extracteur par défaut
     if ((!searchResult || !searchResult.tracks || searchResult.tracks.length === 0) && typeof url === 'string' && (url.includes('youtube') || url.includes('youtu.be'))) {
         try {
-            const youtubedl = require('youtube-dl-exec');
-            const info = await youtubedl(url, { dumpSingleJson: true, noCheckCertificates: true, noWarnings: true, flatPlaylist: true }, { windowsHide: true });
+            const info = await ytdlp(url, { dumpSingleJson: true, noCheckCertificates: true, noWarnings: true, flatPlaylist: true }, { windowsHide: true });
             const entries = Array.isArray(info.entries) ? info.entries : (info ? [info] : []);
             const resolvedTracks = [];
             for (const entry of entries) {

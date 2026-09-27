@@ -7,6 +7,7 @@ const { getSession } = require('./PlaybackSession');
 const { readSetAsideQueue } = require('../utils/setAsideQueue');
 const { analyzePartial } = require('../utils/mp3');
 const log = require('../utils/logger');
+const { ytdlp } = require('../utils/youtubeNetwork');
 
 /** Taille en deçà de laquelle un fichier de cache est jugé incomplet. */
 const MIN_CACHE_BYTES = 1024 * 10;
@@ -1078,9 +1079,8 @@ class PreloadManager {
         // sait plus que l'extracteur sur les formats réellement servis.
         if ((!ffmpegInput || ffmpegInput === 'pipe:0') && /^https?:\/\//i.test(url)) {
             try {
-                const youtubedl = require('youtube-dl-exec');
                 log.info(`[PreloadManager] Resolving a direct audio URL through youtube-dl-exec for: ${track.title}`);
-                const info = await youtubedl(url, {
+                const info = await ytdlp(url, {
                     dumpSingleJson: true,
                     noCheckCertificates: true,
                     noWarnings: true,

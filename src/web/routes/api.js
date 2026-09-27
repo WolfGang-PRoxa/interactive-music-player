@@ -11,6 +11,7 @@ const { arePathsOrUrlsEqual } = require('../../utils/paths');
 const downloadDir = require('../../utils/downloadDir');
 const changelog = require('../changelog');
 const log = require('../../utils/logger');
+const { ytdlp } = require('../../utils/youtubeNetwork');
 
 /** Taille maximale d'un fichier uploadé (Mo). */
 const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB) || 1024;
@@ -990,8 +991,7 @@ function createApiRouter(webServer) {
 
         if (!ffmpegInput && /^https?:\/\//i.test(targetUrl)) {
             try {
-                const youtubedl = require('youtube-dl-exec');
-                const info = await youtubedl(targetUrl, {
+                const info = await ytdlp(targetUrl, {
                     dumpSingleJson: true,
                     noCheckCertificates: true,
                     noWarnings: true,
@@ -1163,11 +1163,10 @@ function createApiRouter(webServer) {
      */
     async function resolveVideoStream(query, height, fallback = {}) {
         try {
-            const youtubedl = require('youtube-dl-exec');
             const isUrl = /^https?:\/\//i.test(query);
             const queryArg = isUrl ? query : `ytsearch1:${query}`;
 
-            const output = await youtubedl(queryArg, {
+            const output = await ytdlp(queryArg, {
                 dumpSingleJson: true,
                 noCheckCertificates: true,
                 noWarnings: true,

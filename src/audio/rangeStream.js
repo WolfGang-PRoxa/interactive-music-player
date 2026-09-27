@@ -53,6 +53,7 @@
 const http = require('http');
 const https = require('https');
 const { PassThrough } = require('stream');
+const { familyFor } = require('../utils/youtubeNetwork');
 
 
 /**
@@ -88,7 +89,8 @@ function request(url, headers) {
 
         const aller = (cible) => {
             const module = cible.startsWith('http:') ? http : https;
-            const req = module.get(cible, { headers }, (res) => {
+            // Par l'IPv4 si YouTube refuse l'IPv6 : voir utils/youtubeNetwork.
+            const req = module.get(cible, { headers, family: familyFor(cible) }, (res) => {
                 const code = res.statusCode;
 
                 if (code >= 300 && code < 400 && res.headers.location && restantes > 0) {

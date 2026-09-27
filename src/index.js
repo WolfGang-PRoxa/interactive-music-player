@@ -26,6 +26,12 @@ if (process.platform === 'win32') {
 
 require('dotenv').config();
 
+// YouTube peut tenir l'IPv6 de l'hôte pour un robot et continuer de servir
+// son IPv4 : l'extracteur youtubei se replie alors sur celle-ci. Avant
+// l'enregistrement des extracteurs, qui ouvrent leur session dès ce moment.
+// Voir le module.
+require('./utils/youtubeNetwork').installYoutubeiFallback();
+
 const { Client, GatewayIntentBits, Collection, Events } = require('discord.js');
 const { Player, AudioFilters } = require('discord-player');
 
