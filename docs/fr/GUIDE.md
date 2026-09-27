@@ -346,7 +346,8 @@ titre et la file continue d'attendre son tour.
 
 Le champ d'ajout retient les saisies validées — les vingt-cinq dernières, une
 entrée déjà connue remontant en tête plutôt que de s'y inscrire une seconde
-fois. Le panneau s'ouvre à la prise de focus et se filtre à la frappe ; la
+fois — y compris un même morceau collé sous une autre forme, lien court ou
+paramètres de partage. Le panneau s'ouvre à la prise de focus et se filtre à la frappe ; la
 recherche porte sur le contenu et non sur le début, de sorte qu'un lien se
 retrouve par le nom du morceau qu'il porte.
 

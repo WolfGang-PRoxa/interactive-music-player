@@ -138,7 +138,9 @@ function mount({ stored = null, clearsFieldFirst = false } = {}) {
             setItem: (k, v) => store.set(k, v),
             removeItem: (k) => store.delete(k),
         },
-        JSON, Math, Array, console,
+        // `URL` n'est pas du langage mais de l'hôte : un contexte vm neuf ne
+        // l'a pas, quand tout navigateur le fournit.
+        JSON, Math, Array, console, URL,
     };
     sandbox.globalThis = sandbox;
     vm.createContext(sandbox);
@@ -508,6 +510,91 @@ console.log('\nCe que l’état vient compléter\n');
     ]);
     check('le rapprochement ignore la casse',
         s.stored()[0].title === 'La Femme d’Argent', JSON.stringify(s.stored()[0]));
+}
+
+{
+    /*
+     * Les adresses que le bot réécrit.
+     *
+     * C'était la panne : l'extracteur YouTube rend `https://youtube.com/watch?v=…`,
+     * sans `www.` ni paramètres, quand on colle presque toujours autre chose. Les
+     * adresses des pistes ci-dessous sont celles que les extracteurs produisent
+     * réellement (discord-player-youtubei, @discord-player/extractor), et non des
+     * copies de la saisie — c'est ce qui avait laissé passer la panne.
+     */
+    const s = mount({ stored: [
+        'https://www.youtube.com/watch?v=wBqfzj6CEzI',
+        'https://www.youtube.com/watch?v=I1bW68QJMUI&pp=ugUEEgJmcg%3D%3D',
+        'https://youtu.be/tE9MMqYu2Bk?si=Zx81kQ',
+        'https://music.youtube.com/watch?v=mQqvg9lMkSM&feature=share',
+        'https://www.youtube.com/shorts/tlhxJzPmziY',
+        'https://open.spotify.com/intl-fr/track/4uLU6hMCjMI75M1A2tKUQC?si=9f3a',
+        'https://soundcloud.com/daftpunk/one-more-time/?utm_source=clipboard&utm_medium=text',
+    ] });
+
+    const yt = (id, title) => ({
+        url: `https://youtube.com/watch?v=${id}`, title, thumbnail: `https://i.ytimg.com/vi/${id}/hq.jpg`,
+    });
+    s.sandbox.window.MusicPlayer.enrichSearchHistory([
+        yt('wBqfzj6CEzI', 'Premier'),
+        yt('I1bW68QJMUI', 'Deuxième'),
+        yt('tE9MMqYu2Bk', 'Troisième'),
+        { url: 'https://youtube.com/watch?v=mQqvg9lMkSM&dpymeta=ytmusic', title: 'Quatrième', thumbnail: 't4' },
+        yt('tlhxJzPmziY', 'Cinquième'),
+        { url: 'https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC', title: 'Sixième', thumbnail: 't6' },
+        { url: 'https://soundcloud.com/daftpunk/one-more-time', title: 'Septième', thumbnail: 't7' },
+    ]);
+
+    const titles = s.stored().map(e => e.title);
+    check('un lien www. est reconnu malgré la réécriture du bot',
+        titles[0] === 'Premier' && s.stored()[0].thumb === 'https://i.ytimg.com/vi/wBqfzj6CEzI/hq.jpg',
+        JSON.stringify(s.stored()[0]));
+    check('  … comme un lien portant « &pp= »', titles[1] === 'Deuxième', String(titles[1]));
+    check('  … un lien court youtu.be avec « ?si= »', titles[2] === 'Troisième', String(titles[2]));
+    check('  … un lien YouTube Music', titles[3] === 'Quatrième', String(titles[3]));
+    check('  … un Short', titles[4] === 'Cinquième', String(titles[4]));
+    check('un lien Spotify régionalisé retrouve son morceau', titles[5] === 'Sixième', String(titles[5]));
+    check('un lien SoundCloud chargé de paramètres de suivi aussi',
+        titles[6] === 'Septième', String(titles[6]));
+    check('  … et la saisie reste celle qui a été collée',
+        s.stored()[0].q === 'https://www.youtube.com/watch?v=wBqfzj6CEzI', s.stored()[0].q);
+}
+
+{
+    // L'identifiant YouTube tient compte de la casse : deux vidéos peuvent ne
+    // différer que par elle. Une liste de lecture, elle, ne désigne aucune
+    // vidéo en particulier et n'a pas à en prendre le nom.
+    // Au format objet : sans correspondance rien n'est réécrit, et des chaînes
+    // resteraient des chaînes — on lirait `undefined` là où l'on attend `null`.
+    const s = mount({ stored: [
+        { q: 'https://www.youtube.com/watch?v=abcDEF12345', title: null, thumb: null },
+        { q: 'https://www.youtube.com/playlist?list=PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG', title: null, thumb: null },
+    ] });
+    s.sandbox.window.MusicPlayer.enrichSearchHistory([
+        { url: 'https://youtube.com/watch?v=abcdef12345', title: 'Une autre', thumbnail: 'x' },
+        { url: 'https://youtube.com/watch?v=PLx0sYbCqOb', title: 'Vidéo', thumbnail: 'y' },
+    ]);
+    check('deux identifiants ne différant que par la casse restent distincts',
+        s.stored()[0].title === null, JSON.stringify(s.stored()[0]));
+    check('une liste de lecture n’emprunte pas le nom d’une vidéo',
+        s.stored()[1].title === null, JSON.stringify(s.stored()[1]));
+}
+
+{
+    // Le même morceau collé sous deux formes : une seule ligne, qui garde ce
+    // qu'on savait déjà et prend la forme saisie en dernier.
+    const s = mount({ stored: [
+        { q: 'https://youtu.be/wBqfzj6CEzI?si=abc', title: 'Premier', thumb: 't' },
+        'daft punk',
+    ] });
+    s.submit('https://www.youtube.com/watch?v=wBqfzj6CEzI');
+    check('un même morceau collé sous une autre forme ne se dédouble pas',
+        s.stored().length === 2, s.saved().join(' | '));
+    check('  … remonte en tête avec la dernière forme saisie',
+        s.stored()[0].q === 'https://www.youtube.com/watch?v=wBqfzj6CEzI', s.stored()[0].q);
+    check('  … et garde le titre et l’image déjà appris',
+        s.stored()[0].title === 'Premier' && s.stored()[0].thumb === 't',
+        JSON.stringify(s.stored()[0]));
 }
 
 {

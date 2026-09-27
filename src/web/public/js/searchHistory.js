@@ -113,6 +113,79 @@ window.MusicPlayer = window.MusicPlayer || {};
     }
 
     /**
+     * Paramètres d'adresse qui ne disent rien du morceau.
+     *
+     * Ce sont eux que le bouton « Partager » des plateformes ajoute — `si` chez
+     * YouTube comme chez Spotify, `pp` sur un résultat de recherche YouTube —,
+     * et eux seuls distinguaient deux copies d'un même lien.
+     */
+    const TRACKING_PARAM = /^(si|pp|feature|fbclid|gclid|igshid|ref|utm_.*)$/i;
+
+    /**
+     * La clé sous laquelle une saisie est rapprochée d'une piste.
+     *
+     * Le bot ne rend jamais l'adresse telle qu'on l'a collée : l'extracteur
+     * YouTube la réécrit en `https://youtube.com/watch?v=…`, sans `www.` ni
+     * paramètres, et celui de Spotify en `https://open.spotify.com/track/…`,
+     * sans le `/intl-fr` que l'application insère. Comparer les deux adresses
+     * brutes échouait donc sur presque tous les liens réellement collés — le
+     * titre et l'image n'arrivaient jamais.
+     *
+     * D'où une clé par plateforme, faite de ce qui désigne vraiment le morceau :
+     *
+     *  - **YouTube**, sous toutes ses formes — `youtu.be`, `music.`, `m.`,
+     *    `shorts/`, `embed/`, `live/` : l'identifiant de la vidéo, en gardant
+     *    sa casse, qui en fait partie ;
+     *  - **Spotify** : l'identifiant du morceau ;
+     *  - **le reste** : l'adresse sans `www.` ni `m.`, sans barre finale, et
+     *    sans les paramètres de suivi — un lien SoundCloud partagé en porte
+     *    toute une série.
+     *
+     * Ce qui n'est pas une adresse — chemin, recherche — garde la comparaison
+     * sans casse qu'il avait : c'est ainsi qu'un chemin Windows saisi en
+     * minuscules retrouve son fichier.
+     *
+     * @param {string} text
+     * @returns {string}
+     */
+    function matchKey(text) {
+        const raw = String(text || '').trim();
+        if (!isLink(raw)) return raw.toLowerCase();
+
+        let url;
+        try {
+            url = new URL(raw);
+        } catch (e) {
+            return raw.toLowerCase();
+        }
+
+        const host = url.hostname.toLowerCase().replace(/^(www|m)\./, '');
+        const path = url.pathname.replace(/\/+$/, '');
+
+        if (host === 'youtu.be' || host === 'youtube.com' || host.endsWith('.youtube.com')
+            || host === 'youtube-nocookie.com') {
+            const id = host === 'youtu.be'
+                ? path.slice(1)
+                : (url.searchParams.get('v')
+                    || (path.match(/^\/(?:shorts|embed|live|v)\/([^/]+)/) || [])[1]);
+            if (id && /^[\w-]{6,}$/.test(id)) return `youtube:${id}`;
+        }
+
+        if (host === 'open.spotify.com') {
+            // `tracks` au pluriel aussi : l'extracteur l'écrit ainsi pour
+            // certains morceaux.
+            const found = path.match(/\/tracks?\/([A-Za-z0-9]+)/);
+            if (found) return `spotify:${found[1]}`;
+        }
+
+        const kept = [...url.searchParams].filter(([name]) => !TRACKING_PARAM.test(name));
+        const query = kept.length
+            ? `?${kept.map(([name, value]) => `${name}=${value}`).join('&')}`
+            : '';
+        return `${host}${path}${query}`.toLowerCase();
+    }
+
+    /**
      * Retient une saisie validée.
      *
      * Une entrée déjà connue remonte en tête au lieu d'être ajoutée deux fois :
@@ -120,16 +193,22 @@ window.MusicPlayer = window.MusicPlayer || {};
      * qu'on sait déjà d'elle la suit — la reconnaissance a pu avoir lieu au
      * premier passage, et la refaire ne servirait à rien.
      *
+     * « Déjà connue » s'entend au sens de `matchKey()` : le même morceau collé
+     * une fois depuis le navigateur et une fois depuis l'application aurait
+     * sinon donné deux lignes portant le même titre et la même image. L'entrée
+     * prend la forme saisie en dernier, puisque c'est elle qu'on a sous la main.
+     *
      * @param {string} value
      */
     function remember(value) {
         const clean = (value || '').trim();
         if (!clean || clean.length > MAX_LENGTH) return;
 
-        const existing = entries.findIndex((e) => e.q === clean);
+        const key = matchKey(clean);
+        const existing = entries.findIndex((e) => matchKey(e.q) === key);
         const known = existing !== -1 ? entries.splice(existing, 1)[0] : null;
 
-        entries.unshift(known || { q: clean, title: null, thumb: null });
+        entries.unshift(known ? { ...known, q: clean } : { q: clean, title: null, thumb: null });
         if (entries.length > MAX_ENTRIES) entries.length = MAX_ENTRIES;
         save();
     }
@@ -490,14 +569,15 @@ window.MusicPlayer = window.MusicPlayer || {};
      *
      * Deux rapprochements, du plus sûr au plus large :
      *
-     *  - **l'adresse**, pour un lien ou un chemin : la saisie est alors très
-     *    exactement l'`url` de la piste ;
+     *  - **l'adresse**, pour un lien ou un chemin : la saisie désigne alors le
+     *    même morceau que l'`url` de la piste — au sens de `matchKey()`, car
+     *    le bot la réécrit en la résolvant ;
      *  - **le titre**, pour une recherche en toutes lettres : on a tapé un nom,
      *    et c'est ce nom qui est revenu.
      *
-     * Une saisie qu'aucun des deux ne retrouve — une adresse que le bot a
-     * réécrite en la résolvant, une recherche approximative — garde son texte
-     * et la note de musique. C'est le repli, pas une panne.
+     * Une saisie qu'aucun des deux ne retrouve — un lien raccourci que seul le
+     * bot sait suivre, une recherche approximative — garde son texte et la
+     * note de musique. C'est le repli, pas une panne.
      *
      * @param {object[]} tracks Pistes connues, dans n'importe quel ordre.
      */
@@ -513,14 +593,13 @@ window.MusicPlayer = window.MusicPlayer || {};
         const byTitle = new Map();
         tracks.forEach((track) => {
             if (!track) return;
-            if (track.url) byUrl.set(String(track.url).toLowerCase(), track);
+            if (track.url) byUrl.set(matchKey(track.url), track);
             if (track.title) byTitle.set(String(track.title).toLowerCase(), track);
         });
 
         let changed = false;
         pending.forEach((entry) => {
-            const key = entry.q.toLowerCase();
-            const found = byUrl.get(key) || byTitle.get(key);
+            const found = byUrl.get(matchKey(entry.q)) || byTitle.get(entry.q.toLowerCase());
             if (!found) return;
             entry.title = found.title || null;
             entry.thumb = found.thumbnail || null;

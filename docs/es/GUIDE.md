@@ -348,7 +348,8 @@ primer título y la cola sigue esperando su turno.
 
 El campo de adición conserva lo que usted valida — las últimas veinticinco
 entradas, y una ya conocida vuelve a la cabeza en lugar de inscribirse una
-segunda vez. El panel se abre al recibir el foco y se filtra a medida que
+segunda vez — también la misma pista pegada de otra forma, enlace corto o
+parámetros de compartir. El panel se abre al recibir el foco y se filtra a medida que
 escribe; la búsqueda examina el contenido y no el principio, de modo que un
 enlace se reencuentra por el nombre de la pista que lleva.
 

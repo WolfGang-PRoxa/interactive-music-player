@@ -362,7 +362,8 @@ Warteschlange wartet weiter, bis sie an der Reihe ist.
 
 Das Eingabefeld merkt sich abgeschickte Eingaben — die letzten fünfundzwanzig,
 wobei ein bereits bekannter Eintrag nach oben rückt, statt ein zweites Mal
-aufgeführt zu werden. Das Feld öffnet die Liste beim Fokussieren und filtert sie
+aufgeführt zu werden — auch derselbe Titel in anderer Form, als Kurzlink oder
+mit Teilen-Parametern. Das Feld öffnet die Liste beim Fokussieren und filtert sie
 beim Tippen; gesucht wird im gesamten Eintrag und nicht nur an seinem Anfang, so
 dass ein Link über den Namen des Titels wiedergefunden wird, den er trägt.
 

@@ -340,7 +340,8 @@ from its first title and the queue keeps waiting its turn.
 
 The add field remembers what you submit — the last twenty-five entries, an
 already known one moving back to the top rather than being written a second
-time. The panel opens when the field takes focus and narrows as you type; the
+time — including the same track pasted in another form, a short link or one
+carrying sharing parameters. The panel opens when the field takes focus and narrows as you type; the
 search looks at the whole entry rather than its beginning, so a link is found
 again by the name of the track it carries.
 
