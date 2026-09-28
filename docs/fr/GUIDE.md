@@ -513,6 +513,11 @@ de progression apparaît sur chaque piste. Cela rend le démarrage instantané e
 la lecture résistante aux coupures réseau. Le nombre de pistes préchargées est
 réglable pour la file, l'historique et les playlists.
 
+Pour ne pas passer pour un robot auprès de YouTube, ce préchargement prend son
+temps : une vidéo à la fois, à une quinzaine de secondes d'intervalle, et une
+demi-heure de pause si YouTube refuse. Ce que vous demandez vous-même — un
+ajout, une lecture, une vidéo — passe toujours sans attendre.
+
 ### Journaux et statistiques
 
 Un terminal intégré affiche les journaux du bot en temps réel, filtrables par

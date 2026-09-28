@@ -536,6 +536,11 @@ die Wiedergabe widerstandsfähig gegen Netzunterbrechungen. Die Anzahl der
 vorgeladenen Titel ist für Warteschlange, Verlauf und Wiedergabelisten
 einstellbar.
 
+Um bei YouTube nicht wie ein Roboter zu wirken, lässt sich das Vorladen Zeit:
+ein Video nach dem anderen, im Abstand von etwa fünfzehn Sekunden, und eine
+halbe Stunde Pause, wenn YouTube ablehnt. Was Sie selbst anfordern — ein
+Hinzufügen, eine Wiedergabe, ein Video — geht immer ohne Wartezeit durch.
+
 ### Protokolle und Statistiken
 
 Ein eingebautes Terminal zeigt die Protokolle des Bots in Echtzeit, filterbar

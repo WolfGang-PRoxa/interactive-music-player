@@ -519,6 +519,11 @@ de progreso aparece en cada pista. Esto hace instantáneo el arranque y la
 reproducción resistente a los cortes de red. El número de pistas precargadas es
 ajustable para la cola, el historial y las listas de reproducción.
 
+Para no parecer un robot ante YouTube, la precarga se toma su tiempo: un vídeo
+cada vez, con unos quince segundos de intervalo, y media hora de pausa si
+YouTube se niega. Lo que usted mismo pide — una adición, una reproducción, un
+vídeo — pasa siempre sin esperar.
+
 ### Registros y estadísticas
 
 Un terminal integrado muestra los registros del bot en tiempo real, filtrables

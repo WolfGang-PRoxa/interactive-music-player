@@ -501,6 +501,11 @@ indicator appears on each track. This makes startup instantaneous and playback
 resistant to network dropouts. The number of preloaded tracks is adjustable for
 the queue, the history and the playlists.
 
+So as not to look like a robot to YouTube, preloading takes its time: one
+video at a time, about fifteen seconds apart, and a half-hour pause if YouTube
+refuses. What you ask for yourself — an addition, a playback, a video — always
+goes through without waiting.
+
 ### Logs and statistics
 
 A built-in terminal shows the bot's logs in real time, filterable by level

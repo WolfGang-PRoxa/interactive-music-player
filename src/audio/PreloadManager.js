@@ -7,7 +7,7 @@ const { getSession } = require('./PlaybackSession');
 const { readSetAsideQueue } = require('../utils/setAsideQueue');
 const { analyzePartial } = require('../utils/mp3');
 const log = require('../utils/logger');
-const { ytdlp } = require('../utils/youtubeNetwork');
+const { ytdlp, isYoutubeUrl } = require('../utils/youtubeNetwork');
 
 /** Taille en deçà de laquelle un fichier de cache est jugé incomplet. */
 const MIN_CACHE_BYTES = 1024 * 10;
@@ -339,6 +339,16 @@ function preloadLimit(raw, fallback = 3) {
     if (!Number.isFinite(value)) return fallback;
     if (value < 0) return Infinity;
     return Math.min(5, value);
+}
+
+/**
+ * Un flux sans adresse s'annonce à ffmpeg comme son entrée standard.
+ *
+ * @param {{ ffmpegInput: string|null, inputStream: object|null }} input
+ */
+function pipeIfStream(input) {
+    if (!input.ffmpegInput && input.inputStream) return { ...input, ffmpegInput: 'pipe:0' };
+    return input;
 }
 
 function upcomingTracks(tracks, currentIndex, limit, loop) {
@@ -1023,7 +1033,7 @@ class PreloadManager {
      *   `ffmpegInput` vaut `pipe:0` lorsque c'est `inputStream` qui alimente.
      *   Les deux sont nuls quand rien n'a pu être résolu.
      */
-    async resolveAudioInput(track, url) {
+    async resolveAudioInput(track, url, { background = false } = {}) {
         // Fichier du disque : ffmpeg le lit à même le chemin. Rien à extraire,
         // et il peut s'y déplacer — ce qu'un flux poussé dans son entrée
         // standard ne permet pas, et dont la reprise d'un encodage interrompu a
@@ -1031,6 +1041,59 @@ class PreloadManager {
         const local = localFilePath(track);
         if (local) return { ffmpegInput: local, inputStream: null };
 
+        const web = /^https?:\/\//i.test(url);
+
+        /*
+         * YouTube : yt-dlp d'abord, l'extracteur en secours seulement.
+         *
+         * L'ordre des autres sources — l'extracteur, puis yt-dlp s'il n'a pas
+         * rendu d'adresse directe — ouvrait pour YouTube un flux par youtubei,
+         * interrogeait ensuite yt-dlp, et jetait le premier flux. Chaque
+         * préchargement coûtait ainsi deux descriptions de la vidéo et une
+         * connexion à googlevideo ouverte pour rien : autant de demandes qui
+         * font passer pour un robot. Voir utils/youtubeNetwork.
+         */
+        if (web && isYoutubeUrl(url)) {
+            const direct = await this._inputFromYtdlp(track, url, { background });
+            if (direct) return direct;
+            log.info(`[PreloadManager] yt-dlp found nothing usable for ${track.title}: `
+                + 'falling back to the extractor stream.');
+            return pipeIfStream(await this._inputFromExtractor(track, url));
+        }
+
+        const fromExtractor = await this._inputFromExtractor(track, url);
+
+        // Pas d'URL directe, et la piste vient du web : youtube-dl en sait plus
+        // que l'extracteur sur les formats réellement servis.
+        if (!fromExtractor.ffmpegInput && web) {
+            const direct = await this._inputFromYtdlp(track, url, { background });
+            if (direct) {
+                // Le flux de l'extracteur ne sera pas lu : le laisser ouvert
+                // retiendrait sa connexion et ses tampons jusqu'à la fin du
+                // préchargement.
+                const stale = fromExtractor.inputStream;
+                if (stale && typeof stale.destroy === 'function') stale.destroy();
+                return direct;
+            }
+            if (fromExtractor.inputStream) {
+                // Rien d'utilisable, mais l'extracteur avait fourni un flux : on
+                // le garde plutôt que de repartir les mains vides — c'est lui
+                // qui alimentait avant ce détour.
+                log.info(`[PreloadManager] No direct audio format for ${track.title}: `
+                    + `keeping the extractor stream.`);
+            }
+        }
+
+        return pipeIfStream(fromExtractor);
+    }
+
+    /**
+     * Ce que l'extracteur de la piste sait en tirer : une adresse directe, ou
+     * un flux. Les quatre formes qu'il peut rendre sont ramenées à ces deux-là.
+     *
+     * @returns {Promise<{ ffmpegInput: string|null, inputStream: object|null }>}
+     */
+    async _inputFromExtractor(track, url) {
         let rawStreamObj = null;
         if (this.player && this.player.extractors) {
             try {
@@ -1075,83 +1138,78 @@ class PreloadManager {
             }
         }
 
-        // Pas encore d'URL directe, et la piste vient du web : youtube-dl en
-        // sait plus que l'extracteur sur les formats réellement servis.
-        if ((!ffmpegInput || ffmpegInput === 'pipe:0') && /^https?:\/\//i.test(url)) {
-            try {
-                log.info(`[PreloadManager] Resolving a direct audio URL through youtube-dl-exec for: ${track.title}`);
-                const info = await ytdlp(url, {
-                    dumpSingleJson: true,
-                    noCheckCertificates: true,
-                    noWarnings: true,
-                    preferFreeFormats: true,
-                }, { windowsHide: true });
-
-                const entry = (info.entries && info.entries[0]) ? info.entries[0] : info;
-                if (entry && entry.formats) {
-                    /*
-                     * Le choix se fait dans `videoSource`, avec celui des
-                     * téléchargements.
-                     *
-                     * Ici, on prenait le premier format sonore de la liste. Or
-                     * yt-dlp ordonne du pire au meilleur et place les variantes
-                     * HLS en tête : le premier était un manifeste `.m3u8`, dans
-                     * un doublage automatique tiré au hasard, sans débit
-                     * annoncé. L'adresse était bien « extraite » — le journal
-                     * l'annonçait en succès — et ffmpeg se prenait un 404 sur un
-                     * manifeste signé pour un autre client.
-                     */
-                    const chosen = require('./videoSource').bestAudio(entry);
-                    if (chosen && chosen.url) {
-                        /*
-                         * L'adresse est téléchargée par tranches, et non tendue
-                         * telle quelle à ffmpeg.
-                         *
-                         * YouTube bride un téléchargement progressif continu au
-                         * débit de lecture : ffmpeg, qui ouvre une requête et la
-                         * garde ouverte, écrivait 32 Ko/s — deux fois le temps
-                         * réel, douze minutes pour un morceau de vingt-cinq. La
-                         * même adresse demandée par tranches se sert à 38 Mo/s.
-                         * Voir `rangeStream`.
-                         */
-                        if (inputStream && typeof inputStream.destroy === 'function') {
-                            // Le flux de l'extracteur ne sera pas lu : le laisser
-                            // ouvert retiendrait sa connexion et ses tampons
-                            // jusqu'à la fin du préchargement.
-                            inputStream.destroy();
-                        }
-                        inputStream = require('./rangeStream').chunkedFetch(chosen.url, {
-                            // Ceux que yt-dlp a employés pour obtenir l'adresse.
-                            headers: chosen.http_headers || {},
-                        });
-                        ffmpegInput = null;
-
-                        const langue = chosen.language ? `, ${chosen.language}` : '';
-                        log.success(`[PreloadManager] Direct URL extracted successfully for: `
-                            + `${track.title} (${chosen.format_id}, `
-                            + `${Math.round(Number(chosen.abr) || 0) || '?'} kbps${langue})`);
-                    } else if (inputStream) {
-                        // Rien d'utilisable, mais l'extracteur avait fourni un
-                        // flux : on le garde plutôt que de repartir les mains
-                        // vides — c'est lui qui alimentait avant ce détour.
-                        log.info(`[PreloadManager] No direct audio format for ${track.title}: `
-                            + `keeping the extractor stream.`);
-                    }
-                } else if (entry && entry.url) {
-                    ffmpegInput = entry.url;
-                    inputStream = null;
-                }
-            } catch (ytdlErr) {
-                log.error(`[PreloadManager] youtube-dl-exec resolution warning for ${track.title}:`,
-                    (ytdlErr && ytdlErr.message) || ytdlErr);
-            }
-        }
-
-        if (!ffmpegInput && inputStream) {
-            ffmpegInput = 'pipe:0';
-        }
-
         return { ffmpegInput, inputStream };
+    }
+
+    /**
+     * Ce que yt-dlp en tire : le meilleur flux audio, téléchargé par tranches,
+     * ou à défaut l'adresse unique qu'il rend. Null quand il n'en tire rien.
+     *
+     * Une pause du travail de fond remonte telle quelle, au lieu d'être prise
+     * pour un échec ordinaire : l'appelant se rabattrait sinon sur l'extracteur,
+     * c'est-à-dire sur une autre demande à YouTube au moment précis où il ne
+     * faut plus lui en faire.
+     *
+     * @param {{ background?: boolean }} [how] - Voir `ytdlp()`.
+     * @returns {Promise<{ ffmpegInput: string|null, inputStream: object|null }|null>}
+     */
+    async _inputFromYtdlp(track, url, { background = false } = {}) {
+        try {
+            log.info(`[PreloadManager] Resolving a direct audio URL through youtube-dl-exec for: ${track.title}`
+                + (background ? ' (background, paced)' : ''));
+            const info = await ytdlp(url, {
+                dumpSingleJson: true,
+                noCheckCertificates: true,
+                noWarnings: true,
+                preferFreeFormats: true,
+            }, { windowsHide: true }, { background });
+
+            const entry = (info.entries && info.entries[0]) ? info.entries[0] : info;
+            if (entry && entry.formats) {
+                /*
+                 * Le choix se fait dans `videoSource`, avec celui des
+                 * téléchargements.
+                 *
+                 * Ici, on prenait le premier format sonore de la liste. Or
+                 * yt-dlp ordonne du pire au meilleur et place les variantes HLS
+                 * en tête : le premier était un manifeste `.m3u8`, dans un
+                 * doublage automatique tiré au hasard, sans débit annoncé.
+                 * L'adresse était bien « extraite » — le journal l'annonçait en
+                 * succès — et ffmpeg se prenait un 404 sur un manifeste signé
+                 * pour un autre client.
+                 */
+                const chosen = require('./videoSource').bestAudio(entry);
+                if (!chosen || !chosen.url) return null;
+
+                /*
+                 * L'adresse est téléchargée par tranches, et non tendue telle
+                 * quelle à ffmpeg.
+                 *
+                 * YouTube bride un téléchargement progressif continu au débit
+                 * de lecture : ffmpeg, qui ouvre une requête et la garde
+                 * ouverte, écrivait 32 Ko/s — deux fois le temps réel, douze
+                 * minutes pour un morceau de vingt-cinq. La même adresse
+                 * demandée par tranches se sert à 38 Mo/s. Voir `rangeStream`.
+                 */
+                const inputStream = require('./rangeStream').chunkedFetch(chosen.url, {
+                    // Ceux que yt-dlp a employés pour obtenir l'adresse.
+                    headers: chosen.http_headers || {},
+                });
+
+                const langue = chosen.language ? `, ${chosen.language}` : '';
+                log.success(`[PreloadManager] Direct URL extracted successfully for: `
+                    + `${track.title} (${chosen.format_id}, `
+                    + `${Math.round(Number(chosen.abr) || 0) || '?'} kbps${langue})`);
+                return { ffmpegInput: 'pipe:0', inputStream };
+            }
+            if (entry && entry.url) return { ffmpegInput: entry.url, inputStream: null };
+            return null;
+        } catch (ytdlErr) {
+            if (ytdlErr && ytdlErr.code === 'YOUTUBE_PAUSED') throw ytdlErr;
+            log.error(`[PreloadManager] youtube-dl-exec resolution warning for ${track.title}:`,
+                (ytdlErr && ytdlErr.message) || ytdlErr);
+            return null;
+        }
     }
 
     /**
@@ -1444,7 +1502,9 @@ class PreloadManager {
                 break;
             }
 
-            this.startDownload(track, key, bitrate);
+            // Personne n'attend les pistes à venir : leur extraction prend son
+            // tour dans la file espacée. Celle qu'on écoute passe devant.
+            this.startDownload(track, key, bitrate, null, { background: !nowPlayingKeys.has(key) });
         }
     }
 
@@ -1611,7 +1671,7 @@ class PreloadManager {
      * @param {string} [debitAudio] - Débit cible ; sinon celui résolu pour la piste
      * @param {string|null} [requalifyFrom] - Débit du fichier déjà en cache, s'il s'agit d'une requalification
      */
-    async startDownload(track, key, audioBitrate, requalifyFrom = null) {
+    async startDownload(track, key, audioBitrate, requalifyFrom = null, { background = false } = {}) {
         // Débit choisi dans la box « Ajouter un fichier » ou dans le menu de la
         // piste. Ne concerne que les sources distantes : un fichier local
         // n'est jamais transcodé.
@@ -1733,7 +1793,7 @@ class PreloadManager {
         if (resolvedDurationMs) estTotalBytes = Math.max(100 * 1024, (resolvedDurationMs / 1000) * bytesPerSecond);
 
         const runPipeline = async () => {
-            const resolved = await this.resolveAudioInput(targetTrack, targetUrl);
+            const resolved = await this.resolveAudioInput(targetTrack, targetUrl, { background });
             const ffmpegInput = resolved.ffmpegInput;
             const inputStream = resolved.inputStream;
 
@@ -1958,12 +2018,19 @@ class PreloadManager {
                 const attempts = (this.failures.get(key)?.attempts || 0) + 1;
                 this.failures.set(key, { at: Date.now(), attempts });
                 const retryIn = Math.round(this._retryDelayMs(attempts) / 1000);
-                log.error(`[PreloadManager] Preload failed for ${track.title} `
-                    + `(attempt ${attempts}, retrying in ${retryIn} s):`, err.message);
+                if (err && err.code === 'YOUTUBE_PAUSED') {
+                    // Voulu : YouTube vient de refuser, et le travail de fond
+                    // attend. Ni erreur à signaler, ni version à soupçonner.
+                    log.info(`[PreloadManager] Preload of ${track.title} postponed: `
+                        + `YouTube refused recently (retrying in ${retryIn} s).`);
+                } else {
+                    log.error(`[PreloadManager] Preload failed for ${track.title} `
+                        + `(attempt ${attempts}, retrying in ${retryIn} s):`, err.message);
 
-                // Lancé sans être attendu : le diagnostic ne doit pas retenir la
-                // boucle de préchargement, qui a d'autres cibles à servir.
-                this._checkYtdlpFreshness(track, attempts);
+                    // Lancé sans être attendu : le diagnostic ne doit pas retenir
+                    // la boucle de préchargement, qui a d'autres cibles à servir.
+                    this._checkYtdlpFreshness(track, attempts);
+                }
             }
             this.notifyProgress();
         }

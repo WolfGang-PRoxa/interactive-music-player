@@ -228,6 +228,184 @@ const refuseIpv6 = (flags) => {
         }
     });
 
+    /* ── Le moins de demandes possible ──────────────────────────────── */
+
+    // Horloge et attente factices : une attente avance l'horloge d'autant, et
+    // le hasard de l'écart est au plus court — dix secondes.
+    const waits = [];
+    net._setTiming({ sleep: async (ms) => { waits.push(ms); clock += ms; }, random: () => 0 });
+
+    const DUMP = { dumpSingleJson: true, noWarnings: true };
+    const expiringIn = (ms) => `https://rr1---sn-x.googlevideo.com/videoplayback?expire=${Math.floor((clock + ms) / 1000)}&id=1`;
+    const described = (ms = 6 * 3600 * 1000) => () => ({ title: 'Titre', formats: [{ url: expiringIn(ms) }] });
+
+    await test('une vidéo n’est extraite qu’une fois, sous toutes ses adresses', async () => {
+        fresh();
+        behaviour = described();
+        const a = await net.ytdlp('https://www.youtube.com/watch?v=abcDEF12345&pp=xyz', DUMP);
+        const b = await net.ytdlp('https://youtube.com/watch?v=abcDEF12345', { noWarnings: true, dumpSingleJson: true });
+        const c = await net.ytdlp('https://youtu.be/abcDEF12345?si=q', DUMP);
+        assert.strictEqual(calls.length, 1, `${calls.length} extraction(s)`);
+        a.title = 'modifié par un appelant';
+        assert.strictEqual(b.title, 'Titre', 'les appelants partagent le même objet');
+        assert.strictEqual(c.title, 'Titre');
+    });
+
+    await test('  … et des demandes simultanées se greffent sur celle en cours', async () => {
+        fresh();
+        behaviour = described();
+        const url = 'https://www.youtube.com/watch?v=zzzZZZ00000';
+        await Promise.all([net.ytdlp(url, DUMP), net.ytdlp(url, DUMP), net.ytdlp(url, DUMP)]);
+        assert.strictEqual(calls.length, 1, `${calls.length} extraction(s)`);
+    });
+
+    await test('  … mais pas au-delà de l’expiration des adresses qu’elle porte', async () => {
+        fresh();
+        behaviour = described(10 * 60 * 1000);
+        await net.ytdlp('https://www.youtube.com/watch?v=exp00000000', DUMP);
+        await net.ytdlp('https://www.youtube.com/watch?v=exp00000000', DUMP);
+        assert.strictEqual(calls.length, 2, 'une adresse qui expire dans dix minutes ne se resert pas');
+    });
+
+    await test('  … ni après un échec, qui se retente', async () => {
+        fresh();
+        behaviour = () => { throw new Error('ERROR: [youtube] x: Video unavailable'); };
+        await assert.rejects(net.ytdlp('https://www.youtube.com/watch?v=gone0000000', DUMP));
+        await assert.rejects(net.ytdlp('https://www.youtube.com/watch?v=gone0000000', DUMP));
+        assert.strictEqual(calls.length, 2);
+    });
+
+    await test('le travail de fond attend dix secondes après la dernière extraction', async () => {
+        fresh();
+        waits.length = 0;
+        behaviour = described();
+        await net.ytdlp('https://www.youtube.com/watch?v=vue00000001', DUMP);
+        clock += 1000;
+        await net.ytdlp('https://www.youtube.com/watch?v=fond0000001', DUMP, {}, { background: true });
+        assert.deepStrictEqual(waits, [9000]);
+        await net.ytdlp('https://www.youtube.com/watch?v=fond0000002', DUMP, {}, { background: true });
+        assert.deepStrictEqual(waits, [9000, 10000], 'une extraction de fond après l’autre');
+    });
+
+    await test('  … quand ce qu’on demande soi-même part sans attendre', async () => {
+        waits.length = 0;
+        await net.ytdlp('https://www.youtube.com/watch?v=vue00000002', DUMP);
+        assert.deepStrictEqual(waits, []);
+    });
+
+    await test('  … et qu’une vidéo déjà extraite ne fait pas la queue', async () => {
+        waits.length = 0;
+        calls.length = 0;
+        await net.ytdlp('https://www.youtube.com/watch?v=vue00000002', DUMP, {}, { background: true });
+        assert.deepStrictEqual(waits, []);
+        assert.strictEqual(calls.length, 0);
+    });
+
+    await test('après un refus par les deux adresses, le fond s’arrête une demi-heure', async () => {
+        fresh();
+        behaviour = () => { throw new Error(BOT); };
+        await assert.rejects(net.ytdlp('https://www.youtube.com/watch?v=refus000001', DUMP), /not a bot/);
+        calls.length = 0;
+        await assert.rejects(
+            net.ytdlp('https://www.youtube.com/watch?v=fond0000003', DUMP, {}, { background: true }),
+            (err) => err.code === 'YOUTUBE_PAUSED');
+        assert.strictEqual(calls.length, 0, 'aucune demande envoyée pendant la pause');
+    });
+
+    await test('  … quand un geste de l’utilisateur tente encore sa chance', async () => {
+        calls.length = 0;
+        await assert.rejects(net.ytdlp('https://www.youtube.com/watch?v=vue00000003', DUMP), /not a bot/);
+        assert.strictEqual(calls.length, 1, 'une seule tentative, directement par le repli');
+    });
+
+    await test('  … et le fond reprend une fois la demi-heure passée', async () => {
+        clock += 30 * 60 * 1000 + 1;
+        behaviour = described();
+        calls.length = 0;
+        const out = await net.ytdlp('https://www.youtube.com/watch?v=fond0000004', DUMP, {}, { background: true });
+        assert.strictEqual(out.title, 'Titre');
+        assert.strictEqual(calls.length, 1);
+    });
+
+    /* ── Le préchargement ───────────────────────────────────────────── */
+
+    const preloadManager = require('../src/audio/PreloadManager');
+    const { Readable } = require('stream');
+    const YT = 'https://youtube.com/watch?v=pre00000001';
+    const audioFormat = () => ({
+        formats: [{
+            url: 'http://127.0.0.1:9/videoplayback?expire=99999999999',
+            acodec: 'opus', vcodec: 'none', protocol: 'https', abr: 130, format_id: '251',
+        }],
+    });
+
+    /** Un lecteur factice dont l'extracteur compte ses flux. */
+    function fakePlayer() {
+        const counts = { stream: 0 };
+        const extractor = {
+            identifier: 'fake',
+            constructor: { name: 'FakeExtractor' },
+            validate: async () => true,
+            stream: async () => { counts.stream++; return Readable.from(['x']); },
+        };
+        return {
+            counts,
+            extractors: {
+                run: async (fn) => {
+                    const result = await fn(extractor);
+                    return result === false ? null : { result, extractor };
+                },
+            },
+        };
+    }
+
+    async function resolveWith(player, how) {
+        const previous = preloadManager.player;
+        preloadManager.player = player;
+        try {
+            return await preloadManager.resolveAudioInput({ title: 'Essai', url: YT }, YT, how);
+        } finally {
+            preloadManager.player = previous;
+        }
+    }
+
+    const close = (input) => {
+        if (input && input.inputStream) {
+            input.inputStream.on('error', () => {});
+            input.inputStream.destroy();
+        }
+    };
+
+    await test('préchargement YouTube : yt-dlp seul, sans flux d’extracteur ouvert pour rien', async () => {
+        fresh();
+        behaviour = audioFormat;
+        const player = fakePlayer();
+        const input = await resolveWith(player);
+        close(input);
+        assert.strictEqual(player.counts.stream, 0, `${player.counts.stream} flux ouvert(s) par l’extracteur`);
+        assert.strictEqual(input.ffmpegInput, 'pipe:0');
+        assert.strictEqual(calls.length, 1);
+    });
+
+    await test('  … l’extracteur ne sert qu’en secours, quand yt-dlp ne trouve rien', async () => {
+        fresh();
+        behaviour = () => ({ formats: [] });
+        const player = fakePlayer();
+        const input = await resolveWith(player);
+        close(input);
+        assert.strictEqual(player.counts.stream, 1);
+        assert.strictEqual(input.ffmpegInput, 'pipe:0');
+    });
+
+    await test('  … et pendant une pause, le fond ne se rabat pas sur lui', async () => {
+        fresh();
+        behaviour = () => { throw new Error(BOT); };
+        await assert.rejects(net.ytdlp('https://www.youtube.com/watch?v=refus000002', DUMP));
+        const player = fakePlayer();
+        await assert.rejects(resolveWith(player, { background: true }), (err) => err.code === 'YOUTUBE_PAUSED');
+        assert.strictEqual(player.counts.stream, 0, 'le secours aurait été une autre demande à YouTube');
+    });
+
     /* ── Les sources ────────────────────────────────────────────────── */
 
     function serverSources(dir = SRC) {

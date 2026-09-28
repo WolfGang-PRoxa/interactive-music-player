@@ -274,9 +274,14 @@ console.log('\nLes trois chemins qui choisissent un son\n');
     const bloc = PRELOAD.slice(PRELOAD.indexOf('bestAudio(entry)'),
         PRELOAD.indexOf('} catch (ytdlErr)'));
 
+    // yt-dlp ne rend rien quand il ne trouve rien ; le flux de l'extracteur
+    // n'est refermé que si yt-dlp a rendu quelque chose. Voir aussi le test de
+    // comportement dans tests/youtubeNetwork.js.
+    const resolver = PRELOAD.slice(PRELOAD.indexOf('async resolveAudioInput('),
+        PRELOAD.indexOf('async _inputFromExtractor('));
     check('le flux de l\'extracteur n\'est lâché que pour mieux',
-        /if \(chosen && chosen\.url\)/.test(bloc) && /inputStream = null;/.test(bloc)
-        && bloc.indexOf('inputStream = null;') > bloc.indexOf('if (chosen && chosen.url)'),
+        /if \(!chosen \|\| !chosen\.url\) return null;/.test(bloc)
+        && /if \(direct\) \{[\s\S]*?stale\.destroy\(\)[\s\S]*?return direct;/.test(resolver),
         'l\'abandonner sans rien en échange laissait une piste muette');
     check('  … et le journal dit ce qui a été retenu',
         /chosen\.format_id/.test(bloc) && /langue/.test(bloc),

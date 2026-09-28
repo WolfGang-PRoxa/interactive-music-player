@@ -367,7 +367,7 @@ function recueillir(flux) {
          * du préchargement.
          */
         check('le flux remplacé est refermé',
-            /inputStream\.destroy\(\);/.test(PRELOAD));
+            /if \(stale && typeof stale\.destroy === 'function'\) stale\.destroy\(\);/.test(PRELOAD));
 
         /*
          * `stream` existait, `cleanup` le détruisait, et rien ne le lui donnait
