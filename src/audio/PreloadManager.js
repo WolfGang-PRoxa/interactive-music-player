@@ -1085,7 +1085,6 @@ class PreloadManager {
                     noCheckCertificates: true,
                     noWarnings: true,
                     preferFreeFormats: true,
-                    addHeader: ['referer:youtube.com', 'user-agent:googlebot']
                 }, { windowsHide: true });
 
                 const entry = (info.entries && info.entries[0]) ? info.entries[0] : info;
@@ -1122,7 +1121,8 @@ class PreloadManager {
                             inputStream.destroy();
                         }
                         inputStream = require('./rangeStream').chunkedFetch(chosen.url, {
-                            headers: { referer: 'youtube.com', 'user-agent': 'googlebot' },
+                            // Ceux que yt-dlp a employés pour obtenir l'adresse.
+                            headers: chosen.http_headers || {},
                         });
                         ffmpegInput = null;
 

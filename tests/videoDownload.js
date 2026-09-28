@@ -289,7 +289,7 @@ console.log('\nCe que la recherche d\'image répond\n');
      */
     check('une seule entrée distante passe par le tuyau',
         /function pipeRemote\(/.test(HANDLER)
-        && /rangeStream\.chunkedFetch\(url, \{ headers: FETCH_HEADERS \}\)/.test(HANDLER),
+        && /rangeStream\.chunkedFetch\(url, \{ headers: input\.headers \|\| \{\} \}\)/.test(HANDLER),
         'rien à poser sur le disque quand une entrée suffit');
 
     check('  … et le téléchargement audio l\'emprunte',
@@ -302,8 +302,17 @@ console.log('\nCe que la recherche d\'image répond\n');
 
     check('image et son séparés passent par des fichiers',
         /rangeStream\.fetchToFile\(adresse, chemin/.test(HANDLER)
-        && /await rapatrier\(source\.videoUrl, 'video'\)/.test(HANDLER),
+        && /await rapatrier\(source\.videoUrl, 'video', source\.videoHeaders\)/.test(HANDLER),
         'ffmpeg n\'a qu\'une entrée standard, et il en faudrait deux');
+
+    // Les en-têtes rejoués sont ceux que yt-dlp a présentés pour chaque flux,
+    // et non une valeur écrite en dur : celle d'avant se faisait passer pour
+    // le robot d'indexation de Google.
+    check('  … chacun avec les en-têtes que yt-dlp a employés pour lui',
+        /await rapatrier\(source\.audioUrl, 'audio', source\.audioHeaders\)/.test(HANDLER)
+        && /headers: choisi\.headers/.test(HANDLER)
+        && !/googlebot/.test(HANDLER),
+        'l\'image, le son recousu, et le son seul au débit choisi');
 
     check('  … posés là où le fichier final ira',
         /const chemin = `\$\{partial\}\.\$\{role\}`/.test(HANDLER),

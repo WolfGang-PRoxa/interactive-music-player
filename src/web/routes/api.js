@@ -996,7 +996,6 @@ function createApiRouter(webServer) {
                     noCheckCertificates: true,
                     noWarnings: true,
                     preferFreeFormats: true,
-                    addHeader: ['referer:youtube.com', 'user-agent:googlebot']
                 }, { windowsHide: true });
 
                 const entry = (info.entries && info.entries[0]) ? info.entries[0] : info;
@@ -1171,7 +1170,6 @@ function createApiRouter(webServer) {
                 noCheckCertificates: true,
                 noWarnings: true,
                 preferFreeFormats: true,
-                addHeader: ['referer:youtube.com', 'user-agent:googlebot']
             }, { windowsHide: true });
 
             const entry = (output.entries && output.entries[0]) ? output.entries[0] : output;

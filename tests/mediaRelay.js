@@ -21,9 +21,9 @@
  *    envoie d'abord — en une seule requête vers la source rendrait le relais
  *    plus lent que le lien direct qu'il remplace.
  *
- *  - **Les en-têtes de la source sont rejoués.** `yt-dlp` résout en se
- *    présentant en `googlebot` ; la source peut exiger les mêmes au moment de
- *    servir, et un navigateur enverra toujours les siens.
+ *  - **Les en-têtes de la source sont rejoués.** La source peut exiger au
+ *    moment de servir ceux que `yt-dlp` a présentés en résolvant, et un
+ *    navigateur enverra toujours les siens.
  *
  *  - **Le client qui s'en va coupe l'amont.** Sinon, changer de piste laisserait
  *    la boucle de tranches tirer des dizaines de mégaoctets dans le vide.
@@ -260,15 +260,16 @@ function demander(port, { range = null, method = 'GET' } = {}) {
 
     {
         const amont = await source({ exige: 'user-agent' });
-        const bot = await relais(amont, { headers: { 'User-Agent': 'googlebot' } });
+        const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/148.0.0.0';
+        const bot = await relais(amont, { headers: { 'User-Agent': UA } });
         const r = await demander(bot.port, { range: 'bytes=0-99' });
         await bot.close(); await amont.close();
 
         check('les en-têtes que la source exige sont rejoués', r.status === 206
             && r.corps.equals(CORPS.subarray(0, 100)),
-            'yt-dlp résout en googlebot, la source peut l\'exiger pour servir');
+            'la source peut exiger ceux que yt-dlp a présentés en résolvant');
         check('  … tels que le relais les porte',
-            amont.demandes[0].headers['user-agent'] === 'googlebot',
+            amont.demandes[0].headers['user-agent'] === UA,
             amont.demandes[0].headers['user-agent'] || '(aucun)');
     }
 

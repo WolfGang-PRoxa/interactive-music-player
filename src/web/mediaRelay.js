@@ -18,9 +18,9 @@
  * qui met longtemps à venir, ne vient pas, puis vient au troisième rechargement
  * — celui qui tombe après l'expiration du cache, donc sur une adresse neuve.
  *
- * Les en-têtes comptent autant que l'adresse : `yt-dlp` résout en se présentant
- * en `googlebot` depuis `youtube.com`, et la source peut exiger les mêmes au
- * moment de servir. Un navigateur enverra toujours les siens. Le relais, lui,
+ * Les en-têtes comptent autant que l'adresse : la source peut exiger au moment
+ * de servir ceux que `yt-dlp` a présentés en résolvant — `http_headers`, dans
+ * ce qu'il rend. Un navigateur enverra toujours les siens. Le relais, lui,
  * rejoue exactement ceux que la source a demandés.
  *
  * ## Ce que le relais doit à Safari

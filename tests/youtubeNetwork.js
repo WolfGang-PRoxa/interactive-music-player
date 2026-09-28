@@ -256,6 +256,15 @@ const refuseIpv6 = (flags) => {
         assert.deepStrictEqual(direct, [], `appel direct de youtube-dl-exec : ${direct.join(', ')}`);
     });
 
+    await test('aucune requête ne se fait passer pour le robot de Google', async () => {
+        // yt-dlp se présentait en `googlebot` : un robot d'indexation annoncé
+        // depuis une adresse domestique, c'est exactement ce que YouTube guette.
+        // Sans en-tête forcé, il présente ceux d'un navigateur ordinaire, et
+        // les flux se servent de la même façon.
+        const found = sources.filter(s => /googlebot/i.test(s.text)).map(s => s.rel);
+        assert.deepStrictEqual(found, [], `googlebot dans : ${found.join(', ')}`);
+    });
+
     await test('le démarrage branche youtubei avant d’enregistrer les extracteurs', async () => {
         const index = sources.find(s => s.rel === 'index.js').text;
         const install = index.indexOf("require('./utils/youtubeNetwork').installYoutubeiFallback()");

@@ -66,7 +66,6 @@ async function dump(url) {
             noCheckCertificates: true,
             noWarnings: true,
             preferFreeFormats: true,
-            addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
         }, { windowsHide: true });
         return (info && info.entries && info.entries[0]) ? info.entries[0] : info;
     } catch (err) {
@@ -325,7 +324,8 @@ function stepDown(ladder, requested, available) {
  *
  * @param {string} url - Adresse déjà pontée.
  * @param {number} kbps - Débit demandé.
- * @returns {Promise<{ url: string, kbps: number|null }|null>}
+ * @returns {Promise<{ url: string, kbps: number|null, headers: object }|null>}
+ *   `headers` : ceux que yt-dlp a employés, à rejouer en allant chercher `url`.
  */
 async function resolveAudio(url, kbps) {
     if (!url || !/^https?:\/\//i.test(url)) return null;
@@ -339,7 +339,7 @@ async function resolveAudio(url, kbps) {
 
     const retenu = stepDown(AUDIO_LADDER, kbps, debits);
     const exact = sons.find((f) => nominalKbps(f) === retenu);
-    return exact ? { url: exact.url, kbps: retenu } : null;
+    return exact ? { url: exact.url, kbps: retenu, headers: exact.http_headers || {} } : null;
 }
 
 /**
@@ -358,7 +358,9 @@ async function resolveAudio(url, kbps) {
  * @param {number|{height?: number, audioKbps?: number}} [wanted] - Hauteur visée,
  *   ou les deux demandes. Un nombre seul reste accepté pour les appels d'avant.
  * @returns {Promise<{ videoUrl: string|null, audioUrl: string|null, audioOnly: boolean,
- *   height: number|null, audioKbps: number|null }>}
+ *   height: number|null, audioKbps: number|null, videoHeaders: object, audioHeaders: object }>}
+ *   Les en-têtes sont ceux que yt-dlp a employés pour chaque flux, à rejouer en
+ *   allant le chercher.
  */
 async function resolve(url, wanted = DEFAULT_HEIGHT) {
     const ask = typeof wanted === 'object' && wanted !== null ? wanted : { height: wanted };
@@ -370,6 +372,7 @@ async function resolve(url, wanted = DEFAULT_HEIGHT) {
 async function resolveWith(url, height, audioKbps) {
     const vide = {
         videoUrl: null, audioUrl: null, audioOnly: true, height: null, audioKbps: null,
+        videoHeaders: {}, audioHeaders: {},
     };
     if (!url || !/^https?:\/\//i.test(url)) return vide;
 
@@ -392,6 +395,7 @@ async function resolveWith(url, height, audioKbps) {
 
     // ── Le son, pour le sien ──
     let audioUrl = null;
+    let audioHeaders = {};
     let sonRetenu = null;
 
     if (!choisi.acodec || choisi.acodec === 'none') {
@@ -405,6 +409,7 @@ async function resolveWith(url, height, audioKbps) {
             sonRetenu = stepDown(AUDIO_LADDER, audioKbps, debits);
             const exact = sons.filter((f) => nominalKbps(f) === sonRetenu);
             audioUrl = (exact[0] || null) && exact[0].url;
+            if (audioUrl) audioHeaders = exact[0].http_headers || {};
         }
 
         // Aucun débit annoncé, ou aucune demande : le meilleur disponible, comme
@@ -412,6 +417,7 @@ async function resolveWith(url, height, audioKbps) {
         if (!audioUrl) {
             const meilleur = sons[0];
             audioUrl = meilleur ? meilleur.url : null;
+            audioHeaders = (meilleur && meilleur.http_headers) || {};
             sonRetenu = meilleur ? nominalKbps(meilleur) || null : null;
         }
     } else {
@@ -426,6 +432,8 @@ async function resolveWith(url, height, audioKbps) {
         audioOnly: false,
         height: definitionOf(choisi) || null,
         audioKbps: sonRetenu,
+        videoHeaders: choisi.http_headers || {},
+        audioHeaders,
     };
 }
 

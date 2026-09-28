@@ -96,11 +96,6 @@ function copyLocal(source, dir) {
 }
 
 /**
- * En-têtes des tranches, ceux-là mêmes qui ont servi à signer les adresses.
- */
-const FETCH_HEADERS = { referer: 'youtube.com', 'user-agent': 'googlebot' };
-
-/**
  * Ramène une entrée distante à un flux poussé dans l'entrée standard.
  *
  * Tendre une URL à ffmpeg le fait ouvrir une requête et la garder ouverte du
@@ -111,7 +106,9 @@ const FETCH_HEADERS = { referer: 'youtube.com', 'user-agent': 'googlebot' };
  * Ne convient qu'aux commandes à une seule entrée distante : ffmpeg n'a qu'une
  * entrée standard. Pour les autres, `fetchToFile`.
  *
- * @param {{ ffmpegInput: string|null, inputStream: object|null }} input
+ * @param {{ ffmpegInput: string|null, inputStream: object|null, headers?: object }} input
+ *   `headers` : ceux que yt-dlp a employés pour obtenir l'adresse, quand on les
+ *   connaît. Sans eux, rien de particulier : googlevideo sert sans.
  * @returns {{ ffmpegInput: string, inputStream: object|null }}
  */
 function pipeRemote(input) {
@@ -120,7 +117,7 @@ function pipeRemote(input) {
     if (url && /^https?:\/\//i.test(url)) {
         return {
             ffmpegInput: 'pipe:0',
-            inputStream: rangeStream.chunkedFetch(url, { headers: FETCH_HEADERS }),
+            inputStream: rangeStream.chunkedFetch(url, { headers: input.headers || {} }),
         };
     }
 
@@ -279,10 +276,10 @@ async function transcodeVideo(track, url, dir, title, bitrate, container, height
      * dont on sait qu'il existe, qu'on peut y écrire et qu'il a la place — une
      * vidéo en 2160p ne tient pas partout.
      */
-    const rapatrier = async (adresse, role) => {
+    const rapatrier = async (adresse, role, headers) => {
         const chemin = `${partial}.${role}`;
         temporaires.push(chemin);
-        await rangeStream.fetchToFile(adresse, chemin, { headers: FETCH_HEADERS });
+        await rangeStream.fetchToFile(adresse, chemin, { headers: headers || {} });
         return chemin;
     };
 
@@ -318,10 +315,10 @@ async function transcodeVideo(track, url, dir, title, bitrate, container, height
              * s'y déplacer. Recopier une piste vidéo sans la réencoder demande
              * de lire l'index du conteneur, qui vit parfois à la fin.
              */
-            args.push('-i', await rapatrier(source.videoUrl, 'video'));
+            args.push('-i', await rapatrier(source.videoUrl, 'video', source.videoHeaders));
 
             if (source.audioUrl) {
-                args.push('-i', await rapatrier(source.audioUrl, 'audio'));
+                args.push('-i', await rapatrier(source.audioUrl, 'audio', source.audioHeaders));
                 args.push('-map', '0:v:0', '-map', '1:a:0');
             }
         }
@@ -412,7 +409,7 @@ async function handleDownloadTrack(ctx) {
                  */
                 const choisi = await videoSource.resolveAudio(playable.url, bitrate);
                 const input = choisi
-                    ? { ffmpegInput: choisi.url, inputStream: null }
+                    ? { ffmpegInput: choisi.url, inputStream: null, headers: choisi.headers }
                     : await preloadManager.resolveAudioInput(playable.track, playable.url);
 
                 if (!input.ffmpegInput && !input.inputStream) {
