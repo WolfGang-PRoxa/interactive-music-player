@@ -21,6 +21,19 @@ was delivered.
     src/web/changelog.js.
 -->
 
+## 2026-11-11 — The desktop app
+
+The bot now installs as a Windows app, without losing anything of its dashboard in the browser.
+
+### Added
+- A Windows installer brings Node.js, the bot and its dependencies: nothing left to install by hand.
+- The app walks through the first setup, starts the bot, and opens the dashboard in its own window once the bot is ready; it stays reachable from any browser, here or elsewhere.
+- An icon in the notification area keeps the bot running with the window closed, and reopens, restarts or shuts it down, or starts it with Windows.
+- An existing installation, with its configuration and playlists, can be taken over as it is by the app.
+
+### Changed
+- Under the app, a restart or a version switch from the dashboard is relaunched by the app itself, which keeps its hold on the bot.
+
 ## 2026-09-14 — The last advisory left standing
 
 ### Security

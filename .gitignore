@@ -6,3 +6,9 @@ versions/
 *.sqlite
 *.sqlite3
 tools/icon.ico
+desktop/node_modules/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+desktop/src-tauri/payload/*
+!desktop/src-tauri/payload/LISEZMOI.md
+desktop/.staging/

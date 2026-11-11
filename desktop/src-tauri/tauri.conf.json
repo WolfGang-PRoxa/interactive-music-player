@@ -1,0 +1,56 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Interactive Music Player",
+  "mainBinaryName": "Interactive Music Player",
+  "version": "../../package.json",
+  "identifier": "com.wolfgangproxa.interactive-music-player",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "launcher",
+        "title": "Interactive Music Player",
+        "url": "index.html",
+        "width": 520,
+        "height": 640,
+        "minWidth": 460,
+        "minHeight": 520,
+        "resizable": true,
+        "center": true,
+        "visible": false,
+        "backgroundColor": "#121019"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "category": "Music",
+    "shortDescription": "Bot Discord de musique avec ducking automatique",
+    "copyright": "MIT",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "resources": {
+      "payload/": "payload/"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["French", "English"],
+        "displayLanguageSelector": false,
+        "installerIcon": "icons/icon.ico"
+      }
+    }
+  }
+}

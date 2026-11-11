@@ -22,6 +22,19 @@ entrée porte la date du jour où le changement a été livré.
     src/web/changelog.js.
 -->
 
+## 2026-11-11 — L'application de bureau
+
+Le bot s'installe désormais comme une application Windows, sans rien perdre de son tableau de bord dans le navigateur.
+
+### Added
+- Un installeur Windows apporte Node.js, le bot et ses dépendances : plus aucun prérequis à installer à la main.
+- L'application guide la première configuration, lance le bot, et ouvre le tableau de bord dans sa propre fenêtre une fois le bot prêt ; il reste accessible dans n'importe quel navigateur, ici comme ailleurs.
+- Une icône dans la zone de notification garde le bot fenêtre fermée, et permet de le rouvrir, de le redémarrer, de l'éteindre, ou de le lancer avec Windows.
+- Une installation existante, avec sa configuration et ses playlists, peut être reprise telle quelle par l'application.
+
+### Changed
+- Sous l'application, un redémarrage ou un changement de version depuis le tableau de bord est relancé par l'application elle-même, qui garde ainsi la main sur le bot.
+
 ## 2026-09-14 — Le dernier avis laissé ouvert
 
 ### Security

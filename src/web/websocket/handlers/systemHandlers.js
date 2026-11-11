@@ -7,6 +7,7 @@
 const database = require('../../../database/Database');
 const playbackStateManager = require('../../../database/PlaybackStateManager');
 const log = require('../../../utils/logger');
+const supervisor = require('../../../utils/supervisor');
 
 function handleRequestState(ctx) {
     const { webServer, currentGuildId } = ctx;
@@ -79,6 +80,16 @@ function restartProcess(webServer, options = {}) {
         try {
             webServer.wss.close();
             webServer.server.close();
+
+            // Sous l'application de bureau, c'est elle qui relance : une
+            // instance détachée échapperait à sa surveillance. Voir
+            // src/utils/supervisor.js.
+            if (supervisor.isSupervised()) {
+                supervisor.writeRestartRequest(entryPoint);
+                log.info(`[WebServer] Server stopped. The desktop app restarts: ${entryPoint}`);
+                process.exit(supervisor.RESTART_EXIT_CODE);
+                return;
+            }
 
             log.info(`[WebServer] Server stopped. Starting the new instance: ${entryPoint}`);
 

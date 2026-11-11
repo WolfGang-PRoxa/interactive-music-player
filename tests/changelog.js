@@ -333,7 +333,7 @@ async function checkRendering() {
         sections[0].dataset.date);
 
     check('chaque date est écrite en toutes lettres, dans la langue du tableau de bord',
-        sections[0].querySelector('.changelog-release-date').textContent === '14 septembre 2026',
+        sections[0].querySelector('.changelog-release-date').textContent === '11 novembre 2026',
         sections[0].querySelector('.changelog-release-date').textContent);
 
     // La couleur d'une catégorie est portée par l'attribut, pas par la classe :
@@ -344,7 +344,7 @@ async function checkRendering() {
         [...kinds].join(', '));
 
     check('le sommaire groupe les dates par mois',
-        $('.changelog-toc-group').length === 2
+        $('.changelog-toc-group').length === 3
             && $('.changelog-toc-entry').length === reference.releases.length,
         `${$('.changelog-toc-group').length} mois, ${$('.changelog-toc-entry').length} dates`);
 
@@ -566,7 +566,7 @@ async function checkRendering() {
         note.textContent);
 
     check('l\'habillage suit malgré tout la langue du tableau de bord',
-        $('.changelog-release-date')[0].textContent === '14 de septiembre de 2026',
+        $('.changelog-release-date')[0].textContent === '11 de noviembre de 2026',
         $('.changelog-release-date')[0].textContent);
 
     // La fenêtre se referme, et le dit à qui la ferme — c'est ce que la touche

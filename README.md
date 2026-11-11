@@ -54,6 +54,22 @@ la [chaîne audio](docs/fr/technique/02-lecture-audio.md), le
 
 ---
 
+## Application de bureau *(Windows)*
+
+Le plus simple : **l'installeur**. Il apporte Node.js, le bot et ses
+dépendances — aucun prérequis —, puis l'application guide la première
+configuration, garde le bot dans la zone de notification et ouvre le tableau de
+bord dans sa propre fenêtre. Celui-ci reste accessible dans n'importe quel
+navigateur, comme avant.
+
+L'installeur est joint aux [releases](https://github.com/WolfGang-PRoxa/interactive-music-player/releases),
+et produit par chaque run du workflow *Application de bureau*. Tout le détail
+est dans [desktop/README.md](desktop/README.md).
+
+La suite de ce document décrit l'installation depuis le code source.
+
+---
+
 ## Prérequis
 
 - **Node.js 18** ou supérieur

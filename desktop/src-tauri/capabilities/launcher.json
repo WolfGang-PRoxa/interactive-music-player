@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "launcher",
+  "description": "La fenêtre de lancement : événements et commandes de l'application, rien d'autre. Le tableau de bord, chargé depuis le serveur du bot, n'a aucun accès à l'IPC.",
+  "windows": ["launcher"],
+  "permissions": ["core:default"]
+}
