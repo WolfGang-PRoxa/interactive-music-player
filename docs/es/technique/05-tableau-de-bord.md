@@ -29,10 +29,10 @@ testigo de acceso.
 | [`oauth.js`](../../../src/web/oauth.js), [`sessions.js`](../../../src/web/sessions.js) | Recorrido OAuth de Discord, sesiones de pestaña |
 | [`owner.js`](../../../src/web/owner.js), [`guests.js`](../../../src/web/guests.js) | Propietario de la instalación, libro de invitados |
 | [`permissions.js`](../../../src/web/permissions.js) | Lo que un invitado tiene derecho a hacer |
-| [`tailscale.js`](../../../src/web/tailscale.js) | Publicación del panel en internet |
+| [`cloudflare.js`](../../../src/web/cloudflare.js), [`oauthRelay.js`](../../../src/web/oauthRelay.js) | Publicación del panel en internet, relé de retorno OAuth |
 | [`routes/api.js`](../../../src/web/routes/api.js) | Rutas HTTP |
 | [`routes/auth.js`](../../../src/web/routes/auth.js) | Recorrido de autenticación de un invitado |
-| [`uploadService.js`](../../../src/web/uploadService.js) | Recepción e integración de las importaciones |
+| [`uploadService.js`](../../../src/web/uploadService.js), [`chunkedUpload.js`](../../../src/web/chunkedUpload.js) | Recepción e integración de las importaciones, envío en trozos |
 | [`websocket/wsHandler.js`](../../../src/web/websocket/wsHandler.js) | Enrutador de mensajes |
 | [`websocket/handlers/`](../../../src/web/websocket/handlers/) | Lógica de negocio, un módulo por dominio |
 
@@ -161,7 +161,7 @@ dominio corresponde a un módulo de `handlers/`:
 | Servidor de Discord | `selectChannel`, `setDefaultChannel`, `updateSettings`, `toggleVoiceDetection`, `leaveGuild` |
 | Pista | `setTrackQuality`, `requestTrackFormats`, `requestTrackLoudness`, `setTrackLoudness`, `downloadTrack` |
 | Compartición del control | `sendInviteLink`, `admitGuest`, `shareControl`, `revokeControl`, `requestRight`, `answerRightRequest`, `muteRightRequests` |
-| Túnel | `tunnelState`, `tunnelLogin`, `tunnelMount`, `tunnelUnmount` |
+| Túnel | `tunnelState`, `tunnelInstall`, `tunnelMount`, `tunnelUnmount` |
 | Versiones | `listVersions`, `installVersion`, `uninstallVersion` |
 | Sistema | `requestState`, `clientLog`, `memoryStream`, `startupFadeinConsumed`, `restartBot`, `shutdownBot` |
 

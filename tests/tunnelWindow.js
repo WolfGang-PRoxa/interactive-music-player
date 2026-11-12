@@ -1,10 +1,9 @@
 /**
  * Vérifie la fenêtre qui rend le tableau de bord joignable de l'extérieur.
  *
- * Publier demande quatre choses que rien n'annonçait : installer Tailscale,
- * authentifier la machine, obtenir du tailnet le droit de publier, monter le
- * tunnel. On ne découvrait l'étape suivante qu'en butant dessus, après avoir cru
- * à chaque fois que la précédente avait raté.
+ * Publier passait par Tailscale, et demandait quatre choses que rien
+ * n'annonçait. Le tunnel Cloudflare n'en demande plus que deux, que le bot fait
+ * sur un clic : rapporter cloudflared, puis ouvrir le tunnel.
  *
  * Ce que ce test protège :
  *
@@ -16,11 +15,11 @@
  *    autre, un lien qui envoie au mauvais endroit coûtant plus cher que pas de
  *    lien du tout.
  *
- *  - **Un tunnel qui n'est pas le nôtre n'est pas écrasé**, même quand l'hôte
- *    clique pour publier. Quelqu'un s'en sert peut-être depuis des mois.
+ *  - **Le bot télécharge lui-même**, après avoir constaté qu'il le faut : le
+ *    navigateur ne rapporte rien.
  *
- *  - **La clé d'authentification ne se journalise pas.** Elle vaut un mot de
- *    passe le temps de son emploi, et le journal du bot se lit à plusieurs.
+ *  - **Derrière le relais, la déclaration chez Discord se fait une fois** : la
+ *    fenêtre le dit, et la propose avant même la publication.
  */
 const fs = require('fs');
 const vm = require('vm');
@@ -137,12 +136,12 @@ console.log('Ce que chaque étape montre, et propose\n');
 {
     const m = mount();
 
-    const INSTALLATEUR = {
-        url: 'https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe',
+    const DIRECT = {
+        url: 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe',
         direct: true,
     };
 
-    m.show({ step: 'absent', installer: INSTALLATEUR });
+    m.show({ step: 'absent', installer: DIRECT });
     check('l\'étape dit ce qui manque, et pourquoi',
         m.texts().some((x) => x.includes('tunnel_absent_title'))
         && m.texts().some((x) => x.includes('tunnel_absent_body')));
@@ -150,78 +149,70 @@ console.log('Ce que chaque étape montre, et propose\n');
 
     check('  … et propose le téléchargement comme un vrai bouton',
         !!telecharger(), 'un lien discret ne se remarquait pas');
-
     check('  … avec une infobulle qui dit ce qu\'il déclenche',
         !!telecharger().attributes['data-tooltip']
         && telecharger().attributes['data-i18n-tooltip'] === 'tunnel_absent_tip');
 
     /*
-     * Le clic ne télécharge pas : il constate d'abord.
-     *
-     * Tailscale a pu être installé depuis l'ouverture de la fenêtre — c'est même
-     * le cas ordinaire, puisqu'on vient d'aller le faire. Rapporter un
-     * installateur par-dessus une installation existante ferait perdre du temps
-     * à qui n'avait qu'à passer à l'étape suivante.
+     * Le bot télécharge lui-même : cloudflared est un exécutable unique, qui
+     * se pose dans son dossier sans droits administrateur. Le navigateur n'a
+     * donc rien à rapporter — il demande, et le serveur constate avant d'agir.
      */
     telecharger().listeners.click();
-    check('  … qui vérifie avant de télécharger',
-        m.sent[m.sent.length - 1].type === 'tunnelState',
-        'Tailscale a pu être installé entre-temps');
+    check('  … qui demande au bot de le rapporter',
+        m.sent[m.sent.length - 1].type === 'tunnelInstall');
+    check('  … sans que le navigateur télécharge quoi que ce soit',
+        m.downloads().length === 0, 'le fichier va dans le dossier du bot, pas dans Téléchargements');
 
-    // Le constat revient : toujours absent, donc le téléchargement part.
-    m.show({ step: 'absent', installer: INSTALLATEUR });
-    check('  … et ne part que si la commande manque toujours',
-        m.downloads().includes(INSTALLATEUR.url), m.downloads().join(', '));
+    m.show({ step: 'downloading' });
+    check('pendant le téléchargement, la fenêtre le dit',
+        m.texts().some((x) => x.includes('tunnel_downloading_title')));
 
-    // L'autre issue : installé entre-temps, rien ne se télécharge.
-    telecharger().listeners.click();
-    const avantConstat = m.downloads().length;
-    m.show({ step: 'ready', publicUrl: 'https://x.ts.net' });
-    check('  … et pas du tout si elle est apparue entre-temps',
-        m.downloads().length === avantConstat,
-        'rapporter un installateur par-dessus une installation ferait perdre du temps');
+    // Sans fichier à rapporter — macOS — c'est la page officielle.
+    m.show({ step: 'absent', installer: { url: 'https://developers.cloudflare.com/x/', direct: false } });
+    check('  … sur une plateforme sans téléchargement direct, un lien vers la page',
+        m.links().some((h) => h.startsWith('https://developers.cloudflare.com/'))
+        && !telecharger(), 'macOS passe par Homebrew');
 
-    // Sans fichier à tendre — macOS, Linux — c'est la page officielle.
-    m.show({ step: 'absent', installer: { url: 'https://tailscale.com/download', direct: false } });
-    check('  … sur une plateforme sans installateur direct, l\'étiquette change',
-        m.buttons().some((b) => b.textContent === 'k#tunnel_absent_page'),
-        'macOS passe par l\'App Store, Linux par un script');
-
-    m.show({ step: 'absent', installer: INSTALLATEUR });
+    m.show({ step: 'absent', installer: DIRECT });
 
     // Une seule étape est peinte : celle où l'on en est.
     check('  … sans montrer les suivantes',
         !m.texts().some((x) => x.includes('tunnel_ready_title')),
         'savoir ce qui reste n\'aide pas quand on ne peut rien y faire');
 
-    m.show({ step: 'needsLogin' });
-    check('l\'authentification propose un champ pour la clé',
-        m.nodes().some((n) => n.tagName === 'INPUT'));
-    check('  … masqué à la saisie',
-        m.nodes().filter((n) => n.tagName === 'INPUT').every((n) => n.type === 'password'),
-        'la clé vaut un mot de passe, et la fenêtre s\'ouvre devant quelqu\'un');
-    check('  … et le lien mène aux clés, pas à la console générale',
-        m.links().some((h) => h.includes('/admin/settings/keys')));
+    m.show({ step: 'needsAddress', mode: 'named' });
+    check('un tunnel nommé sans adresse renvoie au tableau de bord Cloudflare',
+        m.links().some((h) => h.includes('dash.cloudflare.com')),
+        'c\'est là que son nom d\'hôte est écrit');
 
-    m.show({ step: 'needsCapability' });
-    check('le droit de publier renvoie à la console du tailnet',
-        m.links().some((h) => h.includes('login.tailscale.com/admin')),
-        'il ne s\'accorde pas depuis la machine');
+    m.show({ step: 'ready', mode: 'quick', publicUrl: null });
+    check('« prêt » en partage rapide : le bouton, sans adresse à afficher',
+        m.buttons().some((b) => b.textContent === 'k#tunnel_ready_action')
+        && !m.nodes().some((n) => n.className === 'tunnel-url'),
+        'elle n\'existe pas avant que Cloudflare l\'attribue');
+    check('  … et l\'explication dit qu\'elle changera à chaque lancement',
+        m.texts().some((x) => x.includes('tunnel_ready_body')));
 
-    m.show({ step: 'ready', publicUrl: 'https://x.ts.net' });
-    check('« prêt » affiche l\'adresse à venir et le bouton',
-        m.texts().includes('https://x.ts.net')
-        && m.buttons().some((b) => b.textContent === 'k#tunnel_ready_action'));
+    m.show({ step: 'ready', mode: 'named', publicUrl: 'https://imp.romainpiau.dev' });
+    check('« prêt » sur une adresse fixe : l\'adresse à venir et le bouton',
+        m.texts().includes('https://imp.romainpiau.dev')
+        && m.texts().some((x) => x.includes('tunnel_ready_named_body')));
 
-    m.show({ step: 'serving', publicUrl: 'https://x.ts.net' });
+    m.show({ step: 'starting', mode: 'quick' });
+    check('« en cours » propose d\'annuler',
+        m.buttons().some((b) => b.textContent === 'k#tunnel_starting_cancel'));
+
+    m.show({ step: 'serving', mode: 'quick', publicUrl: 'https://x.trycloudflare.com' });
     check('« publié » propose de cesser de l\'être',
         m.buttons().some((b) => b.textContent === 'k#tunnel_serving_action'));
+    check('  … et prévient que l\'adresse rapide changera',
+        m.texts().some((x) => x.includes('tunnel_serving_quick_body')));
 
-    m.show({ step: 'otherTarget', proxy: 'http://127.0.0.1:8080' });
-    check('un tunnel étranger est nommé, sans bouton pour l\'écraser',
-        m.texts().some((x) => x.includes('8080'))
-        && !m.buttons().some((b) => b.textContent === 'k#tunnel_ready_action'),
-        'quelqu\'un s\'en sert peut-être depuis des mois');
+    m.show({ step: 'failed', detail: 'failed to request quick Tunnel' });
+    check('un tunnel tombé dit pourquoi, et propose de réessayer',
+        m.texts().some((x) => x.includes('failed to request quick Tunnel'))
+        && m.buttons().some((b) => b.textContent === 'k#tunnel_failed_action'));
 }
 
 // ───────────────────── Le bouton de reprise ─────────────────────
@@ -232,30 +223,35 @@ console.log('\nCe que propose le bouton de reprise\n');
     const m = mount();
 
     /*
-     * Il n'apparaît que là où l'on part faire quelque chose ailleurs, et porte
-     * le geste accompli plutôt que l'action technique : « Réexaminer »
-     * n'apprenait ni ce qui était examiné ni pourquoi.
+     * Il n'apparaît que là où quelque chose se passe sans que le bot puisse le
+     * dire de lui-même, et porte le geste accompli plutôt que l'action
+     * technique : « Réexaminer » n'apprenait ni ce qui était examiné ni pourquoi.
      */
-    const attendus = {
-        absent: 'k#tunnel_recheck_installed',
-        unreachable: 'k#tunnel_recheck_started',
-        needsCapability: 'k#tunnel_recheck_enabled',
-    };
+    const attendus = [
+        [{ step: 'absent', installer: { url: 'https://developers.cloudflare.com/x/', direct: false } },
+            'k#tunnel_recheck_installed'],
+        [{ step: 'starting' }, 'k#tunnel_recheck_starting'],
+    ];
 
-    for (const [step, label] of Object.entries(attendus)) {
-        m.show({ step });
+    for (const [state, label] of attendus) {
+        m.show(state);
         const bouton = m.buttons().find((b) => b.textContent === label);
-        check(`« ${step} » nomme le geste accompli`, !!bouton, label);
+        check(`« ${state.step} » nomme le geste accompli`, !!bouton, label);
         check('  … et l\'infobulle dit qu\'il réexamine',
             !!bouton && !!bouton.attributes['data-tooltip']);
     }
 
-    // Là où l'on n'est parti nulle part, il n'y a rien à reprendre.
-    for (const step of ['ready', 'serving', 'otherTarget']) {
-        m.show({ step, publicUrl: 'https://x.ts.net' });
+    // Là où le bot agit et constate lui-même, il n'y a rien à reprendre.
+    for (const state of [
+        { step: 'absent', installer: { url: 'https://github.com/x', direct: true } },
+        { step: 'ready', mode: 'quick' },
+        { step: 'serving', mode: 'quick', publicUrl: 'https://x.trycloudflare.com' },
+        { step: 'failed' },
+    ]) {
+        m.show(state);
         const reprise = m.buttons().filter((b) => /recheck/.test(b.textContent));
-        check(`« ${step} » n'en propose aucun`, reprise.length === 0,
-            'rien ne s\'est passé ailleurs');
+        check(`« ${state.step}${state.installer ? ' (direct)' : ''} » n'en propose aucun`,
+            reprise.length === 0, 'rien ne s\'est passé ailleurs');
     }
 }
 
@@ -268,69 +264,74 @@ console.log('\nCe que la fenêtre demande au serveur\n');
 
     m.api.refreshTunnel();
     check('l\'ouverture demande l\'état', m.sent.length === 1
-        && m.sent[0].type === 'tunnelState',
-        'constater lance deux processus : jamais en continu');
+        && m.sent[0].type === 'tunnelState');
 
-    m.show({ step: 'ready', publicUrl: 'https://x.ts.net' });
+    m.show({ step: 'ready', mode: 'quick' });
     m.buttons().find((b) => b.textContent === 'k#tunnel_ready_action').listeners.click();
     check('publier envoie tunnelMount',
         m.sent[m.sent.length - 1].type === 'tunnelMount');
 
-    m.show({ step: 'serving', publicUrl: 'https://x.ts.net' });
+    m.show({ step: 'serving', mode: 'quick', publicUrl: 'https://x.trycloudflare.com' });
     m.buttons().find((b) => b.textContent === 'k#tunnel_serving_action').listeners.click();
     check('retirer envoie tunnelUnmount',
         m.sent[m.sent.length - 1].type === 'tunnelUnmount');
 
-    // Une clé vide ne part pas : l'appel serait refusé, et le refus déroutant.
-    m.show({ step: 'needsLogin' });
-    const vide = m.nodes().find((n) => n.tagName === 'INPUT');
-    vide.value = '   ';
-    const avant = m.sent.length;
-    m.buttons().find((b) => b.textContent === 'k#tunnel_login_submit').listeners.click();
-    check('une clé vide ne part pas', m.sent.length === avant);
+    m.show({ step: 'failed' });
+    m.buttons().find((b) => b.textContent === 'k#tunnel_failed_action').listeners.click();
+    check('réessayer rouvre le tunnel',
+        m.sent[m.sent.length - 1].type === 'tunnelMount');
 
-    vide.value = '  tskey-auth-abc  ';
-    m.buttons().find((b) => b.textContent === 'k#tunnel_login_submit').listeners.click();
-    const dernier = m.sent[m.sent.length - 1];
-    check('  … et une vraie clé part sans ses espaces',
-        dernier.type === 'tunnelLogin' && dernier.data.authKey === 'tskey-auth-abc');
+    m.show({ step: 'downloading' });
+    check('pendant le téléchargement, rien ne se clique',
+        m.buttons().every((b) => b.disabled), 'un second clic lancerait un second téléchargement');
 }
 
 {
     // Un échec se dit sous l'étape, pas à sa place : on doit pouvoir réessayer
     // sans recharger la page.
     const m = mount();
-    m.show({ step: 'ready', publicUrl: 'https://x.ts.net', error: 'refus du tailnet' });
+    m.show({ step: 'ready', mode: 'quick', error: 'cloudflared introuvable' });
     check('un échec s\'affiche sans effacer l\'étape',
-        m.texts().some((x) => x.includes('refus du tailnet'))
+        m.texts().some((x) => x.includes('cloudflared introuvable'))
         && m.buttons().some((b) => b.textContent === 'k#tunnel_ready_action'));
 }
 
 // ───────────────────── Le côté serveur ─────────────────────
 
-console.log('\nCe que le serveur refuse de faire\n');
+console.log('\nCe que le serveur vérifie\n');
 
 {
-    check('publier n\'écrase jamais un tunnel étranger',
-        /STEP\.OTHER_TARGET\)\s*\{\s*\n\s*return send\(ws, before, 'otherTarget'\)/.test(HANDLERS),
-        'vérifié avant de monter, pas après');
-
-    // La clé traverse pour être remise à la commande, et rien de plus.
-    const login = HANDLERS.slice(HANDLERS.indexOf('async function handleTunnelLogin'),
+    const install = HANDLERS.slice(HANDLERS.indexOf('async function handleTunnelInstall'),
         HANDLERS.indexOf('async function handleTunnelMount'));
-    // La valeur, et non le mot : le message dit « with a key », ce qui est
-    // exactement ce qu'on veut lire dans un journal — sans la clé derrière.
-    check('la clé n\'est pas journalisée',
-        /log\.info/.test(login)
-        && !/\$\{\s*key\s*\}/.test(login)
-        && !/log\.[a-z]+\([^)]*[,+]\s*key\b/.test(login),
-        'le journal du bot se lit à plusieurs');
+    check('le téléchargement constate avant d\'agir',
+        /if \(before\.step !== cloudflare\.STEP\.ABSENT\) return send\(ws, before\);/.test(install),
+        'cloudflared a pu être installé entre-temps');
 
     const PERMS = fs.readFileSync(path.join(ROOT, 'src', 'web', 'permissions.js'), 'utf8');
-    for (const action of ['tunnelState', 'tunnelLogin', 'tunnelMount', 'tunnelUnmount']) {
+    for (const action of ['tunnelState', 'tunnelInstall', 'tunnelMount', 'tunnelUnmount']) {
         check(`${action} est réservé au maître`,
             new RegExp(`${action}: MASTER_ONLY`).test(PERMS));
     }
+}
+
+{
+    /*
+     * Derrière le relais, l'URL de rappel ne dépend pas du tunnel : la
+     * déclarer avant de publier évite un premier invité éconduit par Discord.
+     */
+    const m = mount();
+    m.show({ step: 'ready', mode: 'quick', publicUrl: null, relay: true,
+        redirectUri: 'https://imp-auth.romainpiau.dev/discord/callback', clientId: '42' });
+    const declare = m.buttons().find((b) => b.textContent === 'k#tunnel_declare_action');
+    check('derrière le relais, la déclaration se propose avant même la publication', !!declare);
+    check('  … avec l\'infobulle qui dit qu\'elle se fait une seule fois',
+        !!declare && declare.attributes['data-i18n-tooltip'] === 'tunnel_declare_relay_tip');
+
+    m.show({ step: 'ready', mode: 'named', publicUrl: 'https://imp.romainpiau.dev', relay: false,
+        redirectUri: 'https://imp.romainpiau.dev/auth/discord/callback', clientId: '42' });
+    const fixe = m.buttons().find((b) => b.textContent === 'k#tunnel_declare_action');
+    check('sur une adresse fixe, l\'infobulle d\'avant',
+        !!fixe && fixe.attributes['data-i18n-tooltip'] === 'tunnel_declare_tip');
 }
 
 // ───────────────────── Déclarer l'adresse chez Discord ─────────────────────
@@ -451,13 +452,14 @@ console.log('\nCe que le bouton de déclaration copie, et où il mène\n');
 
     // L'ordre du DOM porte le sens : le geste, puis l'adresse dont il ne
     // s'agit pas.
-    const bloc = CLIENT.slice(CLIENT.indexOf('if (step.url) {'),
-        CLIENT.indexOf('if (step.saisie) {'));
+    const bloc = CLIENT.slice(CLIENT.indexOf('if (step.url || step.declare) {'),
+        CLIENT.indexOf('if (step.gestes.length)'));
     check('  … et il précède l\'adresse dans le document',
         bloc.indexOf('tunnel-declare-row') < bloc.indexOf('urlButton(step.url)'),
         'd\'abord ce qu\'on va faire, ensuite l\'adresse dont il ne s\'agit pas');
 
-    const CLES = ['tunnel_declare_action', 'tunnel_declare_tip', 'tunnel_declare_copied',
+    const CLES = ['tunnel_declare_action', 'tunnel_declare_tip', 'tunnel_declare_relay_tip',
+        'tunnel_declare_copied',
         'tunnel_declare_step1', 'tunnel_declare_step2', 'tunnel_declare_step3',
         'tunnel_declare_uri_tip'];
     for (const lang of ['fr', 'en', 'es', 'de']) {

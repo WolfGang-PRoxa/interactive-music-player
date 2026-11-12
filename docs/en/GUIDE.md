@@ -120,7 +120,7 @@ To hand the installation to another account, delete the `data/owner.json` file
 and sign in again with the token.
 
 If the Discord application is not configured — `DISCORD_CLIENT_SECRET` or
-`PUBLIC_URL` missing — signing in is impossible: the window then says what is
+`DISCORD_CLIENT_ID` missing — signing in is impossible: the window then says what is
 left to fill in and lets you in with the token alone, as before. Nobody ends up
 locked out of their own bot over a forgotten variable.
 

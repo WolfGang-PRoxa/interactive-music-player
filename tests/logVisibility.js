@@ -62,7 +62,7 @@ test('le trajet OAuth est refusé', () => {
 });
 
 test('le tunnel est refusé', () => {
-    assert.strictEqual(vis.forGuest(entry('[Tailscale] Funnel serving on ts.net')), null);
+    assert.strictEqual(vis.forGuest(entry('[Tunnel] Dashboard published on the internet at https://x.trycloudflare.com')), null);
 });
 
 test('le serveur web est refusé', () => {

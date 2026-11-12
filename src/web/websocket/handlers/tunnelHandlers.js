@@ -1,25 +1,25 @@
 /**
  * tunnelHandlers — Ce que le tableau de bord peut demander au tunnel.
  *
- * Le module `tailscale` constate et agit ; ces quatre messages sont la seule
+ * Le module `cloudflare` constate et agit ; ces quatre messages sont la seule
  * porte par laquelle l'interface y touche. Tous réservés au maître : rendre le
  * tableau de bord joignable de l'extérieur, ou cesser de l'être, n'est pas une
- * commande de lecture qu'on partage.
+ * commande de lecture qu'on partage — et rapporter un exécutable sur la machine
+ * de l'hôte encore moins.
  *
- * L'état n'est pas joint à la diffusion ordinaire, et c'est délibéré : le
- * constater lance deux processus, et le faire chaque seconde pour une valeur qui
- * ne bouge qu'au geste de quelqu'un serait payer cher un affichage que personne
- * ne regarde la plupart du temps. La fenêtre le demande en s'ouvrant.
+ * L'état n'est pas joint à la diffusion ordinaire : il ne bouge qu'au geste de
+ * quelqu'un, et n'intéresse que la fenêtre de partage, qui le demande en
+ * s'ouvrant. Chaque geste répond par l'état qui en résulte.
  */
 
-const tailscale = require('../../tailscale');
+const cloudflare = require('../../cloudflare');
 const log = require('../../../utils/logger');
 
 /**
  * Renvoie l'état du tunnel à celui qui l'a demandé.
  *
  * @param {import('ws').WebSocket} ws
- * @param {object} state - Ce que rend `tailscale.inspect`.
+ * @param {object} state - Ce que rend `cloudflare.inspect`.
  * @param {string|null} [error] - Ce qui vient d'échouer, le cas échéant.
  */
 function send(ws, state, error = null) {
@@ -37,20 +37,28 @@ function send(ws, state, error = null) {
  * aurait tort d'essayer.
  *
  *  - **L'URL de rappel**, telle que le serveur la construit. C'est elle, et non
- *    l'adresse publique affichée, que le portail attend dans ses redirections —
- *    elle porte en plus `/auth/discord/callback`. La recomposer côté navigateur
- *    ferait deux versions d'une même règle, et un jour l'une des deux aurait
- *    tort.
+ *    l'adresse publique affichée, que le portail attend dans ses redirections :
+ *    l'adresse fixe suivie de `/auth/discord/callback`, ou celle du relais
+ *    quand le partage est rapide. La recomposer côté navigateur ferait deux
+ *    versions d'une même règle, et un jour l'une des deux aurait tort.
+ *
+ *  - **Le relais est-il employé ?** Il change ce qu'il faut dire : son adresse
+ *    se déclare une fois pour toutes, et ne bougera plus d'un lancement à
+ *    l'autre — alors que l'adresse du tunnel, elle, change à chaque fois.
  *
  *  - **L'identifiant de l'application**, qui permet d'ouvrir directement la
  *    page de cette application-là plutôt que la liste. Il n'a rien d'un secret :
  *    il voyage déjà dans l'adresse d'autorisation que le navigateur visite.
  *
- * @returns {{ redirectUri: string, clientId: string }}
+ * @returns {{ redirectUri: string, clientId: string, relay: boolean }}
  */
 function discord() {
     const oauth = require('../../oauth');
-    return { redirectUri: oauth.redirectUri(), clientId: oauth.clientId() };
+    return {
+        redirectUri: oauth.redirectUri(),
+        clientId: oauth.clientId(),
+        relay: oauth.usesRelay(),
+    };
 }
 
 /** Le port réellement servi, seul repère fiable de ce qu'il faut publier. */
@@ -59,28 +67,30 @@ function dashboardPort(webServer) {
 }
 
 async function handleTunnelState(ctx) {
-    const { ws, webServer } = ctx;
-    send(ws, await tailscale.inspect(dashboardPort(webServer)));
+    send(ctx.ws, cloudflare.inspect());
 }
 
 /**
- * Authentifie la machine avec une clé fournie par l'utilisateur.
+ * Rapporte `cloudflared` sur la machine.
  *
- * La clé n'est ni journalisée ni retenue : elle traverse pour être remise à la
- * commande, et disparaît avec l'appel. Elle vaut un mot de passe le temps de son
- * emploi, et le journal du bot se lit à plusieurs.
+ * C'est ce que Tailscale ne permettait pas : son installation demandait les
+ * droits administrateur, et se faisait donc à la main. `cloudflared` est un
+ * exécutable unique, qui se pose dans `data/bin/` sans rien demander.
  */
-async function handleTunnelLogin(ctx) {
-    const { ws, data, webServer } = ctx;
-    const key = data && typeof data.authKey === 'string' ? data.authKey.trim() : '';
+async function handleTunnelInstall(ctx) {
+    const { ws } = ctx;
+    const before = cloudflare.inspect();
+    // Apparu entre-temps — installé à la main, ou par un autre onglet : rien à
+    // rapporter par-dessus.
+    if (before.step !== cloudflare.STEP.ABSENT) return send(ws, before);
 
-    if (!key) {
-        return send(ws, await tailscale.inspect(dashboardPort(webServer)), 'missingKey');
-    }
+    // L'état « téléchargement en cours » d'abord : il prend quelques secondes,
+    // et la fenêtre doit pouvoir le dire pendant ce temps.
+    const pending = cloudflare.download();
+    send(ws, cloudflare.inspect());
 
-    const res = await tailscale.login(key);
-    log.info(`[Tailscale] Sign-in with a key: ${res.ok ? 'accepted' : 'refused'}.`);
-    send(ws, await tailscale.inspect(dashboardPort(webServer)), res.ok ? null : res.error);
+    const res = await pending;
+    send(ws, cloudflare.inspect(), res.ok ? null : res.error);
 }
 
 /**
@@ -94,32 +104,20 @@ async function handleTunnelMount(ctx) {
     const { ws, webServer } = ctx;
     const port = dashboardPort(webServer);
 
-    const before = await tailscale.inspect(port);
-    // Ne jamais écraser un tunnel qui publie autre chose : quelqu'un s'en sert
-    // peut-être depuis des mois, et il ne l'apprendrait qu'en le voyant tomber.
-    if (before.step === tailscale.STEP.OTHER_TARGET) {
-        return send(ws, before, 'otherTarget');
-    }
-
-    const res = await tailscale.mount(port);
-    log.info(`[Tailscale] Publishing the dashboard: ${res.ok ? 'done' : 'failed'}.`);
-    send(ws, await tailscale.inspect(port), res.ok ? null : res.error);
+    const res = await cloudflare.mount(port);
+    log.info(`[Tunnel] Publishing the dashboard: ${res.ok ? 'done' : 'failed'}.`);
+    send(ws, cloudflare.inspect(), res.ok ? null : res.error);
 }
 
-/** Retire la publication, sans toucher au reste de la configuration. */
+/** Retire la publication. */
 async function handleTunnelUnmount(ctx) {
-    const { ws, webServer } = ctx;
-    const port = dashboardPort(webServer);
-
-    const res = await tailscale.unmount(port);
-    log.info(`[Tailscale] Dashboard withdrawn from the internet: `
-        + `${res.ok ? 'done' : 'failed'}.`);
-    send(ws, await tailscale.inspect(port), res.ok ? null : res.error);
+    const res = await cloudflare.unmount();
+    send(ctx.ws, cloudflare.inspect(), res.ok ? null : res.error);
 }
 
 module.exports = {
     handleTunnelState,
-    handleTunnelLogin,
+    handleTunnelInstall,
     handleTunnelMount,
     handleTunnelUnmount,
 };

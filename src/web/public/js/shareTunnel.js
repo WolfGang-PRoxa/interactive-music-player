@@ -3,24 +3,22 @@
  *
  * ## Le problème
  *
- * Publier le tableau de bord demande quatre choses que rien n'annonce :
- * installer Tailscale, authentifier la machine, obtenir du tailnet le droit de
- * publier, monter le tunnel. Chacune échoue à sa façon, et l'on ne découvrait
- * l'étape suivante qu'en butant dessus — après avoir cru, à chaque fois, que la
- * précédente avait raté.
+ * Publier le tableau de bord passait par Tailscale, et demandait quatre choses
+ * que rien n'annonçait : l'installer avec les droits administrateur, créer un
+ * compte, obtenir du réseau le droit de publier, monter le tunnel. On ne
+ * découvrait l'étape suivante qu'en butant dessus.
  *
  * ## L'approche
  *
- * Une seule zone, qui ne montre jamais qu'une étape : celle où l'on en est. Pas
- * de liste de quatre points dont trois sont barrés — savoir ce qui reste à faire
- * n'aide pas quand on ne peut rien y faire tout de suite. Une phrase pour dire
- * où l'on en est, une pour dire pourquoi, un bouton pour la suite.
+ * Un tunnel Cloudflare, qui n'en demande plus que deux, toutes deux faites par
+ * le bot sur un clic : rapporter `cloudflared`, puis ouvrir le tunnel. Aucun
+ * compte n'est nécessaire — c'est le partage rapide, dont l'adresse change à
+ * chaque lancement. Qui veut une adresse fixe la configure dans `.env` (voir
+ * cloudflare.js), et la fenêtre s'y adapte.
  *
- * Ce que la machine peut faire seule, elle le fait : l'authentification par clé
- * et le montage du tunnel sont deux appels. Ce qui lui échappe est nommé sans
- * détour — l'installation demande les droits administrateur, le compte
- * Tailscale ne se crée par aucune API, et le droit de publier s'accorde dans une
- * console qui n'est pas la nôtre.
+ * Une seule zone, qui ne montre jamais qu'une étape : celle où l'on en est. Une
+ * phrase pour dire où l'on en est, une pour dire pourquoi, un bouton pour la
+ * suite.
  *
  * ## Ce que « publier » veut dire, et ce que ça ne veut pas dire
  *
@@ -41,8 +39,6 @@ window.MusicPlayer = window.MusicPlayer || {};
     /** Dernier état reçu, pour redessiner sans redemander. */
     let current = null;
     let busy = false;
-    /** Un téléchargement demandé, en attente du constat qui le confirmera. */
-    let pendingDownload = false;
 
     function t(key, fallback) {
         const value = typeof window.MusicPlayer.t === 'function'
@@ -70,8 +66,8 @@ window.MusicPlayer = window.MusicPlayer || {};
      * Un bouton, avec son infobulle.
      *
      * Elle n'est pas décorative : l'étiquette dit le geste, l'infobulle dit ce
-     * qu'il déclenche. « J'ai installé Tailscale » ne laisse pas deviner que la
-     * machine sera réexaminée, et sans cela on clique sans savoir sur quoi.
+     * qu'il déclenche. « J'ai installé cloudflared » ne laisse pas deviner que
+     * la machine sera réexaminée, et sans cela on clique sans savoir sur quoi.
      */
     function button(label, onClick, options) {
         const { variant, tooltip, i18nTooltip } = options || {};
@@ -146,7 +142,20 @@ window.MusicPlayer = window.MusicPlayer || {};
 
             declared = true;
             render();
-        }, {
+        }, current.relay ? {
+            /*
+             * Derrière le relais, l'URL de rappel n'a plus rien à voir avec
+             * l'adresse affichée : c'est celle du relais, fixe. Le dire évite
+             * de croire qu'il faudra revenir ici à chaque lancement, alors que
+             * la déclaration est faite une fois pour toutes.
+             */
+            variant: 'primary',
+            tooltip: t('tunnel_declare_relay_tip',
+                'Ce n\'est pas l\'adresse ci-dessous : c\'est l\'adresse fixe du relais, où '
+                + 'Discord renvoie après la connexion. Elle se déclare une seule fois, même '
+                + 'si l\'adresse du tunnel change.'),
+            i18nTooltip: 'tunnel_declare_relay_tip',
+        } : {
             variant: 'primary',
             tooltip: t('tunnel_declare_tip',
                 'Ce n\'est pas l\'adresse ci-dessous : l\'URL de rappel est la même, '
@@ -236,40 +245,6 @@ window.MusicPlayer = window.MusicPlayer || {};
         return bloc;
     }
 
-    /**
-     * Vérifie avant de télécharger.
-     *
-     * Tailscale a pu être installé depuis l'ouverture de cette fenêtre — c'est
-     * même le cas ordinaire, puisqu'on vient d'aller le faire. Rapporter un
-     * installateur par-dessus une installation qui existe déjà ferait perdre du
-     * temps à qui n'avait qu'à cliquer sur « J'ai installé Tailscale ».
-     *
-     * Le téléchargement ne part donc qu'après le constat, et seulement si la
-     * commande manque toujours.
-     */
-    function checkThenDownload() {
-        pendingDownload = true;
-        ask('tunnelState');
-    }
-
-    /**
-     * Lance le téléchargement sans quitter la page.
-     *
-     * Le fichier est servi en pièce jointe : le navigateur l'enregistre au lieu
-     * d'y naviguer, et le tableau de bord reste ouvert derrière — avec l'étape
-     * suivante déjà affichée.
-     */
-    function startDownload(url) {
-        const a = document.createElement('a');
-        a.href = url;
-        a.rel = 'noreferrer noopener';
-        if (document.body) {
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
-    }
-
     /** Un lien qui s'ouvre ailleurs : ce que le bot ne peut pas faire pour vous. */
     function link(label, href) {
         const el = document.createElement('a');
@@ -294,110 +269,115 @@ window.MusicPlayer = window.MusicPlayer || {};
      * Ce que chaque état affiche.
      *
      * Un titre, une explication, des gestes. L'explication dit *pourquoi* c'est
-     * bloqué, jamais seulement *que* c'est bloqué : « Tailscale n'est pas
-     * installé » n'apprend rien à qui vient d'ouvrir cette fenêtre.
+     * bloqué, jamais seulement *que* c'est bloqué.
      */
     const STEPS = {
-        absent: (state) => ({
-            title: t('tunnel_absent_title', 'Tailscale n\'est pas installé'),
-            body: t('tunnel_absent_body',
-                'Le tableau de bord ne sort pas de cette machine. Tailscale lui donne une '
-                + 'adresse joignable de partout, sans ouvrir de port sur votre box. '
-                + 'L\'installation demande les droits administrateur : elle se fait à la main, '
-                + 'puis cette fenêtre reprend la suite.'),
-            gestes: [button(
-                state.installer && state.installer.direct
-                    ? t('tunnel_absent_action', 'Télécharger l\'installateur')
-                    : t('tunnel_absent_page', 'Ouvrir la page de téléchargement'),
-                checkThenDownload,
-                {
-                    variant: 'primary',
-                    tooltip: t('tunnel_absent_tip',
-                        'Vérifie d\'abord que Tailscale n\'a pas été installé entre-temps, '
-                        + 'puis lance le téléchargement'),
-                    i18nTooltip: 'tunnel_absent_tip',
-                })],
-            recheck: {
-                label: t('tunnel_recheck_installed', 'J\'ai installé Tailscale'),
-                tooltip: t('tunnel_recheck_installed_tip',
-                    'Réexamine cette machine pour passer à l\'étape suivante'),
-                key: 'tunnel_recheck_installed_tip',
-            },
-        }),
+        absent: (state) => {
+            const direct = Boolean(state.installer && state.installer.direct);
+            return {
+                title: t('tunnel_absent_title', 'Le partage n\'est pas encore prêt'),
+                body: t('tunnel_absent_body',
+                    'Pour sortir de cette machine, le tableau de bord passe par un tunnel '
+                    + 'Cloudflare, sans ouvrir de port sur votre box. Il lui faut un petit '
+                    + 'programme, cloudflared, que le bot rapporte lui-même : aucun compte, '
+                    + 'aucun droit administrateur.'),
+                gestes: [direct
+                    ? button(t('tunnel_absent_action', 'Télécharger cloudflared'),
+                        () => ask('tunnelInstall'), {
+                            variant: 'primary',
+                            tooltip: t('tunnel_absent_tip',
+                                'Rapporte cloudflared depuis la page officielle de Cloudflare, '
+                                + 'dans le dossier du bot'),
+                            i18nTooltip: 'tunnel_absent_tip',
+                        })
+                    : link(t('tunnel_absent_page', 'Ouvrir la page de téléchargement'),
+                        state.installer ? state.installer.url : '#')],
+                // Sur un système sans téléchargement direct, l'installation se
+                // fait ailleurs : il faut pouvoir dire au bot de regarder à
+                // nouveau. Ailleurs, le bot télécharge et constate lui-même.
+                recheck: direct ? null : {
+                    label: t('tunnel_recheck_installed', 'J\'ai installé cloudflared'),
+                    tooltip: t('tunnel_recheck_installed_tip',
+                        'Réexamine cette machine pour passer à l\'étape suivante'),
+                    key: 'tunnel_recheck_installed_tip',
+                },
+            };
+        },
 
-        unreachable: () => ({
-            title: t('tunnel_unreachable_title', 'Tailscale ne répond pas'),
-            body: t('tunnel_unreachable_body',
-                'La commande est là, mais le service ne répond pas. Il est sans doute arrêté : '
-                + 'lancez l\'application Tailscale, puis réessayez.'),
+        downloading: () => ({
+            title: t('tunnel_downloading_title', 'Téléchargement de cloudflared…'),
+            body: t('tunnel_downloading_body',
+                'Quelques dizaines de Mo, depuis la page officielle de Cloudflare. La suite '
+                + 's\'affiche ici dès qu\'il est arrivé.'),
             gestes: [],
-            recheck: {
-                label: t('tunnel_recheck_started', 'J\'ai lancé Tailscale'),
-                tooltip: t('tunnel_recheck_started_tip',
-                    'Réexamine cette machine pour voir si le service répond'),
-                key: 'tunnel_recheck_started_tip',
-            },
         }),
 
-        needsLogin: () => ({
-            title: t('tunnel_login_title', 'Cette machine n\'est rattachée à aucun compte'),
-            body: t('tunnel_login_body',
-                'Tailscale a besoin d\'un compte pour donner une adresse à cette machine. '
-                + 'Aucun ne se crée automatiquement. Créez le vôtre, générez une clé '
-                + 'd\'authentification, et collez-la ici : le bot fera le reste.'),
-            gestes: [link(t('tunnel_login_key', 'Générer une clé'),
-                'https://login.tailscale.com/admin/settings/keys')],
-            saisie: {
-                placeholder: t('tunnel_login_placeholder', 'tskey-auth-...'),
-                label: t('tunnel_login_submit', 'Connecter cette machine'),
-                onSubmit: (value) => ask('tunnelLogin', { authKey: value }),
-            },
-        }),
-
-        needsCapability: () => ({
-            title: t('tunnel_capability_title', 'Ce compte n\'autorise pas encore la publication'),
-            body: t('tunnel_capability_body',
-                'La machine est rattachée, mais votre réseau Tailscale n\'accorde pas le droit '
-                + 'de publier. Il s\'active une fois pour toutes dans la console : les '
-                + 'certificats HTTPS, puis Funnel. Revenez ensuite ici.'),
-            gestes: [link(t('tunnel_capability_action', 'Ouvrir la console'),
-                'https://login.tailscale.com/admin/dns')],
-            recheck: {
-                label: t('tunnel_recheck_enabled', 'C\'est activé dans la console'),
-                tooltip: t('tunnel_recheck_enabled_tip',
-                    'Réexamine les droits que ce réseau Tailscale accorde à la machine'),
-                key: 'tunnel_recheck_enabled_tip',
-            },
+        needsAddress: () => ({
+            title: t('tunnel_address_title', 'Il manque l\'adresse du tunnel'),
+            body: t('tunnel_address_body',
+                'Un tunnel nommé est configuré (CLOUDFLARE_TUNNEL_TOKEN), mais pas l\'adresse '
+                + 'que vous lui avez donnée dans le tableau de bord Cloudflare. Écrivez-la '
+                + 'dans PUBLIC_URL, puis redémarrez le bot.'),
+            gestes: [link(t('tunnel_address_action', 'Ouvrir le tableau de bord Cloudflare'),
+                'https://one.dash.cloudflare.com/')],
         }),
 
         ready: (state) => ({
             title: t('tunnel_ready_title', 'Prêt à publier'),
-            body: t('tunnel_ready_body',
-                'Publier rend l\'adresse joignable depuis l\'internet. L\'accès, lui, ne change '
-                + 'pas : sans compte Discord accepté par vous, on ne voit que la page de '
-                + 'connexion.'),
+            body: state.mode === 'named'
+                ? t('tunnel_ready_named_body',
+                    'Publier ouvre votre tunnel Cloudflare sur l\'adresse ci-dessous. L\'accès, '
+                    + 'lui, ne change pas : sans compte Discord accepté par vous, on ne voit que '
+                    + 'la page de connexion.')
+                : t('tunnel_ready_body',
+                    'Publier ouvre un tunnel Cloudflare : le tableau de bord reçoit une adresse '
+                    + 'joignable de partout, qui change à chaque lancement. L\'accès, lui, ne '
+                    + 'change pas : sans compte Discord accepté par vous, on ne voit que la page '
+                    + 'de connexion.'),
             gestes: [button(t('tunnel_ready_action', 'Publier le tableau de bord'),
-                () => ask('tunnelMount'), 'primary')],
+                () => ask('tunnelMount'), { variant: 'primary' })],
             url: state.publicUrl,
+            declare: true,
+        }),
+
+        starting: (state) => ({
+            title: t('tunnel_starting_title', 'Ouverture du tunnel…'),
+            body: t('tunnel_starting_body',
+                'Cloudflare prépare l\'adresse. Cela prend d\'ordinaire quelques secondes.'),
+            gestes: [button(t('tunnel_starting_cancel', 'Annuler'), () => ask('tunnelUnmount'))],
+            url: state.publicUrl,
+            recheck: {
+                label: t('tunnel_recheck_starting', 'Voir où ça en est'),
+                tooltip: t('tunnel_recheck_starting_tip',
+                    'Redemande au bot si Cloudflare a confirmé le tunnel'),
+                key: 'tunnel_recheck_starting_tip',
+            },
         }),
 
         serving: (state) => ({
             title: t('tunnel_serving_title', 'Publié'),
-            body: t('tunnel_serving_body',
-                'Cette adresse mène au tableau de bord depuis n\'importe où. Elle sert aussi '
-                + 'de lien d\'invitation.'),
+            body: state.mode === 'named'
+                ? t('tunnel_serving_body',
+                    'Cette adresse mène au tableau de bord depuis n\'importe où. Elle sert aussi '
+                    + 'de lien d\'invitation.')
+                : t('tunnel_serving_quick_body',
+                    'Cette adresse mène au tableau de bord depuis n\'importe où, et sert de lien '
+                    + 'd\'invitation. Elle change à chaque lancement du bot : après un '
+                    + 'redémarrage, renvoyez le lien d\'invitation.'),
             gestes: [button(t('tunnel_serving_action', 'Ne plus publier'),
                 () => ask('tunnelUnmount'))],
             url: state.publicUrl,
+            declare: true,
         }),
 
-        otherTarget: (state) => ({
-            title: t('tunnel_other_title', 'Un autre service occupe l\'adresse'),
-            body: t('tunnel_other_body',
-                'Un tunnel publie déjà autre chose sur cette machine. Il n\'y sera pas touché : '
-                + 'quelqu\'un s\'en sert peut-être. Retirez-le vous-même si vous voulez cette '
-                + 'adresse pour le tableau de bord.') + ` (${state.proxy || '?'})`,
-            gestes: [],
+        failed: (state) => ({
+            title: t('tunnel_failed_title', 'Le tunnel s\'est arrêté'),
+            body: t('tunnel_failed_body',
+                'Cloudflare a coupé le tunnel, ou cloudflared s\'est arrêté de lui-même. La '
+                + 'cause est ci-dessous ; vous pouvez réessayer.')
+                + (state.detail ? ` (${state.detail})` : ''),
+            gestes: [button(t('tunnel_failed_action', 'Réessayer'),
+                () => ask('tunnelMount'), { variant: 'primary' })],
         }),
     };
 
@@ -418,7 +398,7 @@ window.MusicPlayer = window.MusicPlayer || {};
         zone.appendChild(line('tunnel-title', step.title));
         zone.appendChild(line('tunnel-body', step.body));
 
-        if (step.url) {
+        if (step.url || step.declare) {
             /*
              * Le bouton au-dessus de l'adresse, et non à côté.
              *
@@ -429,8 +409,12 @@ window.MusicPlayer = window.MusicPlayer || {};
              * champ. Au-dessus, elle a toute la largeur, et l'ordre de lecture
              * dit la même chose que le geste — d'abord ce qu'on va faire,
              * ensuite l'adresse dont il ne s'agit pas.
+             *
+             * Il paraît aussi avant la publication quand le relais est employé :
+             * son adresse ne dépend pas du tunnel, et la déclarer d'avance
+             * évite un premier invité éconduit par Discord.
              */
-            const declare = declareButton();
+            const declare = (step.url || current.relay) ? declareButton() : null;
             if (declare) {
                 const row = document.createElement('div');
                 row.className = 'tunnel-declare-row';
@@ -438,31 +422,12 @@ window.MusicPlayer = window.MusicPlayer || {};
                 zone.appendChild(row);
             }
 
-            zone.appendChild(urlButton(step.url));
+            if (step.url) zone.appendChild(urlButton(step.url));
 
             // Ce qu'il reste à faire dans l'onglet qui vient de s'ouvrir. Il ne
             // paraît qu'après le clic : avant, il décrirait un onglet qui
             // n'existe pas.
             if (declared) zone.appendChild(declareSteps());
-        }
-
-        if (step.saisie) {
-            const row = document.createElement('div');
-            row.className = 'tunnel-actions';
-
-            const input = document.createElement('input');
-            input.type = 'password';
-            input.className = 'tunnel-input';
-            input.placeholder = step.saisie.placeholder;
-            input.autocomplete = 'off';
-            row.appendChild(input);
-
-            const submit = button(step.saisie.label, () => {
-                const value = input.value.trim();
-                if (value) step.saisie.onSubmit(value);
-            }, 'primary');
-            row.appendChild(submit);
-            zone.appendChild(row);
         }
 
         if (step.gestes.length) zone.appendChild(actions(...step.gestes));
@@ -475,13 +440,13 @@ window.MusicPlayer = window.MusicPlayer || {};
         }
 
         /*
-         * Le bouton de reprise n'apparaît que là où l'on part faire quelque
-         * chose ailleurs — installer, démarrer, activer un droit dans une
-         * console. Ces gestes-là ne parviennent pas au bot, et il faut bien un
-         * moyen de lui dire de regarder à nouveau.
+         * Le bouton de reprise n'apparaît que là où quelque chose se passe
+         * sans que le bot puisse le dire de lui-même — une installation faite
+         * à la main, un tunnel que Cloudflare tarde à confirmer. Il faut bien
+         * un moyen de lui demander de regarder à nouveau.
          *
          * Il porte le geste accompli plutôt que l'action technique : « J'ai
-         * installé Tailscale » se comprend sans rien savoir, là où « Réexaminer »
+         * installé cloudflared » se comprend sans rien savoir, là où « Réexaminer »
          * n'apprenait ni ce qui était examiné ni pourquoi. Ailleurs — prêt,
          * publié, adresse occupée — il n'y a rien à reprendre, et il disparaît.
          */
@@ -497,26 +462,18 @@ window.MusicPlayer = window.MusicPlayer || {};
 
     /** Appelé par le routeur de messages à chaque réponse du serveur. */
     window.MusicPlayer.onTunnelState = function (data) {
-        busy = false;
         current = data || null;
+        // Le téléchargement répond en deux temps — « en cours », puis le
+        // résultat : la fenêtre reste occupée tant que le second n'est pas là.
+        busy = Boolean(current && current.step === 'downloading');
         render();
-
-        // Le téléchargement demandé attendait ce constat : il ne part que si la
-        // commande manque toujours. Installée entre-temps, l'étape affichée est
-        // déjà la suivante, et rapporter un installateur n'aurait plus de sens.
-        if (pendingDownload) {
-            pendingDownload = false;
-            if (current && current.step === 'absent' && current.installer) {
-                startDownload(current.installer.url);
-            }
-        }
     };
 
     /**
      * Demandé à l'ouverture de la fenêtre de partage, jamais en continu.
      *
-     * Constater lance deux processus : le faire à chaque état reçu coûterait
-     * cher pour une valeur qui ne bouge qu'au geste de quelqu'un.
+     * L'état ne bouge qu'au geste de quelqu'un, et chaque geste répond par le
+     * sien : le redemander en continu n'apprendrait rien.
      */
     window.MusicPlayer.refreshTunnel = function () {
         // La marche à suivre ne survit pas à la fermeture de la fenêtre : elle

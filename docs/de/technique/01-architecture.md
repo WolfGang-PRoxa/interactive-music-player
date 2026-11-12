@@ -75,8 +75,10 @@ src/
     ├── owner.js              Konto, dem die Installation gehört
     ├── guests.js             Buch der bereits erschienenen Gäste
     ├── permissions.js        Was ein Gast tun darf
-    ├── tailscale.js          Veröffentlichung des Dashboards im Internet
+    ├── cloudflare.js         Veröffentlichung des Dashboards im Internet
+    ├── oauthRelay.js         OAuth-Rückkehr-Relais der schnellen Freigabe
     ├── uploadService.js      Annahme und Einbindung der importierten Dateien
+    ├── chunkedUpload.js      In Stücken gesendete Dateien, wieder zusammengesetzt
     ├── routes/api.js         HTTP-Routen (stream, download, upload, video-info)
     ├── routes/auth.js        Authentifizierungsablauf eines Gastes
     ├── websocket/

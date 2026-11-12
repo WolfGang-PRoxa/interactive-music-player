@@ -144,7 +144,6 @@ window.MusicPlayer.handleFileUpload = function(file, extraData = {}) {
         window.MusicPlayer.showToast(`Envoi de "${file.name}" (${sizeMb} Mo)...`);
     }
 
-    const xhr = new XMLHttpRequest();
     const state = window.MusicPlayer.state || {};
     const guildId = state.guildId || '';
     const guildSelectEl = document.getElementById('guild-select');
@@ -170,39 +169,100 @@ window.MusicPlayer.handleFileUpload = function(file, extraData = {}) {
 
     const url = `/api/upload?guildId=${encodeURIComponent(guildId)}&voiceChannelId=${encodeURIComponent(voiceChannelId)}&playlistId=${encodeURIComponent(playlistId)}&target=${encodeURIComponent(target)}&defaultPlaylistName=${encodeURIComponent(defaultPlaylistName)}`;
 
-    xhr.open('POST', url, true);
-    xhr.setRequestHeader('X-File-Name', encodeURIComponent(file.name));
+    const toast = (message) => {
+        if (typeof window.MusicPlayer.showToast === 'function') window.MusicPlayer.showToast(message);
+    };
 
     let lastNotifiedPercent = -1;
-    xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable && typeof window.MusicPlayer.showToast === 'function') {
-            const percent = Math.round((e.loaded / e.total) * 100);
-            if (percent % 20 === 0 && percent !== lastNotifiedPercent && percent < 100) {
-                lastNotifiedPercent = percent;
-                window.MusicPlayer.showToast(`Transfert de "${file.name}" : ${percent}%`);
-            }
+    const progress = (sent) => {
+        const percent = Math.round((sent / file.size) * 100);
+        if (percent % 20 === 0 && percent !== lastNotifiedPercent && percent < 100) {
+            lastNotifiedPercent = percent;
+            toast(`Transfert de "${file.name}" : ${percent}%`);
         }
     };
 
-    xhr.onload = () => {
-        if (xhr.status === 200) {
-            if (typeof window.MusicPlayer.showToast === 'function') {
-                window.MusicPlayer.showToast(`Fichier "${file.name}" envoyé avec succès !`);
-            }
-        } else {
-            if (typeof window.MusicPlayer.showToast === 'function') {
-                window.MusicPlayer.showToast("Erreur lors du transfert du fichier");
-            }
-        }
+    /*
+     * Une requête, rendue en promesse : le statut et la réponse lue, sans
+     * jamais rejeter — une coupure réseau est un statut 0, que l'appelant
+     * traite comme les autres.
+     */
+    const post = (address, body, offset) => new Promise((resolve) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', address, true);
+        xhr.setRequestHeader('X-File-Name', encodeURIComponent(file.name));
+        xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) progress(offset + e.loaded);
+        };
+        xhr.onload = () => {
+            let data = null;
+            try { data = JSON.parse(xhr.responseText); } catch (e) { /* réponse non JSON */ }
+            resolve({ status: xhr.status, data });
+        };
+        xhr.onerror = () => resolve({ status: 0, data: null });
+        xhr.send(body);
+    });
+
+    const done = (ok, network) => {
+        if (ok) toast(`Fichier "${file.name}" envoyé avec succès !`);
+        else toast(network ? "Erreur réseau lors du transfert du fichier"
+            : "Erreur lors du transfert du fichier");
     };
 
-    xhr.onerror = () => {
-        if (typeof window.MusicPlayer.showToast === 'function') {
-            window.MusicPlayer.showToast("Erreur réseau lors du transfert du fichier");
-        }
-    };
+    /*
+     * En morceaux au-delà de 64 Mo.
+     *
+     * Derrière un tunnel Cloudflare, une requête ne passe pas au-delà de
+     * 100 Mo : le tunnel répond 413 avant même que le bot ne la voie. Découper
+     * garde la limite du bot (`MAX_UPLOAD_MB`) entière, et une coupure ne
+     * coûte plus que le morceau en cours. En dessous, un seul envoi, comme
+     * toujours.
+     */
+    const CHUNK_BYTES = 64 * 1024 * 1024;
 
-    xhr.send(file);
+    if (file.size <= CHUNK_BYTES) {
+        post(url, file, 0).then(({ status }) => done(status === 200, status === 0));
+        return;
+    }
+
+    const bytes = new Uint8Array(16);
+    (window.crypto || {}).getRandomValues
+        ? window.crypto.getRandomValues(bytes)
+        : bytes.forEach((_, i) => { bytes[i] = Math.floor(Math.random() * 256); });
+    const uploadId = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    const total = Math.ceil(file.size / CHUNK_BYTES);
+
+    (async () => {
+        let index = 0;
+        let failures = 0;
+        while (index < total) {
+            const start = index * CHUNK_BYTES;
+            const chunkUrl = `${url}&uploadId=${uploadId}&chunk=${index}&chunks=${total}`;
+            const { status, data } = await post(chunkUrl, file.slice(start, start + CHUNK_BYTES), start);
+
+            if (status === 200) {
+                failures = 0;
+                if (index === total - 1) return done(true);
+                index = data && Number.isInteger(data.next) ? data.next : index + 1;
+                continue;
+            }
+
+            // Le serveur attend un autre morceau — perdu en route, ou transfert
+            // oublié par un redémarrage : on reprend là où il en est.
+            if (status === 409 && data && Number.isInteger(data.expected)) {
+                index = data.expected;
+                if (++failures > 5) return done(false, false);
+                continue;
+            }
+
+            // Une coupure réseau se retente, un refus franc (413, 415…) non.
+            if (status === 0 && ++failures <= 3) {
+                await new Promise((r) => setTimeout(r, 1000 * failures));
+                continue;
+            }
+            return done(false, status === 0);
+        }
+    })();
 };
 
 window.MusicPlayer.handleDroppedFiles = function(fileList, extraData = {}) {

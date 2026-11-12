@@ -1,0 +1,13 @@
+# Relais de retour OAuth — voir LISEZMOI.md.
+#
+# Déployé une seule fois, pour toutes les installations du bot : chacune
+# déclare cette adresse dans le portail de sa propre application Discord.
+name = "imp-oauth-relay"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+workers_dev = false
+
+# Le domaine personnalisé crée lui-même l'entrée DNS et le certificat.
+routes = [
+  { pattern = "imp-auth.romainpiau.dev", custom_domain = true }
+]

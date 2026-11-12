@@ -308,7 +308,7 @@ const MESSAGE_RIGHTS = {
     // invité s'accorderait les siens.
     admitGuest: MASTER_ONLY,
     tunnelState: MASTER_ONLY,
-    tunnelLogin: MASTER_ONLY,
+    tunnelInstall: MASTER_ONLY,
     tunnelMount: MASTER_ONLY,
     tunnelUnmount: MASTER_ONLY,
     shareControl: MASTER_ONLY,

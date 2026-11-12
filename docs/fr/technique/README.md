@@ -23,7 +23,7 @@ courante, voir le [guide utilisateur](../GUIDE.md).
 | [08 — Journalisation](08-journalisation.md) | Logger, niveaux, diffusion vers le tableau de bord |
 | [09 — Configuration](09-configuration.md) | Variables d'environnement, `config.js`, déploiement des commandes |
 | [10 — Versions](10-versions.md) | Racines partagée et d'installation, releases GitHub, bascule de version |
-| [11 — Accès distant](11-acces-distant.md) | Tunnel Tailscale, `PUBLIC_URL`, partage du contrôle |
+| [11 — Accès distant](11-acces-distant.md) | Tunnel Cloudflare, relais de retour OAuth, `PUBLIC_URL`, partage du contrôle |
 | [12 — Tests](12-tests.md) | Les suites de `tests/`, ce qu'elles couvrent, comment en écrire une |
 
 ---

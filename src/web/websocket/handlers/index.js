@@ -60,7 +60,7 @@ module.exports = {
     answerRightRequest: shareHandlers.handleAnswerRightRequest,
     muteRightRequests: shareHandlers.handleMuteRightRequests,
     tunnelState: tunnelHandlers.handleTunnelState,
-    tunnelLogin: tunnelHandlers.handleTunnelLogin,
+    tunnelInstall: tunnelHandlers.handleTunnelInstall,
     tunnelMount: tunnelHandlers.handleTunnelMount,
     tunnelUnmount: tunnelHandlers.handleTunnelUnmount,
     shareControl: shareHandlers.handleShareControl,

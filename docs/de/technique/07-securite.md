@@ -341,7 +341,7 @@ erreichbar. Um von einem Telefon oder einem anderen Arbeitsplatz darauf
 zuzugreifen, `HOST=0.0.0.0` setzen — die Authentifizierung erhält dann ihren
 vollen Sinn. In diesem Fall wird beim Start eine Warnung protokolliert.
 
-Das Dashboard lässt sich zudem über einen Tailscale-Funnel-Tunnel im gesamten
+Das Dashboard lässt sich zudem über einen Cloudflare-Tunnel im gesamten
 Internet veröffentlichen. Es ist die einzige Geste, die das zuständige Modul von
 sich aus verweigert, selbst wenn alles bereitsteht: sie ungefragt auszuführen
 würde den Player eines Menschen ohne dessen Wissen veröffentlichen. Siehe

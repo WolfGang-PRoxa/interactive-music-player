@@ -124,7 +124,7 @@ Para entregar la instalación a otra cuenta, elimina el archivo
 `data/owner.json` y vuelve a conectarte con el token.
 
 Si la aplicación de Discord no está configurada — falta `DISCORD_CLIENT_SECRET`
-o `PUBLIC_URL` —, iniciar sesión es imposible: la ventana indica entonces lo que
+o `DISCORD_CLIENT_ID` —, iniciar sesión es imposible: la ventana indica entonces lo que
 queda por rellenar y deja entrar solo con el token, como antes. Nadie se queda
 encerrado fuera de su propio bot por una variable olvidada.
 

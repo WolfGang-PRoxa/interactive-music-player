@@ -49,22 +49,35 @@ function purge(now) {
     }
 }
 
+/** Les adresses de la machine elle-même, telles que Node les rapporte. */
+const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+
 /**
  * Adresse d'où vient la requête.
  *
- * `req.ip` suffit ici : le serveur écoute en direct, sans mandataire devant
- * lui, et l'en-tête `X-Forwarded-For` n'est donc pas consulté — s'y fier
- * laisserait n'importe qui choisir son propre seau en le forgeant.
+ * `req.ip` d'ordinaire : le serveur écoute en direct, et `X-Forwarded-For`
+ * n'est pas consulté — s'y fier laisserait n'importe qui choisir son propre
+ * seau en le forgeant.
  *
- * Derrière un Funnel Tailscale, toutes les requêtes arrivent de la même
- * adresse. Le plafond y devient global plutôt que par visiteur, ce qui est le
- * bon compromis : mieux vaut un plafond partagé que pas de plafond.
+ * Derrière le tunnel Cloudflare, en revanche, toutes les requêtes arrivent de
+ * `cloudflared`, donc de la machine elle-même : le plafond deviendrait global,
+ * et un seul visiteur trop pressé fermerait la porte à tous les autres.
+ * Cloudflare pose alors l'adresse réelle dans `CF-Connecting-IP`.
+ *
+ * L'en-tête n'est cru que sur une connexion venue de la machine elle-même.
+ * Depuis le réseau local (`HOST=0.0.0.0`), n'importe qui pourrait le forger ;
+ * depuis la machine, celui qui le forge est déjà chez lui.
  *
  * @param {import('express').Request} req
  * @returns {string}
  */
 function originOf(req) {
-    return req.ip || req.socket?.remoteAddress || 'inconnu';
+    const direct = req.socket?.remoteAddress || req.ip || 'inconnu';
+    const relayed = req.headers?.['cf-connecting-ip'];
+    if (LOOPBACK.has(direct) && typeof relayed === 'string' && relayed.trim()) {
+        return relayed.trim().slice(0, 64);
+    }
+    return req.ip || direct;
 }
 
 /**

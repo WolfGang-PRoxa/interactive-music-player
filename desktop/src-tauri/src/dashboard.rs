@@ -73,9 +73,10 @@ impl Endpoint {
     ///
     /// Sur l'origine où vit la session Discord, pas sur l'interface d'écoute :
     /// un cookie appartient à une origine, et le retour de Discord pose le sien
-    /// sur `PUBLIC_URL` (voir WebServer.start). L'adresse donnée par le bot
-    /// passe en premier — c'est la seule qui tienne compte d'une adresse
-    /// déduite de Tailscale au démarrage.
+    /// sur `PUBLIC_URL` quand elle est déclarée, et sur l'origine de départ
+    /// quand le relais de retour OAuth s'en charge (voir oauth.entryUrl).
+    /// L'adresse donnée par le bot passe donc en premier : lui seul sait
+    /// lequel des deux cas est le sien.
     pub fn url(&self) -> String {
         let (_, entry) = self.clients();
         let mut base = entry;

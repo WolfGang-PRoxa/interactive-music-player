@@ -30,10 +30,10 @@ verbunden ist, unter einer URL, die das Zugangstoken enthält.
 | [`oauth.js`](../../../src/web/oauth.js), [`sessions.js`](../../../src/web/sessions.js) | Discord-OAuth-Ablauf, Sitzungen je Tab |
 | [`owner.js`](../../../src/web/owner.js), [`guests.js`](../../../src/web/guests.js) | Eigentümer der Installation, Gästebuch |
 | [`permissions.js`](../../../src/web/permissions.js) | Was ein Gast tun darf |
-| [`tailscale.js`](../../../src/web/tailscale.js) | Veröffentlichung des Dashboards im Internet |
+| [`cloudflare.js`](../../../src/web/cloudflare.js), [`oauthRelay.js`](../../../src/web/oauthRelay.js) | Veröffentlichung des Dashboards im Internet, OAuth-Rückkehr-Relais |
 | [`routes/api.js`](../../../src/web/routes/api.js) | HTTP-Routen |
 | [`routes/auth.js`](../../../src/web/routes/auth.js) | Authentifizierungsablauf eines Gastes |
-| [`uploadService.js`](../../../src/web/uploadService.js) | Annahme und Einbindung der Importe |
+| [`uploadService.js`](../../../src/web/uploadService.js), [`chunkedUpload.js`](../../../src/web/chunkedUpload.js) | Annahme und Einbindung der Importe, Senden in Stücken |
 | [`websocket/wsHandler.js`](../../../src/web/websocket/wsHandler.js) | Nachrichten-Router |
 | [`websocket/handlers/`](../../../src/web/websocket/handlers/) | Fachlogik, ein Modul je Bereich |
 
@@ -167,7 +167,7 @@ Bereich entspricht einem Modul von `handlers/`:
 | Discord-Server | `selectChannel`, `setDefaultChannel`, `updateSettings`, `toggleVoiceDetection`, `leaveGuild` |
 | Titel | `setTrackQuality`, `requestTrackFormats`, `requestTrackLoudness`, `setTrackLoudness`, `downloadTrack` |
 | Teilung der Steuerung | `sendInviteLink`, `admitGuest`, `shareControl`, `revokeControl`, `requestRight`, `answerRightRequest`, `muteRightRequests` |
-| Tunnel | `tunnelState`, `tunnelLogin`, `tunnelMount`, `tunnelUnmount` |
+| Tunnel | `tunnelState`, `tunnelInstall`, `tunnelMount`, `tunnelUnmount` |
 | Versionen | `listVersions`, `installVersion`, `uninstallVersion` |
 | System | `requestState`, `clientLog`, `memoryStream`, `startupFadeinConsumed`, `restartBot`, `shutdownBot` |
 

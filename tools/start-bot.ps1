@@ -157,9 +157,9 @@ function DashboardUrl {
         connecté. Le bot fait la même chose en s'ouvrant lui-même (voir
         WebServer.start).
 
-        -Entry est l'adresse que le bot a donnée par /api/clients : c'est la
-        seule qui tienne compte d'une PUBLIC_URL déduite de Tailscale au
-        démarrage, que .env ne porte pas. À défaut, celle du fichier, puis
+        -Entry est l'adresse que le bot a donnée par /api/clients : c'est lui
+        qui sait si le relais de retour OAuth est employé, et donc si
+        localhost porte une session. À défaut, celle du fichier, puis
         l'interface d'écoute comme autrefois.
 
         La machine ne s'appelle surtout pas $host : c'est une variable réservée

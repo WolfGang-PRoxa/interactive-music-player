@@ -37,7 +37,10 @@ Copy `.env.example` to `.env` and fill in at least `DISCORD_TOKEN`.
 |---|---|---|
 | `PORT` | `3000` | Listening port |
 | `HOST` | `127.0.0.1` | Listening interface. `0.0.0.0` to expose on the local network. |
-| `PUBLIC_URL` | — | Address at which guests reach this dashboard, with no trailing slash. It cannot be guessed, and the callback URL `<PUBLIC_URL>/auth/discord/callback` must be declared identically in the Discord portal. |
+| `PUBLIC_URL` | — | **Fixed** address at which guests reach this dashboard, with no trailing slash: a domain behind a named tunnel, a local network IP. The callback URL `<PUBLIC_URL>/auth/discord/callback` must then be declared identically in the Discord portal. Empty for quick sharing, whose address changes at every launch. |
+| `OAUTH_RELAY_URL` | default relay | OAuth return relay used without `PUBLIC_URL`: its address is what you declare with Discord, once and for all. `off` to do without it. |
+| `CLOUDFLARE_TUNNEL_TOKEN` | — | Token of a named tunnel created in the Cloudflare dashboard. Replaces quick sharing; requires `PUBLIC_URL`. |
+| `CLOUDFLARED_PATH` | — | Path to `cloudflared`, if it lives somewhere other than `data/bin/` or the usual places. |
 | `AUTO_OPEN_DASHBOARD` | `true` | Opening of the browser at startup. `false` when the bot runs on a remotely driven machine — that dashboard would play the music twice over. |
 | `DASHBOARD_TOKEN` | generated | Access token. If empty, generated and saved in `data/dashboard-token`. |
 

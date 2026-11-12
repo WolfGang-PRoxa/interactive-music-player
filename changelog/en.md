@@ -21,6 +21,23 @@ was delivered.
     src/web/changelog.js.
 -->
 
+## 2026-11-12 — Sharing through Cloudflare
+
+The dashboard is now shared through a Cloudflare tunnel, with no account to create and nothing to install yourself.
+
+### Added
+- “Reaching it from outside” downloads cloudflared by itself and opens a Cloudflare tunnel in one click: no account, no administrator rights.
+- Anyone with a domain at Cloudflare can keep a fixed address, by filling in their tunnel's token (`CLOUDFLARE_TUNNEL_TOKEN`) and its address (`PUBLIC_URL`).
+- A fixed return relay lets the Discord sign-in work with a sharing address that changes at every launch: its address is declared once in the Discord portal.
+- Files over 64 MB are sent in pieces, to get past Cloudflare's 100 MB per-request cap without lowering the maximum accepted size; a dropped connection only resends the current piece.
+
+### Changed
+- The chosen sharing is remembered, and the tunnel reopens at the next launch.
+- The rate limiter tells visitors apart behind the tunnel, instead of counting everyone as a single address.
+
+### Removed
+- Sharing through Tailscale Funnel, and the four steps it required.
+
 ## 2026-11-11 — The desktop app
 
 The bot now installs as a Windows app, without losing anything of its dashboard in the browser.

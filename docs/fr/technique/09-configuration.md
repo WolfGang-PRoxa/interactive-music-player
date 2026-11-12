@@ -37,7 +37,10 @@ Copier `.env.example` vers `.env` et renseigner au minimum `DISCORD_TOKEN`.
 |---|---|---|
 | `PORT` | `3000` | Port d'écoute |
 | `HOST` | `127.0.0.1` | Interface d'écoute. `0.0.0.0` pour exposer au réseau local. |
-| `PUBLIC_URL` | — | Adresse par laquelle les invités atteignent le tableau de bord, sans barre oblique finale. Elle ne se devine pas, et l'URL de rappel `<PUBLIC_URL>/auth/discord/callback` doit être déclarée à l'identique dans le portail Discord. |
+| `PUBLIC_URL` | — | Adresse **fixe** par laquelle les invités atteignent le tableau de bord, sans barre oblique finale : un domaine derrière un tunnel nommé, une IP de réseau local. L'URL de rappel `<PUBLIC_URL>/auth/discord/callback` doit alors être déclarée à l'identique dans le portail Discord. Vide pour le partage rapide, dont l'adresse change à chaque lancement. |
+| `OAUTH_RELAY_URL` | relais par défaut | Relais de retour OAuth employé sans `PUBLIC_URL` : c'est son adresse qu'on déclare chez Discord, une fois pour toutes. `off` pour s'en passer. |
+| `CLOUDFLARE_TUNNEL_TOKEN` | — | Jeton d'un tunnel nommé créé dans le tableau de bord Cloudflare. Remplace le partage rapide ; exige `PUBLIC_URL`. |
+| `CLOUDFLARED_PATH` | — | Chemin de `cloudflared`, s'il est ailleurs que dans `data/bin/` ou les emplacements habituels. |
 | `AUTO_OPEN_DASHBOARD` | `true` | Ouverture du navigateur au démarrage. `false` quand le bot tourne sur une machine pilotée à distance — ce tableau de bord jouerait la musique en double. |
 | `DASHBOARD_TOKEN` | généré | Jeton d'accès. Si vide, généré et enregistré dans `data/dashboard-token`. |
 

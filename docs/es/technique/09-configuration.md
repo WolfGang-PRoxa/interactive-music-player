@@ -37,7 +37,10 @@ Copiar `.env.example` a `.env` e indicar como mínimo `DISCORD_TOKEN`.
 |---|---|---|
 | `PORT` | `3000` | Puerto de escucha |
 | `HOST` | `127.0.0.1` | Interfaz de escucha. `0.0.0.0` para exponer a la red local. |
-| `PUBLIC_URL` | — | Dirección por la que los invitados alcanzan este panel, sin barra final. No se adivina, y la URL de retorno `<PUBLIC_URL>/auth/discord/callback` debe declararse idéntica en el portal de Discord. |
+| `PUBLIC_URL` | — | Dirección **fija** por la que los invitados alcanzan este panel, sin barra final: un dominio detrás de un túnel con nombre, una IP de red local. La URL de retorno `<PUBLIC_URL>/auth/discord/callback` debe entonces declararse idéntica en el portal de Discord. Vacía para el uso compartido rápido, cuya dirección cambia en cada arranque. |
+| `OAUTH_RELAY_URL` | relé por defecto | Relé de retorno OAuth usado sin `PUBLIC_URL`: su dirección es la que se declara en Discord, de una vez por todas. `off` para prescindir de él. |
+| `CLOUDFLARE_TUNNEL_TOKEN` | — | Token de un túnel con nombre creado en el panel de Cloudflare. Sustituye al uso compartido rápido; exige `PUBLIC_URL`. |
+| `CLOUDFLARED_PATH` | — | Ruta de `cloudflared`, si está en otro lugar que `data/bin/` o las ubicaciones habituales. |
 | `AUTO_OPEN_DASHBOARD` | `true` | Apertura del navegador en el arranque. `false` cuando el bot corre en una máquina pilotada a distancia — ese panel reproduciría la música por duplicado. |
 | `DASHBOARD_TOKEN` | generado | Testigo de acceso. Si está vacío, se genera y se guarda en `data/dashboard-token`. |
 

@@ -338,6 +338,30 @@ function createAuthRouter(webServer) {
          * fenêtre de démarrage s'y ouvre et nulle part ailleurs (voir
          * WebServer.start). L'aller et le retour partagent donc le même bocal.
          */
+        /*
+         * Derrière le relais, le retour revient là où la connexion est partie.
+         *
+         * C'est ce qui garde l'aller et le retour dans le même bocal à cookies
+         * quand aucune adresse n'est déclarée : ouvert sur `localhost`, le
+         * tableau de bord y retrouve sa session ; ouvert par le lien du partage
+         * rapide, il la retrouve sur le tunnel. Une origine que le relais ne
+         * sait pas servir — une IP de réseau local — est dite ici, avant
+         * Discord, plutôt qu'au bout d'un trajet qui ne pouvait pas aboutir.
+         */
+        let origin;
+        if (oauth.usesRelay()) {
+            origin = oauth.returnOrigin(req);
+            if (!origin) {
+                return res.status(400).type('html').send(errorPage(
+                    'Adresse non déclarée',
+                    'Discord ne peut renvoyer ici que par une adresse fixe. Ouvrez le tableau '
+                    + 'de bord sur cette machine (localhost) ou par le lien de partage, ou '
+                    + 'déclarez cette adresse dans PUBLIC_URL.',
+                    String(req.headers.host || '')
+                ));
+            }
+        }
+
         const nonce = crypto.randomBytes(16).toString('hex');
         res.cookie(OAUTH_COOKIE, nonce, auth.cookieOptions(oauth.STATE_TTL_MS));
 
@@ -346,6 +370,7 @@ function createAuthRouter(webServer) {
             claim: switching,
             silent,
             nonce,
+            origin,
         }));
     });
 

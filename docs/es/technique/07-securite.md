@@ -334,9 +334,9 @@ accesible desde la máquina anfitriona. Para acceder a él desde un teléfono u 
 puesto, definir `HOST=0.0.0.0` — la autenticación cobra entonces todo su sentido.
 En ese caso se registra un aviso en el arranque.
 
-El panel también puede publicarse en internet entero mediante un túnel Tailscale
-Funnel. Es el único gesto que el módulo correspondiente se niega a hacer por sí
-mismo, incluso cuando todo está listo: montarlo sin haberlo pedido publicaría el
+El panel también puede publicarse en internet entero mediante un túnel de
+Cloudflare. Es el único gesto que el módulo correspondiente se niega a hacer por sí
+mismo, incluso cuando todo está listo: abrirlo sin haberlo pedido publicaría el
 reproductor de alguien sin que lo sepa. Véase
 [11 — Acceso remoto](11-acces-distant.md).
 

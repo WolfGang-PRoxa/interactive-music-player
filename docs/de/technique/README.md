@@ -23,7 +23,7 @@ alltäglichen Gebrauch siehe das [Benutzerhandbuch](../GUIDE.md).
 | [08 — Protokollierung](08-journalisation.md) | Logger, Stufen, Übertragung ans Dashboard |
 | [09 — Konfiguration](09-configuration.md) | Umgebungsvariablen, `config.js`, Bereitstellung der Befehle |
 | [10 — Versionen](10-versions.md) | Geteilte und Installationswurzel, GitHub-Releases, Versionswechsel |
-| [11 — Fernzugriff](11-acces-distant.md) | Tailscale-Tunnel, `PUBLIC_URL`, Teilung der Steuerung |
+| [11 — Fernzugriff](11-acces-distant.md) | Cloudflare-Tunnel, OAuth-Rückkehr-Relais, `PUBLIC_URL`, Teilung der Steuerung |
 | [12 — Tests](12-tests.md) | Die Suiten in `tests/`, was sie abdecken, wie man eine schreibt |
 
 ---

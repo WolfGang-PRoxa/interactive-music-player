@@ -301,20 +301,39 @@ server.listen(0, '127.0.0.1', async () => {
         const avant = process.env.PUBLIC_URL;
         process.env.PORT = process.env.PORT || '3000';
 
-        for (const [nom, valeur] of [
-            ['avec PUBLIC_URL', 'https://exemple.ts.net'],
-            ['sans PUBLIC_URL', ''],
-        ]) {
+        {
             delete require.cache[require.resolve(oauthPath)];
-            if (valeur) process.env.PUBLIC_URL = valeur; else delete process.env.PUBLIC_URL;
+            process.env.PUBLIC_URL = 'https://exemple.romainpiau.dev';
             const oauth = require(oauthPath);
 
-            check(`${nom} : la fenêtre s'ouvre là où Discord renvoie`,
-                origine(`${oauth.publicUrl()}/?token=x`) === origine(oauth.redirectUri()),
-                oauth.publicUrl());
-            check(`  … et l'interface d'écoute n'y menait pas`,
+            check('avec PUBLIC_URL : la fenêtre s\'ouvre là où Discord renvoie',
+                origine(`${oauth.entryUrl()}/?token=x`) === origine(oauth.redirectUri()),
+                oauth.entryUrl());
+            check('  … et l\'interface d\'écoute n\'y menait pas',
                 origine('http://127.0.0.1:3000/') !== origine(oauth.redirectUri()),
                 'deux origines distinctes ne partagent aucun cookie');
+        }
+
+        {
+            /*
+             * Sans adresse déclarée, le relais renvoie chaque connexion sur
+             * l'origine d'où elle est partie (voir oauthRelay.js). Le piège
+             * disparaît : `localhost` comme `127.0.0.1` portent une session,
+             * pourvu que le relais sache y revenir.
+             */
+            delete require.cache[require.resolve(oauthPath)];
+            delete process.env.PUBLIC_URL;
+            const oauth = require(oauthPath);
+            const relay = require(path.join(ROOT, 'src', 'web', 'oauthRelay.js'));
+
+            check('sans PUBLIC_URL : le retour passe par le relais',
+                oauth.usesRelay() && oauth.redirectUri() === oauth.relayUrl(),
+                oauth.redirectUri());
+            check('  … qui sait revenir là où la fenêtre s\'ouvre',
+                relay.acceptedTarget(oauth.entryUrl()) === origine(oauth.entryUrl()),
+                oauth.entryUrl());
+            check('  … comme sur l\'interface d\'écoute',
+                relay.acceptedTarget('http://127.0.0.1:3000') === 'http://127.0.0.1:3000');
         }
 
         delete require.cache[require.resolve(oauthPath)];
@@ -322,15 +341,14 @@ server.listen(0, '127.0.0.1', async () => {
 
         const SERVER = fs.readFileSync(path.join(ROOT, 'src', 'web', 'WebServer.js'), 'utf8');
         check('l\'ouverture automatique suit cette origine',
-            /const url = `\$\{require\('\.\/oauth'\)\.publicUrl\(\)\}\/\?token=\$\{token\}`;/.test(SERVER)
+            /const url = `\$\{require\('\.\/oauth'\)\.entryUrl\(\)\}\/\?token=\$\{token\}`;/.test(SERVER)
             && !/const url = `http:\/\/\$\{displayHost\}/.test(SERVER));
         check('  … et la trace de démarrage annonce la même',
             /Dashboard reachable at: \$\{entry\}/.test(SERVER));
 
         /*
-         * Dite après le relevé de partage : `PUBLIC_URL` peut se déduire de la
-         * machine à cet instant-là, et l'annoncer plus tôt donnerait l'adresse
-         * d'avant la déduction.
+         * Dite après le relevé de partage : le tunnel peut se rouvrir à cet
+         * instant-là, et l'annoncer plus tôt donnerait la situation d'avant.
          */
         check('  … une fois l\'adresse publique déduite',
             SERVER.indexOf('const announceEntry') < SERVER.indexOf('announceEntry();')
@@ -343,7 +361,7 @@ server.listen(0, '127.0.0.1', async () => {
          * « Ouvrir le tableau de bord », bot déjà lancé, ouvrait l'interface
          * d'écoute lue dans `.env` : la porte de connexion, pour un propriétaire
          * connecté à un onglet de là. Il demande désormais l'adresse au bot, la
-         * seule à connaître une `PUBLIC_URL` déduite de Tailscale.
+         * seul à savoir si le relais de retour OAuth est employé.
          *
          * Et il la demande avec le jeton en en-tête. En query, un GET est
          * redirigé vers l'adresse nettoyée — le cookie posé au passage, que
@@ -351,7 +369,7 @@ server.listen(0, '127.0.0.1', async () => {
          * chaque fois, sans que rien ne le signale.
          */
         const avantLanceur = process.env.PUBLIC_URL;
-        process.env.PUBLIC_URL = 'https://exemple.ts.net';
+        process.env.PUBLIC_URL = 'https://exemple.romainpiau.dev';
 
         const launcher = await new Promise((resolve, reject) => {
             http.get({
@@ -368,7 +386,7 @@ server.listen(0, '127.0.0.1', async () => {
             }).on('error', reject);
         });
         check('le lanceur apprend du bot où ouvrir le tableau de bord',
-            launcher.status === 200 && launcher.json && launcher.json.entry === 'https://exemple.ts.net',
+            launcher.status === 200 && launcher.json && launcher.json.entry === 'https://exemple.romainpiau.dev',
             launcher.json ? launcher.json.entry : String(launcher.status));
         check('  … le jeton en en-tête y obtient une réponse directe',
             launcher.status === 200 && typeof launcher.json.count === 'number');

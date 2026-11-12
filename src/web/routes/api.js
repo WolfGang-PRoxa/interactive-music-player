@@ -570,13 +570,14 @@ function createApiRouter(webServer) {
      * C'est le piège que `WebServer.start` a déjà déjoué pour l'ouverture
      * automatique ; le lanceur y retombait par l'autre porte.
      *
-     * Demandée au bot plutôt que relue dans `.env` : `PUBLIC_URL` peut se
-     * déduire de Tailscale au démarrage, sans jamais être écrite nulle part.
+     * Demandée au bot plutôt que relue dans `.env` : c'est lui qui sait si le
+     * relais de retour OAuth est employé, et donc si `localhost` porte une
+     * session (voir oauth.entryUrl).
      */
     router.get('/clients', (req, res) => {
         res.json({
             count: webServer.wss ? webServer.wss.clients.size : 0,
-            entry: require('../oauth').publicUrl(),
+            entry: require('../oauth').entryUrl(),
         });
     });
 
@@ -1418,16 +1419,45 @@ function createApiRouter(webServer) {
             return res.status(415).json({ error: 'Type de fichier non supporté' });
         }
 
+        /*
+         * D'un seul tenant, ou en morceaux.
+         *
+         * Le navigateur découpe tout fichier qui dépasserait ce qu'un tunnel
+         * Cloudflare laisse passer en une requête (voir chunkedUpload.js). Les
+         * morceaux arrivent sur cette même route, marqués de `uploadId` ; seul
+         * le dernier poursuit jusqu'à la lecture, les autres reçoivent le
+         * numéro du suivant.
+         */
+        const chunked = typeof req.query.uploadId === 'string';
+
         let stored;
         try {
-            stored = await uploadService.receiveUpload(req, {
-                name,
-                maxBytes: MAX_UPLOAD_MB * 1024 * 1024,
-            });
+            if (chunked) {
+                const result = await require('../chunkedUpload').receiveChunk(req, {
+                    uploadId: req.query.uploadId,
+                    index: Number(req.query.chunk),
+                    total: Number(req.query.chunks),
+                    name,
+                    maxBytes: MAX_UPLOAD_MB * 1024 * 1024,
+                });
+                if (!result.done) return res.json({ success: true, next: result.next });
+                stored = result;
+            } else {
+                stored = await uploadService.receiveUpload(req, {
+                    name,
+                    maxBytes: MAX_UPLOAD_MB * 1024 * 1024,
+                });
+            }
         } catch (err) {
-            log.warn(`[WebServer Upload] Transfer of "${name}" failed: ${err.message}`);
+            // Un morceau attendu ailleurs n'est pas un échec du transfert : le
+            // navigateur reprend au numéro qu'on lui donne.
+            if (err.statusCode !== 409) {
+                log.warn(`[WebServer Upload] Transfer of "${name}" failed: ${err.message}`);
+            }
             if (!res.headersSent) {
-                res.status(err.statusCode || 500).json({ error: err.message });
+                const body = { error: err.message };
+                if (Number.isInteger(err.expected)) body.expected = err.expected;
+                res.status(err.statusCode || 500).json(body);
             }
             return;
         }

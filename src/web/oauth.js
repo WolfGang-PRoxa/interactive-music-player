@@ -61,28 +61,126 @@ function isConfigured() {
 }
 
 /**
- * Adresse publique du tableau de bord, sans barre oblique finale.
+ * Relais de retour employé par défaut.
  *
- * Elle ne se devine pas : le serveur écoute sur `127.0.0.1` par défaut, et
- * l'adresse par laquelle un invité l'atteint — IP du réseau local, tunnel,
- * nom de domaine — n'est connue que de celui qui l'a installé. Discord exige
- * en outre que l'URL de rappel corresponde *exactement* à celle déclarée dans
- * le portail : la deviner à partir de l'en-tête `Host` donnerait une valeur
- * changeante, donc refusée une fois sur deux.
- *
- * @returns {string}
+ * Un Worker Cloudflare déployé une fois pour toutes les installations (voir
+ * oauthRelay.js et tools/oauth-relay/). Chaque installation peut désigner le
+ * sien par `OAUTH_RELAY_URL`, ou s'en passer avec `OAUTH_RELAY_URL=off`.
  */
-function publicUrl() {
-    const declared = (process.env.PUBLIC_URL || '').trim();
-    if (declared) return declared.replace(/\/+$/, '');
+const DEFAULT_RELAY_URL = 'https://imp-auth.romainpiau.dev/discord/callback';
 
+/** L'adresse écrite à la main dans `.env`, sans barre oblique finale, ou ''. */
+function declaredUrl() {
+    return (process.env.PUBLIC_URL || '').trim().replace(/\/+$/, '');
+}
+
+/** L'adresse locale du tableau de bord, celle qui marche sans rien déclarer. */
+function localUrl() {
     const port = process.env.PORT || 3000;
     return `http://localhost:${port}`;
 }
 
+/**
+ * Le relais de retour, ou null s'il est écarté.
+ * @returns {string|null}
+ */
+function relayUrl() {
+    const raw = (process.env.OAUTH_RELAY_URL || '').trim();
+    if (!raw) return DEFAULT_RELAY_URL;
+    if (/^(off|none|false|0)$/i.test(raw)) return null;
+    return raw;
+}
+
+/**
+ * Le retour de Discord passe-t-il par le relais ?
+ *
+ * Oui dès qu'aucune adresse fixe n'est déclarée : c'est le cas du partage
+ * rapide, dont l'adresse change à chaque lancement, et celui de l'usage purement
+ * local. Une adresse fixe — un domaine derrière un tunnel nommé, une IP de
+ * réseau local — se déclare directement chez Discord, comme avant, et le relais
+ * n'a plus rien à faire.
+ *
+ * @returns {boolean}
+ */
+function usesRelay() {
+    return !declaredUrl() && Boolean(relayUrl());
+}
+
+/**
+ * L'adresse du partage rapide, quand il est en ligne.
+ *
+ * Demandée au module du tunnel au moment de l'appel, et jamais recopiée dans
+ * `PUBLIC_URL` : elle change à chaque lancement, et l'écrire là ferait passer
+ * une adresse de passage pour une adresse déclarée — les cookies se poseraient
+ * en `Secure`, et la session de celui qui est devant la machine, en
+ * `http://localhost`, ne tiendrait plus.
+ *
+ * @returns {string|null}
+ */
+function sharedUrl() {
+    try {
+        return require('./cloudflare').sharedUrl();
+    } catch (e) {
+        return null;
+    }
+}
+
+/**
+ * Adresse publique du tableau de bord, sans barre oblique finale.
+ *
+ * Celle qu'on donne aux invités : le lien posté dans le salon vocal, l'adresse
+ * affichée dans la fenêtre de partage. Dans l'ordre : l'adresse déclarée, qui
+ * l'emporte toujours ; celle du partage rapide quand il tourne ; l'adresse
+ * locale à défaut, qui ne mène qu'à cette machine.
+ *
+ * @returns {string}
+ */
+function publicUrl() {
+    return declaredUrl() || sharedUrl() || localUrl();
+}
+
+/**
+ * L'adresse où ouvrir le tableau de bord sur cette machine.
+ *
+ * Elle diffère de `publicUrl()` quand le partage rapide tourne : s'ouvrir sur
+ * l'adresse du tunnel ferait faire à la page un aller-retour par Cloudflare
+ * pour atteindre un serveur posé à côté d'elle. Grâce au relais, la connexion
+ * Discord revient sur l'origine d'où elle est partie, et `localhost` porte donc
+ * une session aussi bien que le tunnel.
+ *
+ * Une adresse déclarée reste la règle quand il y en a une : le retour de Discord
+ * y revient, et c'est la seule origine qui portera une session.
+ *
+ * @returns {string}
+ */
+function entryUrl() {
+    return declaredUrl() || localUrl();
+}
+
 /** URL de rappel, telle qu'elle doit être déclarée dans le portail développeur. */
 function redirectUri() {
-    return `${publicUrl()}/auth/discord/callback`;
+    if (usesRelay()) return relayUrl();
+    return `${declaredUrl() || localUrl()}/auth/discord/callback`;
+}
+
+/**
+ * L'origine où renvoyer cette connexion-ci, quand le relais s'en charge.
+ *
+ * Celle par laquelle la requête est arrivée : c'est là que vivent les cookies
+ * du navigateur — le jeton, le `nonce` de la connexion —, et donc là que le
+ * retour doit revenir pour les retrouver. Le schéma ne se lit pas sur la
+ * requête : derrière le tunnel elle arrive en clair, sur `127.0.0.1`. Il se
+ * déduit de l'hôte — HTTPS pour le tunnel, HTTP pour la machine elle-même.
+ *
+ * @param {import('express').Request} req
+ * @returns {string|null} null si le relais ne saurait pas y revenir — une IP de
+ *   réseau local, par exemple, qui demande une adresse déclarée.
+ */
+function returnOrigin(req) {
+    const host = String(req.headers.host || '').toLowerCase();
+    if (!host) return null;
+    const relay = require('./oauthRelay');
+    return relay.acceptedTarget(`https://${host}`) || relay.acceptedTarget(`http://${host}`);
 }
 
 function purgeStates() {
@@ -111,14 +209,21 @@ function purgeStates() {
  * connaît que la valeur, jamais ce qu'elle recouvre.
  *
  * @param {string} [returnTo] Chemin à rouvrir une fois l'invité reconnu.
- * @param {{ holdsToken?: boolean, claim?: boolean, silent?: boolean }} [carried]
- *   Ce que le rappel devra savoir.
+ * Derrière le relais, le `state` porte en plus l'origine où revenir (voir
+ * oauthRelay.js) : c'est le seul champ que Discord rende tel quel, et donc le
+ * seul où le relais puisse la lire.
+ *
+ * @param {{ holdsToken?: boolean, claim?: boolean, silent?: boolean,
+ *   nonce?: string, origin?: string }} [carried]
+ *   Ce que le rappel devra savoir, et l'origine où revenir.
  * @returns {string} L'URL vers laquelle rediriger le navigateur.
  */
 function buildAuthorizeUrl(returnTo = '/', carried = {}) {
     purgeStates();
 
-    const state = crypto.randomBytes(16).toString('hex');
+    const state = usesRelay()
+        ? require('./oauthRelay').encodeState(carried.origin || localUrl())
+        : crypto.randomBytes(16).toString('hex');
     pendingStates.set(state, {
         createdAt: Date.now(),
         returnTo,
@@ -275,18 +380,28 @@ function logConfiguration() {
     }
     log.info(`[OAuth] Discord authentication active. Callback URL to declare in the `
         + `developer portal: ${redirectUri()}`);
-    if (!process.env.PUBLIC_URL) {
-        log.warn('[OAuth] PUBLIC_URL is not set: the callback URL points at '
-            + 'localhost, and will only work for a guest sitting at this machine.');
+    if (usesRelay()) {
+        log.info('[OAuth] No fixed address declared: Discord returns through the relay, '
+            + 'which sends each sign-in back to the address it started from '
+            + '(this machine, or the quick share).');
+    } else if (!declaredUrl()) {
+        log.warn('[OAuth] PUBLIC_URL is not set and the relay is off: the callback URL '
+            + 'points at localhost, and will only work for a guest sitting at this machine.');
     }
 }
 
 module.exports = {
     STATE_TTL_MS,
+    DEFAULT_RELAY_URL,
     isConfigured,
     clientId,
+    declaredUrl,
     publicUrl,
+    entryUrl,
+    relayUrl,
+    usesRelay,
     redirectUri,
+    returnOrigin,
     buildAuthorizeUrl,
     consumeState,
     exchangeCode,

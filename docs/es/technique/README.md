@@ -23,7 +23,7 @@ véase la [guía de usuario](../GUIDE.md).
 | [08 — Registro](08-journalisation.md) | Logger, niveles, difusión hacia el panel de control |
 | [09 — Configuración](09-configuration.md) | Variables de entorno, `config.js`, despliegue de los comandos |
 | [10 — Versiones](10-versions.md) | Raíces compartida y de instalación, releases de GitHub, cambio de versión |
-| [11 — Acceso remoto](11-acces-distant.md) | Túnel Tailscale, `PUBLIC_URL`, compartición del control |
+| [11 — Acceso remoto](11-acces-distant.md) | Túnel de Cloudflare, relé de retorno OAuth, `PUBLIC_URL`, compartición del control |
 | [12 — Pruebas](12-tests.md) | Las baterías de `tests/`, qué cubren, cómo escribir una |
 
 ---
