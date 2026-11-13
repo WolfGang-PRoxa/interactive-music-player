@@ -75,8 +75,10 @@ src/
     ├── owner.js              Cuenta propietaria de la instalación
     ├── guests.js             Libro de los invitados ya venidos
     ├── permissions.js        Lo que un invitado tiene derecho a hacer
-    ├── tailscale.js          Publicación del panel en internet
+    ├── cloudflare.js         Publicación del panel en internet
+    ├── oauthRelay.js         Relé de retorno OAuth del uso compartido rápido
     ├── uploadService.js      Recepción e integración de los archivos importados
+    ├── chunkedUpload.js      Archivos enviados en trozos, recompuestos
     ├── routes/api.js         Rutas HTTP (stream, download, upload, video-info)
     ├── routes/auth.js        Recorrido de autenticación de un invitado
     ├── websocket/

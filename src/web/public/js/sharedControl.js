@@ -1385,8 +1385,10 @@ window.MusicPlayer = window.MusicPlayer || {};
             const missing = !sharing?.oauthReady;
             warning.classList.toggle('hidden', !missing);
             const reminder = el('share-callback-url');
-            if (reminder && sharing?.publicUrl) {
-                reminder.textContent = `${sharing.publicUrl}/auth/discord/callback`;
+            // Celle que le serveur construit : derrière le relais, elle n'a
+            // rien à voir avec l'adresse publique.
+            if (reminder && sharing?.callbackUrl) {
+                reminder.textContent = sharing.callbackUrl;
             }
         }
 

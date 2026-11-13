@@ -75,8 +75,10 @@ src/
     ├── owner.js              Account that owns the installation
     ├── guests.js             Book of guests who have already come
     ├── permissions.js        What a guest is allowed to do
-    ├── tailscale.js          Publishing the dashboard on the internet
+    ├── cloudflare.js         Publishing the dashboard on the internet
+    ├── oauthRelay.js         OAuth return relay for quick sharing
     ├── uploadService.js      Reception and integration of imported files
+    ├── chunkedUpload.js      Files sent in pieces, put back together
     ├── routes/api.js         HTTP routes (stream, download, upload, video-info)
     ├── routes/auth.js        A guest's authentication journey
     ├── websocket/

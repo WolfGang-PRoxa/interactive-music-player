@@ -37,7 +37,10 @@ leben seine tatsächlichen Einstellungen in `settings.json` (siehe
 |---|---|---|
 | `PORT` | `3000` | Port, auf dem gelauscht wird |
 | `HOST` | `127.0.0.1` | Schnittstelle, auf der gelauscht wird. `0.0.0.0`, um im lokalen Netz erreichbar zu sein. |
-| `PUBLIC_URL` | — | Adresse, unter der Gäste dieses Dashboard erreichen, ohne abschließenden Schrägstrich. Sie lässt sich nicht erraten, und die Rückruf-URL `<PUBLIC_URL>/auth/discord/callback` muss im Discord-Portal genau so eingetragen sein. |
+| `PUBLIC_URL` | — | **Feste** Adresse, unter der Gäste dieses Dashboard erreichen, ohne abschließenden Schrägstrich: eine Domain hinter einem benannten Tunnel, eine IP im lokalen Netz. Die Rückruf-URL `<PUBLIC_URL>/auth/discord/callback` muss dann im Discord-Portal genau so eingetragen sein. Leer für die schnelle Freigabe, deren Adresse sich bei jedem Start ändert. |
+| `OAUTH_RELAY_URL` | Standard-Relais | OAuth-Rückkehr-Relais, das ohne `PUBLIC_URL` verwendet wird: seine Adresse trägt man bei Discord ein, ein für alle Mal. `off`, um darauf zu verzichten. |
+| `CLOUDFLARE_TUNNEL_TOKEN` | — | Token eines benannten Tunnels, der im Cloudflare-Dashboard angelegt wurde. Ersetzt die schnelle Freigabe; verlangt `PUBLIC_URL`. |
+| `CLOUDFLARED_PATH` | — | Pfad zu `cloudflared`, falls es woanders liegt als in `data/bin/` oder an den üblichen Orten. |
 | `AUTO_OPEN_DASHBOARD` | `true` | Öffnen des Browsers beim Start. `false`, wenn der Bot auf einem fernbedienten Rechner läuft — dieses Dashboard spielte die Musik doppelt. |
 | `DASHBOARD_TOKEN` | erzeugt | Zugangstoken. Wenn leer, wird es erzeugt und in `data/dashboard-token` gespeichert. |
 
@@ -279,9 +282,10 @@ Die Rechteprüfungen nutzen
 
 ## Voraussetzungen
 
-- **Node.js 18 oder höher** — das Projekt nutzt `fs.promises`, den Operator für
-  optionale Verkettung und mittelbar über seine Abhängigkeiten
-  `structuredClone`. In `package.json` ist kein `engines`-Feld deklariert.
+- **Node.js 22.12 oder höher** — das Minimum von `@discordjs/voice` 0.19 und
+  die Version, ab der `require()` ein ES-Modul lädt, worauf `file-type`
+  angewiesen ist (siehe `src/utils/fileTypeCompat.js`). Das Feld `engines` in
+  `package.json` deklariert es, und der Windows-Starter prüft es.
 - **FFmpeg** — von `ffmpeg-static` mitgeliefert, keine systemweite Installation
   nötig.
 - **yt-dlp** — von `youtube-dl-exec` mitgeliefert, als Rückfall bei der Auflösung

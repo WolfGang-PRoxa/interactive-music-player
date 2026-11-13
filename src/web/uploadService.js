@@ -12,18 +12,12 @@ const database = require('../database/Database');
 const { switchToQueueSourceIfNeeded, addToSetAsideQueue } = require('./websocket/handlerUtils');
 const { formatMs } = require('../utils/duration');
 const log = require('../utils/logger');
+const { settleIncoming } = require('./chunkedUpload');
 
 const UPLOADS_DIR = path.join(process.cwd(), 'data', 'uploads');
 
 /** Préfixe des transferts en cours, avant nommage définitif. */
 const INCOMING_PREFIX = '.incoming-';
-
-/**
- * Longueur du préfixe d'empreinte apposé aux fichiers stockés. 12 caractères
- * hexadécimaux offrent 2^48 valeurs : largement assez pour une bibliothèque
- * personnelle, tout en gardant un nom de fichier lisible.
- */
-const HASH_PREFIX_LENGTH = 12;
 
 /**
  * Supprime les transferts interrompus laissés par un arrêt brutal.
@@ -112,18 +106,12 @@ function receiveUpload(req, { name, maxBytes }) {
             }
 
             try {
-                const digest = hash.digest('hex').slice(0, HASH_PREFIX_LENGTH);
-                const filePath = path.join(UPLOADS_DIR, `${digest}-${name}`);
-
-                if (fs.existsSync(filePath)) {
-                    // Contenu déjà présent : on garde l'exemplaire existant
-                    fs.unlinkSync(tmpPath);
-                    log.info(`[Upload] "${name}" is already there, copy avoided.`);
-                    return resolve({ filePath, deduplicated: true, bytes: received });
-                }
-
-                fs.renameSync(tmpPath, filePath);
-                resolve({ filePath, deduplicated: false, bytes: received });
+                resolve(settleIncoming(tmpPath, {
+                    dir: UPLOADS_DIR,
+                    name,
+                    digest: hash.digest('hex'),
+                    bytes: received,
+                }));
             } catch (err) {
                 fs.promises.unlink(tmpPath).catch(() => {});
                 err.statusCode = 500;

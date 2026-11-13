@@ -23,7 +23,7 @@ This folder is for people who modify the code. For everyday use, see the
 | [08 — Logging](08-journalisation.md) | Logger, levels, broadcast to the dashboard |
 | [09 — Configuration](09-configuration.md) | Environment variables, `config.js`, command deployment |
 | [10 — Versions](10-versions.md) | Shared and install roots, GitHub releases, version switching |
-| [11 — Remote access](11-acces-distant.md) | Tailscale tunnel, `PUBLIC_URL`, control sharing |
+| [11 — Remote access](11-acces-distant.md) | Cloudflare tunnel, OAuth return relay, `PUBLIC_URL`, control sharing |
 | [12 — Tests](12-tests.md) | The suites in `tests/`, what they cover, how to write one |
 
 ---

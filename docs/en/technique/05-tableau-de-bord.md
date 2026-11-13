@@ -28,10 +28,10 @@ URL containing the access token.
 | [`oauth.js`](../../../src/web/oauth.js), [`sessions.js`](../../../src/web/sessions.js) | Discord OAuth journey, per-tab sessions |
 | [`owner.js`](../../../src/web/owner.js), [`guests.js`](../../../src/web/guests.js) | Owner of the installation, book of guests |
 | [`permissions.js`](../../../src/web/permissions.js) | What a guest is allowed to do |
-| [`tailscale.js`](../../../src/web/tailscale.js) | Publishing the dashboard on the internet |
+| [`cloudflare.js`](../../../src/web/cloudflare.js), [`oauthRelay.js`](../../../src/web/oauthRelay.js) | Publishing the dashboard on the internet, OAuth return relay |
 | [`routes/api.js`](../../../src/web/routes/api.js) | HTTP routes |
 | [`routes/auth.js`](../../../src/web/routes/auth.js) | A guest's authentication journey |
-| [`uploadService.js`](../../../src/web/uploadService.js) | Reception and integration of imports |
+| [`uploadService.js`](../../../src/web/uploadService.js), [`chunkedUpload.js`](../../../src/web/chunkedUpload.js) | Reception and integration of imports, upload in pieces |
 | [`websocket/wsHandler.js`](../../../src/web/websocket/wsHandler.js) | Message router |
 | [`websocket/handlers/`](../../../src/web/websocket/handlers/) | Business logic, one module per domain |
 
@@ -159,7 +159,7 @@ matches one module of `handlers/`:
 | Discord server | `selectChannel`, `setDefaultChannel`, `updateSettings`, `toggleVoiceDetection`, `leaveGuild` |
 | Track | `setTrackQuality`, `requestTrackFormats`, `requestTrackLoudness`, `setTrackLoudness`, `downloadTrack` |
 | Control sharing | `sendInviteLink`, `admitGuest`, `shareControl`, `revokeControl`, `requestRight`, `answerRightRequest`, `muteRightRequests` |
-| Tunnel | `tunnelState`, `tunnelLogin`, `tunnelMount`, `tunnelUnmount` |
+| Tunnel | `tunnelState`, `tunnelInstall`, `tunnelMount`, `tunnelUnmount` |
 | Versions | `listVersions`, `installVersion`, `uninstallVersion` |
 | System | `requestState`, `clientLog`, `memoryStream`, `startupFadeinConsumed`, `restartBot`, `shutdownBot` |
 

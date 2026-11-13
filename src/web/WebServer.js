@@ -218,11 +218,19 @@ class WebServer {
              * celui qui en a besoin à la main sait désormais où le prendre.
              */
             const announceEntry = () => {
-                const entry = require('./oauth').publicUrl();
+                const oauth = require('./oauth');
+                const entry = oauth.entryUrl();
                 log.success(`[WebServer] Dashboard reachable at: ${entry}`);
+                const shared = oauth.publicUrl();
+                if (shared !== entry) {
+                    log.info(`[WebServer] Shared on the internet at: ${shared}`);
+                }
                 log.info('[WebServer] Access token: data/dashboard-token '
                     + '(the window opened automatically already carries it).');
-                if (entry !== `http://${displayHost}:${port}`) {
+                // Derrière le relais, toute adresse de la machine porte une
+                // session : la mise en garde n'a de sens qu'avec une adresse
+                // déclarée.
+                if (!oauth.usesRelay() && entry !== `http://${displayHost}:${port}`) {
                     log.info('[WebServer] The listening address serves the page too, '
                         + 'but holds no sign-in session: use the address above.');
                 }
@@ -244,32 +252,24 @@ class WebServer {
              * c'est la ligne que l'on cherche des yeux au démarrage.
              */
             /*
-             * Le partage d'abord, la trace OAuth ensuite, et l'ordre est le sujet.
+             * Le partage d'abord, la trace OAuth ensuite.
              *
-             * Quand un Funnel publie déjà ce tableau de bord, l'adresse publique
-             * se déduit de la machine — inutile de la recopier à la main dans
-             * PUBLIC_URL, et surtout inutile de la voir voyager avec le dépôt.
-             * Une installation sur une seconde machine héritait sinon de
-             * l'adresse de la première, et l'aller-retour de connexion Discord
-             * renvoyait l'utilisateur sur l'ordinateur d'à côté.
+             * Le tunnel se rouvre ici quand le maître l'avait ouvert avant
+             * l'arrêt du bot (voir cloudflare.js) : la trace OAuth qui suit,
+             * et l'adresse annoncée après elle, décrivent alors la situation
+             * réelle plutôt que celle d'avant la réouverture.
              *
-             * Une valeur écrite à la main l'emporte toujours : elle peut désigner
-             * un domaine, un tunnel tiers, une adresse de réseau local, toutes
-             * choses que cette machine ne peut pas deviner.
+             * L'adresse du partage rapide n'est jamais recopiée dans
+             * PUBLIC_URL : elle change à chaque lancement, et le relais de
+             * retour OAuth rend cette copie inutile (voir oauth.js).
              */
-            require('./tailscale').announce(port).then((shared) => {
-                if (!process.env.PUBLIC_URL && shared.publicUrl
-                    && shared.step === require('./tailscale').STEP.SERVING) {
-                    process.env.PUBLIC_URL = shared.publicUrl;
-                    log.info('[Tailscale] PUBLIC_URL derived from this machine: '
-                        + shared.publicUrl);
-                }
+            require('./cloudflare').announce(port).then(() => {
                 require('./oauth').logConfiguration();
                 announceEntry();
             }).catch((err) => {
                 // Le partage est un confort : son diagnostic ne doit jamais
                 // empêcher la trace qui suit, ni le démarrage.
-                log.warn(`[Tailscale] Sharing state unknown: ${err.message}`);
+                log.warn(`[Tunnel] Sharing state unknown: ${err.message}`);
                 require('./oauth').logConfiguration();
                 announceEntry();
             });
@@ -290,12 +290,12 @@ class WebServer {
                     log.success(`[WebServer] No connected client detected. Opening the dashboard automatically.`);
                     const { execFile } = require('child_process');
                     /*
-                     * Sur l'origine où Discord renvoie, et nulle part ailleurs.
+                     * Sur une origine où Discord sait renvoyer.
                      *
                      * Une session vit dans un cookie, et un cookie appartient à
-                     * une origine. L'aller-retour de connexion revient toujours
-                     * sur `PUBLIC_URL` — ou sur `localhost` à défaut : c'est
-                     * donc la seule adresse où une session puisse exister.
+                     * une origine. L'aller-retour de connexion revient sur
+                     * `PUBLIC_URL` quand elle est déclarée, et sur l'origine de
+                     * départ — `localhost` ici — quand le relais s'en charge.
                      *
                      * Cette fenêtre s'ouvrait sur l'interface d'écoute,
                      * `127.0.0.1`, qui n'en porte aucune et n'en portera jamais.
@@ -308,15 +308,15 @@ class WebServer {
                      * Le jeton reste passé en query : le middleware pose le
                      * cookie puis nettoie l'URL.
                      */
-                    const url = `${require('./oauth').publicUrl()}/?token=${token}`;
+                    const url = `${require('./oauth').entryUrl()}/?token=${token}`;
 
                     /*
                      * Un tableau d'arguments, et non une ligne de commande.
                      *
                      * L'adresse était interpolée dans une chaîne remise à
                      * l'interpréteur — `start "" "${url}"`. Elle porte le jeton
-                     * et se déduit de `PUBLIC_URL`, donc parfois de la sortie de
-                     * Tailscale : un guillemet ou une esperluette qui s'y
+                     * et se déduit de `PUBLIC_URL`, valeur écrite par quelqu'un
+                     * dans `.env` : un guillemet ou une esperluette qui s'y
                      * glisserait fermerait la chaîne et ferait exécuter la
                      * suite. C'était le dernier `exec` du projet, tout le reste
                      * passant déjà par `spawn` ou `execFile`.
@@ -979,6 +979,10 @@ class WebServer {
                 sharing: {
                     oauthReady: oauth.isConfigured(),
                     publicUrl: oauth.publicUrl(),
+                    // L'URL de rappel telle que le serveur la construit : celle
+                    // du relais quand aucune adresse n'est déclarée, et non
+                    // l'adresse publique suivie du chemin de rappel.
+                    callbackUrl: oauth.redirectUri(),
                     grants: database.getSharedControl(guildId),
                     knownUsers: this._knownGuests(),
                     pending: this._pendingGuests(guildId),

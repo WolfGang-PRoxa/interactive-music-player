@@ -131,7 +131,7 @@ Um die Installation an ein anderes Konto zu übergeben, lösche die Datei
 `data/owner.json` und melde dich erneut mit dem Token an.
 
 Ist die Discord-Anwendung nicht eingerichtet — `DISCORD_CLIENT_SECRET` oder
-`PUBLIC_URL` fehlen —, ist eine Anmeldung unmöglich: das Fenster nennt dann, was
+`DISCORD_CLIENT_ID` fehlen —, ist eine Anmeldung unmöglich: das Fenster nennt dann, was
 noch einzutragen ist, und lässt allein mit dem Token herein, wie zuvor. Niemand
 sperrt sich wegen einer vergessenen Variable aus seinem eigenen Bot aus.
 

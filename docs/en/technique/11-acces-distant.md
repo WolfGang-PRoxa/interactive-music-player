@@ -10,110 +10,162 @@ in someone other than its owner.
 
 ## The public address
 
-`PUBLIC_URL` is the address at which guests reach this dashboard, with no
-trailing slash. **It cannot be guessed**: the server listens on `127.0.0.1`, and
-the useful address — local network IP, tunnel, domain name — is known only to
-the operator.
+Two cases, depending on whether the address is fixed.
 
-It is not just for display. Discord requires the callback URL to match
-**exactly** the one declared in the developer portal, tab *OAuth2 → Redirects*:
+**Without a fixed address** — the default — there is nothing to declare. Quick
+sharing (see [the tunnel](#the-tunnel)) gets a new address from Cloudflare at
+every launch, and the return relay takes care of Discord.
+
+**With a fixed address** — a domain behind a named tunnel, a local network IP —
+`PUBLIC_URL` carries it, with no trailing slash. It cannot be guessed, and
+Discord requires the callback URL to match **exactly** the one declared in the
+developer portal, tab *OAuth2 → Redirects*:
 
 ```
-PUBLIC_URL=http://192.168.1.20:3000
-      └──► declare   http://192.168.1.20:3000/auth/discord/callback
+PUBLIC_URL=https://imp.romainpiau.dev
+      └──► declare   https://imp.romainpiau.dev/auth/discord/callback
 ```
 
-Without `PUBLIC_URL`, the callback URL points at `127.0.0.1`: the journey works
-from the host machine and fails everywhere else. A warning is logged at startup
-in that case.
+`PUBLIC_URL` always wins: as soon as it is written, the relay steps aside and
+the journey becomes direct again. It is also what explains the token's detour
+through the OAuth `state`: the dashboard opens on `127.0.0.1` where its cookie
+lives, while Discord redirects to `PUBLIC_URL`. Two hosts, two cookie jars, and
+a callback that does not have the token — see
+[07 — Security](07-securite.md#authentication).
 
-It is also what explains the token's detour through the OAuth `state`: the
-dashboard opens on `127.0.0.1` where its cookie is set, while Discord sends the
-user back to `PUBLIC_URL`. Two hosts, two cookie jars, and a callback that does
-not have the token — see [07 — Security](07-securite.md#authentication).
+### The return relay
+
+Discord only agrees to send a visitor back to an address declared in advance.
+Quick sharing's address changes at every launch: you would have to go back to
+the portal at every start. The relay
+([`oauthRelay.js`](../../../src/web/oauthRelay.js), and the Worker in
+`tools/oauth-relay/`) is a fixed step between the two:
+
+```
+dashboard ──/auth/discord──► Discord ──► relay (fixed address, declared once)
+      ▲                                         │
+      └──── /auth/discord/callback?code=… ◄─────┘  to the origin read in the state
+```
+
+After its random part, the `state` carries the origin the sign-in started from.
+The relay sends the visitor back there with the code. The return therefore
+lands where the browser's cookies live — the token, the sign-in's `nonce` —
+whether the dashboard was opened on `localhost` or through the tunnel's link.
+
+The relay only sees a single-use code go by, worthless without the
+application's secret, which only the bot holds. It keeps nothing and logs
+nothing. A default relay is deployed for every installation; `OAUTH_RELAY_URL`
+points to another one, and `OAUTH_RELAY_URL=off` does without it.
+
+| Destination | Accepted | Why |
+|---|---|---|
+| `https://….trycloudflare.com` | Yes | Quick sharing, whose address changes |
+| `http://localhost:<port>`, `http://127.0.0.1:<port>` | Yes | The machine itself |
+| A domain, a local network IP | No | A fixed address is declared directly with Discord |
+| Any other address | No | An open relay would deliver codes to whoever asks |
+
+The rule is written twice — in the bot and in the Worker, which imports nothing
+from the repository — and [`tests/oauthRelay.js`](../../../tests/oauthRelay.js)
+tests both on the same cases.
 
 ---
 
 ## The tunnel
 
-Opening the dashboard to the outside required four gestures that nothing
-announced: installing Tailscale, authenticating the machine, obtaining the right
-to publish from the tailnet, then mounting the Funnel. Each fails in its own
-way, and none says what is missing — one discovered the next step by running
-into it. Worse: the resulting public address had to be copied by hand into
-`PUBLIC_URL`, and that copy travelled with the repository. An installation on a
-second machine thus inherited the first one's address, and the Discord sign-in
-round trip sent the user back to the computer next door.
+Opening the dashboard to the outside used to go through Tailscale Funnel, and
+took four gestures nothing announced: installing Tailscale with administrator
+rights, creating an account, getting the network's right to publish, mounting
+the Funnel. Every user of the bot had to do all four again.
 
-[`tailscale.js`](../../../src/web/tailscale.js) does nothing on its own: it
-**observes**. It answers "here is where you stand, and here is what is missing",
-in a vocabulary the interface turns into a sentence. The gestures that can be
-automated are asked of it explicitly, one at a time.
+[`cloudflare.js`](../../../src/web/cloudflare.js) replaces them with two, which
+the bot does on a click. `cloudflared` is a single executable: it is not
+installed, it is dropped into `data/bin/` and started, with no special rights.
+The bot downloads it from Cloudflare's official releases, then opens the
+tunnel. Like the module it replaces, it **observes** first, and only acts when
+asked.
 
-### The seven states
-
-They are **ordered**: each assumes the previous one acquired, which allows them
-to be presented as a progression rather than as a diagnosis.
+### The states
 
 | State | What is observed | Next gesture |
 |---|---|---|
-| `absent` | The `tailscale` command cannot be found | Install Tailscale |
-| `unreachable` | Installed, but the daemon does not answer | Start the service |
-| `needsLogin` | Machine not signed in to a tailnet | `tailscale up`, or an auth key |
-| `needsCapability` | Signed in, but the tailnet does not grant the right to publish | Enable HTTPS and Funnel in the admin console |
-| `ready` | Everything is in place; the Funnel remains to be mounted | `mount()` — deliberately |
-| `serving` | The Funnel does publish this dashboard | — |
-| `otherTarget` | The Funnel publishes **something else** | Do not overwrite it without saying so |
+| `absent` | `cloudflared` cannot be found | Download it (one click) |
+| `downloading` | The download is under way | — |
+| `needsAddress` | Named tunnel token, but no `PUBLIC_URL` | Declare the tunnel's address |
+| `ready` | Everything is in place; the tunnel remains to be opened | `mount()` — deliberately |
+| `starting` | Started, Cloudflare has not confirmed yet | Wait a few seconds |
+| `serving` | The dashboard is reachable from the internet | — |
+| `failed` | The tunnel stopped by itself | Try again, the cause is given |
 
-The whole decision lives in `decide()`, separated from what feeds it: it works
-on two already-read objects, which makes it possible to exercise it on all seven
-states without installing Tailscale, disconnecting it, or removing a right from
-the tailnet to see what happens. `inspect()` now does nothing but carry the
-buckets.
+The whole decision lives in `decide()`, a pure function of what was observed:
+every state can be tested without downloading `cloudflared` or opening a
+tunnel. Nothing is started to observe — everything is already in the bot's
+process — so the window can ask for the state as often as it likes.
 
-A command that drags is as good as a missing command — the daemon can be frozen
-— hence an eight-second timeout. And when the `PATH` does not yet carry the
-command, the known locations are visited: a fresh installation does not update
-the `PATH` of processes already started, and the bot launched before it would see
-nothing, which the user would take for a failed installation.
+### Quick sharing
 
-### What cannot be automated
+It is the default mode, and it needs no account. `cloudflared tunnel --url`
+opens a tunnel and Cloudflare gives it an `https://….trycloudflare.com`
+address, read from its output — never guessed. `api.trycloudflare.com`, which
+shows up in its errors, is not one.
 
-Three things, and it is better to say so than to work around it:
+The address changes at every launch. Guests do not suffer from it, since the
+bot posts the link for them; Discord goes through the relay. It is **never
+copied into `PUBLIC_URL`**: cookies would turn `Secure`, and the session of the
+person sitting at the machine, on `http://localhost`, would no longer hold.
 
-- **Installation** requires administrator rights. A service running under a user
-  account does not take them without a system prompt.
-- **The Tailscale account** cannot be created through any API. An auth key
-  removes the interactivity, but an account is needed to issue one.
-- **The right to publish** (`funnel`, `https`) is granted by the tailnet's
-  policy, therefore from the admin console.
+Cloudflare presents these tunnels as a testing tool: no availability guarantee,
+and a cap on simultaneous requests. For a channel among friends, that is plenty;
+the fixed address is there if it gets tight.
 
-### Mounting the Funnel stays a gesture
+### The fixed address
 
-The Funnel exposes the dashboard **to the whole internet**, not to the local
-network. Mounting it unasked would publish someone's player without their
-knowledge: it is the only step the module refuses to take by default, even when
-everything is ready. `mount()` exists, it has to be called.
+Anyone who owns a domain at Cloudflare creates a named tunnel in their dashboard
+(*Zero Trust → Networks → Tunnels*), gives it a hostname leading to
+`http://localhost:<port>`, and copies two values into `.env`:
 
-The call is made with `--bg` — the foreground form would block the bot's startup
-— and with `--yes`, a confirmation prompt inside a service having no reader.
+```
+CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi…
+PUBLIC_URL=https://imp.romainpiau.dev
+```
 
-### The state is not in the ordinary broadcast
+The bot then runs that tunnel instead of quick sharing. The token goes through
+`cloudflared`'s environment (`TUNNEL_TOKEN`) and never through its command
+line, where any process on the machine could read it. A named tunnel does not
+know its own hostname — it lives in the Cloudflare dashboard — hence the
+`needsAddress` state when `PUBLIC_URL` is missing.
 
-Observing it launches two processes. Doing so every second, for a value that
-only moves at someone's gesture, would be paying dearly for a display nobody
-looks at most of the time. The window asks for it as it opens, through
-`tunnelState`.
+A given tunnel must only run on one machine at a time: started on two,
+Cloudflare would split the visitors between them.
 
-The domain's four messages — `tunnelState`, `tunnelLogin`, `tunnelMount`,
+### What never happens on its own
+
+Publishing exposes the dashboard to **the whole internet**. Doing it unasked
+would publish someone's player without their knowledge: `mount()` is only
+called on a gesture from the master. That gesture is remembered
+(`data/tunnel.json`), and the tunnel reopens at the next launch — like the
+Funnel, which survived restarts. Withdrawing the share forgets it.
+
+The tunnel lives with the bot's process and stops with it.
+
+The domain's four messages — `tunnelState`, `tunnelInstall`, `tunnelMount`,
 `tunnelUnmount` — are **reserved for the session master**. Making the dashboard
-reachable from outside, or ceasing to be, is not a playback command one shares.
+reachable, or fetching an executable onto the host's machine, is not a command
+one shares.
 
-At startup, `announce()` writes one line to the log, and each one carries **the
-action rather than the observation**: "not installed" teaches nothing to someone
-who has just opened a console, "install it here" does. It is the counterpart of
-the OAuth trace, and for the same reason — those are the only two things one
-cannot guess when installing the bot on a fresh machine.
+### Cloudflare's limits
+
+- **100 MB per request** on the free plan, beyond which Cloudflare answers 413
+  without the bot seeing anything. The browser therefore splits any file over
+  64 MB, and the server puts the pieces back together
+  ([`chunkedUpload.js`](../../../src/web/chunkedUpload.js)). `MAX_UPLOAD_MB`
+  applies to the total and keeps its full meaning.
+- **A single source address.** Every request arrives from `cloudflared`, hence
+  from the machine itself: the rate limiter reads the real address in
+  `CF-Connecting-IP`, which it only trusts on a connection coming from the
+  machine.
+- **Video.** Cloudflare's CDN terms in principle reserve video delivery for its
+  paid offers. Personal use among friends stays modest, but the dashboard's
+  video relay is in a grey area.
 
 ---
 
@@ -170,12 +222,15 @@ See [07 — Security](07-securite.md#remembering-a-guest) for silent recognition
 
 ## When making changes
 
-- A new message touching the tunnel or sharing must be declared `MASTER_ONLY` in
-  [`permissions.js`](../../../src/web/permissions.js). A message unknown to the
-  table already is by default, but relying on the fallback makes the intent
+- A new message touching the tunnel or sharing must be declared `MASTER_ONLY`
+  in [`permissions.js`](../../../src/web/permissions.js). A message unknown to
+  the table already is by default, but relying on the fallback makes the intent
   unreadable.
-- Never build the callback URL on the client side: the Discord portal expects the
-  one the server builds, and a one-character difference makes the whole journey
-  fail.
-- `decide()` must stay a pure function of its two arguments. That is what makes
-  it exercisable without Tailscale installed.
+- Never build the callback URL on the client side: the Discord portal expects
+  the one the server builds, and a one-character difference breaks the whole
+  journey.
+- Touching the relay's destinations means touching both copies of the rule —
+  `oauthRelay.js` and `tools/oauth-relay/src/index.js` — then redeploying the
+  Worker.
+- `decide()` must remain a pure function of what it receives. That is what makes
+  it testable without `cloudflared`.

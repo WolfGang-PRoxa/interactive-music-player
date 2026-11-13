@@ -331,9 +331,9 @@ machine. To reach it from a phone or another workstation, set `HOST=0.0.0.0` —
 authentication then takes on its full meaning. A warning is logged at startup in
 that case.
 
-The dashboard can also be published on the whole internet through a Tailscale
-Funnel tunnel. It is the only gesture the module concerned refuses to make on
-its own, even when everything is ready: mounting it unasked would publish
+The dashboard can also be published on the whole internet through a Cloudflare
+tunnel. It is the only gesture the module concerned refuses to make on
+its own, even when everything is ready: opening it unasked would publish
 someone's player without their knowledge. See
 [11 — Remote access](11-acces-distant.md).
 

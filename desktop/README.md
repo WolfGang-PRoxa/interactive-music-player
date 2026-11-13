@@ -28,6 +28,24 @@ de lecture — avant de fermer.
 
 ---
 
+## Installer : l'avertissement de Windows
+
+L'installeur **n'est pas signé** : un certificat de signature de code coûte
+plusieurs centaines d'euros par an, ce qui n'a pas de sens pour un projet
+gratuit. Windows SmartScreen affiche donc, au premier lancement, « Windows a
+protégé votre ordinateur » et un éditeur inconnu.
+
+Pour installer quand même : **Informations complémentaires**, puis
+**Exécuter quand même**. Le navigateur peut aussi demander de confirmer le
+téléchargement (*Conserver*).
+
+L'installeur est construit par le workflow public
+[`.github/workflows/desktop.yml`](../.github/workflows/desktop.yml), à partir du
+code de ce dépôt : chaque fichier joint à une release se rattache au run qui l'a
+produit, dans l'onglet *Actions*.
+
+---
+
 ## Où sont les fichiers
 
 | Quoi | Où |

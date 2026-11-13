@@ -22,6 +22,35 @@ entrée porte la date du jour où le changement a été livré.
     src/web/changelog.js.
 -->
 
+## 2026-11-13 — Prêt pour la première version
+
+Les derniers réglages avant de publier la version 0.0.1.
+
+### Changed
+- Node.js 22.12 ou supérieur est désormais exigé, et vérifié au lancement : c'est le minimum réel des dépendances, que la documentation sous-estimait (Node 18).
+- La politique de confidentialité et les conditions d'utilisation décrivent le relais de connexion et le partage par Cloudflare.
+- L'installeur Windows n'est pas signé : la documentation explique comment passer l'avertissement de SmartScreen.
+
+### Security
+- Plus aucun avis de sécurité npm ouvert : undici passe en 6.29.1 et 7.30.2, et la lecture des fichiers locaux utilise un file-type corrigé, qui ne boucle plus sur un fichier ASF malformé.
+
+## 2026-11-12 — Le partage par Cloudflare
+
+Le tableau de bord se partage désormais par un tunnel Cloudflare, sans compte ni installation à faire soi-même.
+
+### Added
+- « Joindre depuis l'extérieur » télécharge cloudflared tout seul et ouvre un tunnel Cloudflare en un clic : aucun compte, aucun droit administrateur.
+- Qui a un domaine chez Cloudflare peut garder une adresse fixe, en renseignant le jeton de son tunnel (`CLOUDFLARE_TUNNEL_TOKEN`) et son adresse (`PUBLIC_URL`).
+- Un relais de retour fixe permet à la connexion Discord de fonctionner avec une adresse de partage qui change à chaque lancement : son adresse se déclare une seule fois dans le portail Discord.
+- Les fichiers de plus de 64 Mo s'envoient en morceaux, pour passer le plafond de 100 Mo par requête de Cloudflare sans baisser la taille maximale acceptée ; une coupure ne fait renvoyer que le morceau en cours.
+
+### Changed
+- Le partage choisi est retenu, et le tunnel se rouvre au lancement suivant.
+- Le limiteur de débit reconnaît chaque visiteur derrière le tunnel, au lieu de compter tout le monde comme une seule adresse.
+
+### Removed
+- Le partage par Tailscale Funnel, et les quatre étapes qu'il demandait.
+
 ## 2026-11-11 — L'application de bureau
 
 Le bot s'installe désormais comme une application Windows, sans rien perdre de son tableau de bord dans le navigateur.

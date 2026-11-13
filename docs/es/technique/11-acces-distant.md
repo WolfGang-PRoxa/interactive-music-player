@@ -2,121 +2,170 @@
 
 [← Índice](README.md)
 
-El bot escucha de manera predeterminada en `127.0.0.1`. Este capítulo cubre las
-dos cosas que hay que hacer para que se le alcance desde otro sitio: darle una
-dirección pública, y dejar entrar a alguien distinto de su propietario.
+El bot escucha por defecto en `127.0.0.1`. Este capítulo cubre las dos cosas que
+hay que hacer para alcanzarlo desde otro lugar: darle una dirección pública, y
+dejar entrar a alguien que no sea su propietario.
 
 ---
 
 ## La dirección pública
 
-`PUBLIC_URL` es la dirección por la que los invitados alcanzan este panel de
-control, sin barra final. **No se adivina**: el servidor escucha en `127.0.0.1`,
-y la dirección útil — IP de la red local, túnel, nombre de dominio — solo la
-conoce quien lo explota.
+Dos casos, según la dirección sea fija o no.
 
-No sirve solo para mostrarse. Discord exige que la URL de retorno corresponda
-**exactamente** a la declarada en el portal de desarrollador, pestaña *OAuth2 →
-Redirects*:
+**Sin dirección fija** — el caso por defecto —, no hay nada que declarar. El uso
+compartido rápido (véase [el túnel](#el-túnel)) recibe de Cloudflare una
+dirección nueva en cada arranque, y el relé de retorno se ocupa de Discord.
+
+**Con una dirección fija** — un dominio detrás de un túnel con nombre, una IP de
+red local —, `PUBLIC_URL` la lleva, sin barra final. No se adivina, y Discord
+exige que la URL de retorno coincida **exactamente** con la declarada en el
+portal de desarrolladores, pestaña *OAuth2 → Redirects*:
 
 ```
-PUBLIC_URL=http://192.168.1.20:3000
-      └──► declarar   http://192.168.1.20:3000/auth/discord/callback
+PUBLIC_URL=https://imp.romainpiau.dev
+      └──► declarar   https://imp.romainpiau.dev/auth/discord/callback
 ```
 
-Sin `PUBLIC_URL`, la URL de retorno apunta a `127.0.0.1`: el recorrido funciona
-desde la máquina anfitriona y falla en todas partes. En ese caso se registra un
-aviso en el arranque.
-
-Es también lo que explica el rodeo del testigo por el `state` de OAuth: el panel
-se abre en `127.0.0.1`, donde se pone su cookie, mientras que Discord devuelve al
-usuario a `PUBLIC_URL`. Dos anfitriones, dos tarros de cookies, y una llamada de
-retorno que no tiene el testigo — véase
+`PUBLIC_URL` siempre gana: en cuanto se escribe, el relé se aparta y el
+recorrido vuelve a ser directo. También es lo que explica el rodeo del token por
+el `state` OAuth: el panel se abre en `127.0.0.1`, donde está su cookie,
+mientras que Discord redirige a `PUBLIC_URL`. Dos hosts, dos tarros de cookies,
+y un retorno que no tiene el token — véase
 [07 — Seguridad](07-securite.md#autenticación).
+
+### El relé de retorno
+
+Discord solo acepta devolver a un visitante a una dirección declarada de
+antemano. La del uso compartido rápido cambia en cada arranque: habría que
+volver al portal en cada inicio. El relé
+([`oauthRelay.js`](../../../src/web/oauthRelay.js), y el Worker de
+`tools/oauth-relay/`) es una etapa fija entre ambos:
+
+```
+panel ──/auth/discord──► Discord ──► relé (dirección fija, declarada una vez)
+  ▲                                        │
+  └──── /auth/discord/callback?code=… ◄────┘  hacia el origen leído en el state
+```
+
+El `state` lleva, tras su parte aleatoria, el origen desde el que partió la
+conexión. El relé devuelve allí al visitante con el código. El retorno llega,
+pues, donde viven las cookies del navegador — el token, el `nonce` de la
+conexión —, tanto si el panel se abrió en `localhost` como por el enlace del
+túnel.
+
+El relé solo ve pasar un código de un solo uso, inservible sin el secreto de la
+aplicación, que solo el bot posee. No guarda nada ni registra nada. Hay un relé
+por defecto desplegado para todas las instalaciones; `OAUTH_RELAY_URL` designa
+otro, y `OAUTH_RELAY_URL=off` prescinde de él.
+
+| Destino | Aceptado | Por qué |
+|---|---|---|
+| `https://….trycloudflare.com` | Sí | El uso compartido rápido, cuya dirección cambia |
+| `http://localhost:<puerto>`, `http://127.0.0.1:<puerto>` | Sí | La propia máquina |
+| Un dominio, una IP de red local | No | Una dirección fija se declara directamente en Discord |
+| Cualquier otra dirección | No | Un relé abierto llevaría los códigos a quien quisiera |
+
+La regla está escrita dos veces — en el bot y en el Worker, que no importa nada
+del repositorio —, y [`tests/oauthRelay.js`](../../../tests/oauthRelay.js)
+pone a prueba ambas sobre los mismos casos.
 
 ---
 
 ## El túnel
 
-Abrir el panel al exterior exigía cuatro gestos que nada anunciaba: instalar
-Tailscale, autenticar la máquina, obtener del tailnet el derecho a publicar, y
-después montar el Funnel. Cada uno falla a su manera, y ninguno dice lo que
-falta — se descubría la etapa siguiente tropezando con ella. Peor: la dirección
-pública obtenida debía copiarse a mano en `PUBLIC_URL`, y esa copia viajaba con
-el repositorio. Una instalación en una segunda máquina heredaba así la dirección
-de la primera, y el viaje de ida y vuelta de la conexión Discord devolvía al
-usuario al ordenador de al lado.
+Abrir el panel al exterior pasaba por Tailscale Funnel, y exigía cuatro gestos
+que nada anunciaba: instalar Tailscale con derechos de administrador, crear una
+cuenta, obtener de la red el derecho a publicar, montar el Funnel. Cada usuario
+del bot tenía que repetir los cuatro.
 
-[`tailscale.js`](../../../src/web/tailscale.js) no hace nada por sí solo:
-**constata**. Responde «esto es donde estás, y esto es lo que falta», en un
-vocabulario que la interfaz traduce en una frase. Los gestos que se automatizan
-se le piden explícitamente, uno a uno.
+[`cloudflare.js`](../../../src/web/cloudflare.js) los sustituye por dos, que el
+bot hace con un clic. `cloudflared` es un ejecutable único: no se instala, se
+deja en `data/bin/` y se lanza, sin derechos especiales. El bot lo descarga de
+las publicaciones oficiales de Cloudflare y luego abre el túnel. Como el módulo
+al que sustituye, primero **constata**, y solo actúa cuando se le pide.
 
-### Los siete estados
-
-Están **ordenados**: cada uno supone el anterior adquirido, lo que permite
-presentarlos como una progresión y no como un diagnóstico.
+### Los estados
 
 | Estado | Lo que se constata | Gesto siguiente |
 |---|---|---|
-| `absent` | La orden `tailscale` no se encuentra | Instalar Tailscale |
-| `unreachable` | Instalada, pero el demonio no responde | Arrancar el servicio |
-| `needsLogin` | Máquina no autenticada en un tailnet | `tailscale up`, o una clave de autenticación |
-| `needsCapability` | Autenticada, pero el tailnet no concede el derecho a publicar | Activar HTTPS y Funnel en la consola de administración |
-| `ready` | Todo está en su sitio; queda montar el Funnel | `mount()` — deliberadamente |
-| `serving` | El Funnel publica efectivamente este panel | — |
-| `otherTarget` | El Funnel publica **otra cosa** | No sobrescribirlo sin decirlo |
+| `absent` | No se encuentra `cloudflared` | Descargarlo (un clic) |
+| `downloading` | La descarga está en curso | — |
+| `needsAddress` | Token de túnel con nombre, pero sin `PUBLIC_URL` | Declarar la dirección del túnel |
+| `ready` | Todo está listo; queda abrir el túnel | `mount()` — deliberadamente |
+| `starting` | Lanzado, Cloudflare aún no lo ha confirmado | Esperar unos segundos |
+| `serving` | El panel es accesible desde internet | — |
+| `failed` | El túnel se detuvo por sí solo | Reintentar, se indica la causa |
 
-Toda la decisión cabe en `decide()`, separada de lo que la alimenta: trabaja
-sobre dos objetos ya leídos, lo que permite ponerla a prueba en los siete estados
-sin instalar Tailscale, ni desconectarlo, ni retirar un derecho al tailnet para
-ver qué pasa. `inspect()` ya no hace más que acarrear los cubos.
+Toda la decisión cabe en `decide()`, función pura de lo constatado: cada estado
+se pone a prueba sin descargar `cloudflared` ni abrir un túnel. No se lanza nada
+para constatar — todo está ya en el proceso del bot —, de modo que la ventana
+puede pedir el estado tantas veces como quiera.
 
-Una orden que se demora vale tanto como una orden ausente — el demonio puede
-estar congelado —, de ahí un plazo de ocho segundos. Y cuando el `PATH` no lleva
-aún la orden, se visitan las ubicaciones conocidas: una instalación reciente no
-actualiza el `PATH` de los procesos ya lanzados, y el bot arrancado antes que
-ella no vería nada, lo que el usuario tomaría por una instalación fallida.
+### El uso compartido rápido
 
-### Lo que no se automatiza
+Es el modo por defecto, y no exige ninguna cuenta. `cloudflared tunnel --url`
+abre un túnel y Cloudflare le asigna una dirección
+`https://….trycloudflare.com`, leída en su salida — nunca adivinada.
+`api.trycloudflare.com`, que aparece en sus errores, no es una de ellas.
 
-Tres cosas, y más vale decirlo que sortearlo:
+La dirección cambia en cada arranque. Los invitados no lo sufren, puesto que el
+bot les publica el enlace; Discord pasa por el relé. **Nunca se copia en
+`PUBLIC_URL`**: las cookies pasarían a `Secure`, y la sesión de quien está ante
+la máquina, en `http://localhost`, dejaría de funcionar.
 
-- **La instalación** exige derechos de administrador. Un servicio en cuenta de
-  usuario no los toma sin una solicitud del sistema.
-- **La cuenta Tailscale** no se crea mediante ninguna API. Una clave de
-  autenticación elimina la interactividad, pero hace falta ya una cuenta para
-  emitirla.
-- **El derecho a publicar** (`funnel`, `https`) lo concede la política del
-  tailnet, por tanto desde la consola de administración.
+Cloudflare presenta estos túneles como una herramienta de prueba: sin garantía
+de disponibilidad, y con un tope de peticiones simultáneas. Para un canal entre
+amigos basta de sobra; la dirección fija sigue ahí si se queda corto.
 
-### Montar el Funnel sigue siendo un gesto
+### La dirección fija
 
-El Funnel expone el panel **a internet entero**, no a la red local. Montarlo sin
-haberlo pedido publicaría el reproductor de alguien sin que lo sepa: es la única
-etapa que el módulo se niega a hacer por defecto, incluso cuando todo está listo.
-`mount()` existe, hay que llamarlo.
+Quien tenga un dominio en Cloudflare crea un túnel con nombre en su panel
+(*Zero Trust → Networks → Tunnels*), le da un nombre de host que lleve a
+`http://localhost:<puerto>`, y copia dos valores en `.env`:
 
-La llamada se hace en `--bg` — la forma en primer plano bloquearía el arranque
-del bot — y en `--yes`, pues una solicitud de confirmación dentro de un servicio
-no tiene lector.
+```
+CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi…
+PUBLIC_URL=https://imp.romainpiau.dev
+```
 
-### El estado no está en la difusión ordinaria
+El bot lanza entonces ese túnel en lugar del uso compartido rápido. El token
+pasa por el entorno de `cloudflared` (`TUNNEL_TOKEN`) y nunca por su línea de
+comandos, donde cualquier proceso de la máquina lo leería. Un túnel con nombre
+no conoce su propio nombre de host — vive en el panel de Cloudflare —, de ahí el
+estado `needsAddress` cuando falta `PUBLIC_URL`.
 
-Constatarlo lanza dos procesos. Hacerlo cada segundo, para un valor que solo se
-mueve al gesto de alguien, sería pagar caro una visualización que nadie mira la
-mayor parte del tiempo. La ventana lo pide al abrirse, mediante `tunnelState`.
+Un mismo túnel solo debe funcionar en una máquina a la vez: lanzado en dos,
+Cloudflare repartiría a los visitantes entre ellas.
 
-Los cuatro mensajes del dominio — `tunnelState`, `tunnelLogin`, `tunnelMount`,
-`tunnelUnmount` — están **reservados al maestro de sesión**. Hacer el panel
-alcanzable desde el exterior, o dejar de serlo, no es una orden de reproducción
-que se comparta.
+### Lo que nunca ocurre solo
 
-En el arranque, `announce()` escribe una línea en el registro, y cada una lleva
-**la acción y no la constatación**: «no instalado» no enseña nada a quien acaba
-de abrir una consola, «instálalo aquí» sí. Es la contrapartida del rastro OAuth,
-y por la misma razón — son las dos únicas cosas que no se pueden adivinar al
-instalar el bot en una máquina nueva.
+Publicar expone el panel a **internet entero**. Hacerlo sin haberlo pedido
+publicaría el reproductor de alguien sin que lo sepa: `mount()` solo se llama
+ante un gesto del maestro. Ese gesto se recuerda (`data/tunnel.json`), y el
+túnel se reabre en el siguiente arranque — como el Funnel, que sobrevivía a los
+reinicios. Retirar el uso compartido lo olvida.
+
+El túnel vive con el proceso del bot y se detiene con él.
+
+Los cuatro mensajes del dominio — `tunnelState`, `tunnelInstall`,
+`tunnelMount`, `tunnelUnmount` — están **reservados al maestro de sesión**.
+Hacer el panel accesible, o traer un ejecutable a la máquina del anfitrión, no
+es una orden que se comparta.
+
+### Los límites de Cloudflare
+
+- **100 MB por petición** en el plan gratuito, más allá de los cuales
+  Cloudflare responde 413 sin que el bot vea nada. El navegador divide, pues,
+  todo archivo de más de 64 MB, y el servidor recompone los trozos
+  ([`chunkedUpload.js`](../../../src/web/chunkedUpload.js)). `MAX_UPLOAD_MB`
+  se aplica al total y conserva todo su sentido.
+- **Una sola dirección de origen.** Todas las peticiones llegan de
+  `cloudflared`, es decir, de la propia máquina: el limitador de tasa lee la
+  dirección real en `CF-Connecting-IP`, en la que solo confía en una conexión
+  que venga de la máquina.
+- **El vídeo.** Las condiciones del CDN de Cloudflare reservan en principio la
+  difusión de vídeo a sus ofertas de pago. Un uso personal entre amigos sigue
+  siendo modesto, pero el relé de vídeo del panel está en zona gris.
 
 ---
 
@@ -181,5 +230,8 @@ reconocimiento mudo (`prompt=none`) y sus salvaguardas.
 - No fabricar nunca la URL de retorno del lado del cliente: el portal de Discord
   espera la que construye el servidor, y una diferencia de un carácter hace
   fracasar todo el recorrido.
-- `decide()` debe seguir siendo una función pura de sus dos argumentos. Es lo que
-  la hace comprobable sin Tailscale instalado.
+- Tocar los destinos del relé es tocar las dos copias de la regla —
+  `oauthRelay.js` y `tools/oauth-relay/src/index.js` — y volver a desplegar el
+  Worker.
+- `decide()` debe seguir siendo una función pura de lo que recibe. Es lo que la
+  hace comprobable sin `cloudflared`.

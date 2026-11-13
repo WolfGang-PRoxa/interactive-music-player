@@ -335,8 +335,8 @@ définir `HOST=0.0.0.0` — l'authentification prend alors tout son sens. Un
 avertissement est journalisé au démarrage dans ce cas.
 
 Le tableau de bord peut aussi être publié sur l'internet entier par un tunnel
-Tailscale Funnel. C'est le seul geste que le module concerné refuse de faire de
-lui-même, même quand tout est prêt : le monter sans l'avoir demandé publierait
+Cloudflare. C'est le seul geste que le module concerné refuse de faire de
+lui-même, même quand tout est prêt : l'ouvrir sans l'avoir demandé publierait
 le lecteur de quelqu'un à son insu. Voir
 [11 — Accès distant](11-acces-distant.md).
 

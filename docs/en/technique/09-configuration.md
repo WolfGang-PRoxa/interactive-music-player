@@ -37,7 +37,10 @@ Copy `.env.example` to `.env` and fill in at least `DISCORD_TOKEN`.
 |---|---|---|
 | `PORT` | `3000` | Listening port |
 | `HOST` | `127.0.0.1` | Listening interface. `0.0.0.0` to expose on the local network. |
-| `PUBLIC_URL` | — | Address at which guests reach this dashboard, with no trailing slash. It cannot be guessed, and the callback URL `<PUBLIC_URL>/auth/discord/callback` must be declared identically in the Discord portal. |
+| `PUBLIC_URL` | — | **Fixed** address at which guests reach this dashboard, with no trailing slash: a domain behind a named tunnel, a local network IP. The callback URL `<PUBLIC_URL>/auth/discord/callback` must then be declared identically in the Discord portal. Empty for quick sharing, whose address changes at every launch. |
+| `OAUTH_RELAY_URL` | default relay | OAuth return relay used without `PUBLIC_URL`: its address is what you declare with Discord, once and for all. `off` to do without it. |
+| `CLOUDFLARE_TUNNEL_TOKEN` | — | Token of a named tunnel created in the Cloudflare dashboard. Replaces quick sharing; requires `PUBLIC_URL`. |
+| `CLOUDFLARED_PATH` | — | Path to `cloudflared`, if it lives somewhere other than `data/bin/` or the usual places. |
 | `AUTO_OPEN_DASHBOARD` | `true` | Opening of the browser at startup. `false` when the bot runs on a remotely driven machine — that dashboard would play the music twice over. |
 | `DASHBOARD_TOKEN` | generated | Access token. If empty, generated and saved in `data/dashboard-token`. |
 
@@ -268,9 +271,10 @@ Rights checks use
 
 ## Prerequisites
 
-- **Node.js 18 or above** — the project uses `fs.promises`, the optional chaining
-  operator and `structuredClone` indirectly through its dependencies. No
-  `engines` field is declared in `package.json`.
+- **Node.js 22.12 or above** — the minimum of `@discordjs/voice` 0.19, and the
+  version from which `require()` loads an ES module, which `file-type` relies
+  on (see `src/utils/fileTypeCompat.js`). The `engines` field of
+  `package.json` declares it, and the Windows launcher checks it.
 - **FFmpeg** — supplied by `ffmpeg-static`, no system installation required.
 - **yt-dlp** — supplied by `youtube-dl-exec`, used as a resolution fallback and
   for video extraction.

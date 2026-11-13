@@ -123,7 +123,7 @@ Pour rendre l'installation à un autre compte, supprimez le fichier
 `data/owner.json` et reconnectez-vous avec le jeton.
 
 Si l'application Discord n'est pas configurée — `DISCORD_CLIENT_SECRET` ou
-`PUBLIC_URL` manquants —, la connexion est impossible : la fenêtre dit alors ce
+`DISCORD_CLIENT_ID` manquants —, la connexion est impossible : la fenêtre dit alors ce
 qu'il reste à renseigner et laisse entrer avec le seul jeton, comme avant. Nul
 ne se retrouve enfermé hors de son propre bot pour une variable oubliée.
 

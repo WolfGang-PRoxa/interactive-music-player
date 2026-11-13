@@ -3,126 +3,175 @@
 [← Inhalt](README.md)
 
 Der Bot lauscht standardmäßig auf `127.0.0.1`. Dieses Kapitel behandelt die zwei
-Dinge, die zu tun sind, damit er von anderswo erreicht wird: ihm eine öffentliche
-Adresse geben und jemand anderen als seinen Besitzer hereinlassen.
+Dinge, die nötig sind, damit er von anderswo erreichbar ist: ihm eine
+öffentliche Adresse geben, und jemand anderen als seinen Eigentümer hereinlassen.
 
 ---
 
 ## Die öffentliche Adresse
 
-`PUBLIC_URL` ist die Adresse, unter der Gäste dieses Dashboard erreichen, ohne
-abschließenden Schrägstrich. **Sie lässt sich nicht erraten**: der Server lauscht
-auf `127.0.0.1`, und die nützliche Adresse — IP des lokalen Netzes, Tunnel,
-Domänenname — kennt nur der Betreiber.
+Zwei Fälle, je nachdem, ob die Adresse fest ist oder nicht.
 
-Sie dient nicht bloß der Anzeige. Discord verlangt, dass die Rückruf-URL **genau**
-derjenigen entspricht, die im Entwicklerportal eingetragen ist, Reiter *OAuth2 →
-Redirects*:
+**Ohne feste Adresse** — der Standardfall — ist nichts einzutragen. Die schnelle
+Freigabe (siehe [der Tunnel](#der-tunnel)) erhält von Cloudflare bei jedem Start
+eine neue Adresse, und das Rückkehr-Relais kümmert sich um Discord.
+
+**Mit einer festen Adresse** — eine Domain hinter einem benannten Tunnel, eine
+IP im lokalen Netz — trägt `PUBLIC_URL` sie, ohne abschließenden Schrägstrich.
+Sie lässt sich nicht erraten, und Discord verlangt, dass die Rückruf-URL
+**genau** der im Entwicklerportal eingetragenen entspricht, Reiter
+*OAuth2 → Redirects*:
 
 ```
-PUBLIC_URL=http://192.168.1.20:3000
-      └──► einzutragen   http://192.168.1.20:3000/auth/discord/callback
+PUBLIC_URL=https://imp.romainpiau.dev
+      └──► eintragen   https://imp.romainpiau.dev/auth/discord/callback
 ```
 
-Ohne `PUBLIC_URL` zeigt die Rückruf-URL auf `127.0.0.1`: der Ablauf gelingt vom
-Wirtsrechner aus und scheitert überall sonst. In diesem Fall wird beim Start eine
-Warnung protokolliert.
-
-Sie erklärt auch den Umweg des Tokens über den OAuth-`state`: das Dashboard
-öffnet sich auf `127.0.0.1`, wo sein Cookie gesetzt wird, während Discord auf
-`PUBLIC_URL` zurückschickt. Zwei Wirte, zwei Cookie-Gläser und ein Rückruf, der
-das Token nicht hat — siehe
+`PUBLIC_URL` gewinnt immer: sobald sie gesetzt ist, tritt das Relais zurück, und
+der Weg wird wieder direkt. Sie erklärt auch den Umweg des Tokens über den
+OAuth-`state`: das Dashboard öffnet sich auf `127.0.0.1`, wo sein Cookie liegt,
+während Discord auf `PUBLIC_URL` zurückleitet. Zwei Hosts, zwei Keksdosen, und
+ein Rückruf, der das Token nicht hat — siehe
 [07 — Sicherheit](07-securite.md#authentifizierung).
+
+### Das Rückkehr-Relais
+
+Discord leitet einen Besucher nur an eine im Voraus eingetragene Adresse
+zurück. Die der schnellen Freigabe ändert sich bei jedem Start: man müsste bei
+jedem Start ins Portal zurück. Das Relais
+([`oauthRelay.js`](../../../src/web/oauthRelay.js), und der Worker in
+`tools/oauth-relay/`) ist eine feste Station zwischen beiden:
+
+```
+Dashboard ──/auth/discord──► Discord ──► Relais (feste Adresse, einmal eingetragen)
+      ▲                                          │
+      └──── /auth/discord/callback?code=… ◄──────┘  zum Ursprung aus dem state
+```
+
+Der `state` trägt nach seinem zufälligen Teil den Ursprung, von dem die
+Anmeldung ausging. Das Relais schickt den Besucher mit dem Code dorthin zurück.
+Die Rückkehr landet also dort, wo die Cookies des Browsers leben — das Token, der
+`nonce` der Anmeldung —, ob das Dashboard nun auf `localhost` oder über den Link
+des Tunnels geöffnet wurde.
+
+Das Relais sieht nur einen Einmal-Code vorbeiziehen, wertlos ohne das Geheimnis
+der Anwendung, das allein der Bot besitzt. Es speichert nichts und
+protokolliert nichts. Ein Standard-Relais ist für alle Installationen
+bereitgestellt; `OAUTH_RELAY_URL` bezeichnet ein anderes, und
+`OAUTH_RELAY_URL=off` verzichtet darauf.
+
+| Ziel | Angenommen | Warum |
+|---|---|---|
+| `https://….trycloudflare.com` | Ja | Die schnelle Freigabe, deren Adresse sich ändert |
+| `http://localhost:<Port>`, `http://127.0.0.1:<Port>` | Ja | Der Rechner selbst |
+| Eine Domain, eine IP im lokalen Netz | Nein | Eine feste Adresse wird direkt bei Discord eingetragen |
+| Jede andere Adresse | Nein | Ein offenes Relais würde Codes an beliebige Empfänger liefern |
+
+Die Regel ist zweimal geschrieben — im Bot und im Worker, der nichts aus dem
+Repository importiert —, und [`tests/oauthRelay.js`](../../../tests/oauthRelay.js)
+prüft beide an denselben Fällen.
 
 ---
 
 ## Der Tunnel
 
-Das Dashboard nach außen zu öffnen verlangte vier Gesten, die nichts ankündigte:
-Tailscale installieren, den Rechner authentifizieren, vom Tailnet das Recht zu
-veröffentlichen erlangen und dann den Funnel aufbauen. Jede scheitert auf ihre
-Weise, und keine sagt, was fehlt — man entdeckte den nächsten Schritt, indem man
-dagegenstieß. Schlimmer: die gewonnene öffentliche Adresse musste von Hand in
-`PUBLIC_URL` abgeschrieben werden, und diese Abschrift reiste mit dem Repository.
-Eine Installation auf einem zweiten Rechner erbte so die Adresse des ersten, und
-die Hin- und Rückreise der Discord-Anmeldung schickte den Benutzer zum Computer
-nebenan.
+Das Dashboard nach außen zu öffnen lief über Tailscale Funnel und verlangte vier
+Gesten, die nichts ankündigte: Tailscale mit Administratorrechten installieren,
+ein Konto anlegen, vom Netz das Recht zum Veröffentlichen erhalten, den Funnel
+aufbauen. Jeder Nutzer des Bots musste alle vier wiederholen.
 
-[`tailscale.js`](../../../src/web/tailscale.js) tut von sich aus nichts: es
-**stellt fest**. Es antwortet „hier stehst du, und das fehlt“, in einem
-Wortschatz, den die Oberfläche in einen Satz übersetzt. Die Gesten, die sich
-automatisieren lassen, werden ihm ausdrücklich aufgetragen, eine nach der
-anderen.
+[`cloudflare.js`](../../../src/web/cloudflare.js) ersetzt sie durch zwei, die der
+Bot auf einen Klick erledigt. `cloudflared` ist eine einzelne ausführbare Datei:
+sie wird nicht installiert, sondern in `data/bin/` abgelegt und gestartet, ohne
+besondere Rechte. Der Bot lädt sie von den offiziellen Veröffentlichungen
+Cloudflares herunter und öffnet dann den Tunnel. Wie das Modul, das er ersetzt,
+**stellt** er zuerst **fest** und handelt nur auf Anfrage.
 
-### Die sieben Zustände
-
-Sie sind **geordnet**: jeder setzt den vorigen als erreicht voraus, was erlaubt,
-sie als Fortschritt statt als Befund darzustellen.
+### Die Zustände
 
 | Zustand | Was festgestellt wird | Nächste Geste |
 |---|---|---|
-| `absent` | Der Befehl `tailscale` ist nicht auffindbar | Tailscale installieren |
-| `unreachable` | Installiert, doch der Dienst antwortet nicht | Den Dienst starten |
-| `needsLogin` | Rechner an keinem Tailnet angemeldet | `tailscale up` oder ein Authentifizierungsschlüssel |
-| `needsCapability` | Angemeldet, doch das Tailnet gewährt kein Veröffentlichungsrecht | HTTPS und Funnel in der Verwaltungskonsole freischalten |
-| `ready` | Alles steht bereit; der Funnel ist noch aufzubauen | `mount()` — absichtlich |
-| `serving` | Der Funnel veröffentlicht tatsächlich dieses Dashboard | — |
-| `otherTarget` | Der Funnel veröffentlicht **etwas anderes** | Ihn nicht unangekündigt überschreiben |
+| `absent` | `cloudflared` ist nicht zu finden | Herunterladen (ein Klick) |
+| `downloading` | Der Download läuft | — |
+| `needsAddress` | Token eines benannten Tunnels, aber keine `PUBLIC_URL` | Die Adresse des Tunnels eintragen |
+| `ready` | Alles ist bereit; der Tunnel muss noch geöffnet werden | `mount()` — bewusst |
+| `starting` | Gestartet, Cloudflare hat noch nicht bestätigt | Ein paar Sekunden warten |
+| `serving` | Das Dashboard ist aus dem Internet erreichbar | — |
+| `failed` | Der Tunnel hat sich selbst beendet | Erneut versuchen, die Ursache steht dabei |
 
-Die ganze Entscheidung steckt in `decide()`, getrennt von dem, was sie speist:
-sie arbeitet auf zwei bereits gelesenen Objekten, was erlaubt, sie an allen
-sieben Zuständen zu erproben, ohne Tailscale zu installieren, es zu trennen oder
-dem Tailnet ein Recht zu entziehen, um zu sehen, was dabei herauskommt.
-`inspect()` trägt nur noch die Eimer.
+Die ganze Entscheidung steckt in `decide()`, einer reinen Funktion des
+Festgestellten: jeder Zustand lässt sich prüfen, ohne `cloudflared`
+herunterzuladen oder einen Tunnel zu öffnen. Zum Feststellen wird nichts
+gestartet — alles liegt schon im Prozess des Bots —, sodass das Fenster den
+Zustand so oft abfragen kann, wie es will.
 
-Ein Befehl, der sich hinzieht, gilt so viel wie ein fehlender — der Dienst kann
-eingefroren sein —, daher eine Frist von acht Sekunden. Und wenn der `PATH` den
-Befehl noch nicht trägt, werden die bekannten Orte aufgesucht: eine frische
-Installation aktualisiert den `PATH` bereits gestarteter Prozesse nicht, und der
-vor ihr gestartete Bot sähe nichts, was der Benutzer für eine misslungene
-Installation hielte.
+### Die schnelle Freigabe
 
-### Was sich nicht automatisieren lässt
+Das ist der Standardmodus, und er braucht kein Konto. `cloudflared tunnel --url`
+öffnet einen Tunnel, und Cloudflare weist ihm eine Adresse
+`https://….trycloudflare.com` zu, die aus seiner Ausgabe gelesen wird — nie
+erraten. `api.trycloudflare.com`, das in seinen Fehlern auftaucht, ist keine.
 
-Drei Dinge, und es ist besser, sie zu sagen, als sie zu umgehen:
+Die Adresse ändert sich bei jedem Start. Die Gäste leiden nicht darunter, da der
+Bot ihnen den Link postet; Discord geht über das Relais. Sie wird **nie in
+`PUBLIC_URL` kopiert**: die Cookies würden `Secure`, und die Sitzung dessen, der
+am Rechner sitzt, auf `http://localhost`, hielte nicht mehr.
 
-- **Die Installation** verlangt Administratorrechte. Ein Dienst unter einem
-  Benutzerkonto nimmt sie sich nicht ohne eine Abfrage des Systems.
-- **Das Tailscale-Konto** lässt sich über keine API anlegen. Ein
-  Authentifizierungsschlüssel nimmt die Interaktivität, doch es braucht bereits
-  ein Konto, um ihn auszustellen.
-- **Das Recht zu veröffentlichen** (`funnel`, `https`) gewährt die Richtlinie des
-  Tailnets, also die Verwaltungskonsole.
+Cloudflare stellt diese Tunnel als Testwerkzeug vor: keine
+Verfügbarkeitsgarantie und eine Obergrenze gleichzeitiger Anfragen. Für einen
+Kanal unter Freunden reicht das reichlich; die feste Adresse bleibt, falls es
+eng wird.
 
-### Den Funnel aufzubauen bleibt eine Geste
+### Die feste Adresse
 
-Der Funnel legt das Dashboard **dem gesamten Internet** offen, nicht dem lokalen
-Netz. Ihn ungefragt aufzubauen würde den Player eines Menschen ohne dessen Wissen
-veröffentlichen: es ist der einzige Schritt, den das Modul standardmäßig
-verweigert, selbst wenn alles bereitsteht. `mount()` gibt es, man muss es
-aufrufen.
+Wer eine Domain bei Cloudflare besitzt, legt in seinem Dashboard einen benannten
+Tunnel an (*Zero Trust → Networks → Tunnels*), gibt ihm einen Hostnamen, der zu
+`http://localhost:<Port>` führt, und kopiert zwei Werte in `.env`:
 
-Der Aufruf erfolgt mit `--bg` — die Vordergrundform blockierte den Start des Bots
-— und mit `--yes`, da eine Bestätigungsabfrage in einem Dienst keinen Leser hat.
+```
+CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi…
+PUBLIC_URL=https://imp.romainpiau.dev
+```
 
-### Der Zustand steckt nicht in der gewöhnlichen Sendung
+Der Bot startet dann diesen Tunnel statt der schnellen Freigabe. Das Token geht
+über die Umgebung von `cloudflared` (`TUNNEL_TOKEN`) und nie über seine
+Befehlszeile, wo jeder Prozess des Rechners es lesen könnte. Ein benannter
+Tunnel kennt seinen eigenen Hostnamen nicht — er lebt im Cloudflare-Dashboard
+—, daher der Zustand `needsAddress`, wenn `PUBLIC_URL` fehlt.
 
-Ihn festzustellen startet zwei Prozesse. Dies jede Sekunde zu tun, für einen
-Wert, der sich nur auf jemandes Geste bewegt, hieße eine Anzeige teuer zu
-bezahlen, die die meiste Zeit niemand ansieht. Das Fenster fordert ihn beim
-Öffnen an, über `tunnelState`.
+Ein und derselbe Tunnel darf nur auf einem Rechner zugleich laufen: auf zweien
+gestartet, würde Cloudflare die Besucher zwischen ihnen aufteilen.
 
-Die vier Nachrichten des Bereichs — `tunnelState`, `tunnelLogin`, `tunnelMount`,
-`tunnelUnmount` — sind **dem Sitzungsmeister vorbehalten**. Das Dashboard von
-außen erreichbar zu machen oder es nicht mehr zu sein, ist kein Wiedergabebefehl,
-den man teilt.
+### Was nie von selbst geschieht
 
-Beim Start schreibt `announce()` eine Zeile ins Protokoll, und jede trägt **die
-Handlung statt der Feststellung**: „nicht installiert“ lehrt den nichts, der
-eben eine Konsole geöffnet hat, „installiere es hier“ schon. Es ist das
-Gegenstück zur OAuth-Spur, und aus demselben Grund — das sind die einzigen zwei
-Dinge, die man beim Installieren des Bots auf einem neuen Rechner nicht erraten
-kann.
+Veröffentlichen setzt das Dashboard dem **gesamten Internet** aus. Es ungefragt
+zu tun, würde den Player eines Menschen ohne dessen Wissen veröffentlichen:
+`mount()` wird nur auf eine Geste des Meisters hin aufgerufen. Diese Geste wird
+gemerkt (`data/tunnel.json`), und der Tunnel öffnet sich beim nächsten Start
+wieder — wie der Funnel, der Neustarts überlebte. Die Freigabe zurückzuziehen
+vergisst sie.
+
+Der Tunnel lebt mit dem Prozess des Bots und endet mit ihm.
+
+Die vier Nachrichten des Bereichs — `tunnelState`, `tunnelInstall`,
+`tunnelMount`, `tunnelUnmount` — sind **dem Sitzungsmeister vorbehalten**. Das
+Dashboard erreichbar zu machen oder eine ausführbare Datei auf den Rechner des
+Gastgebers zu holen, ist kein Befehl, den man teilt.
+
+### Die Grenzen von Cloudflare
+
+- **100 MB pro Anfrage** im kostenlosen Tarif, darüber antwortet Cloudflare mit
+  413, ohne dass der Bot etwas davon sieht. Der Browser teilt deshalb jede Datei
+  über 64 MB auf, und der Server setzt die Stücke wieder zusammen
+  ([`chunkedUpload.js`](../../../src/web/chunkedUpload.js)). `MAX_UPLOAD_MB`
+  gilt für die Gesamtgröße und behält seinen vollen Sinn.
+- **Eine einzige Herkunftsadresse.** Alle Anfragen kommen von `cloudflared`,
+  also vom Rechner selbst: der Ratenbegrenzer liest die echte Adresse in
+  `CF-Connecting-IP`, der er nur bei einer Verbindung vom Rechner selbst traut.
+- **Video.** Die CDN-Bedingungen von Cloudflare behalten die Auslieferung von
+  Video grundsätzlich den bezahlten Angeboten vor. Eine private Nutzung unter
+  Freunden bleibt bescheiden, doch das Video-Relais des Dashboards liegt in
+  einer Grauzone.
 
 ---
 
@@ -187,5 +236,8 @@ stumme Erkennung (`prompt=none`) und ihre Schutzgeländer.
 - Nie die Rückruf-URL clientseitig bauen: das Discord-Portal erwartet jene, die
   der Server baut, und ein Unterschied von einem Zeichen lässt den ganzen Ablauf
   scheitern.
-- `decide()` muss eine reine Funktion seiner zwei Argumente bleiben. Das ist es,
-  was es ohne installiertes Tailscale erprobbar macht.
+- Die Ziele des Relais anzufassen heißt, beide Kopien der Regel anzufassen —
+  `oauthRelay.js` und `tools/oauth-relay/src/index.js` — und den Worker neu
+  bereitzustellen.
+- `decide()` muss eine reine Funktion dessen bleiben, was es erhält. Das ist es,
+  was es ohne `cloudflared` erprobbar macht.

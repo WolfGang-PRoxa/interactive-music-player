@@ -1,15 +1,15 @@
 # Terms of Service
 
 **Interactive Music Player**
-Last updated: 29 August 2026
+Last updated: 13 November 2026
 
 ---
 
 ## 1. Scope
 
 Interactive Music Player ("the Software") is a Discord music bot distributed as
-source code on
-[GitHub](https://github.com/WolfGang-PRoxa/interactive_music_player). It plays
+source code and as a Windows installer on
+[GitHub](https://github.com/WolfGang-PRoxa/interactive-music-player). It plays
 music in a Discord voice channel, automatically lowers the volume when someone
 speaks, and provides a web dashboard to control it.
 
@@ -25,12 +25,13 @@ the [Discord Community Guidelines](https://discord.com/guidelines) and the
 This section governs how the rest of the document is to be read.
 
 The Software **is not an online service**. No public instance is offered: there
-is no official invite link, no server operated by the author, and no account to
-create.
+is no official invite link, no bot operated by the author, and no account to
+create. The only service the author runs is an optional sign-in relay that keeps
+nothing (see the [Privacy Policy](PRIVACY.md#the-sign-in-relay)).
 
 To use the Software, each person:
 
-1. obtains the source code from the GitHub repository;
+1. obtains the source code or the Windows installer from the GitHub repository;
 2. creates **their own Discord application** in the
    [Developer Portal](https://discord.com/developers/applications), with their
    own credentials;
@@ -170,7 +171,8 @@ terms:
 |---|---|
 | Discord | Host platform, voice connection, OAuth2 authentication |
 | YouTube, Spotify, SoundCloud, Apple Music | Resolving searches and streams |
-| GitHub | Code distribution and update checks |
+| GitHub | Distribution of the code and the installer, update checks |
+| Cloudflare | Sharing the dashboard through a tunnel, sign-in relay |
 
 None of these services is affiliated with, sponsors, or endorses the Software.
 The trademarks named belong to their respective holders.
@@ -198,7 +200,7 @@ The Software is provided **as is**, with no service-level commitment.
 
 - No obligation to maintain, to fix, or to preserve future compatibility.
 - No guaranteed support.
-  [GitHub issues](https://github.com/WolfGang-PRoxa/interactive_music_player/issues)
+  [GitHub issues](https://github.com/WolfGang-PRoxa/interactive-music-player/issues)
   are the only channel, with no promised response time.
 - Development may be suspended or abandoned at any time. The MIT Licence then
   leaves anyone free to carry the code forward.
@@ -273,7 +275,7 @@ Licence governing rights in the code.
 ## 16. Contact
 
 Questions about these Terms go through the
-[repository's GitHub issues](https://github.com/WolfGang-PRoxa/interactive_music_player/issues).
+[repository's GitHub issues](https://github.com/WolfGang-PRoxa/interactive-music-player/issues).
 
 For a question about a particular instance encountered on a Discord server,
 contact the person who invited it there: they alone are its operator.
