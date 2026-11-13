@@ -11,3 +11,8 @@ workers_dev = false
 routes = [
   { pattern = "imp-auth.romainpiau.dev", custom_domain = true }
 ]
+
+# Aucun journal : les adresses qui traversent le relais portent le code
+# d'autorisation et l'origine du tunnel (voir la politique de confidentialité).
+[observability]
+enabled = false
