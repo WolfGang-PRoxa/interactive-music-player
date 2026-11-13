@@ -1,4 +1,4 @@
-# Relais de retour OAuth — voir LISEZMOI.md.
+# Relais de retour OAuth — voir README.md.
 #
 # Déployé une seule fois, pour toutes les installations du bot : chacune
 # déclare cette adresse dans le portail de sa propre application Discord.
