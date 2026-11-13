@@ -1,14 +1,16 @@
 # Privacy Policy
 
 **Interactive Music Player**
-Last updated: 29 August 2026
+Last updated: 13 November 2026
 
 ---
 
 ## 1. In short
 
-- **The author of the Software collects no data.** No central server, no
-  telemetry, no usage analytics, no crash reports sent anywhere.
+- **The author of the Software collects no data.** No telemetry, no usage
+  analytics, no crash reports sent anywhere. The only service the author runs
+  is a sign-in relay that keeps nothing (see
+  [section 3](#3-what-the-author-collects)).
 - Every instance runs on the machine of the person who installed it. All data
   stays in that machine's `data/` folder.
 - **No audio is ever recorded.** The bot knows *that* someone is speaking, never
@@ -43,11 +45,32 @@ The Software sends no data to the author, in any form. It contains no tracker,
 no analytics probe, and no crash-reporting service. The source code is public
 and verifiable.
 
-The only outbound request towards the author's infrastructure is a query to
-GitHub's public API (`api.github.com`) to list available releases. That request
-goes to **GitHub**, not to the author, and carries no usage data: GitHub sees
-the machine's IP address, exactly as it would for any visit to the repository
-page.
+Available releases are listed through GitHub's public API (`api.github.com`).
+That request goes to **GitHub**, not to the author, and carries no usage data:
+GitHub sees the machine's IP address, exactly as it would for any visit to the
+repository page.
+
+### The sign-in relay
+
+The only service operated by the author is the **OAuth return relay**,
+`imp-auth.romainpiau.dev`, hosted on Cloudflare Workers. It is used only when a
+guest signs in with their Discord account to a dashboard shared through a quick
+tunnel (a `trycloudflare.com` address that changes at every launch): Discord
+requires a fixed return address, and the relay stands in for it.
+
+- **What it receives**: the guest's browser passes through it once, carrying
+  Discord's authorisation code and the tunnel address the sign-in started from.
+  It immediately sends the browser back to that address.
+- **What it keeps**: nothing. No storage, no application log. The authorisation
+  code is worthless without the Discord application's secret, which only the
+  operator's bot holds.
+- **What Cloudflare sees**: as with any web request, the host sees the browser's
+  IP address and headers, under its
+  [privacy policy](https://www.cloudflare.com/privacypolicy/).
+
+An operator can do without it: with a fixed address (`PUBLIC_URL`, for example a
+named tunnel on their own domain), with their own relay (`OAUTH_RELAY_URL`), or
+by turning it off (`OAUTH_RELAY_URL=off`).
 
 ---
 
@@ -167,7 +190,8 @@ privacy policy:
 | **YouTube / Google** | Searches and stream requests, with the host machine's IP address | [policies.google.com/privacy](https://policies.google.com/privacy) |
 | **Spotify** | Metadata requests, if credentials are configured | [spotify.com/legal/privacy-policy](https://www.spotify.com/legal/privacy-policy/) |
 | **SoundCloud**, **Apple Music** | Metadata and stream requests | Respective policies |
-| **GitHub** | Release listings, and download of an update | [GitHub Privacy Statement](https://docs.github.com/site-policy/privacy-policies/github-privacy-statement) |
+| **GitHub** | Release listings, download of an update, and download of `cloudflared` | [GitHub Privacy Statement](https://docs.github.com/site-policy/privacy-policies/github-privacy-statement) |
+| **Cloudflare** | If the operator shares their dashboard through a tunnel: all visitor traffic, encrypted up to Cloudflare's network; and the pass through the sign-in relay | [cloudflare.com/privacypolicy](https://www.cloudflare.com/privacypolicy/) |
 
 These requests originate from the operator's machine. It is **their IP address**
 that is exposed to those services, not that of the Discord server's members.
@@ -184,7 +208,8 @@ The protections in place are described in detail in the
 [technical documentation](docs/en/technique/07-securite.md). In summary:
 
 - The dashboard listens on `127.0.0.1` only by default; opening it to the
-  network is an explicit decision by the operator.
+  network or sharing it through a Cloudflare tunnel is an explicit decision by
+  the operator.
 - Every HTTP request and every WebSocket connection is authenticated before
   reaching any route.
 - Token comparison is constant-time, so the token cannot be recovered by timing
@@ -245,7 +270,7 @@ at the top of the document marks the latest revision.
 ## 14. Contact
 
 For a question about this policy or about how the Software works:
-[the repository's GitHub issues](https://github.com/WolfGang-PRoxa/interactive_music_player/issues).
+[the repository's GitHub issues](https://github.com/WolfGang-PRoxa/interactive-music-player/issues).
 
 For a request concerning data held by an instance encountered on a Discord
 server, contact the person who invited the bot to that server: they alone are

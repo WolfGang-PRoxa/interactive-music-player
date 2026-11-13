@@ -21,6 +21,18 @@ was delivered.
     src/web/changelog.js.
 -->
 
+## 2026-11-13 — Ready for the first release
+
+The last adjustments before publishing version 0.0.1.
+
+### Changed
+- Node.js 22.12 or above is now required, and checked at launch: it is the real minimum of the dependencies, which the documentation understated (Node 18).
+- The privacy policy and the terms of service describe the sign-in relay and sharing through Cloudflare.
+- The Windows installer is not signed: the documentation explains how to get past the SmartScreen warning.
+
+### Security
+- No npm security advisory left open: undici moves to 6.29.1 and 7.30.2, and reading local files uses a fixed file-type, which no longer loops on a malformed ASF file.
+
 ## 2026-11-12 — Sharing through Cloudflare
 
 The dashboard is now shared through a Cloudflare tunnel, with no account to create and nothing to install yourself.

@@ -1244,12 +1244,19 @@ function StepEnvironment {
             $found = Get-Command node.exe -CommandType Application -ErrorAction SilentlyContinue |
                      Select-Object -First 1
             if (-not $found) { return 'failed' }
+            # @discordjs/voice exige Node 22.12 : en deçà, le bot ne démarrerait pas.
+            $version = (& $found.Source --version 2>$null) -replace '^v', ''
+            $parts = "$version".Split('.')
+            $major = 0; $minor = 0
+            [void][int]::TryParse($parts[0], [ref]$major)
+            if ($parts.Count -gt 1) { [void][int]::TryParse($parts[1], [ref]$minor) }
+            if ($major -lt 22 -or ($major -eq 22 -and $minor -lt 12)) { return 'failed' }
             $script:Node = $found
             return 'done'
         }
         Fail    = @{
-            Headline    = "Node.js est introuvable sur cette machine."
-            Detail      = "Le bot a besoin de Node.js 18 ou supérieur. Installez la version LTS, puis relancez."
+            Headline    = "Node.js est introuvable ou trop ancien sur cette machine."
+            Detail      = "Le bot a besoin de Node.js 22.12 ou supérieur. Installez la version LTS, puis relancez."
             ActionLabel = 'Télécharger Node.js'
             Action      = { Start-Process 'https://nodejs.org/fr/download' }
         }

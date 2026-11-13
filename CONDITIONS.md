@@ -1,15 +1,15 @@
 # Conditions d'utilisation
 
 **Interactive Music Player**
-Dernière mise à jour : 29 août 2026
+Dernière mise à jour : 13 novembre 2026
 
 ---
 
 ## 1. Objet
 
 Interactive Music Player (« le Logiciel ») est un bot Discord de lecture
-musicale, distribué sous forme de code source sur
-[GitHub](https://github.com/WolfGang-PRoxa/interactive_music_player). Il lit de
+musicale, distribué sous forme de code source et d'installeur Windows sur
+[GitHub](https://github.com/WolfGang-PRoxa/interactive-music-player). Il lit de
 la musique dans un salon vocal Discord, atténue automatiquement le volume
 lorsqu'une personne prend la parole, et propose un tableau de bord web pour le
 piloter.
@@ -27,12 +27,14 @@ Logiciel. Elles complètent — sans les remplacer — les
 Ce point conditionne la lecture de tout le reste du document.
 
 Le Logiciel **n'est pas un service en ligne**. Aucune instance publique n'est
-proposée : il n'existe aucun lien d'invitation officiel, aucun serveur exploité
-par l'auteur, aucun compte à créer.
+proposée : il n'existe aucun lien d'invitation officiel, aucun bot exploité par
+l'auteur, aucun compte à créer. Le seul service que l'auteur fait tourner est un
+relais de connexion facultatif, qui ne garde rien (voir la
+[Politique de confidentialité](CONFIDENTIALITE.md#le-relais-de-connexion)).
 
 Pour utiliser le Logiciel, chaque personne :
 
-1. récupère le code source depuis le dépôt GitHub ;
+1. récupère le code source ou l'installeur Windows depuis le dépôt GitHub ;
 2. crée **sa propre application Discord** sur le
    [portail développeur](https://discord.com/developers/applications), avec ses
    propres identifiants ;
@@ -179,7 +181,8 @@ conditions :
 |---|---|
 | Discord | Plateforme hôte, connexion vocale, authentification OAuth2 |
 | YouTube, Spotify, SoundCloud, Apple Music | Résolution des recherches et des flux |
-| GitHub | Distribution du code et vérification des mises à jour |
+| GitHub | Distribution du code et de l'installeur, vérification des mises à jour |
+| Cloudflare | Partage du tableau de bord par un tunnel, relais de connexion |
 
 Aucun de ces services n'est affilié au Logiciel, ne le parraine ni ne le
 soutient. Les marques citées appartiennent à leurs détenteurs respectifs.
@@ -209,7 +212,7 @@ Le Logiciel est fourni **en l'état**, sans engagement de niveau de service.
 
 - Aucune obligation de maintenance, de correction ou de compatibilité future.
 - Aucun support garanti. Les
-  [issues GitHub](https://github.com/WolfGang-PRoxa/interactive_music_player/issues)
+  [issues GitHub](https://github.com/WolfGang-PRoxa/interactive-music-player/issues)
   sont le seul canal, sans délai de réponse promis.
 - Le développement peut être suspendu ou abandonné à tout moment. La licence MIT
   laisse alors chacun libre de reprendre le code.
@@ -286,7 +289,7 @@ relatif à l'usage du Logiciel, la licence MIT régissant les droits sur le code
 ## 16. Contact
 
 Toute question relative aux présentes conditions passe par les
-[issues GitHub du dépôt](https://github.com/WolfGang-PRoxa/interactive_music_player/issues).
+[issues GitHub du dépôt](https://github.com/WolfGang-PRoxa/interactive-music-player/issues).
 
 Pour une question portant sur une instance particulière rencontrée sur un
 serveur Discord, s'adresser à la personne qui l'y a invitée : elle seule en est

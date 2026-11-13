@@ -274,9 +274,10 @@ Las verificaciones de derechos utilizan
 
 ## Requisitos previos
 
-- **Node.js 18 o superior** — el proyecto utiliza `fs.promises`, el operador de
-  encadenamiento opcional y `structuredClone` indirectamente a través de sus
-  dependencias. No se declara ningún campo `engines` en `package.json`.
+- **Node.js 22.12 o superior** — es el mínimo de `@discordjs/voice` 0.19, y la
+  versión a partir de la cual `require()` carga un módulo ESM, del que depende
+  `file-type` (véase `src/utils/fileTypeCompat.js`). El campo `engines` de
+  `package.json` lo declara, y el lanzador de Windows lo comprueba.
 - **FFmpeg** — proporcionado por `ffmpeg-static`, no se requiere instalación en
   el sistema.
 - **yt-dlp** — proporcionado por `youtube-dl-exec`, usado como repliegue de

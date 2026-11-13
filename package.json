@@ -1,6 +1,6 @@
 {
   "name": "interactive-music-player",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Bot Discord de musique interactive avec audio ducking automatique dans les salons vocaux",
   "main": "src/index.js",
   "repository": {
@@ -68,7 +68,7 @@
     "test:docs-integrity": "node tests/docsIntegrity.js",
     "test:changelog": "node tests/changelog.js",
     "test:range-focus": "node tests/rangeFocus.js",
-    "test": "node tests/deviceMode.js && node tests/paintBudget.js && node tests/selectFlags.js && node tests/dragPreview.js && node tests/speedPadPointer.js && node tests/speedPadScale.js && node tests/queueHandoff.js && node tests/favoriteChannel.js && node tests/sharedControl.js && node tests/pilotElection.js && node tests/outputLevel.js && node tests/scrollFade.js && node tests/audioUnlock.js && node tests/accountSwitch.js && node tests/cloudflareShare.js && node tests/oauthRelay.js && node tests/chunkedUpload.js && node tests/guestAdmission.js && node tests/guestBook.js && node tests/tunnelWindow.js && node tests/loginGate.js && node tests/toastSwipe.js && node tests/streamResolution.js && node tests/coffeeSteam.js && node tests/githubTail.js && node tests/powerCharge.js && node tests/voiceReceiver.js && node tests/shareGrant.js && node tests/guestSelects.js && node tests/guestFeeds.js && node tests/rightRequests.js && node tests/sharePresence.js && node tests/headerLayoutButtons.js && node tests/versionCopy.js && node tests/micMuted.js && node tests/preloadInfinity.js && node tests/shuffleMode.js && node tests/themeBlend.js && node tests/githubMenu.js && node tests/playlistSummary.js && node tests/cardChrome.js && node tests/cardLayout.js && node tests/addTarget.js && node tests/pausePrecision.js && node tests/searchHistory.js && node tests/downloadDir.js && node tests/downloadFormats.js && node tests/videoDownload.js && node tests/qualityAvailability.js && node tests/originalAudio.js && node tests/rangeStream.js && node tests/mediaRelay.js && node tests/artwork.js && node tests/loudness.js && node tests/transitions.js && node tests/channelQueue.js && node tests/streamSource.js && node tests/docsLanguages.js && node tests/docsIntegrity.js && node tests/changelog.js && node tests/rangeFocus.js && node tests/logVisibility.js && node tests/httpGuards.js && node tests/oauthBinding.js && node tests/outbound.js && node tests/ownerTransfer.js && node tests/youtubeNetwork.js && node tests/desktopSupervisor.js && node tests/smoke.js",
+    "test": "node tests/deviceMode.js && node tests/paintBudget.js && node tests/selectFlags.js && node tests/dragPreview.js && node tests/speedPadPointer.js && node tests/speedPadScale.js && node tests/queueHandoff.js && node tests/favoriteChannel.js && node tests/sharedControl.js && node tests/pilotElection.js && node tests/outputLevel.js && node tests/scrollFade.js && node tests/audioUnlock.js && node tests/accountSwitch.js && node tests/cloudflareShare.js && node tests/oauthRelay.js && node tests/chunkedUpload.js && node tests/guestAdmission.js && node tests/guestBook.js && node tests/tunnelWindow.js && node tests/loginGate.js && node tests/toastSwipe.js && node tests/streamResolution.js && node tests/coffeeSteam.js && node tests/githubTail.js && node tests/powerCharge.js && node tests/voiceReceiver.js && node tests/shareGrant.js && node tests/guestSelects.js && node tests/guestFeeds.js && node tests/rightRequests.js && node tests/sharePresence.js && node tests/headerLayoutButtons.js && node tests/versionCopy.js && node tests/micMuted.js && node tests/preloadInfinity.js && node tests/shuffleMode.js && node tests/themeBlend.js && node tests/githubMenu.js && node tests/playlistSummary.js && node tests/cardChrome.js && node tests/cardLayout.js && node tests/addTarget.js && node tests/pausePrecision.js && node tests/searchHistory.js && node tests/downloadDir.js && node tests/downloadFormats.js && node tests/videoDownload.js && node tests/qualityAvailability.js && node tests/originalAudio.js && node tests/rangeStream.js && node tests/mediaRelay.js && node tests/artwork.js && node tests/loudness.js && node tests/transitions.js && node tests/channelQueue.js && node tests/streamSource.js && node tests/docsLanguages.js && node tests/docsIntegrity.js && node tests/changelog.js && node tests/rangeFocus.js && node tests/logVisibility.js && node tests/httpGuards.js && node tests/oauthBinding.js && node tests/outbound.js && node tests/ownerTransfer.js && node tests/youtubeNetwork.js && node tests/desktopSupervisor.js && node tests/fileTypeCompat.js && node tests/smoke.js",
     "test:original-audio": "node tests/originalAudio.js",
     "test:range-stream": "node tests/rangeStream.js",
     "test:media-relay": "node tests/mediaRelay.js",
@@ -82,7 +82,8 @@
     "test:outbound": "node tests/outbound.js",
     "test:owner-transfer": "node tests/ownerTransfer.js",
     "test:youtube-network": "node tests/youtubeNetwork.js",
-    "test:desktop-supervisor": "node tests/desktopSupervisor.js"
+    "test:desktop-supervisor": "node tests/desktopSupervisor.js",
+    "test:file-type-compat": "node tests/fileTypeCompat.js"
   },
   "keywords": [
     "discord",
@@ -106,6 +107,7 @@
     "ffmpeg-static": "^5.2.0",
     "mediaplex": "^1.0.0",
     "opusscript": "^0.0.8",
+    "undici": "6.29.1",
     "ws": "^8.21.0",
     "youtube-dl-exec": "^3.1.7",
     "youtube-ext": "^1.1.25"
@@ -120,22 +122,26 @@
     },
     "youtubei.js": "^17.0.1",
     "discord.js": {
-      "undici": "6.28.1"
+      "undici": "6.29.1"
     },
     "@discordjs/rest": {
-      "undici": "6.28.1"
+      "undici": "6.29.1"
     },
     "soundcloud.ts": {
-      "undici": "6.28.1"
+      "undici": "6.29.1"
     },
     "youtube-ext": {
-      "undici": "6.28.1"
+      "undici": "6.29.1"
     },
     "discord-player-youtubei": {
-      "undici": "7.29.1"
+      "undici": "7.30.2"
     },
     "qs": "^6.16.0",
     "body-parser": "^2.3.0",
-    "esbuild": "^0.28.2"
+    "esbuild": "^0.28.2",
+    "file-type": "^21.3.4"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }

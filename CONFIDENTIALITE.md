@@ -1,14 +1,16 @@
 # Politique de confidentialité
 
 **Interactive Music Player**
-Dernière mise à jour : 29 août 2026
+Dernière mise à jour : 13 novembre 2026
 
 ---
 
 ## 1. En bref
 
-- **L'auteur du Logiciel ne collecte aucune donnée.** Aucun serveur central,
-  aucune télémétrie, aucune statistique d'usage, aucun rapport d'erreur envoyé.
+- **L'auteur du Logiciel ne collecte aucune donnée.** Aucune télémétrie,
+  aucune statistique d'usage, aucun rapport d'erreur envoyé. Le seul service
+  qu'il fait tourner est un relais de connexion qui ne garde rien (voir
+  [section 3](#3-ce-que-lauteur-collecte)).
 - Chaque instance tourne sur la machine de la personne qui l'installe. Toutes
   les données restent dans le dossier `data/` de cette machine.
 - **Aucun audio n'est enregistré.** Le bot sait *qu'une* personne parle, jamais
@@ -44,11 +46,33 @@ Le Logiciel n'envoie aucune donnée à l'auteur, sous aucune forme. Il ne contie
 ni traceur, ni sonde analytique, ni service de rapport de plantage. Le code
 source est public et vérifiable.
 
-La seule requête sortante vers l'infrastructure de l'auteur est la consultation
-de l'API publique de GitHub (`api.github.com`) pour connaître les versions
-disponibles. Cette requête est adressée à **GitHub**, pas à l'auteur, et ne
-transporte aucune donnée d'usage : GitHub voit l'adresse IP de la machine, comme
-pour toute visite de la page du dépôt.
+La consultation des versions disponibles passe par l'API publique de GitHub
+(`api.github.com`). Cette requête est adressée à **GitHub**, pas à l'auteur, et
+ne transporte aucune donnée d'usage : GitHub voit l'adresse IP de la machine,
+comme pour toute visite de la page du dépôt.
+
+### Le relais de connexion
+
+Le seul service exploité par l'auteur est le **relais de retour OAuth**,
+`imp-auth.romainpiau.dev`, hébergé sur Cloudflare Workers. Il ne sert que
+lorsqu'un invité se connecte avec son compte Discord à un tableau de bord
+partagé par un tunnel rapide (adresse en `trycloudflare.com`, qui change à
+chaque lancement) : Discord exige une adresse de retour fixe, et le relais en
+tient lieu.
+
+- **Ce qu'il reçoit** : le navigateur de l'invité y passe une fois, avec le code
+  d'autorisation de Discord et l'adresse du tunnel d'où la connexion est
+  partie. Il renvoie aussitôt le navigateur vers cette adresse.
+- **Ce qu'il garde** : rien. Aucun stockage, aucun journal applicatif. Le code
+  d'autorisation ne vaut rien sans le secret de l'application Discord, que seul
+  le bot de l'exploitant détient.
+- **Ce que voit Cloudflare** : comme pour toute requête web, l'hébergeur voit
+  l'adresse IP et les en-têtes du navigateur, selon sa
+  [politique de confidentialité](https://www.cloudflare.com/privacypolicy/).
+
+L'exploitant peut s'en passer : avec une adresse fixe (`PUBLIC_URL`, par exemple
+un tunnel nommé sur son propre domaine), avec son propre relais
+(`OAUTH_RELAY_URL`), ou en le coupant (`OAUTH_RELAY_URL=off`).
 
 ---
 
@@ -174,7 +198,8 @@ par sa propre politique de confidentialité :
 | **YouTube / Google** | Les recherches et les requêtes de flux, avec l'adresse IP de la machine hôte | [policies.google.com/privacy](https://policies.google.com/privacy) |
 | **Spotify** | Les requêtes de métadonnées, si des identifiants sont configurés | [spotify.com/legal/privacy-policy](https://www.spotify.com/legal/privacy-policy/) |
 | **SoundCloud**, **Apple Music** | Les requêtes de métadonnées et de flux | Politiques respectives |
-| **GitHub** | La consultation des versions publiées, et le téléchargement d'une mise à jour | [docs.github.com — GitHub Privacy Statement](https://docs.github.com/site-policy/privacy-policies/github-privacy-statement) |
+| **GitHub** | La consultation des versions publiées, le téléchargement d'une mise à jour et celui de `cloudflared` | [docs.github.com — GitHub Privacy Statement](https://docs.github.com/site-policy/privacy-policies/github-privacy-statement) |
+| **Cloudflare** | Si l'exploitant partage son tableau de bord par un tunnel : tout le trafic des visiteurs, chiffré jusqu'au réseau de Cloudflare ; et le passage par le relais de connexion | [cloudflare.com/privacypolicy](https://www.cloudflare.com/privacypolicy/) |
 
 Ces requêtes partent de la machine de l'exploitant. C'est **son adresse IP** qui
 est exposée à ces services, pas celle des membres du serveur Discord.
@@ -192,7 +217,8 @@ Les protections en place sont décrites en détail dans la
 [documentation technique](docs/fr/technique/07-securite.md). En résumé :
 
 - Le tableau de bord n'écoute que sur `127.0.0.1` par défaut ; l'ouvrir au
-  réseau est une décision explicite de l'exploitant.
+  réseau ou le partager par un tunnel Cloudflare est une décision explicite de
+  l'exploitant.
 - Toute requête HTTP et toute connexion WebSocket sont authentifiées avant
   d'atteindre la moindre route.
 - La comparaison du jeton est faite en temps constant, pour ne pas le révéler
@@ -253,7 +279,7 @@ modifications. La date en tête de document signale la dernière révision.
 ## 14. Contact
 
 Pour une question sur cette politique ou sur le fonctionnement du Logiciel :
-[issues GitHub du dépôt](https://github.com/WolfGang-PRoxa/interactive_music_player/issues).
+[issues GitHub du dépôt](https://github.com/WolfGang-PRoxa/interactive-music-player/issues).
 
 Pour une demande portant sur des données traitées par une instance rencontrée
 sur un serveur Discord, s'adresser à la personne qui a invité le bot sur ce

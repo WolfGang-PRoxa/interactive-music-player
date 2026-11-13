@@ -282,9 +282,10 @@ Die Rechteprüfungen nutzen
 
 ## Voraussetzungen
 
-- **Node.js 18 oder höher** — das Projekt nutzt `fs.promises`, den Operator für
-  optionale Verkettung und mittelbar über seine Abhängigkeiten
-  `structuredClone`. In `package.json` ist kein `engines`-Feld deklariert.
+- **Node.js 22.12 oder höher** — das Minimum von `@discordjs/voice` 0.19 und
+  die Version, ab der `require()` ein ES-Modul lädt, worauf `file-type`
+  angewiesen ist (siehe `src/utils/fileTypeCompat.js`). Das Feld `engines` in
+  `package.json` deklariert es, und der Windows-Starter prüft es.
 - **FFmpeg** — von `ffmpeg-static` mitgeliefert, keine systemweite Installation
   nötig.
 - **yt-dlp** — von `youtube-dl-exec` mitgeliefert, als Rückfall bei der Auflösung

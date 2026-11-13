@@ -22,6 +22,18 @@ entrée porte la date du jour où le changement a été livré.
     src/web/changelog.js.
 -->
 
+## 2026-11-13 — Prêt pour la première version
+
+Les derniers réglages avant de publier la version 0.0.1.
+
+### Changed
+- Node.js 22.12 ou supérieur est désormais exigé, et vérifié au lancement : c'est le minimum réel des dépendances, que la documentation sous-estimait (Node 18).
+- La politique de confidentialité et les conditions d'utilisation décrivent le relais de connexion et le partage par Cloudflare.
+- L'installeur Windows n'est pas signé : la documentation explique comment passer l'avertissement de SmartScreen.
+
+### Security
+- Plus aucun avis de sécurité npm ouvert : undici passe en 6.29.1 et 7.30.2, et la lecture des fichiers locaux utilise un file-type corrigé, qui ne boucle plus sur un fichier ASF malformé.
+
 ## 2026-11-12 — Le partage par Cloudflare
 
 Le tableau de bord se partage désormais par un tunnel Cloudflare, sans compte ni installation à faire soi-même.

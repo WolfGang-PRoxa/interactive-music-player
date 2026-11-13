@@ -66,13 +66,18 @@ L'installeur est joint aux [releases](https://github.com/WolfGang-PRoxa/interact
 et produit par chaque run du workflow *Application de bureau*. Tout le détail
 est dans [desktop/README.md](desktop/README.md).
 
+> **L'installeur n'est pas signé.** Windows SmartScreen affiche « Windows a
+> protégé votre ordinateur » au premier lancement : cliquez sur
+> **Informations complémentaires**, puis **Exécuter quand même**. Voir
+> [pourquoi](desktop/README.md#installer--lavertissement-de-windows).
+
 La suite de ce document décrit l'installation depuis le code source.
 
 ---
 
 ## Prérequis
 
-- **Node.js 18** ou supérieur
+- **Node.js 22.12** ou supérieur (la version LTS convient)
 - Un compte Discord — l'application du bot se crée à l'installation, sur le
   [portail développeur](https://discord.com/developers/applications), et le
   premier démarrage vous y conduit
