@@ -4,15 +4,25 @@
 # npm télécharge pour la machine qui l'exécute — FFmpeg, yt-dlp, le chiffrement
 # DAVE. Voir desktop/scripts/build-payload.js.
 #
-# Les fichiers sortent en artefacts du run. Pousser une étiquette `v*` publie en
-# plus la release correspondante, avec les notes de `.github/releases/<tag>.md`
-# et une empreinte SHA-256 par fichier. Si la release existe déjà (créée depuis
-# l'interface de GitHub, par exemple), les fichiers y sont joints.
+# Les fichiers sortent en artefacts du run. Deux façons de publier en plus la
+# release correspondante, avec les notes de `.github/releases/<tag>.md` et une
+# empreinte SHA-256 par fichier :
+#  - pousser une étiquette `v*` ;
+#  - lancer le workflow à la main depuis l'onglet Actions en remplissant
+#    « release » (`v0.0.1`, par exemple) : l'étiquette est alors créée sur le
+#    commit construit.
+# Si la release existe déjà (créée depuis l'interface de GitHub, par exemple),
+# les fichiers y sont joints.
 
 name: Application de bureau
 
 on:
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Étiquette de la release à publier (v0.0.1…) ; vide = simple construction"
+        required: false
+        default: ''
   push:
     branches: [main]
     tags: ['v*']
@@ -120,7 +130,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || startsWith(inputs.release, 'v')
     needs: [windows, linux]
     runs-on: ubuntu-latest
     steps:
@@ -147,13 +157,13 @@ jobs:
       - name: Publier la release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ inputs.release || github.ref_name }}
         run: |
           notes=".github/releases/${TAG}.md"
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release upload "$TAG" dist/* --clobber
           elif [ -f "$notes" ]; then
-            gh release create "$TAG" dist/* --verify-tag --title "Interactive Music Player ${TAG#v}" --notes-file "$notes"
+            gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "Interactive Music Player ${TAG#v}" --notes-file "$notes"
           else
-            gh release create "$TAG" dist/* --verify-tag --title "Interactive Music Player ${TAG#v}" --generate-notes
+            gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "Interactive Music Player ${TAG#v}" --generate-notes
           fi

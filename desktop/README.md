@@ -90,8 +90,9 @@ L'installeur Windows se construit sous Windows, l'AppImage et le `.deb` sous
 Ubuntu, par le workflow
 [`.github/workflows/desktop.yml`](../.github/workflows/desktop.yml) : à chaque
 modification de `desktop/` poussée sur `main`, et à la demande depuis l'onglet
-*Actions*. Pousser une étiquette `v*` publie en plus la release, avec les notes
-de `.github/releases/<étiquette>.md` et un fichier `SHA256SUMS.txt`.
+*Actions*. Pousser une étiquette `v*`, ou lancer le workflow à la main en
+remplissant *release* (`v0.0.1`…), publie en plus la release, avec les notes de
+`.github/releases/<étiquette>.md` et un fichier `SHA256SUMS.txt`.
 
 En local, avec Node 24 et Rust :
 
