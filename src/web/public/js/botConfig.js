@@ -128,7 +128,7 @@ window.MusicPlayer = window.MusicPlayer || {};
     function inputFor(field, locked) {
         let input;
         if (field.kind === 'select') {
-            input = make('select', 'styled-select config-input');
+            input = make('select', 'styled-select header-select config-input');
             const options = field.options.slice();
             if (!options.includes(field.value)) options.unshift(field.value);
             for (const value of options) {
@@ -175,6 +175,14 @@ window.MusicPlayer = window.MusicPlayer || {};
         const line = make('div', 'config-line');
         line.appendChild(input);
         const entry = { input, field, cleared: false };
+
+        // Le menu du tableau de bord plutôt que celui du système, comme les
+        // autres listes des paramètres. Construit une fois le <select> en
+        // place : CustomSelect se pose juste après lui, et reste branché sur
+        // lui — c'est sa valeur qu'on relit à l'enregistrement.
+        if (field.kind === 'select' && typeof window.MusicPlayer.CustomSelect === 'function') {
+            new window.MusicPlayer.CustomSelect(input);
+        }
 
         // Effacer un secret : on ne peut pas le vider à la main, le champ
         // l'est déjà. Un bouton dit ce qui va se passer, et se reprend.

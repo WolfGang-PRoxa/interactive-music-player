@@ -4671,8 +4671,17 @@ html[data-role]:not([data-role="master"]) #config-section {
     font-size: 0.9rem;
 }
 
-select.config-input {
+/* Le menu du tableau de bord (CustomSelect) occupe la ligne, comme les champs. */
+.config-line .custom-select-container {
+    flex: 1;
+    min-width: 0;
     width: 100%;
+}
+
+/* Grisé à distance : CustomSelect ne relaie pas l'attribut `disabled` du
+   <select> qu'il remplace, d'où le verrou posé ici. */
+.config-field.is-locked .custom-select-container {
+    pointer-events: none;
 }
 
 .config-input.has-error {
