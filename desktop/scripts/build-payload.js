@@ -39,7 +39,7 @@ const NODE_LINE = 24;
  */
 function shipped(file) {
     if (file === 'tools/keep-voice-receiver.js') return true;
-    const excludedDirs = ['tests/', 'desktop/', '.github/', 'tools/'];
+    const excludedDirs = ['tests/', 'desktop/', '.github/', 'tools/', 'branding/'];
     if (excludedDirs.some((dir) => file.startsWith(dir))) return false;
     const excludedFiles = ['Start bot.vbs', 'Create shortcut.vbs', 'TODO.md', '.gitignore'];
     return !excludedFiles.includes(file);
