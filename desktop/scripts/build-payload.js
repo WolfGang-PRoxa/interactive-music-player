@@ -13,6 +13,9 @@
  * télécharge pour la machine qui l'exécute. D'où la construction sur un
  * runner Windows (.github/workflows/desktop.yml).
  *
+ * yt-dlp ne vient pas du `postinstall` de youtube-dl-exec mais du lien direct
+ * de sa dernière release : voir stageYtDlp.
+ *
  * Variables :
  *   IMP_NODE_VERSION  version exacte de Node à embarquer (v24.x.y). Par
  *                     défaut, la dernière de la ligne LTS 24.
@@ -127,7 +130,50 @@ function stageBot() {
         cwd: bot,
         stdio: 'inherit',
         shell: process.platform === 'win32',
+        // yt-dlp est rapporté à part, voir stageYtDlp.
+        env: { ...process.env, YOUTUBE_DL_SKIP_DOWNLOAD: 'true' },
     });
+}
+
+/**
+ * Rapporte yt-dlp à la place du `postinstall` de youtube-dl-exec.
+ *
+ * Celui-ci interroge l'API GitHub sans s'authentifier — il prévoit bien un
+ * jeton, mais le passe à `fetch` hors de ses en-têtes —, et les runners
+ * partagent leurs adresses : le quota de 60 requêtes par heure y est souvent
+ * déjà épuisé, et la construction échouait au hasard (« API rate limit
+ * exceeded »). Le lien de téléchargement direct de la dernière release ne
+ * passe pas par l'API, donc par aucun quota. L'empreinte publiée avec la
+ * release est vérifiée, comme pour Node.
+ */
+async function stageYtDlp(bot) {
+    const file = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
+    const base = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download';
+    let lastError = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+            log(`yt-dlp (${file})`);
+            const [binary, sums] = await Promise.all([get(`${base}/${file}`), get(`${base}/SHA2-256SUMS`)]);
+            const expected = sums.toString('utf8').split('\n')
+                .map((line) => line.trim().split(/\s+/))
+                .find(([, f]) => f === file)?.[0];
+            const actual = crypto.createHash('sha256').update(binary).digest('hex');
+            if (!expected || expected !== actual) throw new Error(`checksum mismatch for ${file}`);
+
+            const dir = path.join(bot, 'node_modules', 'youtube-dl-exec', 'bin');
+            fs.mkdirSync(dir, { recursive: true });
+            const target = path.join(dir, file);
+            fs.writeFileSync(target, binary);
+            if (process.platform !== 'win32') fs.chmodSync(target, 0o755);
+            log(`yt-dlp: ${(binary.length / 1048576).toFixed(1)} MB`);
+            return;
+        } catch (err) {
+            lastError = err;
+            log(`yt-dlp, attempt ${attempt} failed: ${err.message}`);
+            await new Promise((resolve) => setTimeout(resolve, attempt * 5000));
+        }
+    }
+    throw lastError;
 }
 
 /**
@@ -158,6 +204,7 @@ async function main() {
     const version = await nodeVersion();
     await stageRuntime(version);
     stageBot();
+    await stageYtDlp(path.join(STAGING, 'bot'));
 
     const pkg = JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'));
     const commit = execFileSync('git', ['rev-parse', '--short=12', 'HEAD'], { cwd: REPO }).toString('utf8').trim();
