@@ -190,5 +190,67 @@ try {
     fs.rmSync(bac, { recursive: true, force: true });
 }
 
+/*
+ * Les menus de la section sont ceux du reste du tableau de bord : le <select>
+ * natif du navigateur y détonnait. Il reste dessous, masqué, et c'est toujours
+ * lui que lit l'envoi. `jsdom` arrive avec une dépendance, d'où le repli
+ * (comme dans tests/guestSelects.js).
+ */
+{
+    let JSDOM = null;
+    try { ({ JSDOM } = require('jsdom')); } catch { console.log('  passé — jsdom absent de cette installation'); }
+    if (JSDOM) {
+        const pub = (...p) => fs.readFileSync(path.join(ROOT, 'src', 'web', 'public', ...p), 'utf8');
+        const dom = new JSDOM('<!doctype html><div id="config-zone"></div>', { runScripts: 'outside-only', url: 'http://localhost:3000/' });
+        const win = dom.window;
+        const sent = [];
+        win.eval(pub('js', 'customSelect.js'));
+        win.MusicPlayer.sendWS = (m) => sent.push(m);
+        win.eval(pub('js', 'botConfig.js'));
+
+        const state = {
+            fromThisMachine: false,
+            restartNeeded: false,
+            fields: [
+                { key: 'HOST', group: 'network', kind: 'select', options: ['127.0.0.1', '0.0.0.0'], value: '127.0.0.1', local: true },
+                { key: 'LOG_LEVEL', group: 'logs', kind: 'select', options: ['', 'debug', 'info', 'warn', 'error'], value: '' },
+            ],
+        };
+        win.MusicPlayer.onConfigState(state);
+        const doc = win.document;
+        const host = doc.getElementById('config-HOST');
+        const level = doc.getElementById('config-LOG_LEVEL');
+        const menuOf = (select) => select.nextElementSibling;
+
+        check('chaque <select> de la section a le menu du tableau de bord',
+            [host, level].every((s) => s.style.display === 'none' && menuOf(s) && menuOf(s).classList.contains('custom-select-container')));
+        check('le menu montre le libellé traduit, pas la valeur brute',
+            menuOf(level).querySelector('.custom-select-trigger').textContent.trim() === 'Par défaut');
+
+        // Le verrou est une règle de feuille de style (pointer-events), que
+        // jsdom n'applique pas : on vérifie qu'elle vise bien ce menu.
+        const css = pub('css', 'modals.css');
+        check('un réglage grisé à distance garde son menu verrouillé',
+            host.disabled && host.closest('.config-field').classList.contains('is-locked')
+            && /\.config-field\.is-locked \.custom-select-container\s*\{[^}]*pointer-events:\s*none/.test(css));
+
+        const warn = Array.from(menuOf(level).querySelectorAll('.custom-select-option')).find((o) => o.dataset.value === 'warn'
+            || o.textContent.trim() === 'Avertissements');
+        if (warn) warn.click();
+        doc.querySelector('.config-actions button').click();
+        const update = sent.find((m) => m.type === 'configUpdate');
+        check('le choix fait dans le menu part à l\'enregistrement',
+            update && JSON.stringify(update.data.values) === JSON.stringify({ LOG_LEVEL: 'warn' }), JSON.stringify(update));
+
+        win.MusicPlayer.onConfigState({ ...state, result: { ok: false, errors: { LOG_LEVEL: 'invalid_value' } } });
+        const kept = doc.getElementById('config-LOG_LEVEL');
+        check('refusé, le choix reste affiché et le menu est signalé',
+            kept.value === 'warn'
+            && menuOf(kept).querySelector('.custom-select-trigger').classList.contains('has-error')
+            && menuOf(kept).querySelector('.custom-select-trigger').textContent.trim() === 'Avertissements');
+        win.close();
+    }
+}
+
 console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
 process.exit(failed > 0 ? 1 : 0);

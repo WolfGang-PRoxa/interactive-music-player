@@ -234,6 +234,9 @@ window.MusicPlayer = window.MusicPlayer || {};
             entry.error.hidden = !code;
             entry.error.textContent = code ? t(`config_error_${code}`) : '';
             entry.input.classList.toggle('has-error', Boolean(code));
+            // Un <select> est masqué derrière son menu : c'est celui-ci qu'on voit.
+            const custom = entry.input._customSelect;
+            if (custom) custom.trigger.classList.toggle('has-error', Boolean(code));
         }
     }
 
@@ -352,7 +355,11 @@ window.MusicPlayer = window.MusicPlayer || {};
             render();
             for (const [key, entry] of controls) {
                 const before = kept.get(key);
-                if (before && !before.input.disabled) entry.input.value = before.input.value;
+                if (before && !before.input.disabled) {
+                    entry.input.value = before.input.value;
+                    // Le menu visible ne relit pas son <select> de lui-même.
+                    if (entry.input._customSelect) entry.input._customSelect.sync(true);
+                }
             }
             showErrors(errors);
             return;

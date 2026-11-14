@@ -4684,7 +4684,8 @@ html[data-role]:not([data-role="master"]) #config-section {
     pointer-events: none;
 }
 
-.config-input.has-error {
+.config-input.has-error,
+.config-line .custom-select-trigger.has-error {
     border-color: #ef4444;
 }
 
