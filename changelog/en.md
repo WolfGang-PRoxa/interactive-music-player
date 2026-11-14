@@ -27,6 +27,7 @@ The `.env` file can now be edited from the settings, without having to find it o
 
 ### Added
 - A “Bot configuration” section in the settings, for the owner only: Discord token and credentials, fixed address and named tunnel, local network access, port, music folders, limits and logs. It says when a restart is needed and offers one.
+- The desktop app is now available for Linux too: an AppImage for any distribution, and a `.deb` package for Debian, Ubuntu and their derivatives.
 
 ### Fixed
 - npm 12 blocked install scripts: ffmpeg and yt-dlp were no longer downloaded, and the bot could not play anything.

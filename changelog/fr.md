@@ -28,6 +28,7 @@ Le fichier `.env` se règle désormais depuis les paramètres, sans avoir à le 
 
 ### Added
 - Une section « Configuration du bot » dans les paramètres, réservée au propriétaire : jeton et identifiants Discord, adresse fixe et tunnel nommé, accès au réseau local, port, dossiers de musique, plafonds et journaux. Elle signale quand un redémarrage est nécessaire et le propose.
+- L'application de bureau existe aussi pour Linux : un AppImage pour toute distribution, et un paquet `.deb` pour Debian, Ubuntu et leurs dérivées.
 
 ### Fixed
 - npm 12 bloquait les scripts d'installation : ffmpeg et yt-dlp n'étaient plus téléchargés, et le bot ne pouvait rien jouer.

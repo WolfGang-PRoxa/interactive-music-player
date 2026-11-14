@@ -54,7 +54,7 @@ la [chaîne audio](docs/fr/technique/02-lecture-audio.md), le
 
 ---
 
-## Application de bureau *(Windows)*
+## Application de bureau *(Windows, Linux)*
 
 Le plus simple : **l'installeur**. Il apporte Node.js, le bot et ses
 dépendances — aucun prérequis —, puis l'application guide la première
@@ -62,9 +62,17 @@ configuration, garde le bot dans la zone de notification et ouvre le tableau de
 bord dans sa propre fenêtre. Celui-ci reste accessible dans n'importe quel
 navigateur, comme avant.
 
-L'installeur est joint aux [releases](https://github.com/WolfGang-PRoxa/interactive-music-player/releases),
-et produit par chaque run du workflow *Application de bureau*. Tout le détail
-est dans [desktop/README.md](desktop/README.md).
+Tout est joint aux [releases](https://github.com/WolfGang-PRoxa/interactive-music-player/releases) :
+
+| Système | Fichier |
+|---|---|
+| Windows 10 et 11 | `…_x64-setup.exe`, l'installeur |
+| Linux (toute distribution) | `…_amd64.AppImage` : le rendre exécutable, puis le lancer |
+| Debian, Ubuntu et dérivées | `…_amd64.deb` : `sudo apt install ./…_amd64.deb` |
+
+Chaque fichier est produit par le workflow *Application de bureau*, et
+`SHA256SUMS.txt` donne son empreinte. Tout le détail est dans
+[desktop/README.md](desktop/README.md).
 
 > **L'installeur n'est pas signé.** Windows SmartScreen affiche « Windows a
 > protégé votre ordinateur » au premier lancement : cliquez sur

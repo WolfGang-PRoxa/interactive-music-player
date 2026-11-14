@@ -1,7 +1,7 @@
 # Application de bureau
 
-Le bot, empaqueté en application Windows : un installeur, une icône dans la
-zone de notification, et le tableau de bord dans sa propre fenêtre.
+Le bot, empaqueté en application Windows et Linux : un installeur, une icône
+dans la zone de notification, et le tableau de bord dans sa propre fenêtre.
 
 Le bot reste ce qu'il est : un serveur Node. L'application le lance, le garde et
 l'arrête, mais le tableau de bord s'ouvre toujours dans n'importe quel
@@ -19,7 +19,7 @@ autre ordinateur, un invité, exactement comme avant.
 | **Tableau de bord intégré** | Il s'ouvre dans la fenêtre de l'application une fois le bot prêt ; *Ouvrir dans le navigateur* reste à un clic |
 | **Zone de notification** | Fermer la fenêtre ne coupe rien : le bot continue, l'icône permet de rouvrir, redémarrer, éteindre |
 | **Redémarrage et versions** | Le redémarrage du tableau de bord et la bascule de version passent par l'application, qui relance le bon code |
-| **Démarrage avec Windows** | À cocher dans le menu de l'icône : le bot démarre en arrière-plan, sans fenêtre |
+| **Démarrage avec la session** | À cocher dans le menu de l'icône : le bot démarre en arrière-plan, sans fenêtre |
 | **Une seule instance** | Rouvrir l'application montre celle qui tourne déjà |
 
 Fermer la fenêtre de lancement alors que rien ne tourne quitte l'application.
@@ -39,7 +39,12 @@ Pour installer quand même : **Informations complémentaires**, puis
 **Exécuter quand même**. Le navigateur peut aussi demander de confirmer le
 téléchargement (*Conserver*).
 
-L'installeur est construit par le workflow public
+Sous Linux, l'AppImage n'a besoin que d'être rendu exécutable
+(`chmod +x`, ou *Propriétés → Autoriser l'exécution*). Selon la distribution,
+la zone de notification demande l'extension *AppIndicator* (GNOME) et
+l'AppImage la bibliothèque `libfuse2`. Le paquet `.deb` installe ce qu'il faut.
+
+Chaque fichier est construit par le workflow public
 [`.github/workflows/desktop.yml`](../.github/workflows/desktop.yml), à partir du
 code de ce dépôt : chaque fichier joint à une release se rattache au run qui l'a
 produit, dans l'onglet *Actions*.
@@ -55,6 +60,8 @@ produit, dans l'onglet *Actions*.
 | Playlists, réglages, journaux | `bot\data\` |
 | Node.js embarqué | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\runtime\` |
 | Réglages de l'application | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\settings.json` |
+
+Sous Linux, le même dossier est `~/.local/share/com.wolfgangproxa.interactive-music-player/`.
 
 Une mise à jour de l'application remplace le code du bot et le runtime, jamais
 `.env`, `data\` ni `versions\`.
@@ -79,19 +86,25 @@ second, et propose de l'ouvrir, de le redémarrer ou de l'éteindre.
 
 ## Construire
 
-L'installeur se construit sous Windows, par le workflow
+L'installeur Windows se construit sous Windows, l'AppImage et le `.deb` sous
+Ubuntu, par le workflow
 [`.github/workflows/desktop.yml`](../.github/workflows/desktop.yml) : à chaque
-modification de `desktop/` poussée sur `main`, à la demande depuis l'onglet
-*Actions*, et à la publication d'une release, à laquelle il est joint.
+modification de `desktop/` poussée sur `main`, et à la demande depuis l'onglet
+*Actions*. Pousser une étiquette `v*` publie en plus la release, avec les notes
+de `.github/releases/<étiquette>.md` et un fichier `SHA256SUMS.txt`.
 
-En local, sous Windows, avec Node 24 et Rust :
+En local, avec Node 24 et Rust :
 
 ```bash
 cd desktop
 npm ci
 npm run payload       # Node embarqué + bot + dépendances → src-tauri/payload/
-npm run build         # installeur NSIS → src-tauri/target/release/bundle/nsis/
+npm run build         # Windows : installeur NSIS → src-tauri/target/release/bundle/nsis/
+npm run build -- --bundles appimage,deb   # Linux → bundle/appimage/ et bundle/deb/
 ```
+
+Sous Linux, Tauri demande d'abord WebKitGTK et ses voisines : la liste exacte
+est dans l'étape *Bibliothèques système* du workflow.
 
 La charge utile se prépare sur la plateforme visée : npm y télécharge les
 binaires propres à chacune (FFmpeg, yt-dlp, chiffrement DAVE).

@@ -145,9 +145,19 @@ function stageBot() {
  * exceeded »). Le lien de téléchargement direct de la dernière release ne
  * passe pas par l'API, donc par aucun quota. L'empreinte publiée avec la
  * release est vérifiée, comme pour Node.
+ *
+ * Sous Linux, le fichier nommé `yt-dlp` de la release est une archive Python
+ * qui exige Python 3 sur la machine : on prend l'exécutable autonome
+ * `yt-dlp_linux`, déposé sous le nom que youtube-dl-exec appelle.
  */
+const YT_DLP_ASSETS = {
+    win32: { asset: 'yt-dlp.exe', name: 'yt-dlp.exe' },
+    linux: { asset: 'yt-dlp_linux', name: 'yt-dlp' },
+    darwin: { asset: 'yt-dlp_macos', name: 'yt-dlp' },
+};
+
 async function stageYtDlp(bot) {
-    const file = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
+    const { asset: file, name } = YT_DLP_ASSETS[process.platform] || { asset: 'yt-dlp', name: 'yt-dlp' };
     const base = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download';
     let lastError = null;
     for (let attempt = 1; attempt <= 3; attempt++) {
@@ -162,7 +172,7 @@ async function stageYtDlp(bot) {
 
             const dir = path.join(bot, 'node_modules', 'youtube-dl-exec', 'bin');
             fs.mkdirSync(dir, { recursive: true });
-            const target = path.join(dir, file);
+            const target = path.join(dir, name);
             fs.writeFileSync(target, binary);
             if (process.platform !== 'win32') fs.chmodSync(target, 0o755);
             log(`yt-dlp: ${(binary.length / 1048576).toFixed(1)} MB`);
