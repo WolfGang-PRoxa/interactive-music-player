@@ -305,8 +305,10 @@ const LOCAL_URL = 'file://morceau-de-test.opus';
     // avant.
     {
         const vm = require('vm');
+        // Fins de ligne ramenées à \n : sous Windows, Git extrait souvent en CRLF,
+        // et la recherche de la fin de fonction ci-dessous ne trouverait rien.
         const source = fs.readFileSync(
-            path.join(__dirname, '..', 'src', 'web', 'routes', 'api.js'), 'utf8');
+            path.join(__dirname, '..', 'src', 'web', 'routes', 'api.js'), 'utf8').replace(/\r\n/g, '\n');
         const videoSource = require(path.join(__dirname, '..', 'src', 'audio', 'videoSource.js'));
 
         // Le choix est extrait du fichier livré : le recopier ici laisserait le

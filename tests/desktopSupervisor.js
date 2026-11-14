@@ -121,6 +121,8 @@ test('hors application, le redémarrage se fait comme avant : instance détaché
     assert.ok(!fs.existsSync(path.join(bac, 'data', supervisor.RESTART_REQUEST)));
 });
 
+// Windows refuse d'effacer le dossier courant d'un processus : on en sort d'abord.
+process.chdir(__dirname);
 fs.rmSync(bac, { recursive: true, force: true });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
