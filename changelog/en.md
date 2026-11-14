@@ -21,6 +21,20 @@ was delivered.
     src/web/changelog.js.
 -->
 
+## 2026-11-14 — Configuration in the dashboard
+
+The `.env` file can now be edited from the settings, without having to find it on disk.
+
+### Added
+- A “Bot configuration” section in the settings, for the owner only: Discord token and credentials, fixed address and named tunnel, local network access, port, music folders, limits and logs. It says when a restart is needed and offers one.
+
+### Fixed
+- npm 12 blocked install scripts: ffmpeg and yt-dlp were no longer downloaded, and the bot could not play anything.
+- Two tests failed on Windows, because of CRLF line endings and a temporary folder that could not be removed.
+
+### Security
+- Secrets are never sent back to the browser, and whatever can cut off access to the dashboard or open folders on the disk can only be changed from the bot's computer.
+
 ## 2026-11-13 — Ready for the first release
 
 The last adjustments before publishing version 0.0.1.

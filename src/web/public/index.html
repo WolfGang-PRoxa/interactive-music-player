@@ -2237,6 +2237,23 @@
                     </div>
                 </div>
 
+                <!--
+                     Section 4 : la configuration du bot, c'est-à-dire son
+                     fichier .env. Réservée au propriétaire : masquée aux
+                     invités (voir css/modals.css), et refusée par le serveur
+                     de toute façon (permissions.js). Peinte par
+                     js/botConfig.js, qui demande l'état à l'ouverture des
+                     paramètres. Hors du bouton de réinitialisation ci-dessous,
+                     qui ne touche qu'aux réglages du tableau de bord.
+                -->
+                <div class="settings-section config-section" id="config-section">
+                    <h3 class="settings-section-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="9" y1="13" x2="15" y2="13"></line><line x1="9" y1="17" x2="15" y2="17"></line></svg>
+                        <span data-i18n="config_title">Configuration du bot</span>
+                    </h3>
+                    <div class="config-zone" id="config-zone"></div>
+                </div>
+
                 <!-- Footer: Réinitialisation générale -->
                 <div class="settings-reset-footer" style="margin-top: 1.5rem; padding-top: 1.2rem; border-top: 1px solid var(--border-card); text-align: center;">
                     <button id="btn-reset-all-settings" class="btn-reset-all" data-tooltip="Maintenir 1.5s pour réinitialiser tous les paramètres" data-i18n-tooltip="tooltip_hold_reset_settings">
@@ -2933,6 +2950,7 @@
     <script src="js/scrollFade.js"></script>
     <script src="js/account.js"></script>
     <script src="js/shareTunnel.js"></script>
+    <script src="js/botConfig.js"></script>
     <script src="js/scrollLock.js"></script>
     <script src="js/video.js"></script>
     <script src="js/logs.js"></script>

@@ -22,6 +22,20 @@ un servidor, sus ajustes efectivos viven en `settings.json` (véase
 
 Copiar `.env.example` a `.env` e indicar como mínimo `DISCORD_TOKEN`.
 
+El propietario también puede ajustarlas desde la sección **Configuración del
+bot** de los ajustes del panel ([`src/web/botConfig.js`](../../../src/web/botConfig.js),
+escritura mediante [`src/utils/envFile.js`](../../../src/utils/envFile.js)). Tres reglas:
+
+- los secretos (`DISCORD_TOKEN`, `DISCORD_CLIENT_SECRET`, `CLOUDFLARE_TUNNEL_TOKEN`)
+  nunca vuelven al navegador, solo el hecho de que están configurados;
+- las variables que pueden cortar el acceso o ampliar lo que el servidor lee del
+  disco (Discord, uso compartido, `HOST`, `PORT`, `MEDIA_ROOTS`) solo se escriben
+  desde la máquina del bot: conexión local sin la cabecera `CF-Connecting-IP`,
+  que Cloudflare siempre añade;
+- la escritura es todo o nada, solo toca las líneas afectadas y conserva
+  comentarios y finales de línea. `DASHBOARD_TOKEN` y `AUTO_OPEN_DASHBOARD` no
+  figuran.
+
 ### Discord
 
 | Variable | Requerida | Función |

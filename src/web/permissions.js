@@ -308,6 +308,10 @@ const MESSAGE_RIGHTS = {
     // invité s'accorderait les siens.
     admitGuest: MASTER_ONLY,
     tunnelState: MASTER_ONLY,
+
+    // Le fichier .env : un invité n'a rien à y lire, encore moins à y écrire.
+    configState: MASTER_ONLY,
+    configUpdate: MASTER_ONLY,
     tunnelInstall: MASTER_ONLY,
     tunnelMount: MASTER_ONLY,
     tunnelUnmount: MASTER_ONLY,

@@ -22,6 +22,20 @@ known, its effective settings live in `settings.json` (see
 
 Copy `.env.example` to `.env` and fill in at least `DISCORD_TOKEN`.
 
+The owner can also set them from the **Bot configuration** section of the
+dashboard settings ([`src/web/botConfig.js`](../../../src/web/botConfig.js),
+written by [`src/utils/envFile.js`](../../../src/utils/envFile.js)). Three rules:
+
+- secrets (`DISCORD_TOKEN`, `DISCORD_CLIENT_SECRET`, `CLOUDFLARE_TUNNEL_TOKEN`)
+  are never sent back to the browser, only whether they are set;
+- variables that can cut off access or widen what the server reads from disk
+  (Discord, sharing, `HOST`, `PORT`, `MEDIA_ROOTS`) can only be written from the
+  bot's machine: a local connection without the `CF-Connecting-IP` header,
+  which Cloudflare always sets;
+- writing is all or nothing, touches only the lines concerned and keeps
+  comments and line endings. `DASHBOARD_TOKEN` and `AUTO_OPEN_DASHBOARD` are not
+  in it.
+
 ### Discord
 
 | Variable | Required | Role |

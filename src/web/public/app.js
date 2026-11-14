@@ -623,6 +623,12 @@
             if (typeof window.MusicPlayer.onTunnelState === 'function') {
                 window.MusicPlayer.onTunnelState(data);
             }
+        } else if (type === 'configState') {
+            // Réponse à la section « Configuration » des paramètres : le
+            // contenu du .env, secrets exceptés (voir botConfig.js).
+            if (typeof window.MusicPlayer.onConfigState === 'function') {
+                window.MusicPlayer.onConfigState(data);
+            }
         } else if (type === 'shareResult') {
             if (typeof window.MusicPlayer.onShareResult === 'function') {
                 window.MusicPlayer.onShareResult(data);

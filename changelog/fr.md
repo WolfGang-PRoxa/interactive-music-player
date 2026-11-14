@@ -22,6 +22,20 @@ entrée porte la date du jour où le changement a été livré.
     src/web/changelog.js.
 -->
 
+## 2026-11-14 — La configuration dans le tableau de bord
+
+Le fichier `.env` se règle désormais depuis les paramètres, sans avoir à le chercher sur le disque.
+
+### Added
+- Une section « Configuration du bot » dans les paramètres, réservée au propriétaire : jeton et identifiants Discord, adresse fixe et tunnel nommé, accès au réseau local, port, dossiers de musique, plafonds et journaux. Elle signale quand un redémarrage est nécessaire et le propose.
+
+### Fixed
+- npm 12 bloquait les scripts d'installation : ffmpeg et yt-dlp n'étaient plus téléchargés, et le bot ne pouvait rien jouer.
+- Deux tests échouaient sous Windows, à cause des fins de ligne CRLF et d'un dossier temporaire impossible à effacer.
+
+### Security
+- Les secrets ne sont jamais renvoyés au navigateur, et ce qui peut couper l'accès au tableau de bord ou ouvrir des dossiers du disque ne se change que depuis l'ordinateur du bot.
+
 ## 2026-11-13 — Prêt pour la première version
 
 Les derniers réglages avant de publier la version 0.0.1.

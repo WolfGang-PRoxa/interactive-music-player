@@ -550,6 +550,26 @@ Le menu d'alimentation permet de **redémarrer** ou d'**éteindre** le bot depui
 l'interface. L'extinction applique un fondu de sortie et sauvegarde l'état de
 lecture, qui sera restauré au démarrage suivant.
 
+### Configuration du bot
+
+La section **Configuration du bot**, en bas des paramètres, règle le fichier
+`.env` sans avoir à le chercher sur le disque : jeton du bot, identifiants de
+l'application Discord, adresse fixe et jeton du tunnel nommé, accès au réseau
+local, port, dossiers de musique, plafonds et journaux. Elle n'apparaît qu'au
+propriétaire.
+
+- Les **secrets** (jeton du bot, secret OAuth2, jeton du tunnel) ne sont jamais
+  réaffichés : la section dit seulement s'ils sont renseignés. On peut les
+  remplacer ou les effacer.
+- Ce qui peut **couper l'accès** au tableau de bord ou **ouvrir des dossiers** du
+  disque ne se change que depuis l'ordinateur où tourne le bot. Ailleurs, ces
+  champs sont grisés.
+- Rien ne s'applique avant le **redémarrage** : la section le signale et propose
+  de redémarrer. Si le port change, le tableau de bord suit sa nouvelle adresse.
+
+Le fichier reste modifiable à la main ; la section n'en change que les lignes
+touchées et garde ses commentaires.
+
 ### Personnalisation visuelle
 
 - **Styles** — *Glassmorphism* (panneaux translucides), *Neon Cyberpunk*

@@ -582,6 +582,31 @@ function originAllowed(req, identity) {
     return false;
 }
 
+/** Adresses par lesquelles la machine se parle à elle-même. */
+const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+
+/**
+ * La requête vient-elle de l'ordinateur du bot lui-même ?
+ *
+ * Une connexion locale qui ne porte pas `CF-Connecting-IP`. Le tunnel
+ * Cloudflare se connecte lui aussi depuis la machine, mais Cloudflare pose
+ * toujours cet en-tête, et un visiteur ne peut pas l'en retirer : ce qui
+ * arrive par le tunnel n'est donc jamais pris pour local. Depuis le réseau
+ * local (`HOST=0.0.0.0`), l'adresse d'origine n'est pas une boucle locale.
+ *
+ * Ne vaut que tant qu'aucun autre relais n'est posé devant le serveur sur la
+ * machine même : un proxy local qui n'ajoute pas cet en-tête ferait passer ses
+ * visiteurs pour locaux.
+ *
+ * @param {import('http').IncomingMessage} req
+ * @returns {boolean}
+ */
+function fromThisMachine(req) {
+    const address = req?.socket?.remoteAddress;
+    if (!LOOPBACK.has(address)) return false;
+    return !req.headers?.['cf-connecting-ip'];
+}
+
 /**
  * Vérification du handshake WebSocket (option verifyClient de `ws`).
  * @param {{ req: import('http').IncomingMessage }} info
@@ -616,6 +641,7 @@ module.exports = {
     isPublicPath,
     middleware,
     verifyUpgrade,
+    fromThisMachine,
     COOKIE_NAME,
     TOKEN_FILE,
 };

@@ -28,6 +28,15 @@ const http = require('http');
 const path = require('path');
 
 const createApiRouter = require(path.join(__dirname, '..', 'src', 'web', 'routes', 'api.js'));
+
+/**
+ * La date de la dernière livraison, écrite comme on l'attend à l'écran. Tirée
+ * du journal plutôt qu'écrite en dur : chaque livraison la change.
+ */
+function longDate(iso, locale) {
+    return new Date(`${iso}T12:00:00Z`).toLocaleDateString(locale,
+        { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
 const changelog = require(path.join(__dirname, '..', 'src', 'web', 'changelog.js'));
 
 /** Langues du tableau de bord, dans l'ordre du sélecteur des réglages. */
@@ -333,7 +342,7 @@ async function checkRendering() {
         sections[0].dataset.date);
 
     check('chaque date est écrite en toutes lettres, dans la langue du tableau de bord',
-        sections[0].querySelector('.changelog-release-date').textContent === '13 novembre 2026',
+        sections[0].querySelector('.changelog-release-date').textContent === longDate(reference.releases[0].date, 'fr-FR'),
         sections[0].querySelector('.changelog-release-date').textContent);
 
     // La couleur d'une catégorie est portée par l'attribut, pas par la classe :
@@ -566,7 +575,7 @@ async function checkRendering() {
         note.textContent);
 
     check('l\'habillage suit malgré tout la langue du tableau de bord',
-        $('.changelog-release-date')[0].textContent === '13 de noviembre de 2026',
+        $('.changelog-release-date')[0].textContent === longDate(reference.releases[0].date, 'es-ES'),
         $('.changelog-release-date')[0].textContent);
 
     // La fenêtre se referme, et le dit à qui la ferme — c'est ce que la touche

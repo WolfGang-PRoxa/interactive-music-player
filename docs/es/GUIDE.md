@@ -556,6 +556,26 @@ El menú de alimentación permite **reiniciar** o **apagar** el bot desde la
 interfaz. El apagado aplica un fundido de salida y guarda el estado de
 reproducción, que se restaurará en el siguiente arranque.
 
+### Configuración del bot
+
+La sección **Configuración del bot**, al final de los ajustes, modifica el
+archivo `.env` sin tener que buscarlo en el disco: token del bot, credenciales
+de la aplicación de Discord, dirección fija y token del túnel con nombre, acceso
+desde la red local, puerto, carpetas de música, límites y registros. Solo la ve
+el propietario.
+
+- Los **secretos** (token del bot, secreto OAuth2, token del túnel) nunca se
+  vuelven a mostrar: la sección solo indica si están configurados. Se pueden
+  reemplazar o borrar.
+- Lo que puede **cortar el acceso** al panel o **abrir carpetas** del disco solo
+  se cambia desde el ordenador donde funciona el bot. En otro lugar, esos campos
+  aparecen en gris.
+- Nada se aplica antes del **reinicio**: la sección lo indica y propone
+  reiniciar. Si cambia el puerto, el panel sigue a su nueva dirección.
+
+El archivo se puede seguir editando a mano; la sección solo cambia las líneas
+que toca y conserva los comentarios.
+
 ### Personalización visual
 
 - **Estilos** — *Glassmorphism* (paneles translúcidos), *Neon Cyberpunk* (bordes

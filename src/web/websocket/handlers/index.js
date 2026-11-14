@@ -5,6 +5,7 @@
  * routeur lui-même.
  */
 
+const configHandlers = require('./configHandlers');
 const downloadHandlers = require('./downloadHandlers');
 const guildHandlers = require('./guildHandlers');
 const playbackHandlers = require('./playbackHandlers');
@@ -22,6 +23,8 @@ module.exports = {
     clearHistory: queueHandlers.handleClearHistory,
     clearQueue: queueHandlers.handleClearQueue,
     clientLog: systemHandlers.handleClientLog,
+    configState: configHandlers.handleConfigState,
+    configUpdate: configHandlers.handleConfigUpdate,
     createPlaylist: playlistHandlers.handleCreatePlaylist,
     deletePlaylist: playlistHandlers.handleDeletePlaylist,
     installVersion: versionHandlers.handleInstallVersion,

@@ -537,6 +537,24 @@ The power menu allows you to **restart** or **shut down** the bot from the
 interface. Shutting down applies a fade-out and saves the playback state, which
 will be restored at the next startup.
 
+### Bot configuration
+
+The **Bot configuration** section, at the bottom of the settings, edits the
+`.env` file without having to find it on disk: bot token, Discord application
+credentials, fixed address and named tunnel token, local network access, port,
+music folders, limits and logs. Only the owner sees it.
+
+- **Secrets** (bot token, OAuth2 secret, tunnel token) are never shown again:
+  the section only says whether they are set. They can be replaced or cleared.
+- Whatever can **cut off access** to the dashboard or **open folders** on the
+  disk can only be changed from the computer the bot runs on. Elsewhere, those
+  fields are greyed out.
+- Nothing takes effect before a **restart**: the section says so and offers to
+  restart. If the port changes, the dashboard follows to its new address.
+
+The file can still be edited by hand; the section only changes the lines it
+touches and keeps the comments.
+
 ### Visual customisation
 
 - **Styles** — *Glassmorphism* (translucent panels), *Neon Cyberpunk* (neon

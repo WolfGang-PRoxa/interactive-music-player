@@ -662,6 +662,10 @@ class WebServer {
             // côté qui ne coûte rien.
             ws.identity = req?.identity
                 || { authorized: true, master: false, session: null, pendingLogin: true };
+            // Retenu ici, seul moment où l'adresse d'origine et les en-têtes
+            // du handshake sont encore là : certains réglages ne se changent
+            // que devant la machine (voir botConfig.js).
+            ws.fromThisMachine = auth.fromThisMachine(req);
 
             if (!ws.identity.master && ws.identity.session) {
                 log.info(`[WebServer] Guest dashboard connected: `

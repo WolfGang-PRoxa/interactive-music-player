@@ -572,6 +572,26 @@ auswählt, wird nicht als Auswahlklick gedeutet.
 oder **ausschalten**. Das Ausschalten wendet eine Ausblendung an und sichert den
 Wiedergabezustand, der beim nächsten Start wiederhergestellt wird.
 
+### Bot-Konfiguration
+
+Der Abschnitt **Bot-Konfiguration** unten in den Einstellungen bearbeitet die
+Datei `.env`, ohne dass man sie auf der Festplatte suchen muss: Bot-Token,
+Zugangsdaten der Discord-Anwendung, feste Adresse und Token des benannten
+Tunnels, Zugriff aus dem lokalen Netz, Port, Musikordner, Grenzen und
+Protokolle. Nur der Eigentümer sieht ihn.
+
+- **Geheimnisse** (Bot-Token, OAuth2-Geheimnis, Tunnel-Token) werden nie wieder
+  angezeigt: Der Abschnitt sagt nur, ob sie gesetzt sind. Man kann sie ersetzen
+  oder löschen.
+- Was den **Zugang** zum Dashboard **kappen** oder **Ordner** der Festplatte
+  **freigeben** kann, lässt sich nur an dem Computer ändern, auf dem der Bot
+  läuft. Anderswo sind diese Felder ausgegraut.
+- Nichts gilt vor einem **Neustart**: Der Abschnitt weist darauf hin und bietet
+  ihn an. Ändert sich der Port, folgt das Dashboard seiner neuen Adresse.
+
+Die Datei lässt sich weiterhin von Hand bearbeiten; der Abschnitt ändert nur
+die betroffenen Zeilen und behält die Kommentare.
+
 ### Optische Anpassung
 
 - **Stile** — *Glassmorphism* (lichtdurchlässige Flächen), *Neon Cyberpunk*
