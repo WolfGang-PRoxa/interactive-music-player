@@ -141,11 +141,14 @@ jobs:
           path: dist
           merge-multiple: true
 
-      # GitHub remplace les espaces des noms de fichiers joints par des points :
-      # autant leur donner tout de suite un nom sans espace.
+      # L'artefact Linux garde ses sous-dossiers (appimage/, deb/) : tout est
+      # remis à plat. GitHub remplace les espaces des noms de fichiers joints
+      # par des points : autant leur donner tout de suite un nom sans espace.
       - name: Noms et empreintes
         working-directory: dist
         run: |
+          find . -mindepth 2 -type f -exec mv -t . {} +
+          find . -mindepth 1 -type d -empty -delete
           for file in *; do
             renamed="${file// /-}"
             [ "$file" = "$renamed" ] || mv "$file" "$renamed"
