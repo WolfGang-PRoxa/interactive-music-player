@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "description": "Relais de retour OAuth Discord pour le partage rapide du tableau de bord (Worker Cloudflare).",
+  "license": "MIT",
   "scripts": {
     "deploy": "wrangler deploy"
   }

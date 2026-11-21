@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.2",
   "description": "Application de bureau du bot : une coquille Tauri autour du serveur Node",
+  "license": "MIT",
   "scripts": {
     "tauri": "tauri",
     "dev": "tauri dev",
