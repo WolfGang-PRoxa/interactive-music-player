@@ -225,8 +225,20 @@ impl Supervisor {
         }
         let address = Endpoint::of(&layout).url();
         let Ok(url) = tauri::Url::parse(&address) else { return };
+        let app = self.app.clone();
         let built = WebviewWindowBuilder::new(&self.app, DASHBOARD, WebviewUrl::External(url))
             .title("Interactive Music Player")
+            // Les liens qui s'ouvrent ailleurs — GitHub, le don, la
+            // documentation, le portail Discord, le partage — visent un onglet
+            // (`target="_blank"`, `window.open`). Une fenêtre d'application n'a
+            // pas d'onglets : la webview les ignorait, et le clic ne menait
+            // nulle part. Ils partent donc dans le navigateur de l'utilisateur.
+            .on_new_window(move |url, _features| {
+                if is_external_link(&url) {
+                    let _ = app.opener().open_url(url.as_str(), None::<&str>);
+                }
+                tauri::webview::NewWindowResponse::Deny
+            })
             .inner_size(1360.0, 860.0)
             .min_inner_size(420.0, 560.0)
             .center()
@@ -1155,6 +1167,18 @@ pub fn tail(path: &Path, lines: usize) -> Option<String> {
     Some(kept[kept.len().saturating_sub(lines)..].join("\n"))
 }
 
+/// Un lien que le navigateur de l'utilisateur saura ouvrir.
+///
+/// Ce qui sort d'ici est confié au système : seuls le web et le courriel
+/// passent, jamais un fichier ni un protocole d'application.
+fn is_external_link(url: &tauri::Url) -> bool {
+    match url.scheme() {
+        "http" | "https" => url.host().is_some(),
+        "mailto" => true,
+        _ => false,
+    }
+}
+
 fn strip_ansi(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut chars = text.chars().peekable();
@@ -1176,6 +1200,18 @@ fn strip_ansi(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_web_links_leave_the_app() {
+        let link = |s: &str| is_external_link(&tauri::Url::parse(s).unwrap());
+        assert!(link("https://github.com/WolfGang-PRoxa/interactive-music-player"));
+        assert!(link("https://buymeacoffee.com/wolfgang_proxa"));
+        assert!(link("http://localhost:3000/docs"));
+        assert!(link("mailto:someone@example.com"));
+        assert!(!link("file:///C:/Windows/System32/calc.exe"));
+        assert!(!link("ms-settings:privacy"));
+        assert!(!link("about:blank"));
+    }
 
     #[test]
     fn ansi_is_stripped() {

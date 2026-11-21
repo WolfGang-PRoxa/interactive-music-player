@@ -124,6 +124,12 @@ If the Discord application is not configured — `DISCORD_CLIENT_SECRET` or
 left to fill in and lets you in with the token alone, as before. Nobody ends up
 locked out of their own bot over a forgotten variable.
 
+On the bot's own computer, the token is always enough: whoever sits at the
+machine owns it, signed in to Discord or not. That is where the desktop app
+lives, whose window and tray icon drive the bot with the token. The sign-in
+window only concerns those who arrive from elsewhere — the local network or the
+tunnel.
+
 ### Retrieving the token
 
 It is created on first startup and offered to you in three ways:

@@ -70,11 +70,20 @@ app.get('/', (req, res) => res.type('html').send('<html>tableau de bord</html>')
 
 const server = http.createServer(app);
 
-/** Une requête, avec les cookies qu'on choisit de présenter. */
-function ask(port, route, cookies) {
+/**
+ * Une requête, avec les cookies qu'on choisit de présenter.
+ *
+ * Le banc tourne sur `127.0.0.1`, qui est aussi l'adresse de l'ordinateur du
+ * bot : sans précaution, chaque requête serait celle de quelqu'un assis devant
+ * la machine, à qui le jeton suffit. Les visiteurs arrivent donc par défaut
+ * comme par le tunnel, porteurs de `CF-Connecting-IP` ; `local` les remet sur
+ * la machine.
+ */
+function ask(port, route, cookies, { local = false } = {}) {
     return new Promise((resolve, reject) => {
         const headers = { Accept: 'application/json' };
         if (cookies) headers.Cookie = cookies;
+        if (!local) headers['CF-Connecting-IP'] = '203.0.113.7';
         http.get({ host: '127.0.0.1', port, path: route, headers }, (res) => {
             let body = '';
             res.on('data', (c) => { body += c; });
@@ -109,6 +118,38 @@ server.listen(0, '127.0.0.1', async () => {
     const anonymous = await ask(port, '/auth/state', null);
     check('sans jeton ni session, rien ne s\'ouvre', anonymous.status === 401,
         `HTTP ${anonymous.status}`);
+
+    // ───────── Devant la machine ─────────
+
+    /*
+     * Le propriétaire, assis devant l'ordinateur du bot. C'est là que vit
+     * l'application de bureau : sa fenêtre du tableau de bord, et l'icône qui
+     * envoie Quitter et Redémarrer par la WebSocket, avec le jeton et sans
+     * session. Lui demander Discord l'enfermait hors de son propre bot dès que
+     * le secret était renseigné — l'arrêt même était refusé.
+     */
+    console.log('\nLe jeton, depuis la machine du bot\n');
+
+    const atHome = await ask(port, '/auth/state', withToken, { local: true });
+    check('il donne les pleins droits', atHome.json && atHome.json.master === true,
+        'celui qui est devant la machine en est le propriétaire');
+    check('et rien n\'est demandé', atHome.json && atHome.json.pendingLogin === false);
+    check('sans rien revendiquer au passage', owner.isClaimed() === false,
+        'la propriété reste à prendre par une connexion Discord');
+
+    const homeNoToken = await ask(port, '/auth/state', null, { local: true });
+    check('sans le jeton, la machine ne suffit pas', homeNoToken.status === 401,
+        `HTTP ${homeNoToken.status}`);
+
+    check('le tunnel ne passe pas pour la machine',
+        auth.identify({ url: '/', headers: { cookie: withToken, 'cf-connecting-ip': '203.0.113.7' },
+            socket: { remoteAddress: '127.0.0.1' } }).master === false);
+    check('le réseau local non plus',
+        auth.identify({ url: '/', headers: { cookie: withToken },
+            socket: { remoteAddress: '192.168.1.20' } }).master === false);
+    check('l\'application de bureau, en IPv6 aussi',
+        auth.identify({ url: `/?token=${TOKEN}`, headers: {},
+            socket: { remoteAddress: '::1' } }).master === true);
 
     // ───────── La revendication ─────────
 

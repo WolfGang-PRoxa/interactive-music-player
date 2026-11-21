@@ -21,6 +21,13 @@ was delivered.
     src/web/changelog.js.
 -->
 
+## 2026-11-21 — A cleaner desktop app that is yours again
+
+### Fixed
+- On the bot's own computer, the token is enough to be the owner, even once Discord sign-in is set up: the app no longer treats you as a guest, and Quit or Restart from the tray icon work again.
+- External links in the dashboard (GitHub, Buy Me a Coffee, documentation, Discord portal) open in the browser instead of doing nothing in the app window.
+- The app icon has a transparent background, and the startup window shows the real icon.
+
 ## 2026-11-14 — Configuration in the dashboard
 
 The `.env` file can now be edited from the settings, without having to find it on disk.

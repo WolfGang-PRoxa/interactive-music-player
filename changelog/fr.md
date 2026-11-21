@@ -22,6 +22,13 @@ entrée porte la date du jour où le changement a été livré.
     src/web/changelog.js.
 -->
 
+## 2026-11-21 — L'application de bureau, propre et à soi
+
+### Fixed
+- Depuis l'ordinateur du bot, le jeton suffit à être propriétaire, même une fois la connexion Discord configurée : l'application ne vous traite plus en invité, et Quitter ou Redémarrer depuis l'icône fonctionnent de nouveau.
+- Les liens externes du tableau de bord (GitHub, Buy Me a Coffee, documentation, portail Discord) s'ouvrent dans le navigateur au lieu de ne rien faire dans la fenêtre de l'application.
+- L'icône de l'application a un fond transparent, et la fenêtre de démarrage affiche la vraie icône.
+
 ## 2026-11-14 — La configuration dans le tableau de bord
 
 Le fichier `.env` se règle désormais depuis les paramètres, sans avoir à le chercher sur le disque.

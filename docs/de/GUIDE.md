@@ -135,6 +135,12 @@ Ist die Discord-Anwendung nicht eingerichtet — `DISCORD_CLIENT_SECRET` oder
 noch einzutragen ist, und lässt allein mit dem Token herein, wie zuvor. Niemand
 sperrt sich wegen einer vergessenen Variable aus seinem eigenen Bot aus.
 
+Auf dem Computer des Bots selbst genügt das Token immer: wer an der Maschine
+sitzt, ist ihr Eigentümer, ob mit Discord angemeldet oder nicht. Dort lebt die
+Desktop-App, deren Fenster und Tray-Symbol den Bot mit dem Token steuern. Das
+Anmeldefenster betrifft nur, wer von anderswo kommt — aus dem lokalen Netz oder
+über den Tunnel.
+
 ### Das Token abrufen
 
 Es wird beim ersten Start erzeugt und Ihnen auf drei Wegen angeboten:

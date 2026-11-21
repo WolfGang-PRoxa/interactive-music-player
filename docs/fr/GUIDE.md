@@ -127,6 +127,12 @@ Si l'application Discord n'est pas configurée — `DISCORD_CLIENT_SECRET` ou
 qu'il reste à renseigner et laisse entrer avec le seul jeton, comme avant. Nul
 ne se retrouve enfermé hors de son propre bot pour une variable oubliée.
 
+Sur l'ordinateur du bot lui-même, le jeton suffit toujours : celui qui est
+devant la machine en est le propriétaire, connexion Discord ou non. C'est là que
+vit l'application de bureau, dont la fenêtre et l'icône pilotent le bot avec le
+jeton. La fenêtre de connexion ne concerne que ceux qui arrivent d'ailleurs —
+le réseau local ou le tunnel.
+
 ### Récupérer le jeton
 
 Il est créé au premier démarrage et vous est proposé de trois façons :

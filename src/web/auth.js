@@ -27,11 +27,13 @@
  * bien servir celle qui porte la fenêtre de connexion — et rien d'autre :
  * `pendingLogin` le signale, et l'interface bloque tant qu'il n'a pas répondu.
  *
- * La seule exception est l'installation dont l'application Discord n'est pas
+ * Deux exceptions. L'installation dont l'application Discord n'est pas
  * configurée : s'y connecter est alors matériellement impossible, et refuser
  * reviendrait à enfermer quelqu'un hors de son propre bot pour un secret
  * manquant dans un fichier. Le jeton y reprend son ancien rôle, et l'interface
- * le dit au lieu de le taire.
+ * le dit au lieu de le taire. Et le jeton présenté depuis l'ordinateur du bot
+ * lui-même (`fromThisMachine`) : celui qui est devant la machine en est le
+ * propriétaire, nommé ou non — c'est là que vit l'application de bureau.
  *
  * **On demande son nom au visiteur avant de lui fermer la porte.** Un invité
  * qui revient n'a ni jeton ni session : il n'est donc pas autorisé, et tombait
@@ -234,6 +236,25 @@ function identify(req) {
     const { value, source } = extractToken(req);
     const holdsToken = safeEquals(value, getToken());
 
+    /*
+     * Le jeton présenté depuis l'ordinateur du bot lui-même : c'est le
+     * propriétaire, et personne d'autre.
+     *
+     * La porte demande à chacun de se nommer parce que le jeton voyage — dans
+     * un lien, un historique, un manifeste — et qu'un porteur distant peut être
+     * n'importe qui. Sur la machine même, la question ne se pose plus : il
+     * faut avoir la main sur la session Windows qui fait tourner le bot pour
+     * y être, et c'est de là que l'application de bureau pilote le bot (fenêtre
+     * du tableau de bord, Quitter et Redémarrer depuis l'icône).
+     *
+     * Exiger Discord ici enfermait le propriétaire hors de son propre bot dès
+     * que `DISCORD_CLIENT_SECRET` était renseigné : la fenêtre de l'application
+     * le traitait en invité, et même l'arrêt demandé par l'icône était refusé.
+     * Le tunnel n'en profite pas — Cloudflare pose `CF-Connecting-IP` —, ni le
+     * réseau local, dont les adresses ne sont pas des boucles locales.
+     */
+    const atTheMachine = holdsToken && fromThisMachine(req);
+
     const cookies = parseCookies(req.headers.cookie);
     const session = sessions.touch(cookies[sessions.COOKIE_NAME]);
 
@@ -279,7 +300,7 @@ function identify(req) {
 
         return {
             authorized: true,
-            master: owner.isOwner(session),
+            master: owner.isOwner(session) || atTheMachine,
             session,
             holdsToken,
             pendingLogin: false,
@@ -299,8 +320,11 @@ function identify(req) {
          * impossible, et refuser serait enfermer quelqu'un hors de son propre
          * bot pour un secret manquant dans un fichier. Le jeton reprend alors
          * son rôle d'avant, et l'interface le signale au lieu de le taire.
+         *
+         * Depuis la machine du bot, le jeton suffit dans tous les cas : voir
+         * `atTheMachine` plus haut.
          */
-        const canLogIn = oauthConfigured();
+        const canLogIn = oauthConfigured() && !atTheMachine;
         return {
             authorized: true,
             master: !canLogIn,

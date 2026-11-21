@@ -128,6 +128,12 @@ o `DISCORD_CLIENT_ID` —, iniciar sesión es imposible: la ventana indica enton
 queda por rellenar y deja entrar solo con el token, como antes. Nadie se queda
 encerrado fuera de su propio bot por una variable olvidada.
 
+En el propio ordenador del bot, el token siempre basta: quien está delante de la
+máquina es su propietario, con o sin sesión de Discord. Ahí vive la aplicación
+de escritorio, cuya ventana e icono controlan el bot con el token. La ventana de
+inicio de sesión solo afecta a quienes llegan desde otro lugar — la red local o
+el túnel.
+
 ### Recuperar el testigo
 
 Se crea en el primer arranque y se le ofrece de tres maneras:
