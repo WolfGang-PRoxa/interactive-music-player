@@ -13,6 +13,9 @@
     "deploy": "node src/deploy-commands.js",
     "update-ytdlp": "node -e \"require('child_process').execFileSync(require('youtube-dl-exec').constants.YOUTUBE_DL_PATH,['-U'],{stdio:'inherit'})\"",
     "dev": "node --watch src/index.js",
+    "format": "prettier --write .",
+    "lint": "eslint .",
+    "check": "prettier --check . && eslint .",
     "smoke": "node tests/smoke.js",
     "test:device": "node tests/deviceMode.js",
     "test:drag": "node tests/dragPreview.js",
@@ -150,5 +153,11 @@
   },
   "engines": {
     "node": ">=22.12.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.15.0",
+    "globals": "^17.14.0",
+    "prettier": "^3.10.1"
   }
 }

@@ -1,0 +1,17 @@
+# Generated, installed or downloaded
+node_modules/
+dist/
+out/
+release/
+data/
+versions/
+package-lock.json
+desktop/.staging/
+
+# Left as they are on purpose
+# - the Tauri shell is replaced separately
+desktop/src-tauri/
+# - the documentation in docs/<language>/ is maintained as is
+docs/
+# - the release workflow keeps its current layout
+.github/workflows/desktop.yml
