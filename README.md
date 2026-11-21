@@ -1,230 +1,260 @@
+**English** · [Français](README.fr.md)
+
 # Interactive Music Player
 
-Bot Discord de musique avec **atténuation automatique du volume à la parole**
-(*ducking*) et **tableau de bord web temps réel**.
+Discord music bot with **automatic volume lowering when someone speaks**
+(*ducking*) and a **real-time web dashboard**.
 
-La musique baisse dès qu'une personne prend la parole dans le salon vocal, puis
-remonte progressivement une fois le silence revenu — sans intervention, sans
-latence perceptible.
+The music drops as soon as someone starts talking in the voice channel, then
+comes back up gradually once silence returns — no intervention, no noticeable
+latency.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  ♪ Musique à 70 %                                           │
+│  ♪ Music at 70 %                                            │
 │  ─────────────────────────────────────────────              │
-│                    🗣  quelqu'un parle                      │
-│  ♪ Musique à 14 %  ╲___________________╱   ← fondu 200 ms   │
-│                          800 ms de silence                  │
+│                    🗣  someone speaks                       │
+│  ♪ Music at 14 %   ╲___________________╱   ← 200 ms fade    │
+│                          800 ms of silence                  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## En bref
+## At a glance
 
 | | |
 |---|---|
-| **Ducking configurable** | Niveau, délai de garde et durée de fondu réglables ; exclusion possible par participant |
-| **Tableau de bord temps réel** | Contrôle complet, file d'attente en glisser-déposer, playlists, journaux, statistiques |
-| **Deux modes de diffusion** | Dans le salon vocal, ou dans votre navigateur sans déranger le serveur |
-| **Sources multiples** | YouTube, Spotify, SoundCloud, Apple Music, fichiers et dossiers locaux |
-| **Préchargement** | Les pistes à venir sont mises en cache : démarrage instantané, résistance aux coupures réseau |
-| **Reprise après redémarrage** | Le bot repart sur la piste interrompue, à sa position exacte |
-| **Vitesse et enchaînement** | 0,20× à 3,05× ; fondu enchaîné entre pistes, par volume ou avec effet |
-| **Niveau sonore (LUFS)** | Sonie mesurée par piste, réglable au décibel près, et synchronisable sur une cible commune |
-| **Aucune dépendance externe** | Ni base de données, ni build, ni FFmpeg à installer |
+| **Configurable ducking** | Adjustable level, hold time and fade length; participants can be excluded |
+| **Real-time dashboard** | Full control, drag-and-drop queue, playlists, logs, statistics |
+| **Two broadcast modes** | In the voice channel, or in your own browser without disturbing the server |
+| **Many sources** | YouTube, Spotify, SoundCloud, Apple Music, local files and folders |
+| **Preloading** | Upcoming tracks are cached: instant start, resilient to network drops |
+| **Resume after restart** | The bot picks up the interrupted track, at its exact position |
+| **Speed and transitions** | 0.20× to 3.05×; crossfade between tracks, by volume or with an effect |
+| **Loudness (LUFS)** | Loudness measured per track, adjustable to the decibel, and syncable to a common target |
+| **No external dependency** | No database, no build step, no FFmpeg to install |
 
 ---
 
 ## Documentation
 
-| Pour | Document |
+| For | Document |
 |---|---|
-| Utiliser le bot et le tableau de bord | **[Guide utilisateur](docs/fr/GUIDE.md)** |
-| Comprendre ou modifier le code | **[Documentation technique](docs/fr/technique/README.md)** |
+| Using the bot and the dashboard | **[User guide](docs/en/GUIDE.md)** |
+| Understanding or changing the code | **[Technical documentation](docs/en/technique/README.md)** |
 
-La documentation technique couvre l'[architecture](docs/fr/technique/01-architecture.md),
-la [chaîne audio](docs/fr/technique/02-lecture-audio.md), le
-[ducking](docs/fr/technique/03-ducking.md), les
-[modes de diffusion](docs/fr/technique/04-diffusion.md), le
-[tableau de bord](docs/fr/technique/05-tableau-de-bord.md), la
-[persistance](docs/fr/technique/06-persistance.md), la
-[sécurité](docs/fr/technique/07-securite.md), la
-[journalisation](docs/fr/technique/08-journalisation.md) et la
-[configuration](docs/fr/technique/09-configuration.md).
+The technical documentation covers the [architecture](docs/en/technique/01-architecture.md),
+the [audio chain](docs/en/technique/02-lecture-audio.md),
+[ducking](docs/en/technique/03-ducking.md), the
+[broadcast modes](docs/en/technique/04-diffusion.md), the
+[dashboard](docs/en/technique/05-tableau-de-bord.md),
+[persistence](docs/en/technique/06-persistance.md),
+[security](docs/en/technique/07-securite.md),
+[logging](docs/en/technique/08-journalisation.md) and
+[configuration](docs/en/technique/09-configuration.md).
 
 ---
 
-## Application de bureau *(Windows, Linux)*
+## Desktop app *(Windows, Linux)*
 
-Le plus simple : **l'installeur**. Il apporte Node.js, le bot et ses
-dépendances — aucun prérequis —, puis l'application guide la première
-configuration, garde le bot dans la zone de notification et ouvre le tableau de
-bord dans sa propre fenêtre. Celui-ci reste accessible dans n'importe quel
-navigateur, comme avant.
+The easiest way: **the installer**. It brings Node.js, the bot and its
+dependencies — no prerequisites —, then the app walks you through the first
+setup, keeps the bot in the notification area and opens the dashboard in its
+own window. The dashboard is still reachable from any browser, as before.
 
-Tout est joint aux [releases](https://github.com/WolfGang-PRoxa/interactive-music-player/releases) :
+Everything is attached to the [releases](https://github.com/WolfGang-PRoxa/interactive-music-player/releases):
 
-| Système | Fichier |
+| System | File |
 |---|---|
-| Windows 10 et 11 | `…_x64-setup.exe`, l'installeur |
-| Linux (toute distribution) | `…_amd64.AppImage` : le rendre exécutable, puis le lancer |
-| Debian, Ubuntu et dérivées | `…_amd64.deb` : `sudo apt install ./…_amd64.deb` |
+| Windows 10 and 11 | `…_x64-setup.exe`, the installer |
+| Linux (any distribution) | `…_amd64.AppImage`: make it executable, then run it |
+| Debian, Ubuntu and derivatives | `…_amd64.deb`: `sudo apt install ./…_amd64.deb` |
 
-Chaque fichier est produit par le workflow *Application de bureau*, et
-`SHA256SUMS.txt` donne son empreinte. Tout le détail est dans
+Each file is built by the *Application de bureau* workflow, and
+`SHA256SUMS.txt` lists its fingerprint. All the details are in
 [desktop/README.md](desktop/README.md).
 
-> **L'installeur n'est pas signé.** Windows SmartScreen affiche « Windows a
-> protégé votre ordinateur » au premier lancement : cliquez sur
-> **Informations complémentaires**, puis **Exécuter quand même**. Voir
-> [pourquoi](desktop/README.md#installer--lavertissement-de-windows).
+> **The installer is not signed.** Windows SmartScreen shows "Windows protected
+> your PC" on first launch: click **More info**, then **Run anyway**. See
+> [why](desktop/README.md#installing-the-windows-warning).
 
-La suite de ce document décrit l'installation depuis le code source.
+The rest of this document describes installing from source.
 
 ---
 
-## Prérequis
+## Requirements
 
-- **Node.js 22.12** ou supérieur (la version LTS convient)
-- Un compte Discord — l'application du bot se crée à l'installation, sur le
-  [portail développeur](https://discord.com/developers/applications), et le
-  premier démarrage vous y conduit
+- **Node.js 22.12** or later (the LTS release is fine)
+- A Discord account — the bot's application is created during setup, on the
+  [developer portal](https://discord.com/developers/applications), and the
+  first launch takes you there
 
-FFmpeg et yt-dlp sont fournis par les dépendances npm : rien à installer sur le
-système.
+FFmpeg and yt-dlp come with the npm dependencies: nothing to install on the
+system.
 
 ---
 
 ## Installation
 
-### 1. Récupérer le projet
+### 1. Get the project
 
 ```bash
 git clone https://github.com/WolfGang-PRoxa/interactive-music-player
 cd interactive-music-player
 ```
 
-Sous Windows, les dépendances sont installées au premier démarrage par la
-fenêtre de lancement ; il n'y a rien d'autre à faire ici.
+On Windows, the dependencies are installed on first launch by the startup
+window; there is nothing else to do here.
 
-### 2. Créer le bot Discord
+### 2. Create the Discord bot
 
-**Sous Windows, laissez-vous guider** : double-cliquez sur `Start bot.vbs`, à la
-racine du projet. Au premier lancement, la fenêtre qui s'ouvre ne démarre rien —
-elle vous accompagne, et se charge de tout ce qui suit.
+**On Windows, let it guide you**: double-click `Start bot.vbs`, at the root of
+the project. On first launch, the window that opens starts nothing — it walks
+you through the setup, and takes care of everything below.
 
-Il vous reste deux gestes : créer l'application sur le portail, que le bouton
-ouvre pour vous (**New Application**, puis onglet **Bot** → **Reset Token** →
-**Copy**), et cliquer sur *Inviter*. Le jeton copié est reconnu sans que vous
-ayez à le coller, l'identifiant de l'application en est déduit, `.env` est écrit,
-les dépendances installées, les commandes enregistrées, et l'URL d'invitation
-assemblée avec les bonnes portées et permissions.
+Two steps are left to you: create the application on the portal, which the
+button opens for you (**New Application**, then the **Bot** tab → **Reset
+Token** → **Copy**), and click *Invite*. The copied token is picked up without
+you having to paste it, the application ID is derived from it, `.env` is
+written, the dependencies installed, the commands registered, and the invite
+URL assembled with the right scopes and permissions.
 
-Cette même fenêtre sert ensuite à chaque démarrage, et propose de refaire cette
-configuration si Discord venait à refuser le jeton enregistré.
+The same window is then used at every launch, and offers to redo this setup if
+Discord ever rejects the saved token.
 
 <details>
-<summary>À la main, ou hors de Windows</summary>
+<summary>By hand, or outside Windows</summary>
 
-Commencez par `npm install`, puis :
+Start with `npm install`, then:
 
-1. Sur le [portail développeur](https://discord.com/developers/applications),
-   créez une application (**New Application**).
-2. Relevez l'**Application ID** → variable `DISCORD_CLIENT_ID`.
-3. Onglet **Bot** → **Reset Token** → variable `DISCORD_TOKEN`. Ce jeton est
-   confidentiel.
-4. Invitez le bot via **OAuth2 → URL Generator**, en cochant les portées `bot`
-   et `applications.commands`, puis les permissions :
+1. On the [developer portal](https://discord.com/developers/applications),
+   create an application (**New Application**).
+2. Note the **Application ID** → variable `DISCORD_CLIENT_ID`.
+3. **Bot** tab → **Reset Token** → variable `DISCORD_TOKEN`. This token is
+   confidential.
+4. Invite the bot through **OAuth2 → URL Generator**, ticking the `bot` and
+   `applications.commands` scopes, then the permissions:
    *View Channels*, *Connect*, *Speak*, *Manage Channels*, *Move Members*.
 
-Puis créez le fichier de configuration :
+Then create the configuration file:
 
 ```bash
-cp .env.example .env      # copy .env.example .env sous Windows
+cp .env.example .env      # copy .env.example .env on Windows
 ```
 
-Le minimum à renseigner :
+The minimum to fill in:
 
 ```env
-DISCORD_TOKEN=votre_jeton
-DISCORD_CLIENT_ID=votre_application_id
+DISCORD_TOKEN=your_token
+DISCORD_CLIENT_ID=your_application_id
 ```
 
-Et enfin :
+And finally:
 
 ```bash
-npm run deploy    # une fois, puis à chaque changement de commande
+npm run deploy    # once, then whenever a command changes
 npm start
 ```
 
 </details>
 
-> **Aucune intention privilégiée n'est requise.** Le bot n'utilise que
-> `Guilds`, `GuildVoiceStates` et `GuildMessages`, toutes trois non
-> privilégiées. Il est inutile d'activer *Presence*, *Server Members* ou
-> *Message Content*.
+> **No privileged intent is required.** The bot only uses `Guilds`,
+> `GuildVoiceStates` and `GuildMessages`, none of which is privileged. There is
+> no need to enable *Presence*, *Server Members* or *Message Content*.
 
-### 3. Aller plus loin dans la configuration
+### 3. Going further with configuration
 
-Tout le reste est facultatif et se règle dans `.env`. Voir la
-[référence complète des variables](docs/fr/technique/09-configuration.md#variables-denvironnement)
-pour le port, l'exposition réseau, les dossiers de musique locaux et la
-journalisation.
+Everything else is optional and set in `.env`. See the
+[full variable reference](docs/en/technique/09-configuration.md#environment-variables)
+for the port, network exposure, local music folders and logging.
 
-Définir `GUILD_ID` dans `.env` rend les commandes disponibles immédiatement sur
-ce serveur ; sans cette variable, le déploiement est global et peut prendre
-jusqu'à une heure.
+Setting `GUILD_ID` in `.env` makes the commands available immediately on that
+server; without it, deployment is global and can take up to an hour.
 
-### 4. Le raccourci *(Windows, facultatif)*
+### 4. The shortcut *(Windows, optional)*
 
-Pour avoir le bot sous la main ailleurs que dans le dossier du projet, double-cliquez
-plutôt sur **`Create shortcut.vbs`**, à la racine du projet. Un
-assistant s'ouvre : choisissez l'emplacement — bureau, menu Démarrer ou
-n'importe quel dossier de votre PC — et le raccourci y est posé. Une option
-permet aussi de lancer le bot à chaque ouverture de session Windows.
+To keep the bot at hand outside the project folder, double-click
+**`Create shortcut.vbs`** instead, at the root of the project. A wizard opens:
+choose the location — desktop, Start menu or any folder on your PC — and the
+shortcut is placed there. An option also starts the bot every time you sign in
+to Windows.
 
-Le bot démarre **sans aucune fenêtre de terminal** : rien ne s'ouvre à l'écran,
-rien n'apparaît dans la barre des tâches. Une petite fenêtre suit le lancement
-étape par étape — Node.js, configuration, installation des
-dépendances à la première utilisation, démarrage, tableau de bord — puis
-s'efface d'elle-même dès que le bot est prêt. Si une étape échoue, elle reste
-ouverte avec le motif, un extrait du journal et le bouton qui débloque.
+The bot starts **without any terminal window**: nothing opens on screen,
+nothing shows in the taskbar. A small window follows the startup step by step —
+Node.js, configuration, installing the dependencies on first use, startup,
+dashboard — then closes by itself as soon as the bot is ready. If a step fails,
+it stays open with the reason, an excerpt of the log and the button that gets
+you unstuck.
 
-Le bot tournant désormais sans console, on l'**arrête depuis le tableau de
-bord** (bouton d'extinction), et ses journaux se lisent dans l'onglet dédié ou
-dans `data/logs/`.
+Since the bot now runs without a console, you **stop it from the dashboard**
+(power button), and its logs are read in the dedicated tab or in `data/logs/`.
 
-### 5. Ouvrir le tableau de bord
+### 5. Open the dashboard
 
-Le navigateur s'ouvre automatiquement cinq secondes après le démarrage. Le
-tableau de bord est protégé par un **jeton d'accès**, enregistré dans
-`data/dashboard-token` — et affiché dans la console, quand le bot a été démarré
-depuis un terminal :
+The browser opens automatically five seconds after startup. The dashboard is
+protected by an **access token**, saved in `data/dashboard-token` — and shown
+in the console when the bot was started from a terminal:
 
 ```
-http://localhost:3000/?token=VOTRE_JETON
+http://localhost:3000/?token=YOUR_TOKEN
 ```
 
-Par défaut, il n'écoute que sur la machine locale. Pour y accéder depuis un
-téléphone ou un autre poste, voir
-[Accès au tableau de bord](docs/fr/GUIDE.md#accès-au-tableau-de-bord).
+By default, it only listens on the local machine. To reach it from a phone or
+another computer, see [Dashboard access](docs/en/GUIDE.md#dashboard-access).
 
 ---
 
-## Commandes
+## Updating
 
-| Commande | Action |
+**Desktop app**: download the installer of the new version from the
+[releases](https://github.com/WolfGang-PRoxa/interactive-music-player/releases)
+page and install it over the old one. `.env`, playlists, settings and logs are
+kept: an update replaces the bot's code and the runtime, never the data.
+
+**From source**:
+
+```bash
+git pull
+npm install
+npm run deploy    # only if slash commands changed
+```
+
+The dashboard can also switch between published versions, from the versions
+menu. If YouTube suddenly refuses to play, `npm run update-ytdlp` updates
+yt-dlp without waiting for a new version of the bot.
+
+---
+
+## Where the data lives
+
+| What | From source | Desktop app |
+|---|---|---|
+| Configuration (`.env`) | project root | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\bot\` |
+| Settings, playback state, playlists, dashboard token | `data/` | `bot\data\` |
+| Logs | `data/logs/` | `bot\data\logs\` |
+| Versions downloaded from the dashboard | `versions/` | `bot\versions\` |
+
+On Linux, the desktop app's folder is
+`~/.local/share/com.wolfgangproxa.interactive-music-player/`. None of this is
+versioned, and nothing leaves the machine.
+
+---
+
+## Commands
+
+| Command | Action |
 |---|---|
-| `/play query:<recherche, URL ou chemin>` | Lance ou met en file une piste |
-| `/playlist path:<dossier> [shuffle]` | Charge un dossier local entier |
-| `/queue [page]` | Affiche la file d'attente |
-| `/pause` `/resume` `/skip` `/stop` | Contrôle de la lecture |
-| `/nowplaying` | Piste en cours et progression |
-| `/volume level:<0-100>` | Volume de référence |
-| `/ducking toggle\|level\|delay\|fade\|status` | Réglages du ducking |
-| `/broadcast mode:<everyone\|personal>` | Mode de diffusion *(administrateur)* |
+| `/play query:<search, URL or path>` | Plays or queues a track |
+| `/playlist path:<folder> [shuffle]` | Loads a whole local folder |
+| `/queue [page]` | Shows the queue |
+| `/pause` `/resume` `/skip` `/stop` | Playback control |
+| `/nowplaying` | Current track and progress |
+| `/volume level:<0-100>` | Reference volume |
+| `/ducking toggle\|level\|delay\|fade\|status` | Ducking settings |
+| `/broadcast mode:<everyone\|personal>` | Broadcast mode *(administrator)* |
 
-Détail et exemples dans le [guide utilisateur](docs/fr/GUIDE.md#référence-complète-des-commandes-discord).
+Details and examples in the [user guide](docs/en/GUIDE.md#complete-discord-command-reference).
 
 ---
 
@@ -232,75 +262,87 @@ Détail et exemples dans le [guide utilisateur](docs/fr/GUIDE.md#référence-com
 
 ```
 src/
-├── index.js          Point d'entrée : client Discord, lecteur, arrêt propre
-├── config.js         Constantes et valeurs par défaut
-├── audio/            Ducking, volume, événements du lecteur, préchargement
-├── broadcast/        Modes de diffusion, salons personnels
-├── commands/         Commandes slash
-├── database/         Réglages et état de lecture
-├── utils/            Journalisation, JSON atomique, chemins, durées
-└── web/              Serveur HTTP + WebSocket, API, tableau de bord
+├── index.js          Entry point: Discord client, player, clean shutdown
+├── config.js         Constants and default values
+├── audio/            Ducking, volume, player events, preloading
+├── broadcast/        Broadcast modes, personal channels
+├── commands/         Slash commands
+├── database/         Settings and playback state
+├── utils/            Logging, atomic JSON, paths, durations
+└── web/              HTTP + WebSocket server, API, dashboard
 
-tools/                Raccourci Windows : assistant graphique et lanceur
-data/                 Créé à l'exécution, non versionné
-docs/<langue>/        Guide utilisateur et documentation technique (fr, en, es, de)
+tools/                Windows shortcut: graphical wizard and launcher
+data/                 Created at runtime, not versioned
+docs/<language>/      User guide and technical documentation (fr, en, es, de)
 
-Create shortcut.vbs   Ouvre l'assistant (Windows)
-Start bot.vbs         Démarre le bot sans console (Windows)
+Create shortcut.vbs   Opens the wizard (Windows)
+Start bot.vbs         Starts the bot without a console (Windows)
 ```
 
-Arborescence détaillée et carte des dépendances :
-[01 — Architecture](docs/fr/technique/01-architecture.md#arborescence).
+Detailed tree and dependency map:
+[01 — Architecture](docs/en/technique/01-architecture.md#directory-tree).
 
 ---
 
-## Scripts
+## Development
 
-| Commande | Effet |
+| Command | Effect |
 |---|---|
-| `npm start` | Démarre le bot |
-| `npm run dev` | Démarre avec redémarrage au changement de fichier |
-| `npm run deploy` | Enregistre les commandes slash auprès de Discord |
-| `Start bot.vbs` | *(Windows)* Démarre le bot sans console, par double-clic |
-| `Create shortcut.vbs` | *(Windows)* Assistant de création du raccourci de lancement |
-| `tools/start-bot.vbs` | *(Windows)* Cible du raccourci : démarrage sans console |
+| `npm install` | Installs the dependencies (FFmpeg and yt-dlp included) |
+| `npm start` | Starts the bot |
+| `npm run dev` | Starts with a restart on every file change |
+| `npm run deploy` | Registers the slash commands with Discord |
+| `npm test` | Runs all the automated tests |
+| `npm run check` | Checks formatting (Prettier) and code (ESLint) |
+| `npm run format` | Formats the whole project with Prettier |
+| `npm run lint` | Runs ESLint alone |
+| `npm run update-ytdlp` | Updates yt-dlp |
+| `Start bot.vbs` | *(Windows)* Starts the bot without a console, by double-click |
+| `Create shortcut.vbs` | *(Windows)* Wizard that creates the launch shortcut |
+| `tools/start-bot.vbs` | *(Windows)* The shortcut's target: starts without a console |
+
+Continuous integration runs `npm run check` and `npm test` on every push. The
+last stage of the smoke test starts the real bot: it needs a `DISCORD_TOKEN` in
+`.env` and reports itself as skipped without one.
+
+The desktop app has its own [Building](desktop/README.md#building) section.
+The version history is in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
-## Dépannage
+## Troubleshooting
 
-**Les commandes n'apparaissent pas sur Discord**
-Vérifiez que `npm run deploy` a été exécuté et que le bot a été invité avec la
-portée `applications.commands`. Sans `GUILD_ID`, la propagation globale peut
-prendre une heure.
+**The commands don't show up on Discord**
+Check that `npm run deploy` was run and that the bot was invited with the
+`applications.commands` scope. Without `GUILD_ID`, global propagation can take
+an hour.
 
-**Le bot ne rejoint pas le salon vocal**
-Vérifiez les permissions *Connect* et *Speak* sur le salon, et que vous y êtes
-vous-même connecté au moment de la commande.
+**The bot doesn't join the voice channel**
+Check the *Connect* and *Speak* permissions on the channel, and that you are
+connected to it yourself when you run the command.
 
-**Le ducking ne réagit pas**
-Une piste doit être en cours de lecture — le ducking est mis en place au
-démarrage d'une piste, pas à la connexion. Vérifiez ensuite `/ducking status` et
-que le participant n'est pas exclu de la détection depuis le tableau de bord.
-Voir le [guide de diagnostic](docs/fr/technique/03-ducking.md#diagnostic).
+**Ducking doesn't react**
+A track must be playing — ducking is set up when a track starts, not on
+connection. Then check `/ducking status`, and that the participant isn't
+excluded from detection in the dashboard. See the
+[diagnosis guide](docs/en/technique/03-ducking.md#diagnosis).
 
-**Le lecteur du navigateur refuse mes fichiers locaux**
-Seuls les fichiers des dossiers du bot ou déclarés dans `MEDIA_ROOTS` sont
-diffusés. Voir [Sécurité — restriction des chemins](docs/fr/technique/07-securite.md#restriction-des-chemins).
+**The browser player refuses my local files**
+Only files from the bot's folders or declared in `MEDIA_ROOTS` are served. See
+[Security — path restriction](docs/en/technique/07-securite.md#path-restriction).
 
 ---
 
-## Licence et conditions
+## License and terms
 
-Le code est publié sous licence **[MIT](LICENSE)**.
+The code is released under the **[MIT](LICENSE)** license.
 
-Le bot est **auto-hébergé** : chaque personne crée sa propre application Discord
-et fait tourner sa propre instance, sur sa propre machine. Aucune donnée ne
-remonte à l'auteur — pas de télémétrie, pas de statistiques, pas de serveur
-central. Aucun audio n'est enregistré : le ducking ne lit que l'événement
-« untel parle », jamais ce qui est dit.
+The bot is **self-hosted**: everyone creates their own Discord application and
+runs their own instance, on their own machine. No data goes back to the author —
+no telemetry, no statistics, no central server. No audio is recorded: ducking
+only reads the "so-and-so is speaking" event, never what is said.
 
-| Document | Français | English |
+| Document | English | Français |
 |---|---|---|
-| Conditions d'utilisation | **[CONDITIONS.md](CONDITIONS.md)** | **[TERMS.md](TERMS.md)** |
-| Politique de confidentialité | **[CONFIDENTIALITE.md](CONFIDENTIALITE.md)** | **[PRIVACY.md](PRIVACY.md)** |
+| Terms of service | **[TERMS.md](TERMS.md)** | **[CONDITIONS.md](CONDITIONS.md)** |
+| Privacy policy | **[PRIVACY.md](PRIVACY.md)** | **[CONFIDENTIALITE.md](CONFIDENTIALITE.md)** |

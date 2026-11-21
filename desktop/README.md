@@ -1,116 +1,117 @@
-# Application de bureau
+**English** · [Français](README.fr.md)
 
-Le bot, empaqueté en application Windows et Linux : un installeur, une icône
-dans la zone de notification, et le tableau de bord dans sa propre fenêtre.
+# Desktop app
 
-Le bot reste ce qu'il est : un serveur Node. L'application le lance, le garde et
-l'arrête, mais le tableau de bord s'ouvre toujours dans n'importe quel
-navigateur — sur ce PC à `http://localhost:3000`, ou depuis un téléphone, un
-autre ordinateur, un invité, exactement comme avant.
+The bot, packaged as a Windows and Linux app: an installer, an icon in the
+notification area, and the dashboard in its own window.
+
+The bot stays what it is: a Node server. The app starts it, watches over it and
+stops it, but the dashboard still opens in any browser — on this PC at
+`http://localhost:3000`, or from a phone, another computer, a guest, exactly as
+before.
 
 ---
 
-## Ce qu'elle fait
+## What it does
 
 | | |
 |---|---|
-| **Aucun prérequis** | Node.js est embarqué ; l'installeur apporte le bot et toutes ses dépendances |
-| **Première configuration guidée** | Coller le jeton suffit : il est vérifié auprès de Discord, `.env` est écrit, l'invitation préparée |
-| **Tableau de bord intégré** | Il s'ouvre dans la fenêtre de l'application une fois le bot prêt ; *Ouvrir dans le navigateur* reste à un clic |
-| **Zone de notification** | Fermer la fenêtre ne coupe rien : le bot continue, l'icône permet de rouvrir, redémarrer, éteindre |
-| **Redémarrage et versions** | Le redémarrage du tableau de bord et la bascule de version passent par l'application, qui relance le bon code |
-| **Démarrage avec la session** | À cocher dans le menu de l'icône : le bot démarre en arrière-plan, sans fenêtre |
-| **Une seule instance** | Rouvrir l'application montre celle qui tourne déjà |
+| **No prerequisites** | Node.js is bundled; the installer brings the bot and all its dependencies |
+| **Guided first setup** | Pasting the token is enough: it is checked with Discord, `.env` is written, the invite prepared |
+| **Built-in dashboard** | It opens in the app window once the bot is ready; *Open in browser* stays one click away |
+| **Notification area** | Closing the window stops nothing: the bot keeps running, the icon lets you reopen, restart, shut down |
+| **Restart and versions** | The dashboard's restart and version switch go through the app, which relaunches the right code |
+| **Start with the session** | A checkbox in the icon's menu: the bot starts in the background, with no window |
+| **A single instance** | Reopening the app shows the one already running |
 
-Fermer la fenêtre de lancement alors que rien ne tourne quitte l'application.
-*Quitter* depuis l'icône éteint le bot en douceur — fondu, sauvegarde de l'état
-de lecture — avant de fermer.
-
----
-
-## Installer : l'avertissement de Windows
-
-L'installeur **n'est pas signé** : un certificat de signature de code coûte
-plusieurs centaines d'euros par an, ce qui n'a pas de sens pour un projet
-gratuit. Windows SmartScreen affiche donc, au premier lancement, « Windows a
-protégé votre ordinateur » et un éditeur inconnu.
-
-Pour installer quand même : **Informations complémentaires**, puis
-**Exécuter quand même**. Le navigateur peut aussi demander de confirmer le
-téléchargement (*Conserver*).
-
-Sous Linux, l'AppImage n'a besoin que d'être rendu exécutable
-(`chmod +x`, ou *Propriétés → Autoriser l'exécution*). Selon la distribution,
-la zone de notification demande l'extension *AppIndicator* (GNOME) et
-l'AppImage la bibliothèque `libfuse2`. Le paquet `.deb` installe ce qu'il faut.
-
-Chaque fichier est construit par le workflow public
-[`.github/workflows/desktop.yml`](../.github/workflows/desktop.yml), à partir du
-code de ce dépôt : chaque fichier joint à une release se rattache au run qui l'a
-produit, dans l'onglet *Actions*.
+Closing the startup window while nothing is running quits the app. *Quit* from
+the icon shuts the bot down gently — fade-out, playback state saved — before
+closing.
 
 ---
 
-## Où sont les fichiers
+## Installing: the Windows warning
 
-| Quoi | Où |
+The installer **is not signed**: a code-signing certificate costs several
+hundred euros a year, which makes no sense for a free project. Windows
+SmartScreen therefore shows, on first launch, "Windows protected your PC" and
+an unknown publisher.
+
+To install anyway: **More info**, then **Run anyway**. The browser may also ask
+you to confirm the download (*Keep*).
+
+On Linux, the AppImage only needs to be made executable (`chmod +x`, or
+*Properties → Allow executing*). Depending on the distribution, the
+notification area needs the *AppIndicator* extension (GNOME) and the AppImage
+the `libfuse2` library. The `.deb` package installs what is needed.
+
+Each file is built by the public workflow
+[`.github/workflows/desktop.yml`](../.github/workflows/desktop.yml), from the
+code in this repository: every file attached to a release links back to the run
+that produced it, in the *Actions* tab.
+
+---
+
+## Where the files are
+
+| What | Where |
 |---|---|
-| Le bot, sa configuration et ses données | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\bot\` |
-| `.env` | dans ce même dossier `bot\` |
-| Playlists, réglages, journaux | `bot\data\` |
-| Node.js embarqué | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\runtime\` |
-| Réglages de l'application | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\settings.json` |
+| The bot, its configuration and its data | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\bot\` |
+| `.env` | in that same `bot\` folder |
+| Playlists, settings, logs | `bot\data\` |
+| Bundled Node.js | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\runtime\` |
+| App settings | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\settings.json` |
 
-Sous Linux, le même dossier est `~/.local/share/com.wolfgangproxa.interactive-music-player/`.
+On Linux, the same folder is `~/.local/share/com.wolfgangproxa.interactive-music-player/`.
 
-Une mise à jour de l'application remplace le code du bot et le runtime, jamais
-`.env`, `data\` ni `versions\`.
+An update of the app replaces the bot's code and the runtime, never `.env`,
+`data\` or `versions\`.
 
-### Garder une installation existante
+### Keeping an existing install
 
-Un clone du dépôt, avec son `.env` et ses `data/`, peut être lancé tel quel :
-dans l'assistant, *Utiliser une installation existante…*, puis choisir le
-dossier qui contient `src` et `package.json`. L'application lance alors ce
-dossier avec le Node de la machine s'il en a un — celui qui a installé ses
-`node_modules` —, et installe les dépendances si elles manquent.
+A clone of the repository, with its `.env` and its `data/`, can be run as is:
+in the wizard, *Use an existing install…*, then pick the folder that contains
+`src` and `package.json`. The app then runs that folder with the machine's Node
+if it has one — the one that installed its `node_modules` —, and installs the
+dependencies if they are missing.
 
-*Revenir au dossier de l'application*, en bas de la fenêtre, défait ce choix.
+*Back to the app's folder*, at the bottom of the window, undoes this choice.
 
-### Un bot déjà lancé
+### A bot already running
 
-Si un bot répond déjà sur le port du tableau de bord — lancé par
-`Start bot.vbs`, par exemple —, l'application s'y rattache sans en démarrer un
-second, et propose de l'ouvrir, de le redémarrer ou de l'éteindre.
+If a bot already answers on the dashboard's port — started by `Start bot.vbs`,
+for example —, the app attaches to it without starting a second one, and offers
+to open it, restart it or shut it down.
 
 ---
 
-## Construire
+## Building
 
-L'installeur Windows se construit sous Windows, l'AppImage et le `.deb` sous
-Ubuntu, par le workflow
-[`.github/workflows/desktop.yml`](../.github/workflows/desktop.yml) : à chaque
-modification de `desktop/` poussée sur `main`, et à la demande depuis l'onglet
-*Actions*. Pousser une étiquette `v*`, ou lancer le workflow à la main en
-remplissant *release* (`v0.0.1`…), publie en plus la release, avec les notes de
-`.github/releases/<étiquette>.md` et un fichier `SHA256SUMS.txt`.
+The Windows installer is built on Windows, the AppImage and the `.deb` on
+Ubuntu, by the workflow
+[`.github/workflows/desktop.yml`](../.github/workflows/desktop.yml): on every
+change to `desktop/` pushed to `main`, and on demand from the *Actions* tab.
+Pushing a `v*` tag, or running the workflow by hand with *release* filled in
+(`v0.0.1`…), also publishes the release, with the notes from
+`.github/releases/<tag>.md` and a `SHA256SUMS.txt` file.
 
-En local, avec Node 24 et Rust :
+Locally, with Node 24 and Rust:
 
 ```bash
 cd desktop
 npm ci
-npm run payload       # Node embarqué + bot + dépendances → src-tauri/payload/
-npm run build         # Windows : installeur NSIS → src-tauri/target/release/bundle/nsis/
-npm run build -- --bundles appimage,deb   # Linux → bundle/appimage/ et bundle/deb/
+npm run payload       # bundled Node + bot + dependencies → src-tauri/payload/
+npm run build         # Windows: NSIS installer → src-tauri/target/release/bundle/nsis/
+npm run build -- --bundles appimage,deb   # Linux → bundle/appimage/ and bundle/deb/
 ```
 
-Sous Linux, Tauri demande d'abord WebKitGTK et ses voisines : la liste exacte
-est dans l'étape *Bibliothèques système* du workflow.
+On Linux, Tauri first needs WebKitGTK and its neighbours: the exact list is in
+the workflow's *Bibliothèques système* step.
 
-La charge utile se prépare sur la plateforme visée : npm y télécharge les
-binaires propres à chacune (FFmpeg, yt-dlp, chiffrement DAVE).
+The payload is prepared on the target platform: npm downloads there the
+binaries specific to each one (FFmpeg, yt-dlp, DAVE encryption).
 
-### Développer
+### Developing
 
 ```bash
 cd desktop
@@ -118,48 +119,46 @@ npm ci
 npm run dev
 ```
 
-Sans charge utile, l'application lance le dépôt lui-même, avec le Node de la
-machine. `IMP_BOT_ROOT` désigne un autre dossier de bot.
+Without a payload, the app runs the repository itself, with the machine's Node.
+`IMP_BOT_ROOT` points to another bot folder.
 
 ---
 
-## Comment c'est fait
+## How it is built
 
 ```
 desktop/
-├── ui/                     Fenêtre de lancement : HTML et JS sans dépendance
+├── ui/                     Startup window: HTML and JS with no dependency
 ├── scripts/
-│   └── build-payload.js    Prépare l'archive embarquée par l'installeur
+│   └── build-payload.js    Prepares the archive bundled by the installer
 └── src-tauri/
-    ├── tauri.conf.json     Fenêtre, installeur NSIS, ressources
+    ├── tauri.conf.json     Window, NSIS installer, resources
     └── src/
-        ├── supervisor.rs   Cycle de vie du bot : préparation, lancement, garde, arrêt
-        ├── layout.rs       Quel dossier de bot, quel Node
-        ├── payload.rs      Déploiement de l'archive embarquée
-        ├── dashboard.rs    Port, adresse et commandes du tableau de bord
-        ├── discord.rs      Vérification du jeton, invitation
-        ├── env_file.rs     Lecture et écriture de .env
-        ├── tray.rs         Icône et menu de la zone de notification
-        └── view.rs         L'instantané que dessine la fenêtre de lancement
+        ├── supervisor.rs   Bot lifecycle: preparation, launch, watch, shutdown
+        ├── layout.rs       Which bot folder, which Node
+        ├── payload.rs      Deploying the bundled archive
+        ├── dashboard.rs    Dashboard port, address and commands
+        ├── discord.rs      Token check, invite
+        ├── env_file.rs     Reading and writing .env
+        ├── tray.rs         Notification area icon and menu
+        └── view.rs         The snapshot the startup window draws
 ```
 
-La fenêtre de lancement ne décide de rien : l'application lui envoie un
-instantané complet à chaque changement, et elle renvoie l'identifiant du bouton
-cliqué. Le tableau de bord, lui, est chargé depuis le serveur du bot et n'a
-aucun accès aux commandes de l'application.
+The startup window decides nothing: the app sends it a full snapshot on every
+change, and it sends back the ID of the clicked button. The dashboard, for its
+part, is loaded from the bot's server and has no access to the app's commands.
 
-### Le contrat avec le bot
+### The contract with the bot
 
-L'application pose deux variables dans l'environnement du bot :
+The app sets two variables in the bot's environment:
 
-- `AUTO_OPEN_DASHBOARD=false` — le tableau de bord s'ouvre dans l'application,
-  pas dans un onglet ;
-- `IMP_SUPERVISOR=desktop` — pour redémarrer, le bot ne lance plus lui-même une
-  instance détachée, qui échapperait à l'application. Il dépose le point
-  d'entrée voulu dans `data/desktop-restart.json` et sort avec le code 75 ;
-  l'application relance ce point d'entrée avec `IMP_RESTART=1`. Voir
+- `AUTO_OPEN_DASHBOARD=false` — the dashboard opens in the app, not in a tab;
+- `IMP_SUPERVISOR=desktop` — to restart, the bot no longer starts a detached
+  instance itself, which would escape the app. It drops the wanted entry point
+  in `data/desktop-restart.json` and exits with code 75; the app relaunches that
+  entry point with `IMP_RESTART=1`. See
   [`src/utils/supervisor.js`](../src/utils/supervisor.js).
 
-Le reste passe par ce qui existait déjà pour le lanceur PowerShell : le port
-qui s'ouvre quand le bot est prêt, `/api/clients` pour l'adresse du tableau de
-bord, et la WebSocket pour `restartBot` et `shutdownBot`.
+The rest goes through what already existed for the PowerShell launcher: the
+port that opens when the bot is ready, `/api/clients` for the dashboard's
+address, and the WebSocket for `restartBot` and `shutdownBot`.
