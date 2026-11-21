@@ -2976,5 +2976,12 @@
     <script src="js/downloadTarget.js"></script>
     <script src="js/shuffleHint.js"></script>
     <script src="app.js"></script>
+    <!--
+        Closes .app-container, opened at the top of the page. Everything
+        between it and here, modals and scripts included, has always been
+        inside it: the browser closed it implicitly at </body>. Closing it
+        here keeps that exact tree.
+    -->
+    </div>
 </body>
 </html>
