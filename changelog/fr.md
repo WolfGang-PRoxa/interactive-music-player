@@ -27,7 +27,7 @@ entrée porte la date du jour où le changement a été livré.
 ### Fixed
 - Depuis l'ordinateur du bot, le jeton suffit à être propriétaire, même une fois la connexion Discord configurée : l'application ne vous traite plus en invité, et Quitter ou Redémarrer depuis l'icône fonctionnent de nouveau.
 - Les liens externes du tableau de bord (GitHub, Buy Me a Coffee, documentation, portail Discord) s'ouvrent dans le navigateur au lieu de ne rien faire dans la fenêtre de l'application.
-- L'icône de l'application n'est plus posée sur un fond noir, et la fenêtre de démarrage affiche cette icône au lieu d'un dessin approximatif.
+- L'icône de l'application n'est plus posée sur un fond noir, et la fenêtre de démarrage affiche cette icône au lieu d'un dessin approximatif. La double croche est redessinée proprement : plus de trait qui dépasse de la barre.
 
 ## 2026-11-14 — La configuration dans le tableau de bord
 

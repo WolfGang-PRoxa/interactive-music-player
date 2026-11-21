@@ -26,7 +26,7 @@ was delivered.
 ### Fixed
 - On the bot's own computer, the token is enough to be the owner, even once Discord sign-in is set up: the app no longer treats you as a guest, and Quit or Restart from the tray icon work again.
 - External links in the dashboard (GitHub, Buy Me a Coffee, documentation, Discord portal) open in the browser instead of doing nothing in the app window.
-- The app icon no longer sits on a black background, and the startup window shows that icon instead of a rough drawing.
+- The app icon no longer sits on a black background, and the startup window shows that icon instead of a rough drawing. The beamed note is redrawn cleanly, with no stroke sticking out of the beam.
 
 ## 2026-11-14 — Configuration in the dashboard
 
