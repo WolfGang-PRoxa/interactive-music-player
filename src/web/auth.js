@@ -577,10 +577,9 @@ function cookieOptions(maxAge) {
  * session valable.
  *
  * @param {import('http').IncomingMessage} req
- * @param {{ holdsToken?: boolean }} identity
  * @returns {boolean}
  */
-function originAllowed(req, identity) {
+function originAllowed(req) {
   const origin = req.headers.origin;
   // Pas de navigateur derrière : voir plus haut.
   if (!origin) return true;
@@ -647,7 +646,7 @@ function verifyUpgrade(info) {
     return false;
   }
 
-  if (!originAllowed(info.req, identity)) {
+  if (!originAllowed(info.req)) {
     log.warn(`[Auth] WebSocket handshake refused: origin « ${info.req.headers.origin} » ` + 'is not this dashboard.');
     return false;
   }

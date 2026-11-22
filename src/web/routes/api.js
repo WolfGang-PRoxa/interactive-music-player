@@ -975,7 +975,7 @@ function createApiRouter(webServer) {
       reqFormat && formatMap[reqFormat.toLowerCase()] ? formatMap[reqFormat.toLowerCase()] : formatMap['mp3_320'];
     const fileExt = targetFormat.ext;
 
-    const safeTitle = (track.title || 'audio').replace(/[\r\n"\\\/]/g, '_');
+    const safeTitle = (track.title || 'audio').replace(/[\r\n"\\/]/g, '_');
     res.setHeader('Content-Type', targetFormat.mime);
     res.setHeader(
       'Content-Disposition',
@@ -1335,7 +1335,7 @@ function createApiRouter(webServer) {
       !/^https?:\/\//i.test(targetQuery) ||
       targetQuery.includes('/uploads/') ||
       targetQuery.includes('data\\uploads') ||
-      /^[a-zA-Z]:[\\\/]/.test(targetQuery)
+      /^[a-zA-Z]:[\\/]/.test(targetQuery)
     ) {
       return { status: 404, error: 'Local audio file, no video extraction needed' };
     }

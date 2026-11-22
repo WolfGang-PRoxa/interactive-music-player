@@ -96,9 +96,7 @@ const TooltipSystem = (() => {
     clearTimeout(showTimer);
     hide();
     currentTarget = target;
-    const currentSettings =
-      (window.MusicPlayer && window.MusicPlayer.dashboardSettings) ||
-      (typeof dashboardSettings !== 'undefined' ? dashboardSettings : {});
+    const currentSettings = (window.MusicPlayer && window.MusicPlayer.dashboardSettings) || {};
     const delaySec = parseFloat(currentSettings.tooltipDelay ?? 0.25);
     showTimer = setTimeout(
       () => {
@@ -125,9 +123,6 @@ const TooltipSystem = (() => {
   function translate(key) {
     if (typeof window.MusicPlayer?.t === 'function') {
       const translated = window.MusicPlayer.t(key);
-      if (translated && translated !== key) return translated;
-    } else if (typeof t === 'function') {
-      const translated = t(key);
       if (translated && translated !== key) return translated;
     }
     return '';

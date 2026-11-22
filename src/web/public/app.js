@@ -8,7 +8,7 @@
   let state = window.MusicPlayer.state;
   let currentGuildId = null;
   let customGuildSelect = null;
-  let customBroadcastSelect = null;
+  let customBroadcastSelect;
   let customImportAudioSelect = null;
   let customImportVideoSelect = null;
 
@@ -18,14 +18,11 @@
   const showToast = window.MusicPlayer.showToast;
 
   let dashboardSettings = window.MusicPlayer.dashboardSettings;
-  const saveDashboardSettings = window.MusicPlayer.saveDashboardSettings;
 
   /** Empreinte des serveurs connus, pour ne redessiner leur liste qu'utilement. */
   let guildsSignature = '';
 
   // DOM Elements
-  const statusDot = document.querySelector('.status-dot');
-  const statusText = document.querySelector('.status-text');
   const guildSelect = document.getElementById('guild-select');
 
   const progressBarWrapper = document.getElementById('progress-bar-wrapper');
@@ -230,7 +227,7 @@
       { passive: false },
     );
   }
-  let customSourceSelect = null;
+  let customSourceSelect;
 
   // 60 FPS High-Precision Timeline Interpolation Engine
   let animFrameId = null;
@@ -797,13 +794,6 @@
     }
   }
 
-  function syncVideoSpeed(speedStr) {
-    if (typeof window.MusicPlayer.syncVideoSpeed === 'function') {
-      return window.MusicPlayer.syncVideoSpeed(speedStr);
-    }
-    return speedStr;
-  }
-
   function syncVideoProgress(currentMs, isExplicitSeek = false) {
     if (typeof window.MusicPlayer.syncVideoProgress === 'function') {
       window.MusicPlayer.syncVideoProgress(currentMs, isExplicitSeek);
@@ -828,12 +818,6 @@
     }
   }
 
-  function syncVideoOverlayButtons(passedState) {
-    if (typeof window.MusicPlayer.syncVideoOverlayButtons === 'function') {
-      window.MusicPlayer.syncVideoOverlayButtons(passedState);
-    }
-  }
-
   // Update the UI fields according to the state object
   function updateUI() {
     if (window.MusicPlayer) {
@@ -845,7 +829,7 @@
     // Render Voice Channels list grouped by Guild (Server)
     if (guildSelect) {
       const getChannelOptionText = (c) => {
-        let status = '';
+        let status;
         if (c.botConnected) {
           // « Inactif » se disait aussi d'un morceau simplement mis en
           // pause, que rien ne distinguait alors d'un salon où le bot
@@ -3460,14 +3444,6 @@
   let selectedHistoryTrack = null;
   let selectedHistoryIndex = null;
 
-  function showHistoryContextMenu(e, track, index) {
-    selectedHistoryTrack = track;
-    selectedHistoryIndex = index;
-    contextMenu.style.left = `${e.clientX}px`;
-    contextMenu.style.top = `${e.clientY}px`;
-    contextMenu.classList.remove('hidden');
-  }
-
   function hideHistoryContextMenu() {
     contextMenu.classList.add('hidden');
     selectedHistoryTrack = null;
@@ -3748,6 +3724,48 @@
     });
   }
 
+  // Declared here rather than inside the button's block below: the server's
+  // `shutting_down` announcement calls it too, and must find it even when
+  // that button is absent from the page.
+  /** Rampe d'extinction en cours, s'il y en a une. */
+  let fadeOutTimer = null;
+
+  function fadeOutPersonalAudio(durationMs = 5000) {
+    isShuttingDown = true;
+    if (!activeAudio || activeAudio.paused) return;
+
+    // L'extinction déclenche deux appels : le clic local, puis l'annonce
+    // `shutting_down` renvoyée par le serveur. Deux rampes concurrentes
+    // partent de volumes relevés à des instants différents et écrivent
+    // chacune à son rythme : le gain se met à osciller au lieu de
+    // descendre, ce qui s'entend comme un crépitement.
+    if (fadeOutTimer) return;
+
+    const startVol = activeAudio.volume;
+    // Un pas court évite le bruit de fermeture éclair d'un gain qui
+    // descend par sauts audibles.
+    const steps = Math.max(20, Math.round(durationMs / 25));
+    const stepTime = durationMs / steps;
+    let currentStep = 0;
+
+    fadeOutTimer = setInterval(() => {
+      currentStep++;
+      const linearFactor = 1 - currentStep / steps;
+      const curveFactor = Math.pow(linearFactor, 2.5);
+      activeAudio.volume = Math.max(0, startVol * curveFactor);
+      if (currentStep >= steps) {
+        clearInterval(fadeOutTimer);
+        fadeOutTimer = null;
+        activeAudio.volume = 0;
+        activeAudio.pause();
+        if (clientDucking) {
+          clientDucking.currentVolume = -1;
+          clientDucking.lastBaseVolume = -1;
+        }
+      }
+    }, stepTime);
+  }
+
   // Restart / Shutdown Bot Button Listener (Simple click)
   if (btnRestartBot) {
     const maintModal = document.getElementById('maintenance-modal');
@@ -3784,45 +3802,6 @@
       maintModal.addEventListener('click', (e) => {
         if (e.target === maintModal) maintModal.classList.add('hidden');
       });
-    }
-
-    /** Rampe d'extinction en cours, s'il y en a une. */
-    let fadeOutTimer = null;
-
-    function fadeOutPersonalAudio(durationMs = 5000) {
-      isShuttingDown = true;
-      if (!activeAudio || activeAudio.paused) return;
-
-      // L'extinction déclenche deux appels : le clic local, puis l'annonce
-      // `shutting_down` renvoyée par le serveur. Deux rampes concurrentes
-      // partent de volumes relevés à des instants différents et écrivent
-      // chacune à son rythme : le gain se met à osciller au lieu de
-      // descendre, ce qui s'entend comme un crépitement.
-      if (fadeOutTimer) return;
-
-      const startVol = activeAudio.volume;
-      // Un pas court évite le bruit de fermeture éclair d'un gain qui
-      // descend par sauts audibles.
-      const steps = Math.max(20, Math.round(durationMs / 25));
-      const stepTime = durationMs / steps;
-      let currentStep = 0;
-
-      fadeOutTimer = setInterval(() => {
-        currentStep++;
-        const linearFactor = 1 - currentStep / steps;
-        const curveFactor = Math.pow(linearFactor, 2.5);
-        activeAudio.volume = Math.max(0, startVol * curveFactor);
-        if (currentStep >= steps) {
-          clearInterval(fadeOutTimer);
-          fadeOutTimer = null;
-          activeAudio.volume = 0;
-          activeAudio.pause();
-          if (clientDucking) {
-            clientDucking.currentVolume = -1;
-            clientDucking.lastBaseVolume = -1;
-          }
-        }
-      }, stepTime);
     }
 
     if (btnMaintRestart) {

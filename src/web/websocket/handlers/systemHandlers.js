@@ -133,7 +133,7 @@ function handleRestartBot(ctx) {
 }
 
 async function handleShutdownBot(ctx) {
-  const { ws, data, webServer, player } = ctx;
+  const { ws, webServer } = ctx;
 
   const guildId = ws.guildId || webServer.client?.guilds?.cache?.first()?.id;
   const settings = database.getSettings(guildId);
@@ -184,7 +184,7 @@ async function handleShutdownBot(ctx) {
     if (webServer.client) {
       const cl = webServer.client;
       if (cl.duckingManagers) {
-        for (const [gId, manager] of cl.duckingManagers) {
+        for (const manager of cl.duckingManagers.values()) {
           try {
             manager.destroy();
           } catch (e) {}

@@ -116,7 +116,7 @@ console.log('Chaque salon garde la sienne\n');
 console.log("\nCe que le lecteur dit, et ce qu'il ignore\n");
 
 {
-  const s = dans('salon_miroir');
+  dans('salon_miroir');
   database.updateSettings(G, { activePlaybackSource: 'queue' });
 
   channelQueue.write(G, [piste('A'), transitions.create('playlist_x'), piste('B')], dans('salon_miroir'));

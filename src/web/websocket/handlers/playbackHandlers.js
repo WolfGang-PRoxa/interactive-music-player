@@ -15,7 +15,6 @@ const { isInsideAllowedRoots } = require('../../../utils/mediaPaths');
 
 async function handlePlay(ctx) {
   const { ws, data, webServer, player, currentGuildId } = ctx;
-  let queue = ctx.queue;
 
   let { query } = data;
   if (!query) return;

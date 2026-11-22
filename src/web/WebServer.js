@@ -8,7 +8,6 @@ const { WebSocketServer } = require('ws');
 const path = require('path');
 const fs = require('fs');
 const database = require('../database/Database');
-const broadcastManager = require('../broadcast/BroadcastManager');
 const playbackStateManager = require('../database/PlaybackStateManager');
 const preloadManager = require('../audio/PreloadManager');
 const loudness = require('../audio/loudness');

@@ -43,9 +43,6 @@ function longDate(iso, locale) {
 }
 const changelog = require(path.join(__dirname, '..', 'src', 'web', 'changelog.js'));
 
-/** Langues du tableau de bord, dans l'ordre du sélecteur des réglages. */
-const LANGS = ['fr', 'en', 'es', 'de'];
-
 /** Langues dans lesquelles le journal est écrit à la main. */
 const WRITTEN = ['fr', 'en'];
 

@@ -304,7 +304,7 @@ function uninstall(tag) {
   try {
     fs.rmSync(target, { recursive: true, force: true });
   } catch (err) {
-    throw new Error(`Deletion impossible for ${tag}: ${err.message}`);
+    throw new Error(`Deletion impossible for ${tag}: ${err.message}`, { cause: err });
   }
 
   log.info(`[Versions] ${tag} uninstalled (${target} deleted).`);

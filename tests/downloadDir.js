@@ -95,6 +95,7 @@ console.log('\nLes noms de fichiers\n');
   check('les dix caractères refusés par Windows sont couverts', !/[\\/:*?"<>|]/.test(all), all);
 
   const control = downloadDir.safeFilename('titre\x07avec\x00controle', '.mp3');
+  // eslint-disable-next-line no-control-regex -- the control characters are what is checked
   check('les caractères de contrôle disparaissent', !/[\x00-\x1f]/.test(control), JSON.stringify(control));
 
   const dotted = downloadDir.safeFilename('Fin de phrase...', '.mp3');

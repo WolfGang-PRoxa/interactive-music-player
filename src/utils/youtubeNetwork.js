@@ -446,7 +446,6 @@ function wrapFetch(original, agentFor4 = () => ipv4Agent(original)) {
       const response = await original(input, init);
       if (!player || !(await refusedAsBot(response))) return response;
       escalate(ROUTE.IPV4, 'youtubei');
-      route = ROUTE.IPV4;
     }
 
     // Rejouable : youtubei passe le corps dans `init`, sous forme de texte,

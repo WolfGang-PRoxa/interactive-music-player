@@ -821,7 +821,6 @@ window.MusicPlayer.updateVideoPlayer = async function (track) {
   if (videoTopOverlay) videoTopOverlay.classList.remove('hidden');
 
   const trackKey = trackUrl || `${effectiveTrack.title}-${effectiveTrack.author}`;
-  const currentMs = (state.progress && state.progress.currentMs) || 0;
   const isSameTrack = currentVideoTrackUrl === trackKey;
   currentVideoTrackUrl = trackKey;
 
@@ -845,8 +844,6 @@ window.MusicPlayer.updateVideoPlayer = async function (track) {
     return;
   }
 
-  const startSec = Math.max(0, Math.floor(((state.progress && state.progress.currentMs) || 0) / 1000));
-
   if (videoPlaceholder) videoPlaceholder.classList.add('hidden');
 
   // Direct or local video file detection vs audio file
@@ -868,7 +865,7 @@ window.MusicPlayer.updateVideoPlayer = async function (track) {
       !/^https?:\/\//i.test(trackUrl) ||
       trackUrl.includes('/uploads/') ||
       trackUrl.includes('data\\uploads') ||
-      /^[a-zA-Z]:[\\\/]/.test(trackUrl) ||
+      /^[a-zA-Z]:[\\/]/.test(trackUrl) ||
       audioExts.some((ext) => titleExt === ext || trackExt === ext));
 
   if (isVideoFile || /\.(mp4|webm|ogv|m3u8|mkv|avi|mov|flv|m4v|3gp|wmv)(\?.*)?$/i.test(trackUrl)) {
@@ -1365,7 +1362,7 @@ window.MusicPlayer.setupFloatingVideoWindow = function () {
 
     videoBodyElement.addEventListener(
       'touchstart',
-      (e) => {
+      () => {
         tapCameFromTouch = true;
         controlsShownAtTouch = videoWindow.classList.contains('user-active');
       },
@@ -1469,8 +1466,6 @@ window.MusicPlayer.setupFloatingVideoWindow = function () {
   const videoVolumeSlider = document.getElementById('video-volume-slider');
   const videoBtnMute = document.getElementById('video-btn-mute');
   const videoProgressWrapper = document.getElementById('video-progress-wrapper');
-  const videoSpeedBtn = document.getElementById('video-speed-btn');
-  const videoSpeedDropdown = document.getElementById('video-speed-dropdown');
   const videoBtnPip = document.getElementById('video-btn-pip');
 
   window.MusicPlayer.lastNonMuteVolume = window.MusicPlayer.lastNonMuteVolume || 70;
@@ -1494,7 +1489,7 @@ window.MusicPlayer.setupFloatingVideoWindow = function () {
       lastNonMuteVolume: window.MusicPlayer.lastNonMuteVolume,
     });
 
-    let newVol = 0;
+    let newVol;
     if (currentVol > 0) {
       window.MusicPlayer.lastNonMuteVolume = currentVol;
       newVol = 0;

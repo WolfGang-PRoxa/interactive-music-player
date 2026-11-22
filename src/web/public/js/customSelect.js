@@ -291,7 +291,6 @@ class CustomSelect {
 
     const translate = (key) => {
       if (typeof window.MusicPlayer.t === 'function') return window.MusicPlayer.t(key);
-      if (typeof t === 'function') return t(key);
       return key;
     };
 
@@ -306,7 +305,6 @@ class CustomSelect {
 
     const notifyToast = (msg) => {
       if (typeof window.MusicPlayer.showToast === 'function') return window.MusicPlayer.showToast(msg);
-      if (typeof showToast === 'function') return showToast(msg);
     };
 
     if (this.nativeSelect.id === 'guild-select' && option.value) {

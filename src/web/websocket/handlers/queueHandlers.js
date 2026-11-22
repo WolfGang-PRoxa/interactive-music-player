@@ -10,16 +10,15 @@ const { searchLocalAwareTrack, switchToQueueSourceIfNeeded } = require('../handl
 const { readSetAsideQueue, writeSetAsideQueue } = require('../../../utils/setAsideQueue');
 const channelQueue = require('../../../audio/channelQueue');
 const log = require('../../../utils/logger');
+const { parseDurationToMs } = require('../../../utils/duration');
 
 function handleRemoveTrack(ctx) {
   const { data, webServer, player, currentGuildId } = ctx;
-  let queue = ctx.queue;
 
   const { index } = data;
   if (typeof index === 'number') {
     try {
       const settings = database.getSettings(currentGuildId);
-      const isPersonal = settings.broadcastMode === 'personal';
       const isPlaylistPlaying = settings.activePlaybackSource && settings.activePlaybackSource !== 'queue';
 
       /*

@@ -57,7 +57,7 @@ for (let s = 0.2; s <= 3.05; s += 0.01) {
   const rounded = Math.round(s * 100) / 100;
   const filterName = `speed_${String(rounded).replace('.', '_')}`;
 
-  let filterString = '';
+  let filterString;
   if (rounded < 0.5) {
     filterString = `atempo=0.5,atempo=${Math.round((rounded / 0.5) * 100) / 100}`;
   } else if (rounded > 2.0) {
@@ -78,7 +78,6 @@ const { YoutubeiExtractor } = require('discord-player-youtubei');
 const path = require('path');
 const fs = require('fs');
 
-const config = require('./config');
 const database = require('./database/Database');
 const playbackStateManager = require('./database/PlaybackStateManager');
 // Doit être chargé avant toute création de queue : installe les accesseurs
@@ -506,7 +505,7 @@ process.on('SIGINT', async () => {
   }
 
   // Cleanup all ducking managers
-  for (const [guildId, manager] of client.duckingManagers) {
+  for (const manager of client.duckingManagers.values()) {
     manager.destroy();
   }
   client.duckingManagers.clear();

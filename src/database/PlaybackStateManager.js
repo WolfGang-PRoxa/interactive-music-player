@@ -1,4 +1,3 @@
-const fs = require('fs');
 const path = require('path');
 const { Track } = require('discord-player');
 const { writeJsonAtomic, readJsonSafe, cleanStaleTemp } = require('../utils/atomicJson');
@@ -283,7 +282,7 @@ class PlaybackStateManager {
       }
 
       // Écouteur pour la restauration silencieuse et la reprise en temps réel (sans coupure ni saut en arrière)
-      const onRestorePlayerStart = (queue, track) => {
+      const onRestorePlayerStart = (queue) => {
         if (queue.restorePaused) {
           const guildId = queue.guild.id;
           const progress = queue.restoreProgress || 0;

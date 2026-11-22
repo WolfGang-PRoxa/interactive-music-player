@@ -285,7 +285,7 @@
 
     const add = (label, value, count) => {
       if (!value) return;
-      let size = 0;
+      let size;
       try {
         size = JSON.stringify(value).length;
       } catch (e) {

@@ -842,14 +842,6 @@
     }
   }
 
-  function toggleDrawer() {
-    if (drawerPanel && drawerPanel.classList.contains('open')) {
-      closeDrawer();
-    } else {
-      openDrawer();
-    }
-  }
-
   // Format Uptime
   function formatUptime(seconds) {
     if (!seconds || seconds <= 0) return '0s';

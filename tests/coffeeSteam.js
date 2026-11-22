@@ -118,7 +118,6 @@ function makeCanvasStub() {
     };
     return g;
   };
-  const realArc = ctx.arc.bind(ctx);
   ctx.arc = (x, y, r) => {
     current.push({ x, y, r, alpha: pendingAlpha });
   };

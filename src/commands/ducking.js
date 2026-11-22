@@ -5,7 +5,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const embeds = require('../utils/embeds');
 const database = require('../database/Database');
-const config = require('../config');
 
 module.exports = {
   data: new SlashCommandBuilder()

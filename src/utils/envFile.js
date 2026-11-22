@@ -33,7 +33,7 @@ function readText(file) {
   try {
     // Un BOM collerait au nom de la première variable, qui deviendrait
     // introuvable : dotenv a le même travers, d'où l'écriture sans BOM.
-    return fs.readFileSync(file, 'utf8').replace(/^﻿/, '');
+    return fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '');
   } catch (err) {
     if (err.code === 'ENOENT') return null;
     throw err;

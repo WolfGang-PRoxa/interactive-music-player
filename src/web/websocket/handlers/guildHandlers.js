@@ -26,7 +26,6 @@ const ADD_TARGETS = ['queue', 'playlist', 'play', 'download'];
 
 async function handleSelectChannel(ctx) {
   const { ws, data, webServer, player } = ctx;
-  let queue = ctx.queue;
 
   const { guildId: targetGuildId, channelId } = data;
   if (targetGuildId && channelId) {
@@ -456,8 +455,6 @@ async function handleUpdateSettings(ctx) {
   // Mettre à jour les réglages de diffusion
   if (data.broadcastMode !== undefined && data.broadcastMode !== oldSettings.broadcastMode) {
     broadcastManager.setMode(currentGuildId, data.broadcastMode);
-
-    const newSettings = database.getSettings(currentGuildId);
 
     // Si on repasse en mode everyone, reconnecter le bot
     if (data.broadcastMode === 'everyone' && queue) {

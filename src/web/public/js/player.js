@@ -62,7 +62,6 @@ window.MusicPlayer.updateBufferUI = function () {
   const buffers = [document.getElementById('progress-buffer'), document.getElementById('video-progress-buffer')].filter(
     Boolean,
   );
-  const progressBar = document.getElementById('progress-bar');
   const state = window.MusicPlayer.state;
   if (buffers.length === 0) return;
 
@@ -105,7 +104,7 @@ function isLocalFile(track) {
   if (track.queryType === 'file') return true;
   const url = (track.url || '').toLowerCase();
   if (url.includes('/uploads/') || url.includes('data\\uploads') || url.includes('data/uploads')) return true;
-  if (/^[a-z]:[\\\/]/i.test(url)) return true;
+  if (/^[a-z]:[\\/]/i.test(url)) return true;
   if (url.startsWith('file://')) return true;
   return false;
 }

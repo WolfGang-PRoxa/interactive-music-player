@@ -1635,7 +1635,7 @@ class PreloadManager {
       database.clearBridge(track.url);
     }
 
-    let candidates = [];
+    let candidates;
     try {
       const query = `${track.author || ''} ${track.title}`.trim();
       const res = await this.player.search(query, { requestedBy: null });

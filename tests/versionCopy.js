@@ -249,7 +249,6 @@ function mount(options = {}) {
     console,
   };
   sandbox.globalThis = sandbox;
-  sandbox.window.matchMedia = sandbox.window.matchMedia;
   vm.createContext(sandbox);
   vm.runInContext(SOURCE, sandbox);
 

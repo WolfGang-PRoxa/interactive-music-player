@@ -209,6 +209,8 @@ window.MusicPlayer = window.MusicPlayer || {};
       .replace(/(^|[\s(])_([^_\n]+)_(?=[\s).,;:!?]|$)/g, '$1<em>$2</em>')
       .replace(/ {2}$/, '<br>');
 
+    // The NUL bytes are the placeholders set aside for code spans above.
+    // eslint-disable-next-line no-control-regex
     return html.replace(/ (\d+) /g, (_, index) => codes[Number(index)]);
   }
 

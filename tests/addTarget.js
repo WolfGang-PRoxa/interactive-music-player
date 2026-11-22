@@ -144,7 +144,7 @@ async function run() {
   const source = (file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
 
   const handlers = source(path.join('src', 'web', 'websocket', 'handlers', 'guildHandlers.js'));
-  const listed = (handlers.match(/const ADD_TARGETS = \[([^\]]*)\]/) || [, ''])[1]
+  const listed = (handlers.match(/const ADD_TARGETS = \[([^\]]*)\]/) || [null, ''])[1]
     .split(',')
     .map((s) => s.trim().replace(/^'|'$/g, ''))
     .filter(Boolean);

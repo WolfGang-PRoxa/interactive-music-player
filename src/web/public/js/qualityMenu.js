@@ -749,7 +749,7 @@ function writeLoudnessValue(value, level) {
   if (!value) return;
 
   let text;
-  let desired = false;
+  let desired;
 
   if (level.status === 'analyzing') {
     text = t('loudness_analyzing_short', 'analyse…');
