@@ -149,7 +149,7 @@ check(
 );
 check(
   '  … et se tait quand les animations sont refusées',
-  /@media \(prefers-reduced-motion: reduce\) \{\s*\.theme-toggle-btn\.header-pulse::after \{ animation: none; \}/.test(
+  /@media \(prefers-reduced-motion: reduce\) \{\s*\.theme-toggle-btn\.header-pulse::after \{\s*animation: none;\s*\}/.test(
     CSS,
   ),
 );

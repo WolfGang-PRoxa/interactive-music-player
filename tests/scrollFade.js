@@ -291,7 +291,7 @@ console.log("\nCe que le masque efface, et ce qu'il épargne\n");
 
   check(
     'il efface vers le transparent, sans supposer de couleur de fond',
-    /mask-image: linear-gradient\(to bottom,\s*transparent 0,/.test(rule),
+    /mask-image:\s*linear-gradient\(\s*to bottom,\s*transparent 0,/.test(rule),
     'les cartes sont en verre dépoli et changent avec le thème',
   );
 

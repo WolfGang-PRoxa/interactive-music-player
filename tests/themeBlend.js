@@ -68,10 +68,14 @@ function blocks(css) {
   while ((m = re.exec(css)) !== null) {
     const decls = {};
     for (const line of m[3].replace(/\/\*[\s\S]*?\*\//g, '').split(';')) {
-      const kv = /^\s*(--[\w-]+)\s*:\s*(.+?)\s*$/.exec(line);
-      if (kv) decls[kv[1]] = kv[2];
+      // A value may span several lines once formatted: it is read whole, with
+      // its whitespace folded, so the checks see the same text either way.
+      const kv = /^\s*(--[\w-]+)\s*:\s*([\s\S]+?)\s*$/.exec(line);
+      if (kv) decls[kv[1]] = kv[2].replace(/\s+/g, ' ').replace(/\(\s/g, '(').replace(/\s\)/g, ')');
     }
-    out[m[2].trim()] = Object.assign(out[m[2].trim()] || {}, decls);
+    // Selectors are keyed with double quotes, whichever the sheet uses.
+    const selector = m[2].trim().replace(/'/g, '"');
+    out[selector] = Object.assign(out[selector] || {}, decls);
   }
   return out;
 }
@@ -356,8 +360,8 @@ check('  … mais garde son absence de halo', /glow: muted \? 0 :/.test(PARTICLE
  * ni la feuille de style ni le balisage n'en portent la trace.
  */
 {
-  const from = PARTICLES.indexOf('    function clamp(');
-  const to = PARTICLES.indexOf('    function rgba(');
+  const from = PARTICLES.indexOf('function clamp(');
+  const to = PARTICLES.indexOf('function rgba(');
   const box = {
     document: {
       createElement: () => ({
@@ -433,7 +437,7 @@ check(
   /\.header-pop\[hidden\] \{[^}]*display: none;/.test(MODALS),
   'sans quoi le panneau ne se referme jamais',
 );
-check('le curseur va de la nuit au jour', /id="theme-blend-range"[\s\S]{0,120}?min="0" max="100"/.test(MARKUP));
+check('le curseur va de la nuit au jour', /id="theme-blend-range"[\s\S]{0,120}?min="0"\s+max="100"/.test(MARKUP));
 check('le module est chargé', /<script src="js\/themeBlend\.js"><\/script>/.test(MARKUP));
 
 /*

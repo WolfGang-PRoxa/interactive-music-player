@@ -472,7 +472,7 @@ console.log("\nLa file, qui se lit autrement qu'une playlist\n");
   );
   check(
     '  … la playlist suit son curseur',
-    /transitions\.nextAfter\(playlist\.tracks \|\| \[\],/.test(SERVER),
+    /transitions\.nextAfter\(\s*playlist\.tracks \|\| \[\],/.test(SERVER),
     "sa liste ne bouge pas : c'est la position de lecture qui avance",
   );
 
@@ -497,7 +497,7 @@ console.log("\nLa file, qui se lit autrement qu'une playlist\n");
 
   check(
     "l'aiguillage consommé quitte le rangement de la file",
-    /channelQueue\.write\(guildId,\s*\n\s*channelQueue\.read\(settings\)\.filter/.test(SERVER),
+    /channelQueue\.write\(\s*guildId,\s*channelQueue\.read\(settings\)\.filter/.test(SERVER),
     'laissé en place, il se redéclencherait au titre suivant',
   );
 
@@ -874,7 +874,7 @@ console.log('\nCe que le fondu a déjà entamé de la destination\n');
     '  … et la bascule sait quoi en faire',
     /const startProgressMs = Number\(data\.startProgressMs\) \|\| 0;/.test(HANDLER) &&
       /queue\.virtualProgressMs = startProgressMs;/.test(HANDLER) &&
-      /_syncPlaylistToPlayer\(currentGuildId, source, targetIndex, true,\s*\n\s*startProgressMs\)/.test(HANDLER),
+      /_syncPlaylistToPlayer\(currentGuildId, source, targetIndex, true,\s*startProgressMs\)/.test(HANDLER),
     'vers la file comme vers une playlist',
   );
 

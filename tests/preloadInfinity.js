@@ -60,7 +60,7 @@ console.log('Les curseurs et leur dernier cran\n');
 const SLIDERS = ['preload-queue-count', 'preload-history-count', 'preload-playlist-count'];
 
 for (const id of SLIDERS) {
-  const tag = new RegExp(`<input type="range" id="${id}"([^>]*)>`).exec(MARKUP);
+  const tag = new RegExp(`<input\\s+type="range"\\s+id="${id}"([^>]*)>`).exec(MARKUP);
   check(
     `« ${id} » va jusqu'au cran de l'infini`,
     Boolean(tag) && /max="6"/.test(tag[1]) && /min="0"/.test(tag[1]),
@@ -90,7 +90,7 @@ check(
  * partirait d'ailleurs désignerait un cran qui n'est pas là.
  */
 const trackRule = /\.scroll-range\.has-infinity-end \{([^}]*)\}/.exec(CSS);
-check('la fin de la piste porte un dégradé', Boolean(trackRule) && /linear-gradient\(to right/.test(trackRule[1]));
+check('la fin de la piste porte un dégradé', Boolean(trackRule) && /linear-gradient\(\s*to right/.test(trackRule[1]));
 check(
   '  … qui démarre au dernier cran',
   Boolean(trackRule) && /83\.33%/.test(trackRule[1]),
@@ -117,7 +117,7 @@ check(
  */
 check(
   'le symbole est dessiné, pas écrit',
-  /const INFINITY_PATH = 'M20\.288 9\.463/.test(SETTINGS) &&
+  /const INFINITY_PATH =\s*'M20\.288 9\.463/.test(SETTINGS) &&
     /createElementNS\(ns, 'svg'\)/.test(SETTINGS) &&
     !/'∞'/.test(SETTINGS),
   "le tracé fourni, construit dans l'espace de noms SVG",
@@ -127,7 +127,7 @@ check(
   /setAttribute\('fill', 'currentColor'\)/.test(SETTINGS),
   'il suit le thème et le mode jour/nuit',
 );
-check('  … avec un nom pour qui ne le voit pas', /setAttribute\('aria-label'/.test(SETTINGS));
+check('  … avec un nom pour qui ne le voit pas', /setAttribute\(\s*'aria-label'/.test(SETTINGS));
 
 const iconRule = /\.scroll-val-infinity \{([^}]*)\}/.exec(CSS);
 const badgeRule = /\.scroll-val\.is-infinity \{([^}]*)\}/.exec(CSS);
@@ -184,7 +184,7 @@ function extract(signature, endMarker) {
 const sandbox = { console, PRELOAD_ALL: -1 };
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
-vm.runInContext(extract('function preloadPosition(', '\n        const rangeInputs'), sandbox);
+vm.runInContext(extract('function preloadPosition(', 'const rangeInputs'), sandbox);
 
 const range = { max: '6' };
 
@@ -291,24 +291,25 @@ console.log('\nChaque curseur gouverne sa propre section\n');
  * réglages. Les deux cas étaient servis à la suite, si bien que la liste du
  * lecteur passait sous `queueCount` quoi qu'elle contînt.
  */
-const queueBlock = /if \(queueLimit > 0\) \{([\s\S]*?)\n        \}/.exec(PRELOAD);
+// The block ends at the brace back at the `if`'s own indentation.
+const queueBlock = /\n([ \t]*)if \(queueLimit > 0\) \{([\s\S]*?)\n\1\}/.exec(PRELOAD);
 
 check(
   "la file d'attente est choisie, pas cumulée",
   Boolean(queueBlock) &&
-    /const userQueue = sourceIsPlaylist\s*\?\s*this\._setAsideQueue\(settings\)\s*:\s*nextTracks;/.test(queueBlock[1]),
+    /const userQueue = sourceIsPlaylist\s*\?\s*this\._setAsideQueue\(settings\)\s*:\s*nextTracks;/.test(queueBlock[2]),
   'une playlist en lecture occupe la liste du lecteur',
 );
 
 check(
   "  … et la liste du lecteur ne passe plus sous « queueCount » quoi qu'elle contienne",
-  Boolean(queueBlock) && !/targets\.push\(\.\.\.nextTracks\.slice\(0, queueLimit\)\)/.test(queueBlock[1]),
+  Boolean(queueBlock) && !/targets\.push\(\.\.\.nextTracks\.slice\(0, queueLimit\)\)/.test(queueBlock[2]),
   "c'était là que la playlist se faisait précharger par le curseur de la file",
 );
 
 check(
   '  … une seule poussée sous ce curseur',
-  Boolean(queueBlock) && (queueBlock[1].match(/targets\.push\(/g) || []).length === 1,
+  Boolean(queueBlock) && (queueBlock[2].match(/targets\.push\(/g) || []).length === 1,
   "deux ajouts, c'était deux sections servies par un seul réglage",
 );
 
@@ -324,7 +325,7 @@ check(
 );
 check(
   '  … et les autres playlists aussi',
-  /globalPlaylists\.forEach\(pl => \{[\s\S]{0,200}?pl\.tracks\.slice\(0, playlistLimit\)/.test(PRELOAD),
+  /globalPlaylists\.forEach\(\(?pl\)? => \{[\s\S]{0,200}?pl\.tracks\.slice\(0, playlistLimit\)/.test(PRELOAD),
 );
 check("l'historique garde le sien", /prevTracks\.slice\(0, historyLimit\)/.test(PRELOAD));
 

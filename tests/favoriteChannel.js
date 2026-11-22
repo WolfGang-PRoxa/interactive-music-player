@@ -193,12 +193,12 @@ console.log('\nCe que la restauration de lecture choisit\n');
 
   check(
     "une reprise retrouve d'abord ce qui jouait",
-    /\? \(activeChannelId \|\| settings\.lastVoiceChannelId \|\| settings\.defaultVoiceChannelId\)/.test(restore),
+    /\?\s*\(?activeChannelId \|\| settings\.lastVoiceChannelId \|\| settings\.defaultVoiceChannelId\)?/.test(restore),
     "le process est reparti, pas l'écoute",
   );
   check(
     'un allumage suit le salon que le démarrage vient de fixer',
-    /: \(settings\.lastVoiceChannelId \|\| settings\.defaultVoiceChannelId \|\| activeChannelId\)/.test(restore),
+    /:\s*\(?settings\.lastVoiceChannelId \|\| settings\.defaultVoiceChannelId \|\| activeChannelId\)?/.test(restore),
     "c'est là que le favori a son mot à dire",
   );
   check('et les deux ordres se distinguent par la nature du lancement', /const channelId = isRestart/.test(restore));

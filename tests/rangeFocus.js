@@ -63,7 +63,7 @@ console.log("L'arithmétique d'un cran\n");
  * pour `preloadPosition`.
  */
 const start = SETTINGS.indexOf('function wheelValue(');
-const end = SETTINGS.indexOf('\n        const rangeInputs', start);
+const end = SETTINGS.indexOf('const rangeInputs', start);
 if (start < 0 || end < 0) {
   console.log('  FAIL wheelValue introuvable dans settingsModal.js');
   process.exit(1);
@@ -119,8 +119,8 @@ console.log('\nCe qui arme la molette\n');
  * depuis un endroit que l'autre ignore, et le curseur se retrouverait armé sans
  * répondre.
  */
-const clickFrom = ARM.indexOf("zone.addEventListener('mousedown'");
-const wheelFrom = ARM.indexOf("zone.addEventListener('wheel'");
+const clickFrom = ARM.search(/zone\.addEventListener\(\s*'mousedown'/);
+const wheelFrom = ARM.search(/zone\.addEventListener\(\s*'wheel'/);
 check(
   'les deux gestes sont posés sur la zone, pas sur la piste',
   clickFrom > 0 && wheelFrom > 0,
@@ -256,7 +256,7 @@ const rule = (selector) => {
 // curseur armé n'aurait aucune marque.
 check(
   "les curseurs n'ont pas de contour de focus du navigateur",
-  /\.scroll-range,\s*\ninput\[type="range"\] \{[^}]*outline: none;/.test(CSS),
+  /\.scroll-range,\s*\ninput\[type=["']range["']\] \{[^}]*outline: none;/.test(CSS),
 );
 
 const webkitFocus = rule('.scroll-range:focus::-webkit-slider-thumb');
@@ -283,7 +283,7 @@ check(
 // La règle en `:has()` suppose cette imbrication ; le balisage doit la porter.
 check(
   'le curseur est bien un enfant de la ligne',
-  /<div class="scroll-input-wrapper">\s*\n\s*<input type="range"/.test(MARKUP),
+  /<div class="scroll-input-wrapper">\s*\n\s*<input\s+type="range"/.test(MARKUP),
 );
 
 /* ══════════════════ L'indication ══════════════════ */

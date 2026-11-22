@@ -230,9 +230,9 @@ console.log('\n=== La queue du chat GitHub ===\n');
 console.log('Le découpage du logo\n');
 
 {
-  const tailMatch = /<path class="gh-tail" d="([^"]+)"/.exec(MARKUP);
-  const legsMatch = /<path class="gh-legs" d="([^"]+)"/.exec(MARKUP);
-  const headMatch = /<path class="gh-head" d="([^"]+)"/.exec(MARKUP);
+  const tailMatch = /<path\s+class="gh-tail"\s+d="([^"]+)"/.exec(MARKUP);
+  const legsMatch = /<path\s+class="gh-legs"\s+d="([^"]+)"/.exec(MARKUP);
+  const headMatch = /<path\s+class="gh-head"\s+d="([^"]+)"/.exec(MARKUP);
 
   check('la queue est un tracé à elle seule', !!tailMatch, tailMatch ? tailMatch[1] : 'absente');
   check('les pattes sont un tracé à elles seules', !!legsMatch);

@@ -194,7 +194,7 @@ console.log('\nCe que les quatre langues en disent\n');
 console.log('\nLe fragment de silence, décodé\n');
 
 {
-  const match = APP.match(/const SILENCE_WAV = 'data:audio\/wav;base64,'\s*\+\s*'([A-Za-z0-9+/=]+)'/);
+  const match = APP.match(/const SILENCE_WAV =\s*'data:audio\/wav;base64,'\s*\+\s*'([A-Za-z0-9+/=]+)'/);
   check('le fragment est bien là', !!match);
 
   if (match) {

@@ -470,7 +470,7 @@ async function browserSide() {
     const envois = (SETTINGS.match(/type: 'updateSettings'/g) || []).length;
     const gardes = (
       SETTINGS.match(
-        /&& !\(typeof window\.MusicPlayer\.isGuest === 'function' && window\.MusicPlayer\.isGuest\(\)\)\)/g,
+        /&&\s*!\(typeof window\.MusicPlayer\.isGuest === 'function' && window\.MusicPlayer\.isGuest\(\)\)\s*\)/g,
       ) || []
     ).length;
     check(

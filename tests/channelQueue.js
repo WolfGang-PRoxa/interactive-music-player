@@ -287,7 +287,7 @@ console.log('\nCe qui tient les deux bouts\n');
 
   check(
     'le tableau de bord affiche le rangement, pas le lecteur',
-    /queue: channelQueue\.read\(settings\)/.test(SERVER),
+    /queue: channelQueue\s*\.read\(settings\)/.test(SERVER),
     'le lecteur ignore tout de ce qui suit le premier aiguillage',
   );
 

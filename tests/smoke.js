@@ -353,6 +353,13 @@ async function stageWebSocket(t) {
   stageLoading();
   if (failed > 0) {
     console.log('\nLoading failed: starting up is pointless until this is fixed.');
+  } else if (!(process.env.DISCORD_TOKEN || '').trim()) {
+    // Le bot n'ouvre son serveur web qu'une fois connecté à Discord : sans
+    // jeton (l'intégration continue, un clone neuf), cet étage ne peut rien
+    // éprouver. Il le dit, plutôt que d'échouer sur un port qui ne s'ouvrira
+    // jamais.
+    console.log('\n=== 2. Starting the bot and querying it ===\n');
+    console.log('  skip  no DISCORD_TOKEN in .env: the bot cannot connect, so this stage is not run');
   } else {
     await stageIntegration();
   }

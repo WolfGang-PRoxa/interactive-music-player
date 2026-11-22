@@ -109,8 +109,8 @@ console.log('\nQui figure dans la fenêtre de partage\n');
  */
 function listenersOf(state, sharing) {
   const SOURCE = fs.readFileSync(path.join(ROOT, 'src', 'web', 'public', 'js', 'sharedControl.js'), 'utf8');
-  const start = SOURCE.indexOf('    function listeners() {');
-  const end = SOURCE.indexOf('    function initial(', start);
+  const start = SOURCE.indexOf('function listeners() {');
+  const end = SOURCE.indexOf('function initial(', start);
   if (start < 0 || end < 0) throw new Error('listeners() introuvable');
 
   const sandbox = { window: { MusicPlayer: { state } }, sharing, console };

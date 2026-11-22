@@ -88,7 +88,7 @@ function regles(source) {
     out.push({
       selecteurs: m[1]
         .split(',')
-        .map((s) => s.trim().replace(/\s+/g, ' '))
+        .map((s) => s.trim().replace(/\s+/g, ' ').replace(/'/g, '"'))
         .filter(Boolean),
       corps: m[2],
     });
@@ -244,7 +244,7 @@ console.log("\nCe qui se verrait n'est pas étendu\n");
 
 {
   const device = lire('device.css');
-  const pourWebkit = (motif) => new RegExp(`\\[data-engine="webkit"\\][^,{]*${motif}`).test(device);
+  const pourWebkit = (motif) => new RegExp(`\\[data-engine=["']webkit["']\\][^,{]*${motif}`).test(device);
 
   check(
     "l'animation de la pochette tourne toujours sur Safari",
@@ -265,8 +265,8 @@ console.log("\nCe qui se verrait n'est pas étendu\n");
 
   check(
     'ces remèdes-là restent offerts au mode tactile',
-    /\[data-touch-mode="true"\] \.thumbnail-wrapper\.anim-mode-spin/.test(device) &&
-      /\[data-touch-mode="true"\] \.custom-select-trigger/.test(device),
+    /\[data-touch-mode=["']true["']\] \.thumbnail-wrapper\.anim-mode-spin/.test(device) &&
+      /\[data-touch-mode=["']true["']\] \.custom-select-trigger/.test(device),
     "rien n'a été déplacé, seulement ajouté",
   );
 }

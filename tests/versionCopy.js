@@ -57,9 +57,8 @@ console.log('\n=== Copier le numéro de version ===\n');
 
 console.log('Le balisage et la feuille de style\n');
 
-const BUTTON = /<button type="button" class="drawer-footer-value" id="drawer-version-value"([\s\S]{0,240}?)>/.exec(
-  MARKUP,
-);
+const BUTTON =
+  /<button\s+type="button"\s+class="drawer-footer-value"\s+id="drawer-version-value"([\s\S]{0,240}?)>/.exec(MARKUP);
 
 check('la version est un vrai bouton', Boolean(BUTTON), "un <span> qu'on écoute serait hors de portée du clavier");
 check(
@@ -91,7 +90,7 @@ check('  … et ne prend aucun clic', Boolean(ghostRule) && /pointer-events: non
 
 check(
   'animations refusées : le double ne part pas',
-  /@media \(prefers-reduced-motion: reduce\) \{[\s\S]{0,220}?\.version-ghost \{ animation: none;/.test(CSS),
+  /@media \(prefers-reduced-motion: reduce\) \{[\s\S]{0,220}?\.version-ghost \{\s*animation: none;/.test(CSS),
 );
 check(
   '  … mais la confirmation demeure',

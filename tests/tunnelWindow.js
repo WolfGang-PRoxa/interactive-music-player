@@ -908,7 +908,7 @@ console.log("\nCe que le bouton d'envoi répond\n");
   check(
     '  … et la coche se dessine au lieu de paraître',
     /stroke-dasharray: 24;/.test(CSS) &&
-      /@keyframes share-invite-draw \{\s*\n\s*to \{ stroke-dashoffset: 0; \}/.test(CSS),
+      /@keyframes share-invite-draw \{\s*to \{\s*stroke-dashoffset: 0;\s*\}/.test(CSS),
   );
 
   // L'arrivée recouvre la fin du vol : deux gestes qui s'attendent poliment
@@ -967,7 +967,7 @@ console.log("\nCe que le bouton d'envoi répond\n");
   const reduit = reducedMotionRules(CSS);
   check(
     '  … et se tait quand le mouvement est refusé',
-    /\.is-sent \.share-invite-plane,\s*\n\s*\.share-invite-btn\.is-sent \.plane-trail \{ animation: none; opacity: 0; \}/.test(
+    /\.is-sent \.share-invite-plane,\s*\n\s*\.share-invite-btn\.is-sent \.plane-trail \{\s*animation: none;\s*opacity: 0;\s*\}/.test(
       reduit,
     ),
     'le vol et son sillage ne portaient rien à eux seuls',
@@ -975,7 +975,7 @@ console.log("\nCe que le bouton d'envoi répond\n");
   check(
     '  … sans emporter ce qui porte le message',
     /\.is-sent \.share-invite-done \{[\s\S]{0,120}opacity: 1;/.test(reduit) &&
-      /\.share-invite-check \{ stroke-dashoffset: 0; \}/.test(reduit),
+      /\.share-invite-check \{\s*stroke-dashoffset: 0;\s*\}/.test(reduit),
     'la coche entière, le mot, le fond vert',
   );
 

@@ -549,7 +549,7 @@ console.log('\nCe que le clic ouvre\n');
   // Un `<span>` cliquable n'est pas un bouton : ni tabulation, ni entrée, ni
   // annonce au lecteur d'écran. Ce qui ouvre quelque chose au clic doit le
   // dire dans le balisage.
-  check('les deux indicateurs sont de vrais boutons', (row.match(/<button type="button"/g) || []).length === 2);
+  check('les deux indicateurs sont de vrais boutons', (row.match(/<button\s+type="button"/g) || []).length === 2);
   check(
     "  … et non des boutons d'envoi de formulaire",
     !/<button(?![^>]*type=)/.test(row),

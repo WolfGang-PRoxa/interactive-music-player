@@ -327,14 +327,14 @@ check(
 const MARKUP = read('src', 'web', 'public', 'index.html');
 check(
   'les deux sélecteurs de mode portent le bouton',
-  (MARKUP.match(/class="mode-switch-btn mode-shuffle" data-mode="shuffle"/g) || []).length === 2,
+  (MARKUP.match(/class="mode-switch-btn mode-shuffle"\s+data-mode="shuffle"/g) || []).length === 2,
   'la carte « En cours de lecture » et la fenêtre vidéo flottante',
 );
 
 check(
   '  … avec le symbole plein, qui suit la couleur du bouton',
   (MARKUP.match(/d="M8\.7,14\.2C8,14\.7/g) || []).length === 2 &&
-    (MARKUP.match(/class="mode-switch-btn mode-shuffle"[\s\S]{0,200}?fill="currentColor"/g) || []).length === 2,
+    (MARKUP.match(/class="mode-switch-btn mode-shuffle"[\s\S]{0,400}?fill="currentColor"/g) || []).length === 2,
   'reconnu à son tracé : la page compte trente icônes pleines',
 );
 

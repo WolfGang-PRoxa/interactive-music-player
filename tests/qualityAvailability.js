@@ -428,7 +428,7 @@ console.log('\nCe qui tient les deux bouts\n');
 
   check(
     'les définitions sont dédoublonnées et ordonnées',
-    /\[\.\.\.new Set\(videoTracks\(entry\)/.test(SRC) && /sort\(\(a, b\) => b - a\)/.test(SRC),
+    /\[\s*\.\.\.new Set\(\s*videoTracks\(entry\)/.test(SRC) && /sort\(\(a, b\) => b - a\)/.test(SRC),
     'la même hauteur revient en plusieurs codecs',
   );
 
