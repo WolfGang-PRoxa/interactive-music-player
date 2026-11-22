@@ -26,6 +26,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # tests/videoDownload.js reads back the file it writes with ffprobe,
+      # which ffmpeg-static does not ship.
+      - name: ffprobe
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
       - name: Formatting and lint
         run: npm run check
 
