@@ -29,13 +29,13 @@ const engines = new WeakMap();
  * @returns {boolean}
  */
 function expectedBus(queue) {
-    const guildId = queue?.guild?.id;
-    if (!guildId) return false;
-    try {
-        return database.getSettings(guildId).broadcastMode !== 'personal';
-    } catch (e) {
-        return false;
-    }
+  const guildId = queue?.guild?.id;
+  if (!guildId) return false;
+  try {
+    return database.getSettings(guildId).broadcastMode !== 'personal';
+  } catch (e) {
+    return false;
+  }
 }
 
 /**
@@ -51,9 +51,9 @@ function expectedBus(queue) {
  * @returns {MixEngine|null}
  */
 function activeEngine(queue) {
-    if (!queue) return null;
-    const engine = engines.get(queue);
-    return engine && engine.active ? engine : null;
+  if (!queue) return null;
+  const engine = engines.get(queue);
+  return engine && engine.active ? engine : null;
 }
 
 /**
@@ -64,25 +64,25 @@ function activeEngine(queue) {
  *   — l'appelant reprend alors le chemin d'origine.
  */
 function ensureEngine(queue) {
-    if (!queue || !expectedBus(queue)) return null;
-    if (!queue.dispatcher?.voiceConnection) return null;
+  if (!queue || !expectedBus(queue)) return null;
+  if (!queue.dispatcher?.voiceConnection) return null;
 
-    const existing = engines.get(queue);
-    if (existing && existing.active) {
-        existing.checkSubscription();
-        return existing;
-    }
+  const existing = engines.get(queue);
+  if (existing && existing.active) {
+    existing.checkSubscription();
+    return existing;
+  }
 
-    const engine = new MixEngine(queue);
-    try {
-        if (!engine.start()) return null;
-    } catch (err) {
-        log.error('[MixEngine] The mix bus could not be mounted:', err.message);
-        return null;
-    }
+  const engine = new MixEngine(queue);
+  try {
+    if (!engine.start()) return null;
+  } catch (err) {
+    log.error('[MixEngine] The mix bus could not be mounted:', err.message);
+    return null;
+  }
 
-    engines.set(queue, engine);
-    return engine;
+  engines.set(queue, engine);
+  return engine;
 }
 
 /**
@@ -90,10 +90,10 @@ function ensureEngine(queue) {
  * @param {object} queue
  */
 function removeEngine(queue) {
-    const engine = queue && engines.get(queue);
-    if (!engine) return;
-    engine.stop();
-    engines.delete(queue);
+  const engine = queue && engines.get(queue);
+  if (!engine) return;
+  engine.stop();
+  engines.delete(queue);
 }
 
 module.exports = { ensureEngine, activeEngine, removeEngine, expectedBus };

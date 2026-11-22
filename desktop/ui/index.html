@@ -1,75 +1,82 @@
 <!doctype html>
 <html lang="fr">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Interactive Music Player</title>
-  <link rel="stylesheet" href="launcher.css">
-</head>
-<body>
-  <main class="shell">
-    <header class="header">
-      <img class="logo" src="logo.png" alt="" aria-hidden="true">
-      <div>
-        <h1>Interactive Music Player</h1>
-        <p id="headline" class="headline">Démarrage en cours…</p>
-      </div>
-    </header>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Interactive Music Player</title>
+    <link rel="stylesheet" href="launcher.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="header">
+        <img class="logo" src="logo.png" alt="" aria-hidden="true" />
+        <div>
+          <h1>Interactive Music Player</h1>
+          <p id="headline" class="headline">Démarrage en cours…</p>
+        </div>
+      </header>
 
-    <div id="track" class="track" hidden><div id="bar" class="bar"></div></div>
+      <div id="track" class="track" hidden><div id="bar" class="bar"></div></div>
 
-    <section id="steps" class="steps" aria-live="polite"></section>
+      <section id="steps" class="steps" aria-live="polite"></section>
 
-    <section id="cards" class="cards" hidden></section>
+      <section id="cards" class="cards" hidden></section>
 
-    <section id="setup" class="setup" hidden>
-      <div id="setup-stage-1">
-        <p class="lead">Votre bot a besoin de sa propre application Discord. C'est gratuit, et à faire une seule fois.</p>
-        <ol class="howto">
-          <li>Sur le portail : <b>New Application</b>, puis un nom.</li>
-          <li>Onglet <b>Bot</b>, à gauche → <b>Reset Token</b> → <b>Copy</b>.</li>
-          <li>Collez le jeton ci-dessous : il est vérifié tout seul.</li>
-        </ol>
-        <button class="button secondary wide" data-action="open-portal">Ouvrir le portail Discord</button>
-        <form id="token-form" class="token" autocomplete="off">
-          <input id="token" type="password" spellcheck="false" placeholder="Jeton du bot" aria-label="Jeton du bot">
-          <button class="button primary" type="submit">Vérifier</button>
-        </form>
-        <p id="setup-status" class="status"></p>
-        <p class="alternative">
-          Le bot tourne déjà ailleurs sur ce PC ?
-          <button class="link" data-action="choose-folder">Utiliser une installation existante…</button>
-        </p>
-      </div>
-      <div id="setup-stage-2" hidden>
-        <div class="recognised">
-          <span class="tick" aria-hidden="true"></span>
-          <div>
-            <p id="bot-name" class="recognised-name"></p>
-            <p class="recognised-detail">Jeton vérifié auprès de Discord et enregistré.</p>
+      <section id="setup" class="setup" hidden>
+        <div id="setup-stage-1">
+          <p class="lead">
+            Votre bot a besoin de sa propre application Discord. C'est gratuit, et à faire une seule fois.
+          </p>
+          <ol class="howto">
+            <li>Sur le portail : <b>New Application</b>, puis un nom.</li>
+            <li>Onglet <b>Bot</b>, à gauche → <b>Reset Token</b> → <b>Copy</b>.</li>
+            <li>Collez le jeton ci-dessous : il est vérifié tout seul.</li>
+          </ol>
+          <button class="button secondary wide" data-action="open-portal">Ouvrir le portail Discord</button>
+          <form id="token-form" class="token" autocomplete="off">
+            <input id="token" type="password" spellcheck="false" placeholder="Jeton du bot" aria-label="Jeton du bot" />
+            <button class="button primary" type="submit">Vérifier</button>
+          </form>
+          <p id="setup-status" class="status"></p>
+          <p class="alternative">
+            Le bot tourne déjà ailleurs sur ce PC ?
+            <button class="link" data-action="choose-folder">Utiliser une installation existante…</button>
+          </p>
+        </div>
+        <div id="setup-stage-2" hidden>
+          <div class="recognised">
+            <span class="tick" aria-hidden="true"></span>
+            <div>
+              <p id="bot-name" class="recognised-name"></p>
+              <p class="recognised-detail">Jeton vérifié auprès de Discord et enregistré.</p>
+            </div>
+          </div>
+          <p class="lead">
+            Reste à l'inviter sur votre serveur. Les permissions dont il a besoin sont déjà cochées ; le bot démarre
+            pendant ce temps.
+          </p>
+          <div class="actions">
+            <button class="button secondary" data-action="later">Plus tard</button>
+            <button class="button primary" data-action="invite">Inviter le bot sur mon serveur</button>
           </div>
         </div>
-        <p class="lead">Reste à l'inviter sur votre serveur. Les permissions dont il a besoin sont déjà cochées ; le bot démarre pendant ce temps.</p>
-        <div class="actions">
-          <button class="button secondary" data-action="later">Plus tard</button>
-          <button class="button primary" data-action="invite">Inviter le bot sur mon serveur</button>
-        </div>
-      </div>
-    </section>
+      </section>
 
-    <section id="footer" class="footer" hidden>
-      <p id="footer-message" class="footer-message"></p>
-      <p id="footer-details" class="footer-details" hidden></p>
-      <pre id="footer-log" class="footer-log" hidden></pre>
-      <div id="footer-actions" class="actions"></div>
-    </section>
+      <section id="footer" class="footer" hidden>
+        <p id="footer-message" class="footer-message"></p>
+        <p id="footer-details" class="footer-details" hidden></p>
+        <pre id="footer-log" class="footer-log" hidden></pre>
+        <div id="footer-actions" class="actions"></div>
+      </section>
 
-    <footer class="where">
-      <span id="root" class="root"></span>
-      <button id="change-root" class="link" data-action="choose-folder" hidden>Changer de dossier…</button>
-      <button id="default-root" class="link" data-action="default-folder" hidden>Revenir au dossier de l'application</button>
-    </footer>
-  </main>
-  <script src="launcher.js"></script>
-</body>
+      <footer class="where">
+        <span id="root" class="root"></span>
+        <button id="change-root" class="link" data-action="choose-folder" hidden>Changer de dossier…</button>
+        <button id="default-root" class="link" data-action="default-folder" hidden>
+          Revenir au dossier de l'application
+        </button>
+      </footer>
+    </main>
+    <script src="launcher.js"></script>
+  </body>
 </html>

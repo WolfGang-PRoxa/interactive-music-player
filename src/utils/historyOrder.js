@@ -30,21 +30,19 @@
  * @returns {number} Nombre de pistes réinsérées.
  */
 function restoreHistory(queue, entries, toTrack, excludeUrl = null) {
-    if (!queue?.history?.tracks || !Array.isArray(entries) || entries.length === 0) {
-        return 0;
-    }
+  if (!queue?.history?.tracks || !Array.isArray(entries) || entries.length === 0) {
+    return 0;
+  }
 
-    const kept = excludeUrl
-        ? entries.filter(data => data && data.url !== excludeUrl)
-        : entries;
+  const kept = excludeUrl ? entries.filter((data) => data && data.url !== excludeUrl) : entries;
 
-    const tracks = kept.map(toTrack).filter(Boolean);
-    if (tracks.length === 0) return 0;
+  const tracks = kept.map(toTrack).filter(Boolean);
+  if (tracks.length === 0) return 0;
 
-    // Insertion en bloc : `add(tableau)` déplie le tableau en tête de file et
-    // préserve l'ordre. Un `forEach` avec `add(piste)` le retournerait.
-    queue.history.tracks.add(tracks);
-    return tracks.length;
+  // Insertion en bloc : `add(tableau)` déplie le tableau en tête de file et
+  // préserve l'ordre. Un `forEach` avec `add(piste)` le retournerait.
+  queue.history.tracks.add(tracks);
+  return tracks.length;
 }
 
 module.exports = { restoreHistory };

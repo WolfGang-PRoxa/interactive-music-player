@@ -59,52 +59,52 @@ let store = null;
 let saveTimer = null;
 
 function load() {
-    if (store) return store;
+  if (store) return store;
 
-    cleanStaleTemp(SESSIONS_FILE);
-    const raw = readJsonSafe(SESSIONS_FILE, '[Sessions]');
-    store = raw && typeof raw === 'object' ? raw : {};
+  cleanStaleTemp(SESSIONS_FILE);
+  const raw = readJsonSafe(SESSIONS_FILE, '[Sessions]');
+  store = raw && typeof raw === 'object' ? raw : {};
 
-    const before = Object.keys(store).length;
-    purgeExpired();
-    const after = Object.keys(store).length;
-    if (before !== after) {
-        log.info(`[Sessions] ${before - after} expired session(s) dropped at load time.`);
-    }
+  const before = Object.keys(store).length;
+  purgeExpired();
+  const after = Object.keys(store).length;
+  if (before !== after) {
+    log.info(`[Sessions] ${before - after} expired session(s) dropped at load time.`);
+  }
 
-    return store;
+  return store;
 }
 
 function save() {
-    if (!store) return;
-    try {
-        writeJsonAtomic(SESSIONS_FILE, store);
-    } catch (err) {
-        log.error(`[Sessions] Enregistrement impossible : ${err.message}`);
-    }
+  if (!store) return;
+  try {
+    writeJsonAtomic(SESSIONS_FILE, store);
+  } catch (err) {
+    log.error(`[Sessions] Enregistrement impossible : ${err.message}`);
+  }
 }
 
 /** Programme une écriture, en repoussant celle déjà prévue. */
 function saveSoon() {
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-        saveTimer = null;
-        save();
-    }, SAVE_DEBOUNCE_MS);
-    // Une écriture en attente ne doit pas retenir le process au moment de sortir.
-    if (typeof saveTimer.unref === 'function') saveTimer.unref();
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    save();
+  }, SAVE_DEBOUNCE_MS);
+  // Une écriture en attente ne doit pas retenir le process au moment de sortir.
+  if (typeof saveTimer.unref === 'function') saveTimer.unref();
 }
 
 function purgeExpired() {
-    const now = Date.now();
-    let touched = false;
-    for (const [id, session] of Object.entries(store)) {
-        if (!session || typeof session !== 'object' || now - (session.lastSeenAt || 0) > MAX_AGE_MS) {
-            delete store[id];
-            touched = true;
-        }
+  const now = Date.now();
+  let touched = false;
+  for (const [id, session] of Object.entries(store)) {
+    if (!session || typeof session !== 'object' || now - (session.lastSeenAt || 0) > MAX_AGE_MS) {
+      delete store[id];
+      touched = true;
     }
-    return touched;
+  }
+  return touched;
 }
 
 /**
@@ -127,7 +127,7 @@ function purgeExpired() {
  * @returns {string}
  */
 function fingerprint(sessionId) {
-    return crypto.createHash('sha256').update(String(sessionId)).digest('hex');
+  return crypto.createHash('sha256').update(String(sessionId)).digest('hex');
 }
 
 /**
@@ -152,30 +152,28 @@ function fingerprint(sessionId) {
  * @returns {{ id: string, session: object }}
  */
 function create(user) {
-    load();
-    keepRecent(String(user.id), MAX_PER_USER - 1);
+  load();
+  keepRecent(String(user.id), MAX_PER_USER - 1);
 
-    const id = crypto.randomBytes(32).toString('hex');
-    // Rangée sous son empreinte : c'est elle qui touche le disque, jamais `id`.
-    const key = fingerprint(id);
-    const now = Date.now();
+  const id = crypto.randomBytes(32).toString('hex');
+  // Rangée sous son empreinte : c'est elle qui touche le disque, jamais `id`.
+  const key = fingerprint(id);
+  const now = Date.now();
 
-    store[key] = {
-        userId: String(user.id),
-        username: user.username || '',
-        displayName: user.global_name || user.username || '',
-        avatar: user.avatar
-            ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`
-            : null,
-        createdAt: now,
-        lastSeenAt: now,
-    };
+  store[key] = {
+    userId: String(user.id),
+    username: user.username || '',
+    displayName: user.global_name || user.username || '',
+    avatar: user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64` : null,
+    createdAt: now,
+    lastSeenAt: now,
+  };
 
-    save();
-    log.info(`[Sessions] Session opened for ${store[key].displayName} (${user.id}).`);
-    // `id` part dans le cookie, `store[key]` reste ici : les deux ne se
-    // rencontrent plus que le temps d'un hachage.
-    return { id, session: store[key] };
+  save();
+  log.info(`[Sessions] Session opened for ${store[key].displayName} (${user.id}).`);
+  // `id` part dans le cookie, `store[key]` reste ici : les deux ne se
+  // rencontrent plus que le temps d'un hachage.
+  return { id, session: store[key] };
 }
 
 /**
@@ -184,20 +182,20 @@ function create(user) {
  * @returns {object|null} La session, ou null si inconnue ou expirée.
  */
 function get(sessionId) {
-    if (!sessionId) return null;
-    load();
+  if (!sessionId) return null;
+  load();
 
-    const key = fingerprint(sessionId);
-    const session = store[key];
-    if (!session) return null;
+  const key = fingerprint(sessionId);
+  const session = store[key];
+  if (!session) return null;
 
-    if (Date.now() - (session.lastSeenAt || 0) > MAX_AGE_MS) {
-        delete store[key];
-        save();
-        return null;
-    }
+  if (Date.now() - (session.lastSeenAt || 0) > MAX_AGE_MS) {
+    delete store[key];
+    save();
+    return null;
+  }
 
-    return session;
+  return session;
 }
 
 /**
@@ -212,13 +210,13 @@ function get(sessionId) {
  * @returns {boolean} La session existait-elle.
  */
 function destroy(sessionId) {
-    load();
-    if (!sessionId) return false;
-    const key = fingerprint(sessionId);
-    if (!store[key]) return false;
-    delete store[key];
-    save();
-    return true;
+  load();
+  if (!sessionId) return false;
+  const key = fingerprint(sessionId);
+  if (!store[key]) return false;
+  delete store[key];
+  save();
+  return true;
 }
 
 /**
@@ -240,20 +238,20 @@ const MAX_PER_USER = 8;
  * @param {number} limit
  */
 function keepRecent(userId, limit) {
-    const owned = Object.entries(store)
-        .filter(([, session]) => session && session.userId === userId)
-        .sort((a, b) => (b[1].lastSeenAt || 0) - (a[1].lastSeenAt || 0));
+  const owned = Object.entries(store)
+    .filter(([, session]) => session && session.userId === userId)
+    .sort((a, b) => (b[1].lastSeenAt || 0) - (a[1].lastSeenAt || 0));
 
-    for (const [id] of owned.slice(Math.max(0, limit))) delete store[id];
+  for (const [id] of owned.slice(Math.max(0, limit))) delete store[id];
 }
 
 /** Repousse l'expiration d'une session encore active. */
 function touch(sessionId) {
-    const session = get(sessionId);
-    if (!session) return null;
-    session.lastSeenAt = Date.now();
-    saveSoon();
-    return session;
+  const session = get(sessionId);
+  if (!session) return null;
+  session.lastSeenAt = Date.now();
+  saveSoon();
+  return session;
 }
 
 /**
@@ -266,19 +264,19 @@ function touch(sessionId) {
  * @returns {number} Nombre de sessions fermées.
  */
 function revokeUser(userId) {
-    load();
-    let count = 0;
-    for (const [id, session] of Object.entries(store)) {
-        if (session && session.userId === String(userId)) {
-            delete store[id];
-            count++;
-        }
+  load();
+  let count = 0;
+  for (const [id, session] of Object.entries(store)) {
+    if (session && session.userId === String(userId)) {
+      delete store[id];
+      count++;
     }
-    if (count) {
-        save();
-        log.info(`[Sessions] ${count} session(s) closed for user ${userId}.`);
-    }
-    return count;
+  }
+  if (count) {
+    save();
+    log.info(`[Sessions] ${count} session(s) closed for user ${userId}.`);
+  }
+  return count;
 }
 
 /**
@@ -290,51 +288,51 @@ function revokeUser(userId) {
  * @returns {Array<{ userId: string, displayName: string, avatar: string|null, lastSeenAt: number }>}
  */
 function listUsers() {
-    load();
+  load();
 
-    /*
-     * Un compte par ligne, et non une session par ligne.
-     *
-     * Depuis qu'une personne peut ouvrir le tableau de bord sur plusieurs
-     * appareils, compter les sessions la ferait apparaître deux fois dans la
-     * fenêtre de partage — deux lignes de droits pour un seul invité, dont on ne
-     * saurait laquelle fait foi.
-     */
-    const byUser = new Map();
-    for (const session of Object.values(store)) {
-        if (!session) continue;
-        const seen = session.lastSeenAt || 0;
-        const known = byUser.get(session.userId);
-        if (known && known.lastSeenAt >= seen) continue;
-        byUser.set(session.userId, {
-            userId: session.userId,
-            displayName: session.displayName,
-            avatar: session.avatar || null,
-            lastSeenAt: seen,
-        });
-    }
+  /*
+   * Un compte par ligne, et non une session par ligne.
+   *
+   * Depuis qu'une personne peut ouvrir le tableau de bord sur plusieurs
+   * appareils, compter les sessions la ferait apparaître deux fois dans la
+   * fenêtre de partage — deux lignes de droits pour un seul invité, dont on ne
+   * saurait laquelle fait foi.
+   */
+  const byUser = new Map();
+  for (const session of Object.values(store)) {
+    if (!session) continue;
+    const seen = session.lastSeenAt || 0;
+    const known = byUser.get(session.userId);
+    if (known && known.lastSeenAt >= seen) continue;
+    byUser.set(session.userId, {
+      userId: session.userId,
+      displayName: session.displayName,
+      avatar: session.avatar || null,
+      lastSeenAt: seen,
+    });
+  }
 
-    return [...byUser.values()].sort((a, b) => b.lastSeenAt - a.lastSeenAt);
+  return [...byUser.values()].sort((a, b) => b.lastSeenAt - a.lastSeenAt);
 }
 
 /** Écrit sans attendre le délai — à l'extinction du process. */
 function flush() {
-    if (saveTimer) {
-        clearTimeout(saveTimer);
-        saveTimer = null;
-    }
-    save();
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  save();
 }
 
 module.exports = {
-    COOKIE_NAME,
-    SESSIONS_FILE,
-    MAX_AGE_MS,
-    create,
-    get,
-    touch,
-    destroy,
-    revokeUser,
-    listUsers,
-    flush,
+  COOKIE_NAME,
+  SESSIONS_FILE,
+  MAX_AGE_MS,
+  create,
+  get,
+  touch,
+  destroy,
+  revokeUser,
+  listUsers,
+  flush,
 };

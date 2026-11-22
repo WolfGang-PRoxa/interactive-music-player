@@ -10,9 +10,9 @@ const log = require('../../../utils/logger');
 const supervisor = require('../../../utils/supervisor');
 
 function handleRequestState(ctx) {
-    const { webServer, currentGuildId } = ctx;
+  const { webServer, currentGuildId } = ctx;
 
-        webServer.broadcastState(currentGuildId);
+  webServer.broadcastState(currentGuildId);
 }
 
 /**
@@ -24,13 +24,13 @@ function handleRequestState(ctx) {
  * consomme ici — une seule fois, même si plusieurs onglets sont ouverts.
  */
 function handleStartupFadeinConsumed(ctx) {
-    const { queue, webServer, currentGuildId } = ctx;
+  const { queue, webServer, currentGuildId } = ctx;
 
-        if (queue && queue.pendingStartupFadein) {
-            queue.pendingStartupFadein = null;
-            log.info('[WebServer] Startup fade-in played by the dashboard.');
-            webServer.broadcastState(currentGuildId);
-        }
+  if (queue && queue.pendingStartupFadein) {
+    queue.pendingStartupFadein = null;
+    log.info('[WebServer] Startup fade-in played by the dashboard.');
+    webServer.broadcastState(currentGuildId);
+  }
 }
 
 /**
@@ -39,18 +39,18 @@ function handleStartupFadeinConsumed(ctx) {
  * Voir WebServer.setFluxMemoire.
  */
 function handleMemoryStream(ctx) {
-    const { ws, data, webServer } = ctx;
+  const { ws, data, webServer } = ctx;
 
-        webServer.setMemoryStream(ws, !!(data && data.enabled));
+  webServer.setMemoryStream(ws, !!(data && data.enabled));
 }
 
 function handleClientLog(ctx) {
-    const { data } = ctx;
+  const { data } = ctx;
 
-        if (data && data.message) {
-            const tag = data.source ? `[${data.source}]` : '[Client Log]';
-            log.info(`${tag} ${data.message}`);
-        }
+  if (data && data.message) {
+    const tag = data.source ? `[${data.source}]` : '[Client Log]';
+    log.info(`${tag} ${data.message}`);
+  }
 }
 
 /**
@@ -66,141 +66,151 @@ function handleClientLog(ctx) {
  * @param {{ entryPoint?: string }} [options]
  */
 function restartProcess(webServer, options = {}) {
-    const entryPoint = options.entryPoint || process.argv[1];
+  const entryPoint = options.entryPoint || process.argv[1];
 
-        try {
-            const { useMainPlayer } = require('discord-player');
-            const player = useMainPlayer();
-            playbackStateManager.saveState(player);
-            log.info('[WebServer] Playback state saved instantly before the restart.');
-        } catch (saveErr) {
-            log.error('[WebServer] Error saving the state before the restart:', saveErr.message);
-        }
+  try {
+    const { useMainPlayer } = require('discord-player');
+    const player = useMainPlayer();
+    playbackStateManager.saveState(player);
+    log.info('[WebServer] Playback state saved instantly before the restart.');
+  } catch (saveErr) {
+    log.error('[WebServer] Error saving the state before the restart:', saveErr.message);
+  }
 
-        try {
-            webServer.wss.close();
-            webServer.server.close();
+  try {
+    webServer.wss.close();
+    webServer.server.close();
 
-            // Sous l'application de bureau, c'est elle qui relance : une
-            // instance détachée échapperait à sa surveillance. Voir
-            // src/utils/supervisor.js.
-            if (supervisor.isSupervised()) {
-                supervisor.writeRestartRequest(entryPoint);
-                log.info(`[WebServer] Server stopped. The desktop app restarts: ${entryPoint}`);
-                process.exit(supervisor.RESTART_EXIT_CODE);
-                return;
-            }
+    // Sous l'application de bureau, c'est elle qui relance : une
+    // instance détachée échapperait à sa surveillance. Voir
+    // src/utils/supervisor.js.
+    if (supervisor.isSupervised()) {
+      supervisor.writeRestartRequest(entryPoint);
+      log.info(`[WebServer] Server stopped. The desktop app restarts: ${entryPoint}`);
+      process.exit(supervisor.RESTART_EXIT_CODE);
+      return;
+    }
 
-            log.info(`[WebServer] Server stopped. Starting the new instance: ${entryPoint}`);
+    log.info(`[WebServer] Server stopped. Starting the new instance: ${entryPoint}`);
 
-            const spawn = require('child_process').spawn;
-            const args = [entryPoint, ...process.argv.slice(2)];
-            const executor = process.argv[0];
+    const spawn = require('child_process').spawn;
+    const args = [entryPoint, ...process.argv.slice(2)];
+    const executor = process.argv[0];
 
-            const child = spawn(executor, args, {
-                // Le redémarrage se veut transparent : l'état est sauvegardé sans
-                // fade-out, la musique n'est pas coupée. La nouvelle instance doit
-                // donc s'abstenir du fade-in de démarrage, qui en est la
-                // contrepartie et trahirait la coupure.
-                env: { ...process.env, IMP_RESTART: '1' },
-                cwd: process.cwd(),
-                detached: true,
-                stdio: 'ignore',
-                windowsHide: true
-            });
-            child.unref();
+    const child = spawn(executor, args, {
+      // Le redémarrage se veut transparent : l'état est sauvegardé sans
+      // fade-out, la musique n'est pas coupée. La nouvelle instance doit
+      // donc s'abstenir du fade-in de démarrage, qui en est la
+      // contrepartie et trahirait la coupure.
+      env: { ...process.env, IMP_RESTART: '1' },
+      cwd: process.cwd(),
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    child.unref();
 
-            process.exit(0);
-        } catch (err) {
-            log.error('[WebServer] Error during the restart:', err.message);
-            process.exit(1);
-        }
+    process.exit(0);
+  } catch (err) {
+    log.error('[WebServer] Error during the restart:', err.message);
+    process.exit(1);
+  }
 }
 
 function handleRestartBot(ctx) {
-    const { webServer } = ctx;
+  const { webServer } = ctx;
 
-        log.info('[WebServer] Restart request received. Instant state save (the music keeps going, no fade-out)...');
+  log.info('[WebServer] Restart request received. Instant state save (the music keeps going, no fade-out)...');
 
-        const payload = JSON.stringify({ type: 'status', data: { status: 'restarting' } });
-        webServer.wss.clients.forEach((client) => {
-            if (client.readyState === 1) {
-                client.send(payload);
-            }
-        });
+  const payload = JSON.stringify({ type: 'status', data: { status: 'restarting' } });
+  webServer.wss.clients.forEach((client) => {
+    if (client.readyState === 1) {
+      client.send(payload);
+    }
+  });
 
-        restartProcess(webServer);
+  restartProcess(webServer);
 }
 
 async function handleShutdownBot(ctx) {
-    const { ws, data, webServer, player } = ctx;
+  const { ws, data, webServer, player } = ctx;
 
-        const guildId = ws.guildId || webServer.client?.guilds?.cache?.first()?.id;
-        const settings = database.getSettings(guildId);
-        const fadeoutEnabled = settings.fadeoutEnabled !== undefined ? !!settings.fadeoutEnabled : true;
-        const fadeoutDurationSecs = settings.fadeoutDuration !== undefined ? parseFloat(settings.fadeoutDuration) : 5;
-        const fadeDurationMs = fadeoutEnabled ? Math.round(fadeoutDurationSecs * 1000) : 0;
+  const guildId = ws.guildId || webServer.client?.guilds?.cache?.first()?.id;
+  const settings = database.getSettings(guildId);
+  const fadeoutEnabled = settings.fadeoutEnabled !== undefined ? !!settings.fadeoutEnabled : true;
+  const fadeoutDurationSecs = settings.fadeoutDuration !== undefined ? parseFloat(settings.fadeoutDuration) : 5;
+  const fadeDurationMs = fadeoutEnabled ? Math.round(fadeoutDurationSecs * 1000) : 0;
 
-        log.info(`[WebServer] Shutdown request received. Starting the ${fadeDurationMs / 1000}s fade-out...`);
+  log.info(`[WebServer] Shutdown request received. Starting the ${fadeDurationMs / 1000}s fade-out...`);
 
-        const payload = JSON.stringify({
-            type: 'status',
-            data: {
-                status: 'shutting_down',
-                fadeoutEnabled,
-                fadeoutDuration: fadeoutDurationSecs
-            }
-        });
-        webServer.wss.clients.forEach((cClient) => {
-            if (cClient.readyState === 1) {
-                cClient.send(payload);
-            }
-        });
+  const payload = JSON.stringify({
+    type: 'status',
+    data: {
+      status: 'shutting_down',
+      fadeoutEnabled,
+      fadeoutDuration: fadeoutDurationSecs,
+    },
+  });
+  webServer.wss.clients.forEach((cClient) => {
+    if (cClient.readyState === 1) {
+      cClient.send(payload);
+    }
+  });
 
+  try {
+    const { useMainPlayer } = require('discord-player');
+    const player = useMainPlayer();
+    await playbackStateManager.fadeOutAndSaveState(player, fadeDurationMs);
+  } catch (saveErr) {
+    log.error('[WebServer] Fade-out error before shutdown:', saveErr.message);
+  }
+
+  try {
+    if (webServer.wss) {
+      webServer.wss.clients.forEach((c) => {
         try {
-            const { useMainPlayer } = require('discord-player');
-            const player = useMainPlayer();
-            await playbackStateManager.fadeOutAndSaveState(player, fadeDurationMs);
-        } catch (saveErr) {
-            log.error('[WebServer] Fade-out error before shutdown:', saveErr.message);
+          c.close();
+        } catch (e) {}
+      });
+      try {
+        webServer.wss.close();
+      } catch (e) {}
+    }
+    if (webServer.server) {
+      try {
+        webServer.server.close();
+      } catch (e) {}
+    }
+    if (webServer.client) {
+      const cl = webServer.client;
+      if (cl.duckingManagers) {
+        for (const [gId, manager] of cl.duckingManagers) {
+          try {
+            manager.destroy();
+          } catch (e) {}
         }
+        cl.duckingManagers.clear();
+      }
+      try {
+        cl.destroy();
+      } catch (e) {}
+    }
 
-        try {
-            if (webServer.wss) {
-                webServer.wss.clients.forEach((c) => {
-                    try { c.close(); } catch (e) {}
-                });
-                try { webServer.wss.close(); } catch (e) {}
-            }
-            if (webServer.server) {
-                try { webServer.server.close(); } catch (e) {}
-            }
-            if (webServer.client) {
-                const cl = webServer.client;
-                if (cl.duckingManagers) {
-                    for (const [gId, manager] of cl.duckingManagers) {
-                        try { manager.destroy(); } catch (e) {}
-                    }
-                    cl.duckingManagers.clear();
-                }
-                try { cl.destroy(); } catch (e) {}
-            }
-
-            log.info('[WebServer] Server stopped after the fade-out. Bot fully shut down.');
-            setTimeout(() => process.exit(0), 100);
-            process.exit(0);
-        } catch (err) {
-            log.error('[WebServer] Error during the shutdown:', err.message);
-            process.exit(1);
-        }
+    log.info('[WebServer] Server stopped after the fade-out. Bot fully shut down.');
+    setTimeout(() => process.exit(0), 100);
+    process.exit(0);
+  } catch (err) {
+    log.error('[WebServer] Error during the shutdown:', err.message);
+    process.exit(1);
+  }
 }
 
 module.exports = {
-    handleRequestState,
-    handleStartupFadeinConsumed,
-    handleMemoryStream,
-    handleClientLog,
-    handleRestartBot,
-    handleShutdownBot,
-    restartProcess,
+  handleRequestState,
+  handleStartupFadeinConsumed,
+  handleMemoryStream,
+  handleClientLog,
+  handleRestartBot,
+  handleShutdownBot,
+  restartProcess,
 };

@@ -55,12 +55,12 @@ const log = require('../utils/logger');
  * exception au lieu d'un refus lisible.
  */
 function deny(res, what) {
-    return res.status(403).json({
-        error: 'Droit refusé',
-        // Le tableau de bord grise ce qui est interdit ; quand il ne l'a pas
-        // fait, cette clé lui dit quoi.
-        action: what,
-    });
+  return res.status(403).json({
+    error: 'Droit refusé',
+    // Le tableau de bord grise ce qui est interdit ; quand il ne l'a pas
+    // fait, cette clé lui dit quoi.
+    action: what,
+  });
 }
 
 /**
@@ -75,34 +75,31 @@ function deny(res, what) {
  * @returns {{ master: boolean, userId: string|null, permissions: object }}
  */
 function identityOf(req, webServer) {
-    const identity = req.identity || auth.identify(req);
+  const identity = req.identity || auth.identify(req);
 
-    if (identity.master) {
-        return { master: true, userId: null, permissions: permissions.allPermissions() };
-    }
+  if (identity.master) {
+    return { master: true, userId: null, permissions: permissions.allPermissions() };
+  }
 
-    const userId = identity.session?.userId || null;
+  const userId = identity.session?.userId || null;
 
-    /*
-     * Les droits sont attachés à un serveur Discord, pas au compte seul : le
-     * même invité peut mener la lecture ici et n'avoir rien là-bas. La route
-     * dit lequel elle vise, comme le font déjà ses autres paramètres ; à
-     * défaut, c'est le premier serveur, qui est aussi ce que fait `getState`.
-     */
-    const guildId = (typeof req.query.guildId === 'string' && req.query.guildId)
-        // Appelé avec un serveur réduit dans les tests, qui montent le routeur
-        // seul : l'absence de serveur vaut absence de droits, pas une exception.
-        || (typeof webServer?._getFirstGuildId === 'function'
-            ? webServer._getFirstGuildId()
-            : null);
+  /*
+   * Les droits sont attachés à un serveur Discord, pas au compte seul : le
+   * même invité peut mener la lecture ici et n'avoir rien là-bas. La route
+   * dit lequel elle vise, comme le font déjà ses autres paramètres ; à
+   * défaut, c'est le premier serveur, qui est aussi ce que fait `getState`.
+   */
+  const guildId =
+    (typeof req.query.guildId === 'string' && req.query.guildId) ||
+    // Appelé avec un serveur réduit dans les tests, qui montent le routeur
+    // seul : l'absence de serveur vaut absence de droits, pas une exception.
+    (typeof webServer?._getFirstGuildId === 'function' ? webServer._getFirstGuildId() : null);
 
-    return {
-        master: false,
-        userId,
-        permissions: userId && guildId
-            ? database.getUserPermissions(guildId, userId)
-            : permissions.noPermissions(),
-    };
+  return {
+    master: false,
+    userId,
+    permissions: userId && guildId ? database.getUserPermissions(guildId, userId) : permissions.noPermissions(),
+  };
 }
 
 /**
@@ -114,35 +111,39 @@ function identityOf(req, webServer) {
  * @param {object} webServer
  */
 function createGuards(webServer) {
-    /**
-     * Réservé à qui est devant la machine — voir l'en-tête du module.
-     */
-    function local(req, res, next) {
-        const identity = req.identity || auth.identify(req);
-        if (identity.master || identity.holdsToken) return next();
+  /**
+   * Réservé à qui est devant la machine — voir l'en-tête du module.
+   */
+  function local(req, res, next) {
+    const identity = req.identity || auth.identify(req);
+    if (identity.master || identity.holdsToken) return next();
 
-        log.warn(`[HTTP] ${req.method} ${req.path} refused to guest `
-            + `${identity.session?.userId || '?'}: reserved to the machine's holder.`);
-        return deny(res, 'local');
-    }
+    log.warn(
+      `[HTTP] ${req.method} ${req.path} refused to guest ` +
+        `${identity.session?.userId || '?'}: reserved to the machine's holder.`,
+    );
+    return deny(res, 'local');
+  }
 
-    /**
-     * Exige un droit nommé du catalogue de `permissions.js`.
-     * @param {string} key Par exemple `queue.add`.
-     */
-    function right(key) {
-        return (req, res, next) => {
-            const identity = identityOf(req, webServer);
-            if (identity.master) return next();
-            if (identity.permissions && identity.permissions[key] === true) return next();
+  /**
+   * Exige un droit nommé du catalogue de `permissions.js`.
+   * @param {string} key Par exemple `queue.add`.
+   */
+  function right(key) {
+    return (req, res, next) => {
+      const identity = identityOf(req, webServer);
+      if (identity.master) return next();
+      if (identity.permissions && identity.permissions[key] === true) return next();
 
-            log.warn(`[HTTP] ${req.method} ${req.path} refused to guest `
-                + `${identity.userId || '?'}: right « ${key} » not granted.`);
-            return deny(res, key);
-        };
-    }
+      log.warn(
+        `[HTTP] ${req.method} ${req.path} refused to guest ` +
+          `${identity.userId || '?'}: right « ${key} » not granted.`,
+      );
+      return deny(res, key);
+    };
+  }
 
-    return { local, right };
+  return { local, right };
 }
 
 module.exports = { createGuards, identityOf };

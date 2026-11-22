@@ -14,152 +14,152 @@ const transitions = require('../../../audio/transitions');
 const log = require('../../../utils/logger');
 
 function handleReorderPlaylists(ctx) {
-    const { data, webServer, player, currentGuildId } = ctx;
+  const { data, webServer, player, currentGuildId } = ctx;
 
-        const { fromIndex, toIndex, playlistOrder } = data;
-        database.reorderPlaylists(fromIndex, toIndex, playlistOrder);
-        webServer.broadcastState(currentGuildId);
-        try {
-            playbackStateManager.saveState(player);
-        } catch (e) { }
+  const { fromIndex, toIndex, playlistOrder } = data;
+  database.reorderPlaylists(fromIndex, toIndex, playlistOrder);
+  webServer.broadcastState(currentGuildId);
+  try {
+    playbackStateManager.saveState(player);
+  } catch (e) {}
 }
 
 function handleCreatePlaylist(ctx) {
-    const { data, webServer, currentGuildId } = ctx;
+  const { data, webServer, currentGuildId } = ctx;
 
-        const { name } = data;
-        database.createPlaylist(currentGuildId, name);
-        webServer.broadcastState(currentGuildId);
+  const { name } = data;
+  database.createPlaylist(currentGuildId, name);
+  webServer.broadcastState(currentGuildId);
 }
 
 function handleRenamePlaylist(ctx) {
-    const { data, webServer, currentGuildId } = ctx;
+  const { data, webServer, currentGuildId } = ctx;
 
-        const { playlistId, name } = data;
-        database.renamePlaylist(currentGuildId, playlistId, name);
-        webServer.broadcastState(currentGuildId);
+  const { playlistId, name } = data;
+  database.renamePlaylist(currentGuildId, playlistId, name);
+  webServer.broadcastState(currentGuildId);
 }
 
 function handleDeletePlaylist(ctx) {
-    const { data, webServer, currentGuildId } = ctx;
+  const { data, webServer, currentGuildId } = ctx;
 
-        const { playlistId } = data;
-        database.deletePlaylist(currentGuildId, playlistId);
-        webServer.broadcastState(currentGuildId);
+  const { playlistId } = data;
+  database.deletePlaylist(currentGuildId, playlistId);
+  webServer.broadcastState(currentGuildId);
 }
 
 async function handleAddPlaylistTrack(ctx) {
-    const { data, webServer, player, currentGuildId } = ctx;
+  const { data, webServer, player, currentGuildId } = ctx;
 
-        let { playlistId, url, defaultPlaylistName } = data;
-        if (!url) return;
-        let playlists = database.getGlobalPlaylists();
-        if (!playlistId || !playlists.find(p => p.id === playlistId)) {
-            if (playlists.length > 0) {
-                playlistId = playlists[0].id;
-            } else {
-                const nameToUse = defaultPlaylistName || 'Ma Playlist';
-                const newPl = database.createPlaylist(currentGuildId, nameToUse);
-                playlistId = newPl.id;
-            }
-        }
+  let { playlistId, url, defaultPlaylistName } = data;
+  if (!url) return;
+  let playlists = database.getGlobalPlaylists();
+  if (!playlistId || !playlists.find((p) => p.id === playlistId)) {
+    if (playlists.length > 0) {
+      playlistId = playlists[0].id;
+    } else {
+      const nameToUse = defaultPlaylistName || 'Ma Playlist';
+      const newPl = database.createPlaylist(currentGuildId, nameToUse);
+      playlistId = newPl.id;
+    }
+  }
 
-        try {
-            const searchResult = await searchLocalAwareTrack(player, url);
-            if (searchResult.tracks.length > 0) {
-                const track = searchResult.tracks[0];
-                database.addTrackToPlaylist(currentGuildId, playlistId, {
-                    title: track.title,
-                    author: track.author || 'Inconnu',
-                    duration: track.duration || '0:00',
-                    durationMS: track.durationMS || 0,
-                    thumbnail: track.thumbnail || null,
-                    url: track.url,
-                    queryType: track.queryType || 'youtube'
-                });
+  try {
+    const searchResult = await searchLocalAwareTrack(player, url);
+    if (searchResult.tracks.length > 0) {
+      const track = searchResult.tracks[0];
+      database.addTrackToPlaylist(currentGuildId, playlistId, {
+        title: track.title,
+        author: track.author || 'Inconnu',
+        duration: track.duration || '0:00',
+        durationMS: track.durationMS || 0,
+        thumbnail: track.thumbnail || null,
+        url: track.url,
+        queryType: track.queryType || 'youtube',
+      });
 
-                const currentSettings = database.getSettings(currentGuildId);
-                if (currentSettings.activePlaybackSource === playlistId) {
-                    await webServer._syncPlaylistToPlayer(currentGuildId, playlistId, currentSettings.playlistCurrentIndex);
-                }
-                webServer.broadcastState(currentGuildId);
-            } else {
-                webServer._sendError(`Impossible de trouver le morceau : ${url}`);
-            }
-        } catch (err) {
-            log.error('[WebServer] addPlaylistTrack error:', err.message);
-        }
+      const currentSettings = database.getSettings(currentGuildId);
+      if (currentSettings.activePlaybackSource === playlistId) {
+        await webServer._syncPlaylistToPlayer(currentGuildId, playlistId, currentSettings.playlistCurrentIndex);
+      }
+      webServer.broadcastState(currentGuildId);
+    } else {
+      webServer._sendError(`Impossible de trouver le morceau : ${url}`);
+    }
+  } catch (err) {
+    log.error('[WebServer] addPlaylistTrack error:', err.message);
+  }
 }
 
 async function handleAddTrackToPlaylist(ctx) {
-    const { data, webServer, currentGuildId } = ctx;
+  const { data, webServer, currentGuildId } = ctx;
 
-        let { playlistId, track, targetIndex, defaultPlaylistName } = data;
-        if (!track) return;
+  let { playlistId, track, targetIndex, defaultPlaylistName } = data;
+  if (!track) return;
 
-        let playlists = database.getGlobalPlaylists();
-        if (!playlistId || !playlists.find(p => p.id === playlistId)) {
-            if (playlists.length > 0) {
-                playlistId = playlists[0].id;
-            } else {
-                const nameToUse = defaultPlaylistName || 'Ma Playlist';
-                const newPl = database.createPlaylist(currentGuildId, nameToUse);
-                playlistId = newPl.id;
-            }
-        }
+  let playlists = database.getGlobalPlaylists();
+  if (!playlistId || !playlists.find((p) => p.id === playlistId)) {
+    if (playlists.length > 0) {
+      playlistId = playlists[0].id;
+    } else {
+      const nameToUse = defaultPlaylistName || 'Ma Playlist';
+      const newPl = database.createPlaylist(currentGuildId, nameToUse);
+      playlistId = newPl.id;
+    }
+  }
 
-        database.addTrackToPlaylist(currentGuildId, playlistId, track, targetIndex);
+  database.addTrackToPlaylist(currentGuildId, playlistId, track, targetIndex);
 
-        const settings = database.getSettings(currentGuildId);
-        if (settings.activePlaybackSource === playlistId) {
-            let currentIndex = settings.playlistCurrentIndex || 0;
-            if (typeof targetIndex === 'number' && targetIndex <= currentIndex) {
-                currentIndex++;
-                database.updateSettings(currentGuildId, { playlistCurrentIndex: currentIndex });
-            }
-            await webServer._syncPlaylistToPlayer(currentGuildId, playlistId, currentIndex);
-        }
-        webServer.broadcastState(currentGuildId);
+  const settings = database.getSettings(currentGuildId);
+  if (settings.activePlaybackSource === playlistId) {
+    let currentIndex = settings.playlistCurrentIndex || 0;
+    if (typeof targetIndex === 'number' && targetIndex <= currentIndex) {
+      currentIndex++;
+      database.updateSettings(currentGuildId, { playlistCurrentIndex: currentIndex });
+    }
+    await webServer._syncPlaylistToPlayer(currentGuildId, playlistId, currentIndex);
+  }
+  webServer.broadcastState(currentGuildId);
 }
 
 async function handleRemoveTrackFromPlaylist(ctx) {
-    const { data, webServer, currentGuildId } = ctx;
+  const { data, webServer, currentGuildId } = ctx;
 
-        const { playlistId, index } = data;
-        database.removeTrackFromPlaylist(currentGuildId, playlistId, index);
+  const { playlistId, index } = data;
+  database.removeTrackFromPlaylist(currentGuildId, playlistId, index);
 
-        const settings = database.getSettings(currentGuildId);
-        if (settings.activePlaybackSource === playlistId) {
-            let currentIndex = settings.playlistCurrentIndex || 0;
-            if (index <= currentIndex && currentIndex > 0) {
-                currentIndex--;
-                database.updateSettings(currentGuildId, { playlistCurrentIndex: currentIndex });
-            }
-            await webServer._syncPlaylistToPlayer(currentGuildId, playlistId, currentIndex);
-        }
-        webServer.broadcastState(currentGuildId);
+  const settings = database.getSettings(currentGuildId);
+  if (settings.activePlaybackSource === playlistId) {
+    let currentIndex = settings.playlistCurrentIndex || 0;
+    if (index <= currentIndex && currentIndex > 0) {
+      currentIndex--;
+      database.updateSettings(currentGuildId, { playlistCurrentIndex: currentIndex });
+    }
+    await webServer._syncPlaylistToPlayer(currentGuildId, playlistId, currentIndex);
+  }
+  webServer.broadcastState(currentGuildId);
 }
 
 async function handleMovePlaylistTrack(ctx) {
-    const { data, webServer, currentGuildId } = ctx;
+  const { data, webServer, currentGuildId } = ctx;
 
-        const { playlistId, fromIndex, toIndex } = data;
-        database.movePlaylistTrack(currentGuildId, playlistId, fromIndex, toIndex);
+  const { playlistId, fromIndex, toIndex } = data;
+  database.movePlaylistTrack(currentGuildId, playlistId, fromIndex, toIndex);
 
-        const settings = database.getSettings(currentGuildId);
-        if (settings.activePlaybackSource === playlistId) {
-            let currentIndex = settings.playlistCurrentIndex || 0;
-            if (currentIndex === fromIndex) {
-                currentIndex = toIndex;
-            } else if (fromIndex < currentIndex && toIndex >= currentIndex) {
-                currentIndex--;
-            } else if (fromIndex > currentIndex && toIndex <= currentIndex) {
-                currentIndex++;
-            }
-            database.updateSettings(currentGuildId, { playlistCurrentIndex: currentIndex });
-            await webServer._syncPlaylistToPlayer(currentGuildId, playlistId, currentIndex);
-        }
-        webServer.broadcastState(currentGuildId);
+  const settings = database.getSettings(currentGuildId);
+  if (settings.activePlaybackSource === playlistId) {
+    let currentIndex = settings.playlistCurrentIndex || 0;
+    if (currentIndex === fromIndex) {
+      currentIndex = toIndex;
+    } else if (fromIndex < currentIndex && toIndex >= currentIndex) {
+      currentIndex--;
+    } else if (fromIndex > currentIndex && toIndex <= currentIndex) {
+      currentIndex++;
+    }
+    database.updateSettings(currentGuildId, { playlistCurrentIndex: currentIndex });
+    await webServer._syncPlaylistToPlayer(currentGuildId, playlistId, currentIndex);
+  }
+  webServer.broadcastState(currentGuildId);
 }
 
 /**
@@ -174,52 +174,51 @@ async function handleMovePlaylistTrack(ctx) {
  * @param {object} ctx
  */
 async function handleInsertTransition(ctx) {
-    const { data, webServer, currentGuildId } = ctx;
-    const { container, index, target } = data || {};
+  const { data, webServer, currentGuildId } = ctx;
+  const { container, index, target } = data || {};
 
-    if (!container || !target || typeof index !== 'number') return;
-    if (container === target) return;   // un aiguillage sur place ne mène nulle part
+  if (!container || !target || typeof index !== 'number') return;
+  if (container === target) return; // un aiguillage sur place ne mène nulle part
 
-    const versPlaylist = String(container).startsWith('playlist_');
-    if (!versPlaylist && container !== 'queue') return;
+  const versPlaylist = String(container).startsWith('playlist_');
+  if (!versPlaylist && container !== 'queue') return;
 
-    // Une destination qui n'existe pas : la poser mènerait à un aiguillage
-    // qu'on ne pourrait que consommer sans effet, le jour où on l'atteindrait.
-    if (target !== 'queue' && !(database.getGlobalPlaylists() || []).some(p => p.id === target)) {
-        return;
-    }
+  // Une destination qui n'existe pas : la poser mènerait à un aiguillage
+  // qu'on ne pourrait que consommer sans effet, le jour où on l'atteindrait.
+  if (target !== 'queue' && !(database.getGlobalPlaylists() || []).some((p) => p.id === target)) {
+    return;
+  }
 
-    const settings = database.getSettings(currentGuildId);
+  const settings = database.getSettings(currentGuildId);
 
-    if (!versPlaylist) {
-        const liste = channelQueue.read(settings);
-        const at = Math.max(0, Math.min(index, liste.length));
-        liste.splice(at, 0, transitions.create(target));
-        channelQueue.write(currentGuildId, liste, settings);
+  if (!versPlaylist) {
+    const liste = channelQueue.read(settings);
+    const at = Math.max(0, Math.min(index, liste.length));
+    liste.splice(at, 0, transitions.create(target));
+    channelQueue.write(currentGuildId, liste, settings);
 
-        /*
-         * Le lecteur porte peut-être des titres qui suivent désormais un
-         * aiguillage : il faut les lui reprendre, sans quoi il les jouerait
-         * par-dessus la bascule. `loadChannelQueue` le renourrit depuis le
-         * rangement, c'est-à-dire jusqu'au premier aiguillage — et pas au-delà.
-         */
-        webServer.loadChannelQueue(currentGuildId);
-        webServer.broadcastState(currentGuildId);
-        return;
-    }
-
-    if (!database.insertPlaylistTransition(container, index, target)) return;
-
-    // La playlist qui joue vient de changer sous le lecteur : il a reçu ses
-    // titres jusqu'à l'ancien premier aiguillage, et il en existe peut-être un
-    // plus tôt désormais. On la lui redonne, sans le couper — `forceRestart`
-    // resterait faux, la piste en cours étant la même.
-    if (settings.activePlaybackSource === container) {
-        await webServer._syncPlaylistToPlayer(currentGuildId, container,
-            settings.playlistCurrentIndex || 0);
-    }
-
+    /*
+     * Le lecteur porte peut-être des titres qui suivent désormais un
+     * aiguillage : il faut les lui reprendre, sans quoi il les jouerait
+     * par-dessus la bascule. `loadChannelQueue` le renourrit depuis le
+     * rangement, c'est-à-dire jusqu'au premier aiguillage — et pas au-delà.
+     */
+    webServer.loadChannelQueue(currentGuildId);
     webServer.broadcastState(currentGuildId);
+    return;
+  }
+
+  if (!database.insertPlaylistTransition(container, index, target)) return;
+
+  // La playlist qui joue vient de changer sous le lecteur : il a reçu ses
+  // titres jusqu'à l'ancien premier aiguillage, et il en existe peut-être un
+  // plus tôt désormais. On la lui redonne, sans le couper — `forceRestart`
+  // resterait faux, la piste en cours étant la même.
+  if (settings.activePlaybackSource === container) {
+    await webServer._syncPlaylistToPlayer(currentGuildId, container, settings.playlistCurrentIndex || 0);
+  }
+
+  webServer.broadcastState(currentGuildId);
 }
 
 /**
@@ -231,167 +230,161 @@ async function handleInsertTransition(ctx) {
  * @param {object} ctx
  */
 function handleSetTransitionTarget(ctx) {
-    const { data, webServer, currentGuildId } = ctx;
-    const { container, id, target } = data || {};
+  const { data, webServer, currentGuildId } = ctx;
+  const { container, id, target } = data || {};
 
-    if (!container || !id || !target) return;
-    if (container === target) return;   // un aiguillage sur place ne mène nulle part
+  if (!container || !id || !target) return;
+  if (container === target) return; // un aiguillage sur place ne mène nulle part
 
-    // Une destination qui n'existe pas : l'inscrire ne mènerait qu'à un
-    // aiguillage consommé sans effet, le jour où on l'atteindrait.
-    if (target !== 'queue' && !(database.getGlobalPlaylists() || []).some(p => p.id === target)) {
-        return;
-    }
+  // Une destination qui n'existe pas : l'inscrire ne mènerait qu'à un
+  // aiguillage consommé sans effet, le jour où on l'atteindrait.
+  if (target !== 'queue' && !(database.getGlobalPlaylists() || []).some((p) => p.id === target)) {
+    return;
+  }
 
-    if (container === 'queue') {
-        const settings = database.getSettings(currentGuildId);
-        const liste = channelQueue.read(settings);
-        const marker = liste.find(t => t && t.id === id && transitions.isTransition(t));
-        if (!marker) return;
+  if (container === 'queue') {
+    const settings = database.getSettings(currentGuildId);
+    const liste = channelQueue.read(settings);
+    const marker = liste.find((t) => t && t.id === id && transitions.isTransition(t));
+    if (!marker) return;
 
-        marker.target = target;
-        channelQueue.write(currentGuildId, liste, settings);
-    } else if (!database.setPlaylistTransitionTarget(container, id, target)) {
-        return;
-    }
+    marker.target = target;
+    channelQueue.write(currentGuildId, liste, settings);
+  } else if (!database.setPlaylistTransitionTarget(container, id, target)) {
+    return;
+  }
 
-    webServer.broadcastState(currentGuildId);
+  webServer.broadcastState(currentGuildId);
 }
 
 async function handleSetActivePlaybackSource(ctx) {
-    const { data, webServer, player, currentGuildId } = ctx;
-    let queue = ctx.queue;
+  const { data, webServer, player, currentGuildId } = ctx;
+  let queue = ctx.queue;
 
-        const { source, index } = data;
+  const { source, index } = data;
 
-        /*
-         * Position déjà atteinte dans le premier titre de la nouvelle source.
-         *
-         * Nulle quand un utilisateur bascule depuis le tableau de bord — il
-         * demande un début. Non nulle quand un aiguillage a déclenché la
-         * bascule pendant un enchaînement mix : le navigateur joue déjà ce
-         * titre depuis plusieurs secondes, et lui répondre zéro le ferait
-         * repartir du début sous l'oreille de l'auditeur.
-         */
-        const startProgressMs = Number(data.startProgressMs) || 0;
-        const settings = database.getSettings(currentGuildId);
-        const oldSource = settings.activePlaybackSource || 'queue';
-        const targetIndex = typeof index === 'number' ? index : 0;
+  /*
+   * Position déjà atteinte dans le premier titre de la nouvelle source.
+   *
+   * Nulle quand un utilisateur bascule depuis le tableau de bord — il
+   * demande un début. Non nulle quand un aiguillage a déclenché la
+   * bascule pendant un enchaînement mix : le navigateur joue déjà ce
+   * titre depuis plusieurs secondes, et lui répondre zéro le ferait
+   * repartir du début sous l'oreille de l'auditeur.
+   */
+  const startProgressMs = Number(data.startProgressMs) || 0;
+  const settings = database.getSettings(currentGuildId);
+  const oldSource = settings.activePlaybackSource || 'queue';
+  const targetIndex = typeof index === 'number' ? index : 0;
 
-        if (source === oldSource && typeof index !== 'number') return;
+  if (source === oldSource && typeof index !== 'number') return;
 
-        const isPersonal = settings.broadcastMode === 'personal';
+  const isPersonal = settings.broadcastMode === 'personal';
 
-        const toData = (t) => {
-            if (!t) return null;
-            return {
-                title: t.title,
-                author: t.author || 'Inconnu',
-                duration: t.duration || '0:00',
-                thumbnail: t.thumbnail || null,
-                url: t.url,
-                queryType: t.queryType || 'youtube',
-                extractorName: t.extractor?.identifier || t.extractorName || null
-            };
-        };
-        const currentTrackOf = () => (isPersonal ? queue?.virtualCurrentTrack : queue?.currentTrack) || null;
+  const toData = (t) => {
+    if (!t) return null;
+    return {
+      title: t.title,
+      author: t.author || 'Inconnu',
+      duration: t.duration || '0:00',
+      thumbnail: t.thumbnail || null,
+      url: t.url,
+      queryType: t.queryType || 'youtube',
+      extractorName: t.extractor?.identifier || t.extractorName || null,
+    };
+  };
+  const currentTrackOf = () => (isPersonal ? queue?.virtualCurrentTrack : queue?.currentTrack) || null;
 
-        // Relevée avant la bascule : c'est en comparant après coup qu'on saura
-        // si la nouvelle source a réellement pris la main.
-        const trackBefore = currentTrackOf();
+  // Relevée avant la bascule : c'est en comparant après coup qu'on saura
+  // si la nouvelle source a réellement pris la main.
+  const trackBefore = currentTrackOf();
 
-        /*
-         * Rien n'est rangé ici, et c'est un changement.
-         *
-         * Ce bloc recopiait la file du lecteur dans les réglages avant qu'une
-         * playlist ne lui prenne la place. Elle y est désormais rangée en
-         * permanence, salon par salon, et remise à jour à chaque diffusion
-         * d'état — donc après chaque geste qui la touche. À cet instant, le
-         * rangement dit déjà exactement ce qu'il faut.
-         *
-         * Le réécrire depuis le lecteur ne pourrait que perdre : celui-ci ne
-         * reçoit rien au-delà du premier aiguillage, et il est même tout à fait
-         * vide quand c'est un aiguillage de la file qui provoque cette
-         * bascule — ce qui effaçait les titres placés après lui.
-         *
-         * La piste en cours n'entre pas non plus dans ce rangement, et n'y
-         * entrait pas davantage avant : elle poursuit sa lecture par-dessus le
-         * changement de source, et l'y ranger la ferait apparaître deux fois.
-         * Elle n'y rejoindra sa place que si la nouvelle source l'interrompt
-         * (voir plus bas).
-         */
+  /*
+   * Rien n'est rangé ici, et c'est un changement.
+   *
+   * Ce bloc recopiait la file du lecteur dans les réglages avant qu'une
+   * playlist ne lui prenne la place. Elle y est désormais rangée en
+   * permanence, salon par salon, et remise à jour à chaque diffusion
+   * d'état — donc après chaque geste qui la touche. À cet instant, le
+   * rangement dit déjà exactement ce qu'il faut.
+   *
+   * Le réécrire depuis le lecteur ne pourrait que perdre : celui-ci ne
+   * reçoit rien au-delà du premier aiguillage, et il est même tout à fait
+   * vide quand c'est un aiguillage de la file qui provoque cette
+   * bascule — ce qui effaçait les titres placés après lui.
+   *
+   * La piste en cours n'entre pas non plus dans ce rangement, et n'y
+   * entrait pas davantage avant : elle poursuit sa lecture par-dessus le
+   * changement de source, et l'y ranger la ferait apparaître deux fois.
+   * Elle n'y rejoindra sa place que si la nouvelle source l'interrompt
+   * (voir plus bas).
+   */
 
-        database.updateSettings(currentGuildId, {
-            activePlaybackSource: source,
-            playlistCurrentIndex: targetIndex
+  database.updateSettings(currentGuildId, {
+    activePlaybackSource: source,
+    playlistCurrentIndex: targetIndex,
+  });
+
+  if (source === 'queue') {
+    // Retour à la file : son premier titre redevient la piste courante,
+    // dans les deux modes.
+    const setAside = readSetAsideQueue(settings);
+
+    if (isPersonal) {
+      if (queue && setAside.length > 0) {
+        const [first, ...rest] = setAside;
+        queue.virtualCurrentTrack = first;
+        queue.virtualTracks = rest;
+        queue.virtualProgressMs = startProgressMs;
+        queue.virtualIsPlaying = true;
+        queue.virtualIsPaused = false;
+        queue.virtualLastUpdated = Date.now();
+      }
+    } else if (queue) {
+      queue.tracks.clear();
+      if (setAside.length > 0) {
+        const { Track } = require('discord-player');
+        const tracksToRestore = setAside.map((tData) => {
+          const track = new Track(player, tData);
+          if (tData.extractorName) {
+            track.extractor = player.extractors.store.get(tData.extractorName) || null;
+          }
+          return track;
         });
+        queue.addTrack(tracksToRestore);
+      }
+    }
+  } else {
+    await webServer._syncPlaylistToPlayer(currentGuildId, source, targetIndex, true, startProgressMs);
 
-        if (source === 'queue') {
-            // Retour à la file : son premier titre redevient la piste courante,
-            // dans les deux modes.
-            const setAside = readSetAsideQueue(settings);
+    // La playlist n'interrompt pas toujours ce qui joue : le lecteur
+    // range le titre demandé derrière le morceau en cours plutôt que de
+    // le couper. Quand elle prend malgré tout la main, la piste qu'elle
+    // a interrompue ouvre la file mise de côté — c'est là qu'on la
+    // retrouvera au retour, et à cet endroit seulement.
+    const trackAfter = currentTrackOf();
+    const interrupted = trackBefore && (!trackAfter || !arePathsOrUrlsEqual(trackBefore.url, trackAfter.url));
 
-            if (isPersonal) {
-                if (queue && setAside.length > 0) {
-                    const [first, ...rest] = setAside;
-                    queue.virtualCurrentTrack = first;
-                    queue.virtualTracks = rest;
-                    queue.virtualProgressMs = startProgressMs;
-                    queue.virtualIsPlaying = true;
-                    queue.virtualIsPaused = false;
-                    queue.virtualLastUpdated = Date.now();
-                }
-            } else if (queue) {
-                queue.tracks.clear();
-                if (setAside.length > 0) {
-                    const { Track } = require('discord-player');
-                    const tracksToRestore = setAside.map(tData => {
-                        const track = new Track(player, tData);
-                        if (tData.extractorName) {
-                            track.extractor = player.extractors.store.get(tData.extractorName) || null;
-                        }
-                        return track;
-                    });
-                    queue.addTrack(tracksToRestore);
-                }
-            }
-        } else {
-            await webServer._syncPlaylistToPlayer(currentGuildId, source, targetIndex, true,
-                startProgressMs);
+    if (interrupted) {
+      const settings = database.getSettings(currentGuildId);
+      writeSetAsideQueue(currentGuildId, [toData(trackBefore), ...readSetAsideQueue(settings)], settings);
+    }
+  }
 
-            // La playlist n'interrompt pas toujours ce qui joue : le lecteur
-            // range le titre demandé derrière le morceau en cours plutôt que de
-            // le couper. Quand elle prend malgré tout la main, la piste qu'elle
-            // a interrompue ouvre la file mise de côté — c'est là qu'on la
-            // retrouvera au retour, et à cet endroit seulement.
-            const trackAfter = currentTrackOf();
-            const interrupted = trackBefore
-                && (!trackAfter || !arePathsOrUrlsEqual(trackBefore.url, trackAfter.url));
-
-            if (interrupted) {
-                const settings = database.getSettings(currentGuildId);
-                writeSetAsideQueue(
-                    currentGuildId,
-                    [toData(trackBefore), ...readSetAsideQueue(settings)],
-                    settings
-                );
-            }
-        }
-
-        webServer.broadcastState(currentGuildId);
-        playbackStateManager.saveState(player);
+  webServer.broadcastState(currentGuildId);
+  playbackStateManager.saveState(player);
 }
 
 module.exports = {
-    handleReorderPlaylists,
-    handleCreatePlaylist,
-    handleRenamePlaylist,
-    handleDeletePlaylist,
-    handleAddPlaylistTrack,
-    handleAddTrackToPlaylist,
-    handleRemoveTrackFromPlaylist,
-    handleMovePlaylistTrack,
-    handleInsertTransition,
-    handleSetTransitionTarget,
-    handleSetActivePlaybackSource,
+  handleReorderPlaylists,
+  handleCreatePlaylist,
+  handleRenamePlaylist,
+  handleDeletePlaylist,
+  handleAddPlaylistTrack,
+  handleAddTrackToPlaylist,
+  handleRemoveTrackFromPlaylist,
+  handleMovePlaylistTrack,
+  handleInsertTransition,
+  handleSetTransitionTarget,
+  handleSetActivePlaybackSource,
 };

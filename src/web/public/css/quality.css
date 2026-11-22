@@ -12,452 +12,483 @@
  * la chromie s'adapte au fond qui les porte.
  */
 .quality-gear-btn {
-    flex-shrink: 0;
-    background: transparent;
-    border: 1px solid transparent;
-    color: var(--text-muted);
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    padding: 0;
-    transition: background 0.18s ease, color 0.18s ease;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease;
 }
 
 /* Seul l'engrenage pivote : faire tourner le bouton entraînerait son cadre et
    son fond, ce qui se voit et n'a pas de sens. */
 .quality-gear-btn svg {
-    width: 16px;
-    height: 16px;
-    transition: transform 0.35s ease;
+  width: 16px;
+  height: 16px;
+  transition: transform 0.35s ease;
 }
 
 .quality-gear-btn:hover svg,
 .quality-gear-btn.is-open svg {
-    transform: rotate(45deg);
+  transform: rotate(45deg);
 }
 
 .quality-gear-btn.is-open {
-    background: var(--c-accent);
-    border-color: var(--c-accent);
-    color: #ffffff;
+  background: var(--c-accent);
+  border-color: var(--c-accent);
+  color: #ffffff;
 }
 
 .quality-gear-btn.hidden {
-    display: none;
+  display: none;
 }
 
 /* Variante « en-tête de carte » : plus discrète, elle s'aligne sur les autres
    commandes de la boîte plutôt que sur une incrustation vidéo. */
 .player-quality-btn {
-    width: 26px;
-    height: 26px;
+  width: 26px;
+  height: 26px;
 }
 
 .player-quality-btn svg {
-    width: 14px;
-    height: 14px;
+  width: 14px;
+  height: 14px;
 }
 
 .player-quality-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: var(--text-main);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
 }
 
 /* --- Menu principal --- */
 
 .quality-menu {
-    position: fixed;
-    z-index: 2100;
-    background: rgba(15, 14, 22, 0.96);
-    border: 1px solid var(--border-card-hover);
-    border-radius: 12px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-    padding: 0.5rem;
-    min-width: 232px;
-    max-width: 300px;
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+  position: fixed;
+  z-index: 2100;
+  background: rgba(15, 14, 22, 0.96);
+  border: 1px solid var(--border-card-hover);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  padding: 0.5rem;
+  min-width: 232px;
+  max-width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .quality-menu-title {
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--text-main);
-    padding: 0.3rem 0.5rem 0.15rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-main);
+  padding: 0.3rem 0.5rem 0.15rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* --- Ligne d'état du préchargement --- */
 
 .quality-menu-status {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.25rem 0.5rem 0.4rem;
-    font-size: 0.75rem;
-    color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 .quality-menu-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--text-muted);
-    opacity: 0.5;
-    flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  opacity: 0.5;
+  flex-shrink: 0;
 }
 
 .quality-menu-status-text {
-    flex: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .quality-menu-status-value {
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .quality-menu-status.is-preloaded .quality-menu-dot,
 .quality-menu-status.is-preloading .quality-menu-dot {
-    background: var(--c-success);
-    opacity: 1;
-    box-shadow: 0 0 8px rgba(38, 222, 128, 0.6);
+  background: var(--c-success);
+  opacity: 1;
+  box-shadow: 0 0 8px rgba(38, 222, 128, 0.6);
 }
 
 .quality-menu-status.is-preloaded .quality-menu-status-value {
-    color: var(--c-success);
+  color: var(--c-success);
 }
 
 .quality-menu-status.is-preloading .quality-menu-dot,
 .quality-menu-status.is-requalifying .quality-menu-dot {
-    animation: quality-dot-pulse 1.2s ease-in-out infinite;
+  animation: quality-dot-pulse 1.2s ease-in-out infinite;
 }
 
 .quality-menu-status.is-requalifying.is-up .quality-menu-dot {
-    background: var(--c-success);
-    opacity: 1;
+  background: var(--c-success);
+  opacity: 1;
 }
 
 .quality-menu-status.is-requalifying.is-down .quality-menu-dot {
-    background: var(--c-error);
-    opacity: 1;
+  background: var(--c-error);
+  opacity: 1;
 }
 
 .quality-menu-status.is-requalifying.is-up .quality-menu-status-value {
-    color: var(--c-success);
+  color: var(--c-success);
 }
 
 .quality-menu-status.is-requalifying.is-down .quality-menu-status-value {
-    color: var(--c-error);
+  color: var(--c-error);
 }
 
 @keyframes quality-dot-pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.45; transform: scale(0.8); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.8);
+  }
 }
 
 .quality-menu-note {
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    padding: 0.1rem 0.5rem 0.35rem;
-    line-height: 1.35;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  padding: 0.1rem 0.5rem 0.35rem;
+  line-height: 1.35;
 }
 
 .quality-menu-separator {
-    height: 1px;
-    background: var(--border-card-hover);
-    opacity: 0.5;
-    margin: 0.15rem 0.25rem 0.25rem;
+  height: 1px;
+  background: var(--border-card-hover);
+  opacity: 0.5;
+  margin: 0.15rem 0.25rem 0.25rem;
 }
 
 /* --- Boutons de qualité --- */
 
 .quality-menu-item {
-    background: transparent;
-    border: none;
-    color: var(--text-main);
-    font-family: var(--font-primary);
-    font-size: 0.82rem;
-    font-weight: 500;
-    padding: 0.5rem 0.6rem;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
-    text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text-main);
+  font-family: var(--font-primary);
+  font-size: 0.82rem;
+  font-weight: 500;
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+  text-align: left;
 }
 
 .quality-menu-item:hover,
 .quality-menu-item.is-open {
-    background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .quality-menu-icon {
-    display: flex;
-    align-items: center;
-    color: var(--text-muted);
-    flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .quality-menu-icon svg {
-    width: 14px;
-    height: 14px;
+  width: 14px;
+  height: 14px;
 }
 
 .quality-menu-label {
-    flex: 1;
+  flex: 1;
 }
 
 .quality-menu-value {
-    font-weight: 600;
-    font-size: 0.78rem;
-    color: var(--c-success);
-    font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 0.78rem;
+  color: var(--c-success);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Qualité seulement souhaitée : aucun fichier ne la porte encore. */
 .quality-menu-value.is-desired {
-    color: var(--text-muted);
-    font-style: italic;
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .quality-menu-arrow {
-    display: flex;
-    align-items: center;
-    color: var(--text-muted);
-    flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .quality-menu-chevron {
-    width: 13px;
-    height: 13px;
-    transition: transform 0.15s ease;
+  width: 13px;
+  height: 13px;
+  transition: transform 0.15s ease;
 }
 
 .quality-menu-item.is-open .quality-menu-chevron {
-    transform: rotate(90deg);
+  transform: rotate(90deg);
 }
 
 /* --- Copie de la source --- */
 
 .quality-menu-copy-mark svg {
-    width: 13px;
-    height: 13px;
+  width: 13px;
+  height: 13px;
 }
 
 /* Le libellé peut être long (« Copier le chemin d'accès ») : il s'abrège
    plutôt que d'élargir le menu ou de passer à la ligne. */
 .quality-menu-source .quality-menu-label {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .quality-menu-source.is-copied,
 .quality-menu-source.is-copied:hover {
-    background: rgba(87, 242, 135, 0.12);
+  background: rgba(87, 242, 135, 0.12);
 }
 
 .quality-menu-source.is-copied .quality-menu-label,
 .quality-menu-source.is-copied .quality-menu-icon,
 .quality-menu-source.is-copied .quality-menu-copy-mark {
-    color: var(--c-success);
+  color: var(--c-success);
 }
 
 /* --- Sous-menu de choix --- */
 
 .quality-submenu {
-    position: fixed;
-    z-index: 2110;
-    background: rgba(15, 14, 22, 0.97);
-    border: 1px solid var(--border-card-hover);
-    border-radius: 10px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.55);
-    padding: 0.35rem;
-    min-width: 140px;
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+  position: fixed;
+  z-index: 2110;
+  background: rgba(15, 14, 22, 0.97);
+  border: 1px solid var(--border-card-hover);
+  border-radius: 10px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.55);
+  padding: 0.35rem;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .quality-submenu-item {
-    background: transparent;
-    border: none;
-    color: var(--text-main);
-    font-family: var(--font-primary);
-    font-size: 0.8rem;
-    font-weight: 500;
-    padding: 0.42rem 0.55rem;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    cursor: pointer;
-    transition: background 0.15s ease;
-    text-align: left;
-    white-space: nowrap;
+  background: transparent;
+  border: none;
+  color: var(--text-main);
+  font-family: var(--font-primary);
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 0.42rem 0.55rem;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  text-align: left;
+  white-space: nowrap;
 }
 
 .quality-submenu-item:hover {
-    background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .quality-submenu-item.is-current {
-    color: var(--c-success);
-    font-weight: 600;
+  color: var(--c-success);
+  font-weight: 600;
 }
 
 .quality-submenu-check {
-    display: flex;
-    align-items: center;
-    width: 13px;
-    flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  width: 13px;
+  flex-shrink: 0;
 }
 
 .quality-submenu-check svg {
-    width: 13px;
-    height: 13px;
+  width: 13px;
+  height: 13px;
 }
 
 /* --- Barre de requalification, superposée au vert du préchargement --- */
 
 .requalify-fill-bar {
-    position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: 100%;
-    transform-origin: left center;
-    transform: scaleX(0);
-    pointer-events: none;
-    z-index: 1;
-    transition: transform 0.25s ease-out;
-    will-change: transform;
-    display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  transform-origin: left center;
+  transform: scaleX(0);
+  pointer-events: none;
+  z-index: 1;
+  transition: transform 0.25s ease-out;
+  will-change: transform;
+  display: none;
 }
 
 .is-requalifying .requalify-fill-bar {
-    display: block;
+  display: block;
 }
 
 /* Montée en qualité : progression verte, plus vive que le vert du cache. */
 .is-requalifying.requalify-up .requalify-fill-bar {
-    background: linear-gradient(90deg, rgba(38, 222, 128, 0.30), rgba(72, 255, 168, 0.55));
-    box-shadow: 0 0 12px rgba(38, 222, 128, 0.45);
+  background: linear-gradient(90deg, rgba(38, 222, 128, 0.3), rgba(72, 255, 168, 0.55));
+  box-shadow: 0 0 12px rgba(38, 222, 128, 0.45);
 }
 
 /* Descente en qualité : progression rouge. */
 .is-requalifying.requalify-down .requalify-fill-bar {
-    background: linear-gradient(90deg, rgba(237, 66, 69, 0.28), rgba(255, 108, 110, 0.5));
-    box-shadow: 0 0 12px rgba(237, 66, 69, 0.4);
+  background: linear-gradient(90deg, rgba(237, 66, 69, 0.28), rgba(255, 108, 110, 0.5));
+  box-shadow: 0 0 12px rgba(237, 66, 69, 0.4);
 }
 
 /* Tête de progression, comme pour le préchargement initial. */
 .is-requalifying .requalify-fill-bar::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 2px;
-    transform-origin: right center;
-    transform: scaleX(calc(1 / var(--requalify-scale, 1)));
-    will-change: transform;
-    pointer-events: none;
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 2px;
+  transform-origin: right center;
+  transform: scaleX(calc(1 / var(--requalify-scale, 1)));
+  will-change: transform;
+  pointer-events: none;
 }
 
 .is-requalifying.requalify-up .requalify-fill-bar::after {
-    background: rgba(72, 255, 168, 0.95);
-    box-shadow: 0 0 8px rgba(38, 222, 128, 0.85);
+  background: rgba(72, 255, 168, 0.95);
+  box-shadow: 0 0 8px rgba(38, 222, 128, 0.85);
 }
 
 .is-requalifying.requalify-down .requalify-fill-bar::after {
-    background: rgba(255, 108, 110, 0.95);
-    box-shadow: 0 0 8px rgba(237, 66, 69, 0.85);
+  background: rgba(255, 108, 110, 0.95);
+  box-shadow: 0 0 8px rgba(237, 66, 69, 0.85);
 }
 
 /* --- Flèches animées le long de l'élément --- */
 
 .requalify-arrows {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    overflow: hidden;
-    pointer-events: none;
-    z-index: 3;
-    display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 3;
+  display: none;
 }
 
 .is-requalifying .requalify-arrows {
-    display: block;
+  display: block;
 }
 
 .requalify-arrow {
-    position: absolute;
-    bottom: -10px;
-    width: 9px;
-    height: 9px;
-    opacity: 0;
-    border-left: 2px solid currentColor;
-    border-top: 2px solid currentColor;
-    border-radius: 1px;
+  position: absolute;
+  bottom: -10px;
+  width: 9px;
+  height: 9px;
+  opacity: 0;
+  border-left: 2px solid currentColor;
+  border-top: 2px solid currentColor;
+  border-radius: 1px;
 }
 
 /* Montée : flèches vertes qui remontent l'élément. */
 .requalify-up .requalify-arrow {
-    color: rgba(72, 255, 168, 0.9);
-    transform: rotate(45deg);
-    animation: requalify-rise 2.2s ease-in-out infinite;
+  color: rgba(72, 255, 168, 0.9);
+  transform: rotate(45deg);
+  animation: requalify-rise 2.2s ease-in-out infinite;
 }
 
 /* Descente : flèches rouges qui redescendent. */
 .requalify-down .requalify-arrow {
-    color: rgba(255, 108, 110, 0.9);
-    top: -10px;
-    bottom: auto;
-    transform: rotate(-135deg);
-    animation: requalify-fall 2.2s ease-in-out infinite;
+  color: rgba(255, 108, 110, 0.9);
+  top: -10px;
+  bottom: auto;
+  transform: rotate(-135deg);
+  animation: requalify-fall 2.2s ease-in-out infinite;
 }
 
 @keyframes requalify-rise {
-    0%   { opacity: 0; transform: translateY(0) rotate(45deg); }
-    18%  { opacity: 0.95; }
-    72%  { opacity: 0.65; }
-    100% { opacity: 0; transform: translateY(calc(-1 * var(--requalify-travel, 46px))) rotate(45deg); }
+  0% {
+    opacity: 0;
+    transform: translateY(0) rotate(45deg);
+  }
+  18% {
+    opacity: 0.95;
+  }
+  72% {
+    opacity: 0.65;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--requalify-travel, 46px))) rotate(45deg);
+  }
 }
 
 @keyframes requalify-fall {
-    0%   { opacity: 0; transform: translateY(0) rotate(-135deg); }
-    18%  { opacity: 0.95; }
-    72%  { opacity: 0.65; }
-    100% { opacity: 0; transform: translateY(var(--requalify-travel, 46px)) rotate(-135deg); }
+  0% {
+    opacity: 0;
+    transform: translateY(0) rotate(-135deg);
+  }
+  18% {
+    opacity: 0.95;
+  }
+  72% {
+    opacity: 0.65;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(var(--requalify-travel, 46px)) rotate(-135deg);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .requalify-arrow {
-        animation: none !important;
-        opacity: 0 !important;
-    }
-    .quality-menu-status .quality-menu-dot {
-        animation: none !important;
-    }
+  .requalify-arrow {
+    animation: none !important;
+    opacity: 0 !important;
+  }
+  .quality-menu-status .quality-menu-dot {
+    animation: none !important;
+  }
 }
 
 /* --- Panneau de niveau sonore (LUFS) --- */
@@ -469,18 +500,18 @@
  * la même façon deux fois de suite.
  */
 .loudness-panel {
-    width: 258px;
-    min-width: 258px;
-    padding: 0.7rem 0.75rem 0.6rem;
-    gap: 0;
+  width: 258px;
+  min-width: 258px;
+  padding: 0.7rem 0.75rem 0.6rem;
+  gap: 0;
 }
 
 .loudness-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    margin-bottom: 0.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
 }
 
 /*
@@ -489,59 +520,66 @@
  * quand on passe de « −9.5 » à « −10.0 ».
  */
 .loudness-reading {
-    font-size: 1.15rem;
-    font-weight: 700;
-    color: var(--c-primary);
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.01em;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--c-primary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 .loudness-reset {
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid var(--border-card);
-    color: var(--text-muted);
-    width: 26px;
-    height: 26px;
-    border-radius: 7px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: background 0.15s ease, color 0.15s ease, transform 0.25s ease;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-card);
+  color: var(--text-muted);
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    transform 0.25s ease;
 }
 
 .loudness-reset svg {
-    width: 13px;
-    height: 13px;
+  width: 13px;
+  height: 13px;
 }
 
 .loudness-reset:hover {
-    background: rgba(255, 255, 255, 0.12);
-    color: var(--text-main);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-main);
 }
 
 /* La flèche du bouton fait le tour : le geste dit le retour en arrière mieux
    que le libellé qui ne tient pas dans 26 pixels. */
 .loudness-reset:hover svg {
-    animation: loudness-rewind 0.5s ease;
+  animation: loudness-rewind 0.5s ease;
 }
 
 @keyframes loudness-rewind {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(-360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-360deg);
+  }
 }
 
 .loudness-rail {
-    position: relative;
-    display: flex;
-    align-items: center;
-    padding: 0.25rem 0 0.1rem;
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0.25rem 0 0.1rem;
 }
 
 .loudness-slider {
-    width: 100%;
+  width: 100%;
 }
 
 /*
@@ -551,49 +589,49 @@
  * un trait posé par-dessus clignoterait derrière lui.
  */
 .loudness-origin-mark {
-    position: absolute;
-    top: 50%;
-    width: 2px;
-    height: 14px;
-    margin-top: -7px;
-    border-radius: 1px;
-    background: var(--text-muted);
-    opacity: 0.75;
-    pointer-events: none;
-    z-index: 0;
+  position: absolute;
+  top: 50%;
+  width: 2px;
+  height: 14px;
+  margin-top: -7px;
+  border-radius: 1px;
+  background: var(--text-muted);
+  opacity: 0.75;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .loudness-bounds {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.66rem;
-    color: var(--text-muted);
-    opacity: 0.7;
-    font-variant-numeric: tabular-nums;
-    margin-bottom: 0.45rem;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.66rem;
+  color: var(--text-muted);
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 0.45rem;
 }
 
 .loudness-facts {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.5rem;
-    font-size: 0.72rem;
-    color: var(--text-muted);
-    margin-bottom: 0.35rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
 }
 
 .loudness-origin {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .loudness-gain {
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    color: var(--text-main);
-    flex-shrink: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-main);
+  flex-shrink: 0;
 }
 
 /*
@@ -605,99 +643,97 @@
  * avec le remplissage serait rouge dès le premier dixième de décibel.
  */
 .loudness-meter {
-    position: relative;
-    height: 6px;
-    border-radius: 3px;
-    background: color-mix(in srgb, rgba(0, 0, 0, 0.08) var(--blend-pct), rgba(255, 255, 255, 0.07));
-    overflow: hidden;
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, rgba(0, 0, 0, 0.08) var(--blend-pct), rgba(255, 255, 255, 0.07));
+  overflow: hidden;
 }
 
 .loudness-meter-fill {
-    position: absolute;
-    inset: 0;
-    width: 0;
-    border-radius: 3px;
-    background: linear-gradient(90deg,
-        var(--c-success) 0%,
-        #f2c94c 45%,
-        #f2994a 70%,
-        var(--c-error) 100%);
-    /* 258 px de panneau moins ses 2 × 12 px de marge intérieure : le dégradé
+  position: absolute;
+  inset: 0;
+  width: 0;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--c-success) 0%, #f2c94c 45%, #f2994a 70%, var(--c-error) 100%);
+  /* 258 px de panneau moins ses 2 × 12 px de marge intérieure : le dégradé
        couvre exactement la barre, sans quoi sa fin — le rouge — tomberait à
        côté du bord droit et l'échelle mentirait. */
-    background-size: 234px 100%;
-    background-repeat: no-repeat;
-    transition: width 0.12s linear;
+  background-size: 234px 100%;
+  background-repeat: no-repeat;
+  transition: width 0.12s linear;
 }
 
 .loudness-verdict {
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: var(--c-success);
-    margin-top: 0.3rem;
-    transition: color 0.2s ease;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--c-success);
+  margin-top: 0.3rem;
+  transition: color 0.2s ease;
 }
 
 .loudness-panel.is-degraded .loudness-verdict {
-    color: #f2c94c;
+  color: #f2c94c;
 }
 
 .loudness-panel.is-severe .loudness-verdict {
-    color: var(--c-error);
+  color: var(--c-error);
 }
 
 /* Le gain lui-même passe au rouge quand il coûte quelque chose : c'est le
    chiffre qu'on relit avant de refermer le menu. */
 .loudness-panel.is-degraded .loudness-gain {
-    color: #f2c94c;
+  color: #f2c94c;
 }
 
 .loudness-panel.is-severe .loudness-gain {
-    color: var(--c-error);
+  color: var(--c-error);
 }
 
 .loudness-synced-note {
-    font-size: 0.68rem;
-    line-height: 1.35;
-    color: var(--text-muted);
-    margin-top: 0.45rem;
-    padding-top: 0.4rem;
-    border-top: 1px solid var(--border-card);
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+  margin-top: 0.45rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border-card);
 }
 
 .loudness-notice {
-    font-size: 0.74rem;
-    line-height: 1.4;
-    color: var(--text-muted);
-    padding: 0.15rem 0.1rem;
-    max-width: 210px;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+  padding: 0.15rem 0.1rem;
+  max-width: 210px;
 }
 
 .loudness-notice.is-working::after {
-    content: '';
-    display: inline-block;
-    width: 9px;
-    height: 9px;
-    margin-left: 0.4rem;
-    vertical-align: -1px;
-    border: 2px solid currentColor;
-    border-right-color: transparent;
-    border-radius: 50%;
-    animation: loudness-spin 0.8s linear infinite;
+  content: '';
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-left: 0.4rem;
+  vertical-align: -1px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: loudness-spin 0.8s linear infinite;
 }
 
 @keyframes loudness-spin {
-    to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .loudness-reset:hover svg,
-    .loudness-notice.is-working::after {
-        animation: none !important;
-    }
-    .loudness-meter-fill {
-        transition: none;
-    }
+  .loudness-reset:hover svg,
+  .loudness-notice.is-working::after {
+    animation: none !important;
+  }
+  .loudness-meter-fill {
+    transition: none;
+  }
 }
 
 /*
@@ -708,19 +744,19 @@
  * mal regardé. Éteint, il dit les deux à la fois.
  */
 .quality-submenu-item.is-unavailable {
-    opacity: 0.38;
-    cursor: not-allowed;
+  opacity: 0.38;
+  cursor: not-allowed;
 }
 
 .quality-submenu-item.is-unavailable:hover {
-    background: transparent;
+  background: transparent;
 }
 
 /* L'attente de l'inventaire : une à trois secondes, et il vaut mieux le dire
    que laisser croire à une liste définitive. */
 .quality-submenu-pending {
-    padding: 0.35rem 0.7rem;
-    font-size: 0.72rem;
-    font-style: italic;
-    color: var(--text-muted);
+  padding: 0.35rem 0.7rem;
+  font-size: 0.72rem;
+  font-style: italic;
+  color: var(--text-muted);
 }

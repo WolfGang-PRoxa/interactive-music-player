@@ -13,9 +13,9 @@ Last updated: 13 November 2026
   [section 3](#3-what-the-author-collects)).
 - Every instance runs on the machine of the person who installed it. All data
   stays in that machine's `data/` folder.
-- **No audio is ever recorded.** The bot knows *that* someone is speaking, never
-  *what* they said.
-- **No message content is read.** The *Message Content* privileged intent is not
+- **No audio is ever recorded.** The bot knows _that_ someone is speaking, never
+  _what_ they said.
+- **No message content is read.** The _Message Content_ privileged intent is not
   enabled.
 
 ---
@@ -25,10 +25,10 @@ Last updated: 13 November 2026
 The Software is **self-hosted**: no public instance is operated by the author
 (see [Terms of Service, section 2](TERMS.md#2-distribution-model-self-hosting)).
 
-| | |
-|---|---|
-| **Data controller** | The **operator** — the person or entity who installs the Software, creates the Discord application, and runs the instance |
-| **The author's role** | Publisher of the source code. Neither controller nor processor: they have access to no instance and to no data |
+|                       |                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **Data controller**   | The **operator** — the person or entity who installs the Software, creates the Discord application, and runs the instance |
+| **The author's role** | Publisher of the source code. Neither controller nor processor: they have access to no instance and to no data            |
 
 To exercise a right over data held by a given instance, contact **that
 instance's operator** — the person who invited the bot to the Discord server
@@ -79,15 +79,15 @@ by turning it off (`OAUTH_RELAY_URL=off`).
 This data is written to the `data/` folder on the operator's machine. It never
 leaves that machine.
 
-| File | Data | Purpose |
-|---|---|---|
-| `settings.json` | Discord server and channel IDs; per-server settings (volume, ducking, speed); IDs of members excluded from speech detection; playlists (titles, URLs, file paths) | Preserving settings and playlists between sessions |
-| `playback_state.json` | Per server and per channel: current track, position, queue, history, repeat mode, playing or paused | Resuming playback at the exact position after a restart |
-| `sessions.json` | Per signed-in guest: Discord user ID, username, display name, avatar URL, session creation date and last-activity date | Recognising a dashboard guest in order to apply the rights the session owner granted them |
-| `dashboard-token` | The dashboard access token (`0600` permissions) | Protecting the dashboard |
-| `logs/*.log` | Technical logs: playback events, errors, and depending on the configured level, server, channel and member IDs | Diagnostics |
-| `cache/*` | Preloaded audio files for upcoming tracks | Instant start-up, resilience to network interruptions |
-| `uploads/*` | Media files uploaded by dashboard users, stored as `<fingerprint>-<original name>` | Making uploads replayable |
+| File                  | Data                                                                                                                                                              | Purpose                                                                                   |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `settings.json`       | Discord server and channel IDs; per-server settings (volume, ducking, speed); IDs of members excluded from speech detection; playlists (titles, URLs, file paths) | Preserving settings and playlists between sessions                                        |
+| `playback_state.json` | Per server and per channel: current track, position, queue, history, repeat mode, playing or paused                                                               | Resuming playback at the exact position after a restart                                   |
+| `sessions.json`       | Per signed-in guest: Discord user ID, username, display name, avatar URL, session creation date and last-activity date                                            | Recognising a dashboard guest in order to apply the rights the session owner granted them |
+| `dashboard-token`     | The dashboard access token (`0600` permissions)                                                                                                                   | Protecting the dashboard                                                                  |
+| `logs/*.log`          | Technical logs: playback events, errors, and depending on the configured level, server, channel and member IDs                                                    | Diagnostics                                                                               |
+| `cache/*`             | Preloaded audio files for upcoming tracks                                                                                                                         | Instant start-up, resilience to network interruptions                                     |
+| `uploads/*`           | Media files uploaded by dashboard users, stored as `<fingerprint>-<original name>`                                                                                | Making uploads replayable                                                                 |
 
 None of this data is sold, rented, shared or transmitted to a third party by the
 Software.
@@ -102,18 +102,18 @@ This deserves stating plainly, because a voice bot can reasonably cause concern.
 
 Automatic volume ducking relies on the `speaking` `start` and `end` events of
 the Discord voice connection. Those events carry exactly one piece of
-information: *this member ID started or stopped transmitting*. The Software
+information: _this member ID started or stopped transmitting_. The Software
 subscribes to no incoming audio stream. There is no path in the code by which a
 voice could be captured, written to disk, or sent anywhere — this is verifiable
 in [`src/audio/DuckingManager.js`](src/audio/DuckingManager.js).
 
-**It reads the content of no message.** The *Message Content* privileged intent
+**It reads the content of no message.** The _Message Content_ privileged intent
 is neither required nor enabled. The bot works with three non-privileged intents
 only: `Guilds`, `GuildVoiceStates` and `GuildMessages`.
 
-**It builds no member list.** The *Server Members* intent is not enabled.
+**It builds no member list.** The _Server Members_ intent is not enabled.
 
-**It tracks no presence status.** The *Presence* intent is not enabled.
+**It tracks no presence status.** The _Presence_ intent is not enabled.
 
 **It profiles no one and makes no automated decisions** producing legal effects.
 
@@ -123,11 +123,11 @@ only: `Guilds`, `GuildVoiceStates` and `GuildMessages`.
 
 ### Gateway intents
 
-| Intent | Privileged | What it provides |
-|---|---|---|
-| `Guilds` | No | The list of servers and channels, to know where the bot may play |
-| `GuildVoiceStates` | No | Who is connected to which voice channel, and speaking events |
-| `GuildMessages` | No | Receiving commands, without access to message content |
+| Intent             | Privileged | What it provides                                                 |
+| ------------------ | ---------- | ---------------------------------------------------------------- |
+| `Guilds`           | No         | The list of servers and channels, to know where the bot may play |
+| `GuildVoiceStates` | No         | Who is connected to which voice channel, and speaking events     |
+| `GuildMessages`    | No         | Receiving commands, without access to message content            |
 
 ### Guest OAuth2 sign-in
 
@@ -153,10 +153,10 @@ the dashboard's shared token allows.
 The dashboard sets two cookies, both strictly necessary for it to work. There
 are no advertising cookies and no analytics cookies.
 
-| Cookie | Contents | Lifetime | Role |
-|---|---|---|---|
-| `dashboard_token` | The access token | 1 year | Avoiding having to put the token back in the URL on every visit, and letting the browser load media and open the WebSocket |
-| `dashboard_session` | A random session identifier | 30 days, sliding | Tying the browser tab to the guest's Discord identity |
+| Cookie              | Contents                    | Lifetime         | Role                                                                                                                       |
+| ------------------- | --------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `dashboard_token`   | The access token            | 1 year           | Avoiding having to put the token back in the URL on every visit, and letting the browser load media and open the WebSocket |
+| `dashboard_session` | A random session identifier | 30 days, sliding | Tying the browser tab to the guest's Discord identity                                                                      |
 
 Both are `httpOnly` and `sameSite=lax`: the page's JavaScript cannot read them,
 and they are not sent with a request triggered from another site.
@@ -165,14 +165,14 @@ and they are not sent with a request triggered from another site.
 
 ## 8. Retention
 
-| Data | Retention |
-|---|---|
-| Guest sessions | 30 days without activity, then automatic deletion. Each request pushes the deadline back |
-| Logs | The 20 most recent files by default, configurable via `LOG_RETENTION`. Older ones are deleted at start-up |
-| Settings and playlists | Until deleted by the operator |
-| Playback state | Continuously overwritten; only the last known state is kept |
-| Audio cache | Until deleted by the operator |
-| Uploaded files | Until deleted by the operator |
+| Data                   | Retention                                                                                                 |
+| ---------------------- | --------------------------------------------------------------------------------------------------------- |
+| Guest sessions         | 30 days without activity, then automatic deletion. Each request pushes the deadline back                  |
+| Logs                   | The 20 most recent files by default, configurable via `LOG_RETENTION`. Older ones are deleted at start-up |
+| Settings and playlists | Until deleted by the operator                                                                             |
+| Playback state         | Continuously overwritten; only the last known state is kept                                               |
+| Audio cache            | Until deleted by the operator                                                                             |
+| Uploaded files         | Until deleted by the operator                                                                             |
 
 An operator deletes all data by removing the `data/` folder.
 
@@ -184,14 +184,14 @@ The Software transmits data to no third party for commercial purposes. It does
 issue technical requests to the following services, each governed by its own
 privacy policy:
 
-| Service | What it receives | Policy |
-|---|---|---|
-| **Discord** | The bot's API calls and the OAuth2 round trip | [discord.com/privacy](https://discord.com/privacy) |
-| **YouTube / Google** | Searches and stream requests, with the host machine's IP address | [policies.google.com/privacy](https://policies.google.com/privacy) |
-| **Spotify** | Metadata requests, if credentials are configured | [spotify.com/legal/privacy-policy](https://www.spotify.com/legal/privacy-policy/) |
-| **SoundCloud**, **Apple Music** | Metadata and stream requests | Respective policies |
-| **GitHub** | Release listings, download of an update, and download of `cloudflared` | [GitHub Privacy Statement](https://docs.github.com/site-policy/privacy-policies/github-privacy-statement) |
-| **Cloudflare** | If the operator shares their dashboard through a tunnel: all visitor traffic, encrypted up to Cloudflare's network; and the pass through the sign-in relay | [cloudflare.com/privacypolicy](https://www.cloudflare.com/privacypolicy/) |
+| Service                         | What it receives                                                                                                                                           | Policy                                                                                                    |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| **Discord**                     | The bot's API calls and the OAuth2 round trip                                                                                                              | [discord.com/privacy](https://discord.com/privacy)                                                        |
+| **YouTube / Google**            | Searches and stream requests, with the host machine's IP address                                                                                           | [policies.google.com/privacy](https://policies.google.com/privacy)                                        |
+| **Spotify**                     | Metadata requests, if credentials are configured                                                                                                           | [spotify.com/legal/privacy-policy](https://www.spotify.com/legal/privacy-policy/)                         |
+| **SoundCloud**, **Apple Music** | Metadata and stream requests                                                                                                                               | Respective policies                                                                                       |
+| **GitHub**                      | Release listings, download of an update, and download of `cloudflared`                                                                                     | [GitHub Privacy Statement](https://docs.github.com/site-policy/privacy-policies/github-privacy-statement) |
+| **Cloudflare**                  | If the operator shares their dashboard through a tunnel: all visitor traffic, encrypted up to Cloudflare's network; and the pass through the sign-in relay | [cloudflare.com/privacypolicy](https://www.cloudflare.com/privacypolicy/)                                 |
 
 These requests originate from the operator's machine. It is **their IP address**
 that is exposed to those services, not that of the Discord server's members.
@@ -278,4 +278,4 @@ its operator, and they alone hold that data.
 
 ---
 
-*[Version française](CONFIDENTIALITE.md) · [Terms of Service](TERMS.md)*
+_[Version française](CONFIDENTIALITE.md) · [Terms of Service](TERMS.md)_

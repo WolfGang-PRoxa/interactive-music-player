@@ -57,8 +57,8 @@ const INSTALL_ROOT = path.resolve(__dirname, '..', '..');
  * développement, quelle qu'en soit la valeur.
  */
 const VERSIONS_DIR = process.env.IMP_VERSIONS_DIR
-    ? path.resolve(process.env.IMP_VERSIONS_DIR)
-    : path.join(SHARED_ROOT, 'versions');
+  ? path.resolve(process.env.IMP_VERSIONS_DIR)
+  : path.join(SHARED_ROOT, 'versions');
 
 /**
  * `enfant` est-il strictement contenu dans `parent` ?
@@ -73,19 +73,19 @@ const VERSIONS_DIR = process.env.IMP_VERSIONS_DIR
  * l'assainissement d'un tag exotique — n'a rien d'une évasion.
  */
 function isSubdirectory(parent, child) {
-    const relative = path.relative(path.resolve(parent), path.resolve(child));
-    if (!relative) return false;
-    if (path.isAbsolute(relative)) return false;
-    return relative !== '..' && !relative.startsWith(`..${path.sep}`);
+  const relative = path.relative(path.resolve(parent), path.resolve(child));
+  if (!relative) return false;
+  if (path.isAbsolute(relative)) return false;
+  return relative !== '..' && !relative.startsWith(`..${path.sep}`);
 }
 
 function isSameDir(a, b) {
-    return path.relative(path.resolve(a), path.resolve(b)) === '';
+  return path.relative(path.resolve(a), path.resolve(b)) === '';
 }
 
 /** La version en cours d'exécution est-elle une release installée ? */
 function runningOnRelease() {
-    return isSubdirectory(VERSIONS_DIR, INSTALL_ROOT);
+  return isSubdirectory(VERSIONS_DIR, INSTALL_ROOT);
 }
 
 /**
@@ -95,20 +95,20 @@ function runningOnRelease() {
  * release, le dépôt est celui qui héberge `versions/` : la racine partagée.
  */
 function devRoot() {
-    return runningOnRelease() ? SHARED_ROOT : INSTALL_ROOT;
+  return runningOnRelease() ? SHARED_ROOT : INSTALL_ROOT;
 }
 
 /** Point d'entrée Node d'une racine d'installation. */
 function entryPointFor(root) {
-    return path.join(root, 'src', 'index.js');
+  return path.join(root, 'src', 'index.js');
 }
 
 function readPackage(root) {
-    try {
-        return JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-    } catch (e) {
-        return null;
-    }
+  try {
+    return JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  } catch (e) {
+    return null;
+  }
 }
 
 /**
@@ -116,27 +116,27 @@ function readPackage(root) {
  * @returns {{ type: 'dev'|'release', tag: string, versionPackage: string|null, racine: string }}
  */
 function currentVersion() {
-    const pkg = readPackage(INSTALL_ROOT);
-    const packageVersion = pkg && pkg.version ? String(pkg.version) : null;
+  const pkg = readPackage(INSTALL_ROOT);
+  const packageVersion = pkg && pkg.version ? String(pkg.version) : null;
 
-    if (runningOnRelease()) {
-        // Le dossier porte le nom de la release ; le marqueur garde le tag
-        // d'origine, que l'assainissement du nom de dossier a pu altérer.
-        const marker = readMarker(INSTALL_ROOT);
-        return {
-            type: 'release',
-            tag: (marker && marker.tag) || path.basename(INSTALL_ROOT),
-            packageVersion,
-            root: INSTALL_ROOT,
-        };
-    }
+  if (runningOnRelease()) {
+    // Le dossier porte le nom de la release ; le marqueur garde le tag
+    // d'origine, que l'assainissement du nom de dossier a pu altérer.
+    const marker = readMarker(INSTALL_ROOT);
+    return {
+      type: 'release',
+      tag: (marker && marker.tag) || path.basename(INSTALL_ROOT),
+      packageVersion,
+      root: INSTALL_ROOT,
+    };
+  }
 
-    return { type: 'dev', tag: DEV_TAG, packageVersion, root: INSTALL_ROOT };
+  return { type: 'dev', tag: DEV_TAG, packageVersion, root: INSTALL_ROOT };
 }
 
 /** Le dépôt de développement est-il lançable depuis cette machine ? */
 function devAvailable() {
-    return fs.existsSync(entryPointFor(devRoot()));
+  return fs.existsSync(entryPointFor(devRoot()));
 }
 
 /**
@@ -149,22 +149,22 @@ function devAvailable() {
  * @throws {Error} si le tag ne laisse aucun nom exploitable
  */
 function safeFolderName(tag) {
-    const raw = String(tag || '').trim();
-    if (!raw) throw new Error('Empty version tag.');
+  const raw = String(tag || '').trim();
+  if (!raw) throw new Error('Empty version tag.');
 
-    const name = raw.replace(/[^A-Za-z0-9._-]/g, '-').replace(/^-+|-+$/g, '');
-    if (!name || name === '.' || name === '..' || /^\.+$/.test(name)) {
-        throw new Error(`Unusable version tag: ${raw}`);
-    }
-    return name;
+  const name = raw.replace(/[^A-Za-z0-9._-]/g, '-').replace(/^-+|-+$/g, '');
+  if (!name || name === '.' || name === '..' || /^\.+$/.test(name)) {
+    throw new Error(`Unusable version tag: ${raw}`);
+  }
+  return name;
 }
 
 function readMarker(dir) {
-    try {
-        return JSON.parse(fs.readFileSync(path.join(dir, MARKER_FILE), 'utf8'));
-    } catch (e) {
-        return null;
-    }
+  try {
+    return JSON.parse(fs.readFileSync(path.join(dir, MARKER_FILE), 'utf8'));
+  } catch (e) {
+    return null;
+  }
 }
 
 /**
@@ -174,9 +174,9 @@ function readMarker(dir) {
  * le bot refuserait de démarrer après le redémarrage.
  */
 function isInstallComplete(dir) {
-    const marker = readMarker(dir);
-    if (!marker || marker.complete !== true) return false;
-    return fs.existsSync(entryPointFor(dir));
+  const marker = readMarker(dir);
+  if (!marker || marker.complete !== true) return false;
+  return fs.existsSync(entryPointFor(dir));
 }
 
 /**
@@ -200,30 +200,28 @@ function isInstallComplete(dir) {
  * @throws {Error} si l'opération doit être refusée
  */
 function assertTargetWritable(target, refusal) {
-    const dev = devRoot();
+  const dev = devRoot();
 
-    if (isSameDir(VERSIONS_DIR, dev) || isSubdirectory(VERSIONS_DIR, dev)) {
-        throw new Error(
-            `${refusal}: the versions folder (${VERSIONS_DIR}) holds the development checkout.`
-        );
-    }
+  if (isSameDir(VERSIONS_DIR, dev) || isSubdirectory(VERSIONS_DIR, dev)) {
+    throw new Error(`${refusal}: the versions folder (${VERSIONS_DIR}) holds the development checkout.`);
+  }
 
-    if (!isSubdirectory(VERSIONS_DIR, target)) {
-        throw new Error(`${refusal}: ${target} is outside the versions folder.`);
-    }
+  if (!isSubdirectory(VERSIONS_DIR, target)) {
+    throw new Error(`${refusal}: ${target} is outside the versions folder.`);
+  }
 
-    if (isSameDir(target, INSTALL_ROOT)) {
-        throw new Error(`${refusal}: this version is the one currently running.`);
-    }
+  if (isSameDir(target, INSTALL_ROOT)) {
+    throw new Error(`${refusal}: this version is the one currently running.`);
+  }
 
-    if (isSameDir(target, dev) || isSubdirectory(target, dev)) {
-        throw new Error(`${refusal}: this target overlaps the development checkout.`);
-    }
+  if (isSameDir(target, dev) || isSubdirectory(target, dev)) {
+    throw new Error(`${refusal}: this target overlaps the development checkout.`);
+  }
 }
 
 /** `cible` peut-elle accueillir une installation ? @throws {Error} sinon */
 function assertTargetInstallable(target) {
-    assertTargetWritable(target, 'Installation refusée');
+  assertTargetWritable(target, 'Installation refusée');
 }
 
 /**
@@ -236,26 +234,26 @@ function assertTargetInstallable(target) {
  * @throws {Error} sinon
  */
 function assertTargetRemovable(target) {
-    assertTargetWritable(target, 'Désinstallation refusée');
+  assertTargetWritable(target, 'Désinstallation refusée');
 }
 
 module.exports = {
-    MARKER_FILE,
-    DEV_TAG,
-    SHARED_ROOT,
-    INSTALL_ROOT,
-    VERSIONS_DIR,
-    devAvailable,
-    entryPointFor,
-    isSubdirectory,
-    isInstallComplete,
-    readMarker,
-    readPackage,
-    isSameDir,
-    safeFolderName,
-    devRoot,
-    runningOnRelease,
-    assertTargetInstallable,
-    assertTargetRemovable,
-    currentVersion,
+  MARKER_FILE,
+  DEV_TAG,
+  SHARED_ROOT,
+  INSTALL_ROOT,
+  VERSIONS_DIR,
+  devAvailable,
+  entryPointFor,
+  isSubdirectory,
+  isInstallComplete,
+  readMarker,
+  readPackage,
+  isSameDir,
+  safeFolderName,
+  devRoot,
+  runningOnRelease,
+  assertTargetInstallable,
+  assertTargetRemovable,
+  currentVersion,
 };

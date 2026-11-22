@@ -14,17 +14,17 @@ before.
 
 ## What it does
 
-| | |
-|---|---|
-| **No prerequisites** | Node.js is bundled; the installer brings the bot and all its dependencies |
-| **Guided first setup** | Pasting the token is enough: it is checked with Discord, `.env` is written, the invite prepared |
-| **Built-in dashboard** | It opens in the app window once the bot is ready; *Open in browser* stays one click away |
-| **Notification area** | Closing the window stops nothing: the bot keeps running, the icon lets you reopen, restart, shut down |
-| **Restart and versions** | The dashboard's restart and version switch go through the app, which relaunches the right code |
-| **Start with the session** | A checkbox in the icon's menu: the bot starts in the background, with no window |
-| **A single instance** | Reopening the app shows the one already running |
+|                            |                                                                                                       |
+| -------------------------- | ----------------------------------------------------------------------------------------------------- |
+| **No prerequisites**       | Node.js is bundled; the installer brings the bot and all its dependencies                             |
+| **Guided first setup**     | Pasting the token is enough: it is checked with Discord, `.env` is written, the invite prepared       |
+| **Built-in dashboard**     | It opens in the app window once the bot is ready; _Open in browser_ stays one click away              |
+| **Notification area**      | Closing the window stops nothing: the bot keeps running, the icon lets you reopen, restart, shut down |
+| **Restart and versions**   | The dashboard's restart and version switch go through the app, which relaunches the right code        |
+| **Start with the session** | A checkbox in the icon's menu: the bot starts in the background, with no window                       |
+| **A single instance**      | Reopening the app shows the one already running                                                       |
 
-Closing the startup window while nothing is running quits the app. *Quit* from
+Closing the startup window while nothing is running quits the app. _Quit_ from
 the icon shuts the bot down gently — fade-out, playback state saved — before
 closing.
 
@@ -38,29 +38,29 @@ SmartScreen therefore shows, on first launch, "Windows protected your PC" and
 an unknown publisher.
 
 To install anyway: **More info**, then **Run anyway**. The browser may also ask
-you to confirm the download (*Keep*).
+you to confirm the download (_Keep_).
 
 On Linux, the AppImage only needs to be made executable (`chmod +x`, or
-*Properties → Allow executing*). Depending on the distribution, the
-notification area needs the *AppIndicator* extension (GNOME) and the AppImage
+_Properties → Allow executing_). Depending on the distribution, the
+notification area needs the _AppIndicator_ extension (GNOME) and the AppImage
 the `libfuse2` library. The `.deb` package installs what is needed.
 
 Each file is built by the public workflow
 [`.github/workflows/desktop.yml`](../.github/workflows/desktop.yml), from the
 code in this repository: every file attached to a release links back to the run
-that produced it, in the *Actions* tab.
+that produced it, in the _Actions_ tab.
 
 ---
 
 ## Where the files are
 
-| What | Where |
-|---|---|
-| The bot, its configuration and its data | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\bot\` |
-| `.env` | in that same `bot\` folder |
-| Playlists, settings, logs | `bot\data\` |
-| Bundled Node.js | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\runtime\` |
-| App settings | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\settings.json` |
+| What                                    | Where                                                                     |
+| --------------------------------------- | ------------------------------------------------------------------------- |
+| The bot, its configuration and its data | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\bot\`          |
+| `.env`                                  | in that same `bot\` folder                                                |
+| Playlists, settings, logs               | `bot\data\`                                                               |
+| Bundled Node.js                         | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\runtime\`      |
+| App settings                            | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\settings.json` |
 
 On Linux, the same folder is `~/.local/share/com.wolfgangproxa.interactive-music-player/`.
 
@@ -70,12 +70,12 @@ An update of the app replaces the bot's code and the runtime, never `.env`,
 ### Keeping an existing install
 
 A clone of the repository, with its `.env` and its `data/`, can be run as is:
-in the wizard, *Use an existing install…*, then pick the folder that contains
+in the wizard, _Use an existing install…_, then pick the folder that contains
 `src` and `package.json`. The app then runs that folder with the machine's Node
 if it has one — the one that installed its `node_modules` —, and installs the
 dependencies if they are missing.
 
-*Back to the app's folder*, at the bottom of the window, undoes this choice.
+_Back to the app's folder_, at the bottom of the window, undoes this choice.
 
 ### A bot already running
 
@@ -90,8 +90,8 @@ to open it, restart it or shut it down.
 The Windows installer is built on Windows, the AppImage and the `.deb` on
 Ubuntu, by the workflow
 [`.github/workflows/desktop.yml`](../.github/workflows/desktop.yml): on every
-change to `desktop/` pushed to `main`, and on demand from the *Actions* tab.
-Pushing a `v*` tag, or running the workflow by hand with *release* filled in
+change to `desktop/` pushed to `main`, and on demand from the _Actions_ tab.
+Pushing a `v*` tag, or running the workflow by hand with _release_ filled in
 (`v0.0.1`…), also publishes the release, with the notes from
 `.github/releases/<tag>.md` and a `SHA256SUMS.txt` file.
 
@@ -106,7 +106,7 @@ npm run build -- --bundles appimage,deb   # Linux → bundle/appimage/ and bundl
 ```
 
 On Linux, Tauri first needs WebKitGTK and its neighbours: the exact list is in
-the workflow's *Bibliothèques système* step.
+the workflow's _Bibliothèques système_ step.
 
 The payload is prepared on the target platform: npm downloads there the
 binaries specific to each one (FFmpeg, yt-dlp, DAVE encryption).

@@ -40,26 +40,26 @@ const NPM_TIMEOUT_MS = 10 * 60 * 1000;
  * qu'un confort, l'erreur qui l'a déclenché prime.
  */
 function removeQuietly(dir) {
-    try {
-        fs.rmSync(dir, { recursive: true, force: true });
-    } catch (e) {
-        log.warn(`[Versions] Cleanup impossible for ${dir}: ${e.message}`);
-    }
+  try {
+    fs.rmSync(dir, { recursive: true, force: true });
+  } catch (e) {
+    log.warn(`[Versions] Cleanup impossible for ${dir}: ${e.message}`);
+  }
 }
 
 /** Balaie les extractions abandonnées par une installation interrompue. */
 function cleanTempDirs() {
-    let entries;
-    try {
-        entries = fs.readdirSync(locations.VERSIONS_DIR, { withFileTypes: true });
-    } catch (e) {
-        return;
+  let entries;
+  try {
+    entries = fs.readdirSync(locations.VERSIONS_DIR, { withFileTypes: true });
+  } catch (e) {
+    return;
+  }
+  for (const entry of entries) {
+    if (entry.isDirectory() && entry.name.startsWith(TEMP_PREFIX)) {
+      removeQuietly(path.join(locations.VERSIONS_DIR, entry.name));
     }
-    for (const entry of entries) {
-        if (entry.isDirectory() && entry.name.startsWith(TEMP_PREFIX)) {
-            removeQuietly(path.join(locations.VERSIONS_DIR, entry.name));
-        }
-    }
+  }
 }
 
 /**
@@ -70,52 +70,48 @@ function cleanTempDirs() {
  * d'entrée fantôme dans le menu.
  */
 function listInstalled() {
-    let entries;
-    try {
-        entries = fs.readdirSync(locations.VERSIONS_DIR, { withFileTypes: true });
-    } catch (e) {
-        return [];
-    }
+  let entries;
+  try {
+    entries = fs.readdirSync(locations.VERSIONS_DIR, { withFileTypes: true });
+  } catch (e) {
+    return [];
+  }
 
-    const current = locations.currentVersion();
+  const current = locations.currentVersion();
 
-    return entries
-        .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
-        .map((e) => {
-            const dir = path.join(locations.VERSIONS_DIR, e.name);
-            if (!locations.isInstallComplete(dir)) return null;
-            const marker = locations.readMarker(dir) || {};
-            return {
-                tag: marker.tag || e.name,
-                dir,
-                installedAt: marker.installedAt || null,
-                localDependencies: !!marker.localDependencies,
-                current: current.type === 'release' && locations.isSameDir(dir, current.root),
-            };
-        })
-        .filter(Boolean)
-        .sort((a, b) => String(b.installedAt || '').localeCompare(String(a.installedAt || '')));
+  return entries
+    .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+    .map((e) => {
+      const dir = path.join(locations.VERSIONS_DIR, e.name);
+      if (!locations.isInstallComplete(dir)) return null;
+      const marker = locations.readMarker(dir) || {};
+      return {
+        tag: marker.tag || e.name,
+        dir,
+        installedAt: marker.installedAt || null,
+        localDependencies: !!marker.localDependencies,
+        current: current.type === 'release' && locations.isSameDir(dir, current.root),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => String(b.installedAt || '').localeCompare(String(a.installedAt || '')));
 }
 
 /** Dossier d'une release installée, ou null si elle ne l'est pas (ou l'est mal). */
 function installedDir(tag) {
-    const target = path.join(locations.VERSIONS_DIR, locations.safeFolderName(tag));
-    return locations.isInstallComplete(target) ? target : null;
+  const target = path.join(locations.VERSIONS_DIR, locations.safeFolderName(tag));
+  return locations.isInstallComplete(target) ? target : null;
 }
 
 /** Sous-ensemble de package.json qui décide du contenu de node_modules. */
 function dependencyFingerprint(pkg) {
-    if (!pkg) return null;
-    const sortEntries = (obj) =>
-        Object.keys(obj || {})
-            .sort()
-            .map((key) => `${key}@${JSON.stringify(obj[key])}`)
-            .join(',');
-    return [
-        sortEntries(pkg.dependencies),
-        sortEntries(pkg.optionalDependencies),
-        sortEntries(pkg.overrides),
-    ].join('|');
+  if (!pkg) return null;
+  const sortEntries = (obj) =>
+    Object.keys(obj || {})
+      .sort()
+      .map((key) => `${key}@${JSON.stringify(obj[key])}`)
+      .join(',');
+  return [sortEntries(pkg.dependencies), sortEntries(pkg.optionalDependencies), sortEntries(pkg.overrides)].join('|');
 }
 
 /**
@@ -126,9 +122,9 @@ function dependencyFingerprint(pkg) {
  * peut elle-même être une release munie de ses propres dépendances.
  */
 function dependenciesMatch(versionPkg) {
-    const rootPkg = locations.readPackage(locations.SHARED_ROOT);
-    if (!rootPkg) return false;
-    return dependencyFingerprint(rootPkg) === dependencyFingerprint(versionPkg);
+  const rootPkg = locations.readPackage(locations.SHARED_ROOT);
+  if (!rootPkg) return false;
+  return dependencyFingerprint(rootPkg) === dependencyFingerprint(versionPkg);
 }
 
 /**
@@ -139,40 +135,40 @@ function dependenciesMatch(versionPkg) {
  * la ligne de commande étant entièrement constante.
  */
 function npmInstall(dir, onLine) {
-    return new Promise((resolve, reject) => {
-        const command = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-        const child = spawn(command, ['install', '--omit=dev', '--no-audit', '--no-fund'], {
-            cwd: dir,
-            shell: process.platform === 'win32',
-            windowsHide: true,
-            stdio: ['ignore', 'pipe', 'pipe'],
-        });
-
-        const timer = setTimeout(() => {
-            child.kill();
-            reject(new Error('npm install ran past its time limit.'));
-        }, NPM_TIMEOUT_MS);
-
-        const relay = (stream) => {
-            stream.setEncoding('utf8');
-            stream.on('data', (block) => {
-                const line = String(block).trim().split('\n').pop();
-                if (line && onLine) onLine(line.slice(0, 200));
-            });
-        };
-        relay(child.stdout);
-        relay(child.stderr);
-
-        child.on('error', (err) => {
-            clearTimeout(timer);
-            reject(new Error(`npm not found or not runnable: ${err.message}`));
-        });
-        child.on('close', (code) => {
-            clearTimeout(timer);
-            if (code === 0) return resolve();
-            reject(new Error(`npm install failed (code ${code}).`));
-        });
+  return new Promise((resolve, reject) => {
+    const command = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    const child = spawn(command, ['install', '--omit=dev', '--no-audit', '--no-fund'], {
+      cwd: dir,
+      shell: process.platform === 'win32',
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
+
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error('npm install ran past its time limit.'));
+    }, NPM_TIMEOUT_MS);
+
+    const relay = (stream) => {
+      stream.setEncoding('utf8');
+      stream.on('data', (block) => {
+        const line = String(block).trim().split('\n').pop();
+        if (line && onLine) onLine(line.slice(0, 200));
+      });
+    };
+    relay(child.stdout);
+    relay(child.stderr);
+
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      reject(new Error(`npm not found or not runnable: ${err.message}`));
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      if (code === 0) return resolve();
+      reject(new Error(`npm install failed (code ${code}).`));
+    });
+  });
 }
 
 /**
@@ -183,97 +179,97 @@ function npmInstall(dir, onLine) {
  * @returns {Promise<{ dossier: string, tag: string, dejaInstallee: boolean }>}
  */
 async function install(tag, onStep = () => {}) {
-    const folderName = locations.safeFolderName(tag);
-    const target = path.join(locations.VERSIONS_DIR, folderName);
+  const folderName = locations.safeFolderName(tag);
+  const target = path.join(locations.VERSIONS_DIR, folderName);
 
-    // Refus avant toute écriture : dépôt de développement, version en cours
-    // d'exécution, ou cible hors du dossier des versions.
-    locations.assertTargetInstallable(target);
+  // Refus avant toute écriture : dépôt de développement, version en cours
+  // d'exécution, ou cible hors du dossier des versions.
+  locations.assertTargetInstallable(target);
 
-    if (locations.isInstallComplete(target)) {
-        log.info(`[Versions] ${tag} is already installed: reusing ${target}.`);
-        return { dir: target, tag, alreadyInstalled: true };
+  if (locations.isInstallComplete(target)) {
+    log.info(`[Versions] ${tag} is already installed: reusing ${target}.`);
+    return { dir: target, tag, alreadyInstalled: true };
+  }
+
+  // Le dossier existe mais son marqueur manque : extraction interrompue,
+  // jamais démarrée. Il n'a donc jamais servi et peut céder la place.
+  if (fs.existsSync(target)) {
+    log.warn(`[Versions] Incomplete install detected for ${tag}, starting it over from scratch.`);
+    removeQuietly(target);
+  }
+
+  onStep({ phase: 'search' });
+  const releases = await github.listReleases({ force: true });
+  const release = releases.find((r) => r.tag === tag);
+  if (!release) {
+    throw new Error(`Release ${tag} cannot be found on the repository.`);
+  }
+
+  onStep({ phase: 'download', percent: 0 });
+  let lastPercent = -1;
+  const archive = await github.downloadArchive(release.tarballUrl, (received, total) => {
+    const percent = total ? Math.floor((received / total) * 100) : null;
+    // Une notification par point de pourcentage : le tableau de bord n'a
+    // rien à faire d'un message par paquet TCP.
+    if (percent === null || percent !== lastPercent) {
+      lastPercent = percent;
+      onStep({ phase: 'download', percent, bytes: received, total });
+    }
+  });
+
+  fs.mkdirSync(locations.VERSIONS_DIR, { recursive: true });
+  const tempDir = path.join(
+    locations.VERSIONS_DIR,
+    `${TEMP_PREFIX}${folderName}-${process.pid}-${Date.now().toString(36)}`,
+  );
+
+  try {
+    onStep({ phase: 'extraction' });
+    const result = extractTarGz(archive, tempDir);
+    log.info(`[Versions] ${tag}: ${result.files} files extracted.`);
+
+    const pkg = locations.readPackage(tempDir);
+    if (!pkg) throw new Error('Archive invalide : package.json absent.');
+    if (!fs.existsSync(locations.entryPointFor(tempDir))) {
+      throw new Error('Archive invalide : src/index.js absent.');
     }
 
-    // Le dossier existe mais son marqueur manque : extraction interrompue,
-    // jamais démarrée. Il n'a donc jamais servi et peut céder la place.
-    if (fs.existsSync(target)) {
-        log.warn(`[Versions] Incomplete install detected for ${tag}, starting it over from scratch.`);
-        removeQuietly(target);
+    let localDependencies = false;
+    if (dependenciesMatch(pkg)) {
+      log.info('[Versions] Dependencies identical to the root: shared node_modules reused.');
+    } else {
+      log.info('[Versions] Dependencies differ from the root: local npm install.');
+      onStep({ phase: 'dependencies', message: 'npm install' });
+      await npmInstall(tempDir, (line) => onStep({ phase: 'dependencies', message: line }));
+      localDependencies = true;
     }
 
-    onStep({ phase: 'search' });
-    const releases = await github.listReleases({ force: true });
-    const release = releases.find((r) => r.tag === tag);
-    if (!release) {
-        throw new Error(`Release ${tag} cannot be found on the repository.`);
-    }
-
-    onStep({ phase: 'download', percent: 0 });
-    let lastPercent = -1;
-    const archive = await github.downloadArchive(release.tarballUrl, (received, total) => {
-        const percent = total ? Math.floor((received / total) * 100) : null;
-        // Une notification par point de pourcentage : le tableau de bord n'a
-        // rien à faire d'un message par paquet TCP.
-        if (percent === null || percent !== lastPercent) {
-            lastPercent = percent;
-            onStep({ phase: 'download', percent, bytes: received, total });
-        }
-    });
-
-    fs.mkdirSync(locations.VERSIONS_DIR, { recursive: true });
-    const tempDir = path.join(
-        locations.VERSIONS_DIR,
-        `${TEMP_PREFIX}${folderName}-${process.pid}-${Date.now().toString(36)}`
+    fs.writeFileSync(
+      path.join(tempDir, locations.MARKER_FILE),
+      JSON.stringify(
+        {
+          tag,
+          version: pkg.version || null,
+          installedAt: new Date().toISOString(),
+          localDependencies: localDependencies,
+          complete: true,
+        },
+        null,
+        2,
+      ),
+      'utf8',
     );
 
-    try {
-        onStep({ phase: 'extraction' });
-        const result = extractTarGz(archive, tempDir);
-        log.info(`[Versions] ${tag}: ${result.files} files extracted.`);
-
-        const pkg = locations.readPackage(tempDir);
-        if (!pkg) throw new Error('Archive invalide : package.json absent.');
-        if (!fs.existsSync(locations.entryPointFor(tempDir))) {
-            throw new Error('Archive invalide : src/index.js absent.');
-        }
-
-        let localDependencies = false;
-        if (dependenciesMatch(pkg)) {
-            log.info('[Versions] Dependencies identical to the root: shared node_modules reused.');
-        } else {
-            log.info('[Versions] Dependencies differ from the root: local npm install.');
-            onStep({ phase: 'dependencies', message: 'npm install' });
-            await npmInstall(tempDir, (line) => onStep({ phase: 'dependencies', message: line }));
-            localDependencies = true;
-        }
-
-        fs.writeFileSync(
-            path.join(tempDir, locations.MARKER_FILE),
-            JSON.stringify(
-                {
-                    tag,
-                    version: pkg.version || null,
-                    installedAt: new Date().toISOString(),
-                    localDependencies: localDependencies,
-                    complete: true,
-                },
-                null,
-                2
-            ),
-            'utf8'
-        );
-
-        // Bascule finale. Le renommage est atomique sur un même volume : la
-        // version apparaît complète ou pas du tout.
-        fs.renameSync(tempDir, target);
-        github.clearCache();
-        log.info(`[Versions] ${tag} installed in ${target}.`);
-        return { dir: target, tag, alreadyInstalled: false };
-    } catch (err) {
-        removeQuietly(tempDir);
-        throw err;
-    }
+    // Bascule finale. Le renommage est atomique sur un même volume : la
+    // version apparaît complète ou pas du tout.
+    fs.renameSync(tempDir, target);
+    github.clearCache();
+    log.info(`[Versions] ${tag} installed in ${target}.`);
+    return { dir: target, tag, alreadyInstalled: false };
+  } catch (err) {
+    removeQuietly(tempDir);
+    throw err;
+  }
 }
 
 /**
@@ -297,28 +293,28 @@ async function install(tag, onStep = () => {}) {
  * @throws {Error} si la désinstallation est refusée ou impossible
  */
 function uninstall(tag) {
-    const target = path.join(locations.VERSIONS_DIR, locations.safeFolderName(tag));
+  const target = path.join(locations.VERSIONS_DIR, locations.safeFolderName(tag));
 
-    locations.assertTargetRemovable(target);
+  locations.assertTargetRemovable(target);
 
-    if (!fs.existsSync(target)) {
-        throw new Error(`Version ${tag} is not installed.`);
-    }
+  if (!fs.existsSync(target)) {
+    throw new Error(`Version ${tag} is not installed.`);
+  }
 
-    try {
-        fs.rmSync(target, { recursive: true, force: true });
-    } catch (err) {
-        throw new Error(`Deletion impossible for ${tag}: ${err.message}`);
-    }
+  try {
+    fs.rmSync(target, { recursive: true, force: true });
+  } catch (err) {
+    throw new Error(`Deletion impossible for ${tag}: ${err.message}`);
+  }
 
-    log.info(`[Versions] ${tag} uninstalled (${target} deleted).`);
-    return { dir: target, tag };
+  log.info(`[Versions] ${tag} uninstalled (${target} deleted).`);
+  return { dir: target, tag };
 }
 
 module.exports = {
-    uninstall,
-    installedDir,
-    install,
-    listInstalled,
-    cleanTempDirs,
+  uninstall,
+  installedDir,
+  install,
+  listInstalled,
+  cleanTempDirs,
 };

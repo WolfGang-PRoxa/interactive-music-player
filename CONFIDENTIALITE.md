@@ -13,10 +13,10 @@ Dernière mise à jour : 13 novembre 2026
   [section 3](#3-ce-que-lauteur-collecte)).
 - Chaque instance tourne sur la machine de la personne qui l'installe. Toutes
   les données restent dans le dossier `data/` de cette machine.
-- **Aucun audio n'est enregistré.** Le bot sait *qu'une* personne parle, jamais
-  *ce qu'elle* dit.
+- **Aucun audio n'est enregistré.** Le bot sait _qu'une_ personne parle, jamais
+  _ce qu'elle_ dit.
 - **Aucun contenu de message n'est lu.** L'intention privilégiée
-  *Message Content* n'est pas activée.
+  _Message Content_ n'est pas activée.
 
 ---
 
@@ -26,10 +26,10 @@ Le Logiciel est **auto-hébergé** : il n'existe aucune instance publique
 exploitée par l'auteur (voir
 [Conditions d'utilisation, article 2](CONDITIONS.md#2-la-distribution-par-auto-hébergement)).
 
-| | |
-|---|---|
+|                               |                                                                                                                            |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | **Responsable de traitement** | L'**exploitant** — la personne ou l'entité qui installe le Logiciel, crée l'application Discord et fait tourner l'instance |
-| **Rôle de l'auteur** | Éditeur du code source. Ni responsable de traitement, ni sous-traitant : il n'a accès à aucune instance ni à aucune donnée |
+| **Rôle de l'auteur**          | Éditeur du code source. Ni responsable de traitement, ni sous-traitant : il n'a accès à aucune instance ni à aucune donnée |
 
 Pour exercer un droit sur des données traitées par une instance donnée, il faut
 donc s'adresser à **l'exploitant de cette instance** — la personne qui a invité
@@ -81,15 +81,15 @@ un tunnel nommé sur son propre domaine), avec son propre relais
 Ces données sont écrites dans le dossier `data/` de la machine de l'exploitant.
 Elles ne quittent jamais cette machine.
 
-| Fichier | Données | Finalité |
-|---|---|---|
-| `settings.json` | Identifiants de serveurs et de salons Discord ; réglages par serveur (volume, ducking, vitesse) ; identifiants des membres exclus de la détection de parole ; playlists (titres, URL, chemins de fichiers) | Conserver les réglages et les playlists d'une session à l'autre |
-| `playback_state.json` | Par serveur et par salon : piste en cours, position, file d'attente, historique, mode de répétition, état lecture ou pause | Reprendre la lecture au point exact après un redémarrage |
-| `sessions.json` | Par invité connecté : identifiant Discord, nom d'utilisateur, nom affiché, URL de l'avatar, date de création et date de dernière activité de la session | Reconnaître un invité du tableau de bord pour lui appliquer les droits que le maître de session lui a accordés |
-| `dashboard-token` | Le jeton d'accès au tableau de bord (permissions `0600`) | Protéger le tableau de bord |
-| `logs/*.log` | Journaux techniques : événements de lecture, erreurs, et selon le niveau retenu, identifiants de serveurs, de salons et de membres | Diagnostic |
-| `cache/*` | Fichiers audio préchargés des pistes à venir | Démarrage instantané, résistance aux coupures réseau |
-| `uploads/*` | Fichiers médias importés par les utilisateurs du tableau de bord, sous le nom `<empreinte>-<nom d'origine>` | Rendre les imports rejouables |
+| Fichier               | Données                                                                                                                                                                                                    | Finalité                                                                                                       |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `settings.json`       | Identifiants de serveurs et de salons Discord ; réglages par serveur (volume, ducking, vitesse) ; identifiants des membres exclus de la détection de parole ; playlists (titres, URL, chemins de fichiers) | Conserver les réglages et les playlists d'une session à l'autre                                                |
+| `playback_state.json` | Par serveur et par salon : piste en cours, position, file d'attente, historique, mode de répétition, état lecture ou pause                                                                                 | Reprendre la lecture au point exact après un redémarrage                                                       |
+| `sessions.json`       | Par invité connecté : identifiant Discord, nom d'utilisateur, nom affiché, URL de l'avatar, date de création et date de dernière activité de la session                                                    | Reconnaître un invité du tableau de bord pour lui appliquer les droits que le maître de session lui a accordés |
+| `dashboard-token`     | Le jeton d'accès au tableau de bord (permissions `0600`)                                                                                                                                                   | Protéger le tableau de bord                                                                                    |
+| `logs/*.log`          | Journaux techniques : événements de lecture, erreurs, et selon le niveau retenu, identifiants de serveurs, de salons et de membres                                                                         | Diagnostic                                                                                                     |
+| `cache/*`             | Fichiers audio préchargés des pistes à venir                                                                                                                                                               | Démarrage instantané, résistance aux coupures réseau                                                           |
+| `uploads/*`           | Fichiers médias importés par les utilisateurs du tableau de bord, sous le nom `<empreinte>-<nom d'origine>`                                                                                                | Rendre les imports rejouables                                                                                  |
 
 Aucune de ces données n'est vendue, louée, partagée ni transmise à un tiers par
 le Logiciel.
@@ -102,23 +102,23 @@ Ce point mérite d'être explicite, car un bot vocal peut légitimement inquiét
 
 **Il n'enregistre, ne stocke, ne transmet et n'analyse aucun audio.**
 
-L'atténuation automatique du volume (*ducking*) repose sur les événements
+L'atténuation automatique du volume (_ducking_) repose sur les événements
 `speaking` `start` et `end` de la connexion vocale Discord. Ces événements ne
-portent qu'une information : *tel identifiant de membre a commencé ou cessé
-d'émettre*. Le Logiciel ne s'abonne à aucun flux audio entrant. Il n'existe dans
+portent qu'une information : _tel identifiant de membre a commencé ou cessé
+d'émettre_. Le Logiciel ne s'abonne à aucun flux audio entrant. Il n'existe dans
 le code aucun chemin par lequel une voix pourrait être capturée, écrite sur
 disque ou envoyée ailleurs — cela se vérifie dans
 [`src/audio/DuckingManager.js`](src/audio/DuckingManager.js).
 
 **Il ne lit le contenu d'aucun message.** L'intention privilégiée
-*Message Content* n'est ni requise, ni activée. Le bot ne fonctionne qu'avec
+_Message Content_ n'est ni requise, ni activée. Le bot ne fonctionne qu'avec
 trois intentions non privilégiées : `Guilds`, `GuildVoiceStates` et
 `GuildMessages`.
 
-**Il ne dresse aucune liste de membres.** L'intention *Server Members* n'est pas
+**Il ne dresse aucune liste de membres.** L'intention _Server Members_ n'est pas
 activée.
 
-**Il ne suit aucun statut de présence.** L'intention *Presence* n'est pas
+**Il ne suit aucun statut de présence.** L'intention _Presence_ n'est pas
 activée.
 
 **Il ne profile personne et n'automatise aucune décision** produisant des effets
@@ -130,11 +130,11 @@ juridiques.
 
 ### Intentions de la passerelle
 
-| Intention | Privilégiée | Ce qu'elle apporte |
-|---|---|---|
-| `Guilds` | Non | Liste des serveurs et des salons, pour savoir où le bot peut jouer |
-| `GuildVoiceStates` | Non | Qui est connecté à quel salon vocal, et les événements de parole |
-| `GuildMessages` | Non | Réception des commandes, sans accès au contenu des messages |
+| Intention          | Privilégiée | Ce qu'elle apporte                                                 |
+| ------------------ | ----------- | ------------------------------------------------------------------ |
+| `Guilds`           | Non         | Liste des serveurs et des salons, pour savoir où le bot peut jouer |
+| `GuildVoiceStates` | Non         | Qui est connecté à quel salon vocal, et les événements de parole   |
+| `GuildMessages`    | Non         | Réception des commandes, sans accès au contenu des messages        |
 
 ### Connexion OAuth2 des invités
 
@@ -160,10 +160,10 @@ l'accès qu'autorise le jeton partagé du tableau de bord.
 Le tableau de bord dépose deux cookies, tous deux strictement nécessaires à son
 fonctionnement. Aucun cookie publicitaire, aucun cookie de mesure d'audience.
 
-| Cookie | Contenu | Durée | Rôle |
-|---|---|---|---|
-| `dashboard_token` | Le jeton d'accès | 1 an | Éviter de replacer le jeton dans l'URL à chaque visite, et permettre au navigateur de charger les médias et d'ouvrir le WebSocket |
-| `dashboard_session` | Un identifiant de session aléatoire | 30 jours glissants | Rattacher l'onglet à l'identité Discord de l'invité |
+| Cookie              | Contenu                             | Durée              | Rôle                                                                                                                              |
+| ------------------- | ----------------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `dashboard_token`   | Le jeton d'accès                    | 1 an               | Éviter de replacer le jeton dans l'URL à chaque visite, et permettre au navigateur de charger les médias et d'ouvrir le WebSocket |
+| `dashboard_session` | Un identifiant de session aléatoire | 30 jours glissants | Rattacher l'onglet à l'identité Discord de l'invité                                                                               |
 
 Les deux sont `httpOnly` et `sameSite=lax` : le JavaScript de la page ne peut
 pas les lire, et ils ne partent pas avec une requête déclenchée depuis un autre
@@ -173,14 +173,14 @@ site.
 
 ## 8. Durées de conservation
 
-| Donnée | Conservation |
-|---|---|
-| Sessions d'invités | 30 jours sans activité, puis suppression automatique. Chaque requête repousse l'échéance |
-| Journaux | Les 20 fichiers les plus récents par défaut, réglable par `LOG_RETENTION`. Les plus anciens sont supprimés au démarrage |
-| Réglages et playlists | Jusqu'à suppression par l'exploitant |
-| État de lecture | Écrasé en continu ; ne conserve que le dernier état connu |
-| Cache audio | Jusqu'à suppression par l'exploitant |
-| Fichiers importés | Jusqu'à suppression par l'exploitant |
+| Donnée                | Conservation                                                                                                            |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Sessions d'invités    | 30 jours sans activité, puis suppression automatique. Chaque requête repousse l'échéance                                |
+| Journaux              | Les 20 fichiers les plus récents par défaut, réglable par `LOG_RETENTION`. Les plus anciens sont supprimés au démarrage |
+| Réglages et playlists | Jusqu'à suppression par l'exploitant                                                                                    |
+| État de lecture       | Écrasé en continu ; ne conserve que le dernier état connu                                                               |
+| Cache audio           | Jusqu'à suppression par l'exploitant                                                                                    |
+| Fichiers importés     | Jusqu'à suppression par l'exploitant                                                                                    |
 
 Un exploitant supprime l'intégralité des données en effaçant le dossier `data/`.
 
@@ -192,14 +192,14 @@ Le Logiciel ne transmet de données à aucun tiers à des fins commerciales. Il
 adresse en revanche des requêtes techniques aux services suivants, chacun régi
 par sa propre politique de confidentialité :
 
-| Service | Ce qu'il reçoit | Politique |
-|---|---|---|
-| **Discord** | Les appels d'API du bot et l'aller-retour OAuth2 | [discord.com/privacy](https://discord.com/privacy) |
-| **YouTube / Google** | Les recherches et les requêtes de flux, avec l'adresse IP de la machine hôte | [policies.google.com/privacy](https://policies.google.com/privacy) |
-| **Spotify** | Les requêtes de métadonnées, si des identifiants sont configurés | [spotify.com/legal/privacy-policy](https://www.spotify.com/legal/privacy-policy/) |
-| **SoundCloud**, **Apple Music** | Les requêtes de métadonnées et de flux | Politiques respectives |
-| **GitHub** | La consultation des versions publiées, le téléchargement d'une mise à jour et celui de `cloudflared` | [docs.github.com — GitHub Privacy Statement](https://docs.github.com/site-policy/privacy-policies/github-privacy-statement) |
-| **Cloudflare** | Si l'exploitant partage son tableau de bord par un tunnel : tout le trafic des visiteurs, chiffré jusqu'au réseau de Cloudflare ; et le passage par le relais de connexion | [cloudflare.com/privacypolicy](https://www.cloudflare.com/privacypolicy/) |
+| Service                         | Ce qu'il reçoit                                                                                                                                                            | Politique                                                                                                                   |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **Discord**                     | Les appels d'API du bot et l'aller-retour OAuth2                                                                                                                           | [discord.com/privacy](https://discord.com/privacy)                                                                          |
+| **YouTube / Google**            | Les recherches et les requêtes de flux, avec l'adresse IP de la machine hôte                                                                                               | [policies.google.com/privacy](https://policies.google.com/privacy)                                                          |
+| **Spotify**                     | Les requêtes de métadonnées, si des identifiants sont configurés                                                                                                           | [spotify.com/legal/privacy-policy](https://www.spotify.com/legal/privacy-policy/)                                           |
+| **SoundCloud**, **Apple Music** | Les requêtes de métadonnées et de flux                                                                                                                                     | Politiques respectives                                                                                                      |
+| **GitHub**                      | La consultation des versions publiées, le téléchargement d'une mise à jour et celui de `cloudflared`                                                                       | [docs.github.com — GitHub Privacy Statement](https://docs.github.com/site-policy/privacy-policies/github-privacy-statement) |
+| **Cloudflare**                  | Si l'exploitant partage son tableau de bord par un tunnel : tout le trafic des visiteurs, chiffré jusqu'au réseau de Cloudflare ; et le passage par le relais de connexion | [cloudflare.com/privacypolicy](https://www.cloudflare.com/privacypolicy/)                                                   |
 
 Ces requêtes partent de la machine de l'exploitant. C'est **son adresse IP** qui
 est exposée à ces services, pas celle des membres du serveur Discord.
@@ -287,4 +287,4 @@ serveur : elle seule en est l'exploitant, et elle seule détient ces données.
 
 ---
 
-*[English version](PRIVACY.md) · [Conditions d'utilisation](CONDITIONS.md)*
+_[English version](PRIVACY.md) · [Conditions d'utilisation](CONDITIONS.md)_

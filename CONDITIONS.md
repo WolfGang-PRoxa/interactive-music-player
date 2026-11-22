@@ -42,11 +42,11 @@ Pour utiliser le Logiciel, chaque personne :
 
 Il en découle une répartition des rôles qui ne varie jamais :
 
-| Rôle | Qui | Responsabilité |
-|---|---|---|
-| **Auteur** | Le mainteneur du dépôt | Publier le code source. Rien d'autre. |
-| **Exploitant** | Toute personne qui installe et fait tourner une instance | L'application Discord, la machine, la configuration, les données, l'usage |
-| **Utilisateur final** | Les membres d'un serveur Discord où une instance est invitée | Son propre usage du bot et du tableau de bord |
+| Rôle                  | Qui                                                          | Responsabilité                                                            |
+| --------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| **Auteur**            | Le mainteneur du dépôt                                       | Publier le code source. Rien d'autre.                                     |
+| **Exploitant**        | Toute personne qui installe et fait tourner une instance     | L'application Discord, la machine, la configuration, les données, l'usage |
+| **Utilisateur final** | Les membres d'un serveur Discord où une instance est invitée | Son propre usage du bot et du tableau de bord                             |
 
 L'auteur n'exploite aucune instance, n'a accès aux données d'aucune instance, et
 n'est partie à aucune relation entre un exploitant et ses utilisateurs. Une
@@ -161,7 +161,7 @@ Il est interdit d'utiliser le Logiciel pour :
 - harceler, menacer ou nuire à une personne ou à un groupe ;
 - perturber un serveur Discord : spam, raid, contournement de sanction,
   saturation d'un salon vocal ;
-- automatiser un compte utilisateur Discord (*self-bot*), pratique interdite par
+- automatiser un compte utilisateur Discord (_self-bot_), pratique interdite par
   Discord ;
 - collecter des données de membres Discord au-delà de ce que le fonctionnement
   décrit exige ;
@@ -177,12 +177,12 @@ Il est interdit d'utiliser le Logiciel pour :
 Le Logiciel dialogue avec des services indépendants, chacun régi par ses propres
 conditions :
 
-| Service | Rôle |
-|---|---|
-| Discord | Plateforme hôte, connexion vocale, authentification OAuth2 |
-| YouTube, Spotify, SoundCloud, Apple Music | Résolution des recherches et des flux |
-| GitHub | Distribution du code et de l'installeur, vérification des mises à jour |
-| Cloudflare | Partage du tableau de bord par un tunnel, relais de connexion |
+| Service                                   | Rôle                                                                   |
+| ----------------------------------------- | ---------------------------------------------------------------------- |
+| Discord                                   | Plateforme hôte, connexion vocale, authentification OAuth2             |
+| YouTube, Spotify, SoundCloud, Apple Music | Résolution des recherches et des flux                                  |
+| GitHub                                    | Distribution du code et de l'installeur, vérification des mises à jour |
+| Cloudflare                                | Partage du tableau de bord par un tunnel, relais de connexion          |
 
 Aucun de ces services n'est affilié au Logiciel, ne le parraine ni ne le
 soutient. Les marques citées appartiennent à leurs détenteurs respectifs.
@@ -297,4 +297,4 @@ l'exploitant.
 
 ---
 
-*[English version](TERMS.md) · [Politique de confidentialité](CONFIDENTIALITE.md)*
+_[English version](TERMS.md) · [Politique de confidentialité](CONFIDENTIALITE.md)_

@@ -46,23 +46,23 @@ const net = require('net');
  * @returns {boolean}
  */
 function isPrivateV4(ip) {
-    const parts = ip.split('.').map(Number);
-    if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
-        return true; // Illisible : on ne parie pas dessus.
-    }
-    const [a, b] = parts;
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
+    return true; // Illisible : on ne parie pas dessus.
+  }
+  const [a, b] = parts;
 
-    if (a === 0) return true;                      // « cet hôte »
-    if (a === 10) return true;                     // privé
-    if (a === 127) return true;                    // boucle locale
-    if (a === 169 && b === 254) return true;       // lien-local, métadonnées
-    if (a === 172 && b >= 16 && b <= 31) return true; // privé
-    if (a === 192 && b === 168) return true;       // privé
-    if (a === 192 && b === 0) return true;         // réservé (RFC 5736/6598 voisins)
-    if (a === 100 && b >= 64 && b <= 127) return true; // NAT de fournisseur
-    if (a >= 224) return true;                     // multicast et réservé
+  if (a === 0) return true; // « cet hôte »
+  if (a === 10) return true; // privé
+  if (a === 127) return true; // boucle locale
+  if (a === 169 && b === 254) return true; // lien-local, métadonnées
+  if (a === 172 && b >= 16 && b <= 31) return true; // privé
+  if (a === 192 && b === 168) return true; // privé
+  if (a === 192 && b === 0) return true; // réservé (RFC 5736/6598 voisins)
+  if (a === 100 && b >= 64 && b <= 127) return true; // NAT de fournisseur
+  if (a >= 224) return true; // multicast et réservé
 
-    return false;
+  return false;
 }
 
 /**
@@ -75,33 +75,33 @@ function isPrivateV4(ip) {
  * @returns {boolean}
  */
 function isPrivateV6(ip) {
-    const value = ip.toLowerCase().split('%')[0]; // « %eth0 » : portée d'interface
+  const value = ip.toLowerCase().split('%')[0]; // « %eth0 » : portée d'interface
 
-    if (value === '::' || value === '::1') return true;
+  if (value === '::' || value === '::1') return true;
 
-    /*
-     * Les deux écritures d'une IPv4 mappée, et il faut les deux.
-     *
-     * `::ffff:192.168.0.1` est celle qu'on écrit ; `::ffff:c0a8:1` est celle
-     * que l'analyseur d'URL de Node rend, car il normalise en hexadécimal. Ne
-     * connaître que la première laissait donc passer par la seconde tout le
-     * réseau privé — c'est le test qui l'a montré, pas la relecture.
-     */
-    const pointee = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(value);
-    if (pointee) return isPrivateV4(pointee[1]);
+  /*
+   * Les deux écritures d'une IPv4 mappée, et il faut les deux.
+   *
+   * `::ffff:192.168.0.1` est celle qu'on écrit ; `::ffff:c0a8:1` est celle
+   * que l'analyseur d'URL de Node rend, car il normalise en hexadécimal. Ne
+   * connaître que la première laissait donc passer par la seconde tout le
+   * réseau privé — c'est le test qui l'a montré, pas la relecture.
+   */
+  const pointee = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(value);
+  if (pointee) return isPrivateV4(pointee[1]);
 
-    const hexa = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(value);
-    if (hexa) {
-        const haut = parseInt(hexa[1], 16);
-        const bas = parseInt(hexa[2], 16);
-        return isPrivateV4(`${haut >> 8}.${haut & 255}.${bas >> 8}.${bas & 255}`);
-    }
+  const hexa = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(value);
+  if (hexa) {
+    const haut = parseInt(hexa[1], 16);
+    const bas = parseInt(hexa[2], 16);
+    return isPrivateV4(`${haut >> 8}.${haut & 255}.${bas >> 8}.${bas & 255}`);
+  }
 
-    if (value.startsWith('fe80:')) return true;  // lien-local
-    if (/^f[cd]/.test(value)) return true;       // unique local (fc00::/7)
-    if (value.startsWith('ff')) return true;     // multicast
+  if (value.startsWith('fe80:')) return true; // lien-local
+  if (/^f[cd]/.test(value)) return true; // unique local (fc00::/7)
+  if (value.startsWith('ff')) return true; // multicast
 
-    return false;
+  return false;
 }
 
 /**
@@ -110,10 +110,10 @@ function isPrivateV6(ip) {
  * @returns {boolean}
  */
 function isPrivateAddress(ip) {
-    const version = net.isIP(ip);
-    if (version === 4) return isPrivateV4(ip);
-    if (version === 6) return isPrivateV6(ip);
-    return true; // Pas une adresse : on ne parie pas dessus.
+  const version = net.isIP(ip);
+  if (version === 4) return isPrivateV4(ip);
+  if (version === 6) return isPrivateV6(ip);
+  return true; // Pas une adresse : on ne parie pas dessus.
 }
 
 /**
@@ -132,52 +132,50 @@ const LOCAL_SUFFIXES = ['.local', '.localhost', '.internal', '.home', '.lan'];
  * @returns {Promise<{ ok: true } | { ok: false, reason: string }>}
  */
 async function isFetchable(rawUrl) {
-    let url;
-    try {
-        url = new URL(String(rawUrl));
-    } catch (e) {
-        return { ok: false, reason: 'adresse illisible' };
+  let url;
+  try {
+    url = new URL(String(rawUrl));
+  } catch (e) {
+    return { ok: false, reason: 'adresse illisible' };
+  }
+
+  // Ni `file:`, ni `data:`, ni rien d'autre : le bot va chercher de la
+  // musique sur le web, et le disque a son propre chemin (voir mediaPaths).
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return { ok: false, reason: `schéma refusé (${url.protocol})` };
+  }
+
+  // Les crochets d'une adresse IPv6 littérale ne font pas partie de l'adresse.
+  const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (!host) return { ok: false, reason: 'hôte absent' };
+
+  if (host === 'localhost' || LOCAL_SUFFIXES.some((s) => host.endsWith(s))) {
+    return { ok: false, reason: `hôte local (${host})` };
+  }
+
+  // Adresse écrite en clair : pas de résolution à faire.
+  if (net.isIP(host)) {
+    return isPrivateAddress(host) ? { ok: false, reason: `adresse non publique (${host})` } : { ok: true };
+  }
+
+  let resolved;
+  try {
+    resolved = await dns.lookup(host, { all: true });
+  } catch (e) {
+    // Un nom qui ne se résout pas ne mènera nulle part de toute façon ;
+    // refuser ici évite seulement de le découvrir plus tard.
+    return { ok: false, reason: `nom introuvable (${host})` };
+  }
+
+  // *Toutes* les réponses, et non la première : un nom qui rend une adresse
+  // publique et une privée servirait sinon de passe-partout.
+  for (const { address } of resolved) {
+    if (isPrivateAddress(address)) {
+      return { ok: false, reason: `${host} mène à ${address}` };
     }
+  }
 
-    // Ni `file:`, ni `data:`, ni rien d'autre : le bot va chercher de la
-    // musique sur le web, et le disque a son propre chemin (voir mediaPaths).
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-        return { ok: false, reason: `schéma refusé (${url.protocol})` };
-    }
-
-    // Les crochets d'une adresse IPv6 littérale ne font pas partie de l'adresse.
-    const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
-    if (!host) return { ok: false, reason: 'hôte absent' };
-
-    if (host === 'localhost' || LOCAL_SUFFIXES.some((s) => host.endsWith(s))) {
-        return { ok: false, reason: `hôte local (${host})` };
-    }
-
-    // Adresse écrite en clair : pas de résolution à faire.
-    if (net.isIP(host)) {
-        return isPrivateAddress(host)
-            ? { ok: false, reason: `adresse non publique (${host})` }
-            : { ok: true };
-    }
-
-    let resolved;
-    try {
-        resolved = await dns.lookup(host, { all: true });
-    } catch (e) {
-        // Un nom qui ne se résout pas ne mènera nulle part de toute façon ;
-        // refuser ici évite seulement de le découvrir plus tard.
-        return { ok: false, reason: `nom introuvable (${host})` };
-    }
-
-    // *Toutes* les réponses, et non la première : un nom qui rend une adresse
-    // publique et une privée servirait sinon de passe-partout.
-    for (const { address } of resolved) {
-        if (isPrivateAddress(address)) {
-            return { ok: false, reason: `${host} mène à ${address}` };
-        }
-    }
-
-    return { ok: true };
+  return { ok: true };
 }
 
 module.exports = { isFetchable, isPrivateAddress, isPrivateV4, isPrivateV6 };

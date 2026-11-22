@@ -55,13 +55,13 @@
  *    yt-dlp, qui citent des URL signées et des chemins de cache.
  */
 const GUEST_TAGS = new Set([
-    'Player',
-    'MixEngine',
-    'MixSource',
-    'Ducking',
-    'PlaybackState',
-    'PlaybackSettings',
-    'SilencePlayer',
+  'Player',
+  'MixEngine',
+  'MixSource',
+  'Ducking',
+  'PlaybackState',
+  'PlaybackSettings',
+  'SilencePlayer',
 ]);
 
 /**
@@ -76,8 +76,8 @@ const GUEST_TAGS = new Set([
  * @returns {string|null} L'étiquette, ou null si la ligne n'en porte pas.
  */
 function tagOf(text) {
-    const match = /^\[([A-Za-z0-9_-]+)(?:\s[^\]]*)?\]/.exec(String(text || ''));
-    return match ? match[1] : null;
+  const match = /^\[([A-Za-z0-9_-]+)(?:\s[^\]]*)?\]/.exec(String(text || ''));
+  return match ? match[1] : null;
 }
 
 /**
@@ -89,14 +89,14 @@ function tagOf(text) {
  * dans une trace mais dont la disparition ne se vérifie qu'ici.
  */
 const REDACTIONS = [
-    // Chemin Windows : « C:\Users\… » jusqu'au prochain blanc ou guillemet.
-    [/[A-Za-z]:\\[^\s"'`)]+/g, '<chemin>'],
-    // Chemin UNC : « \\serveur\partage\… »
-    [/\\\\[^\s"'`)]+/g, '<chemin>'],
-    // Chemin POSIX, restreint aux racines qui nomment quelqu'un ou le système.
-    [/\/(?:home|Users|root|etc|var|opt|srv)\/[^\s"'`)]*/g, '<chemin>'],
-    // Jeton, sous la forme où il voyageait dans l'adresse d'entrée.
-    [/token=[A-Za-z0-9_-]{8,}/gi, 'token=<masqué>'],
+  // Chemin Windows : « C:\Users\… » jusqu'au prochain blanc ou guillemet.
+  [/[A-Za-z]:\\[^\s"'`)]+/g, '<chemin>'],
+  // Chemin UNC : « \\serveur\partage\… »
+  [/\\\\[^\s"'`)]+/g, '<chemin>'],
+  // Chemin POSIX, restreint aux racines qui nomment quelqu'un ou le système.
+  [/\/(?:home|Users|root|etc|var|opt|srv)\/[^\s"'`)]*/g, '<chemin>'],
+  // Jeton, sous la forme où il voyageait dans l'adresse d'entrée.
+  [/token=[A-Za-z0-9_-]{8,}/gi, 'token=<masqué>'],
 ];
 
 /**
@@ -105,11 +105,11 @@ const REDACTIONS = [
  * @returns {string}
  */
 function redact(text) {
-    let out = String(text || '');
-    for (const [pattern, replacement] of REDACTIONS) {
-        out = out.replace(pattern, replacement);
-    }
-    return out;
+  let out = String(text || '');
+  for (const [pattern, replacement] of REDACTIONS) {
+    out = out.replace(pattern, replacement);
+  }
+  return out;
 }
 
 /**
@@ -120,12 +120,12 @@ function redact(text) {
  *   L'entrée caviardée, ou null si elle ne le regarde pas.
  */
 function forGuest(entry) {
-    if (!entry || typeof entry.text !== 'string') return null;
+  if (!entry || typeof entry.text !== 'string') return null;
 
-    const tag = tagOf(entry.text);
-    if (!tag || !GUEST_TAGS.has(tag)) return null;
+  const tag = tagOf(entry.text);
+  if (!tag || !GUEST_TAGS.has(tag)) return null;
 
-    return { ...entry, text: redact(entry.text) };
+  return { ...entry, text: redact(entry.text) };
 }
 
 /**
@@ -140,7 +140,7 @@ function forGuest(entry) {
  * @returns {object|null}
  */
 function forClient(client, entry) {
-    return client?.identity?.master ? entry : forGuest(entry);
+  return client?.identity?.master ? entry : forGuest(entry);
 }
 
 /**
@@ -150,22 +150,22 @@ function forClient(client, entry) {
  * @returns {object[]}
  */
 function historyForClient(client, history) {
-    const entries = Array.isArray(history) ? history : [];
-    if (client?.identity?.master) return entries;
+  const entries = Array.isArray(history) ? history : [];
+  if (client?.identity?.master) return entries;
 
-    const visible = [];
-    for (const entry of entries) {
-        const kept = forGuest(entry);
-        if (kept) visible.push(kept);
-    }
-    return visible;
+  const visible = [];
+  for (const entry of entries) {
+    const kept = forGuest(entry);
+    if (kept) visible.push(kept);
+  }
+  return visible;
 }
 
 module.exports = {
-    GUEST_TAGS,
-    tagOf,
-    redact,
-    forGuest,
-    forClient,
-    historyForClient,
+  GUEST_TAGS,
+  tagOf,
+  redact,
+  forGuest,
+  forClient,
+  historyForClient,
 };

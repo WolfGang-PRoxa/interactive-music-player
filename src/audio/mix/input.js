@@ -23,7 +23,7 @@ const log = require('../../utils/logger');
  * @returns {boolean}
  */
 function isUrl(value) {
-    return typeof value === 'string' && /^https?:\/\//i.test(value);
+  return typeof value === 'string' && /^https?:\/\//i.test(value);
 }
 
 /**
@@ -36,15 +36,15 @@ function isUrl(value) {
  * @returns {{ input: string, stream: import('stream').Readable|null }|null}
  */
 function normalizeExtractorOutput(raw) {
-    if (!raw) return null;
+  if (!raw) return null;
 
-    if (isUrl(raw)) return { input: raw, stream: null };
-    if (isUrl(raw?.url)) return { input: raw.url, stream: null };
+  if (isUrl(raw)) return { input: raw, stream: null };
+  if (isUrl(raw?.url)) return { input: raw.url, stream: null };
 
-    if (typeof raw?.pipe === 'function') return { input: 'pipe:0', stream: raw };
-    if (typeof raw?.stream?.pipe === 'function') return { input: 'pipe:0', stream: raw.stream };
+  if (typeof raw?.pipe === 'function') return { input: 'pipe:0', stream: raw };
+  if (typeof raw?.stream?.pipe === 'function') return { input: 'pipe:0', stream: raw.stream };
 
-    return null;
+  return null;
 }
 
 /**
@@ -59,18 +59,18 @@ function normalizeExtractorOutput(raw) {
  * @returns {string|null}
  */
 function localPath(track) {
-    try {
-        const cache = preloadManager.getCachedPath(track);
-        if (cache) return cache;
-    } catch (e) {}
+  try {
+    const cache = preloadManager.getCachedPath(track);
+    if (cache) return cache;
+  } catch (e) {}
 
-    const url = track?.url;
-    if (!url || isUrl(url)) return null;
-    try {
-        return fs.existsSync(url) ? url : null;
-    } catch (e) {
-        return null;
-    }
+  const url = track?.url;
+  if (!url || isUrl(url)) return null;
+  try {
+    return fs.existsSync(url) ? url : null;
+  } catch (e) {
+    return null;
+  }
 }
 
 /**
@@ -85,35 +85,40 @@ function localPath(track) {
  * @returns {Promise<{ input: string, stream: import('stream').Readable|null }|null>}
  */
 async function viaExtractors(track, player) {
-    if (!player?.extractors) return null;
+  if (!player?.extractors) return null;
 
-    const attempt = async () => {
-        try {
-            const result = await player.extractors.run(async (extractor) => {
-                if (track.extractor && extractor.identifier !== track.extractor.identifier) return false;
-                if (await extractor.validate(track.url, track.queryType)) {
-                    return await extractor.stream(track);
-                }
-                return false;
-            });
-            return normalizeExtractorOutput(result?.result);
-        } catch (err) {
-            log.error(`[MixInput] Extraction failed for ${track?.title}:`, err.message);
-            return null;
+  const attempt = async () => {
+    try {
+      const result = await player.extractors.run(async (extractor) => {
+        if (track.extractor && extractor.identifier !== track.extractor.identifier) return false;
+        if (await extractor.validate(track.url, track.queryType)) {
+          return await extractor.stream(track);
         }
-    };
-
-    if (player.extractors.context?.provide) {
-        let output = null;
-        await player.extractors.context.provide({
-            id: crypto.randomUUID(),
-            attemptedExtractors: new Set(),
-            bridgeAttemptedExtractors: new Set()
-        }, async () => { output = await attempt(); });
-        return output;
+        return false;
+      });
+      return normalizeExtractorOutput(result?.result);
+    } catch (err) {
+      log.error(`[MixInput] Extraction failed for ${track?.title}:`, err.message);
+      return null;
     }
+  };
 
-    return attempt();
+  if (player.extractors.context?.provide) {
+    let output = null;
+    await player.extractors.context.provide(
+      {
+        id: crypto.randomUUID(),
+        attemptedExtractors: new Set(),
+        bridgeAttemptedExtractors: new Set(),
+      },
+      async () => {
+        output = await attempt();
+      },
+    );
+    return output;
+  }
+
+  return attempt();
 }
 
 /**
@@ -125,17 +130,17 @@ async function viaExtractors(track, player) {
  * @throws {Error} Si aucune entrée n'a pu être obtenue.
  */
 async function resolveInput(track, player) {
-    const local = localPath(track);
-    if (local) return { input: local, stream: null, local: true };
+  const local = localPath(track);
+  if (local) return { input: local, stream: null, local: true };
 
-    const remote = await viaExtractors(track, player);
-    if (remote) return { ...remote, local: false };
+  const remote = await viaExtractors(track, player);
+  if (remote) return { ...remote, local: false };
 
-    // Dernier recours : l'URL de la piste elle-même. FFmpeg sait ouvrir une
-    // adresse HTTP directe, ce qui couvre les fichiers hébergés en clair.
-    if (isUrl(track?.url)) return { input: track.url, stream: null, local: false };
+  // Dernier recours : l'URL de la piste elle-même. FFmpeg sait ouvrir une
+  // adresse HTTP directe, ce qui couvre les fichiers hébergés en clair.
+  if (isUrl(track?.url)) return { input: track.url, stream: null, local: false };
 
-    throw new Error(`No usable audio input for « ${track?.title || '?'} »`);
+  throw new Error(`No usable audio input for « ${track?.title || '?'} »`);
 }
 
 module.exports = { resolveInput, isUrl };

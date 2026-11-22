@@ -1,27 +1,33 @@
 .floating-video-window {
-    --video-bg-opacity: 1;
-    position: fixed;
-    top: 100px;
-    right: 30px;
-    width: 440px;
-    height: 280px;
-    min-width: 300px;
-    min-height: 200px;
-    max-width: 90vw;
-    max-height: 90vh;
-    max-height: 90dvh;
-    z-index: 500;
-    display: flex;
-    flex-direction: column;
-    padding: 0 !important;
-    border-radius: 20px;
-    background: color-mix(in srgb, rgba(240, 237, 246, calc(0.94 * var(--video-bg-opacity, 1))) var(--blend-pct), rgba(10, 9, 15, calc(0.92 * var(--video-bg-opacity, 1))));
-    backdrop-filter: blur(calc(20px * var(--video-bg-opacity, 1)));
-    -webkit-backdrop-filter: blur(calc(20px * var(--video-bg-opacity, 1)));
-    border: 1px solid var(--border-card-hover);
-    box-shadow: 0 20px 50px rgba(0, 0, 0, calc(0.6 * var(--video-bg-opacity, 1))), 0 0 20px rgba(235, 69, 158, calc(0.2 * var(--video-bg-opacity, 1)));
-    overflow: hidden;
-    transition: transform 0.3s ease;
+  --video-bg-opacity: 1;
+  position: fixed;
+  top: 100px;
+  right: 30px;
+  width: 440px;
+  height: 280px;
+  min-width: 300px;
+  min-height: 200px;
+  max-width: 90vw;
+  max-height: 90vh;
+  max-height: 90dvh;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  padding: 0 !important;
+  border-radius: 20px;
+  background: color-mix(
+    in srgb,
+    rgba(240, 237, 246, calc(0.94 * var(--video-bg-opacity, 1))) var(--blend-pct),
+    rgba(10, 9, 15, calc(0.92 * var(--video-bg-opacity, 1)))
+  );
+  backdrop-filter: blur(calc(20px * var(--video-bg-opacity, 1)));
+  -webkit-backdrop-filter: blur(calc(20px * var(--video-bg-opacity, 1)));
+  border: 1px solid var(--border-card-hover);
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, calc(0.6 * var(--video-bg-opacity, 1))),
+    0 0 20px rgba(235, 69, 158, calc(0.2 * var(--video-bg-opacity, 1)));
+  overflow: hidden;
+  transition: transform 0.3s ease;
 }
 
 /*
@@ -45,101 +51,103 @@
  */
 body.video-fullscreen-active #video-floating-window,
 .floating-video-window.is-fullscreen {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    height: 100dvh !important;
-    max-width: 100vw !important;
-    max-height: 100vh !important;
-    max-height: 100dvh !important;
-    margin: 0 !important;
-    border-radius: 0 !important;
-    border: none !important;
-    box-shadow: none !important;
-    /* Un cran sous la notification, deux sous l'infobulle, et au-dessus de
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  /* Un cran sous la notification, deux sous l'infobulle, et au-dessus de
        tout le reste — voir l'échelle en tête de css/modals.css. */
-    z-index: 2147483645 !important;
-    background: #000000 !important;
+  z-index: 2147483645 !important;
+  background: #000000 !important;
 }
 
 body.video-fullscreen-active #video-floating-window .video-window-header,
 .floating-video-window.is-fullscreen .video-window-header,
 .floating-video-window:fullscreen .video-window-header {
-    display: none !important;
+  display: none !important;
 }
 
 body.video-fullscreen-active #video-floating-window .video-window-body,
 .floating-video-window.is-fullscreen .video-window-body,
 .floating-video-window:fullscreen .video-window-body {
-    height: 100vh !important;
-    height: 100dvh !important;
-    width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  width: 100vw !important;
 }
 
-html[data-theme="light"] .floating-video-window {
-    box-shadow: 0 20px 50px rgba(0, 0, 0, calc(0.2 * var(--video-bg-opacity, 1))), 0 0 20px rgba(235, 69, 158, calc(0.15 * var(--video-bg-opacity, 1)));
+html[data-theme='light'] .floating-video-window {
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, calc(0.2 * var(--video-bg-opacity, 1))),
+    0 0 20px rgba(235, 69, 158, calc(0.15 * var(--video-bg-opacity, 1)));
 }
 
 .floating-video-window.hidden {
-    display: none !important;
+  display: none !important;
 }
 
 .video-window-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.6rem 1rem;
-    background: rgba(255, 255, 255, calc(0.04 * var(--video-bg-opacity, 1)));
-    border-bottom: 1px solid var(--border-card);
-    cursor: move;
-    user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  background: rgba(255, 255, 255, calc(0.04 * var(--video-bg-opacity, 1)));
+  border-bottom: 1px solid var(--border-card);
+  cursor: move;
+  user-select: none;
 }
 
 .video-header-title {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-main);
 }
 
 .video-header-controls {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* Opacity Slider Control in Video Header */
 .video-header-opacity {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    background: color-mix(in srgb, rgba(0, 0, 0, 0.05) var(--blend-pct), rgba(0, 0, 0, 0.25));
-    padding: 3px 8px;
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-color: color-mix(in srgb, rgba(0, 0, 0, 0.12) var(--blend-pct), rgba(255, 255, 255, 0.08));
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: color-mix(in srgb, rgba(0, 0, 0, 0.05) var(--blend-pct), rgba(0, 0, 0, 0.25));
+  padding: 3px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-color: color-mix(in srgb, rgba(0, 0, 0, 0.12) var(--blend-pct), rgba(255, 255, 255, 0.08));
 }
 
 .video-opacity-slider {
-    width: 55px;
-    height: 4px;
-    accent-color: var(--c-accent);
-    cursor: pointer;
+  width: 55px;
+  height: 4px;
+  accent-color: var(--c-accent);
+  cursor: pointer;
 }
 
 .video-opacity-val {
-    font-size: 0.65rem;
-    font-weight: 700;
-    color: var(--text-muted);
-    min-width: 28px;
-    text-align: right;
-    font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  min-width: 28px;
+  text-align: right;
+  font-family: var(--font-mono);
 }
 
 /*
@@ -148,18 +156,18 @@ html[data-theme="light"] .floating-video-window {
  * répondent, elles ne peuvent pas habiller leur en-tête chacune à sa façon.
  */
 .video-control-btn {
-    background: var(--bg-select);
-    border: 1px solid var(--border-card);
-    color: var(--text-muted);
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
+  background: var(--bg-select);
+  border: 1px solid var(--border-card);
+  color: var(--text-muted);
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
 /*
@@ -170,25 +178,25 @@ html[data-theme="light"] .floating-video-window {
  * donner l'échelle.
  */
 .video-control-btn svg {
-    width: 15px;
-    height: 15px;
+  width: 15px;
+  height: 15px;
 }
 
 .video-control-btn:hover {
-    background: rgba(237, 66, 69, 0.2);
-    border-color: var(--c-error);
-    color: var(--c-error);
-    transform: scale(1.05);
+  background: rgba(237, 66, 69, 0.2);
+  border-color: var(--c-error);
+  color: var(--c-error);
+  transform: scale(1.05);
 }
 
 .video-control-btn:active {
-    transform: scale(0.95);
+  transform: scale(0.95);
 }
 
 .video-window-body {
-    position: relative;
-    width: 100%;
-    /*
+  position: relative;
+  width: 100%;
+  /*
      * Le double appui recule ou avance de dix secondes. Sans cette déclaration,
      * un navigateur mobile y voit d'abord son propre geste — le double tap qui
      * zoome — et retient les clics le temps d'en décider : le second appui
@@ -196,141 +204,146 @@ html[data-theme="light"] .floating-video-window {
      * `manipulation` lui retire le zoom par double tap sur cette zone, et lui
      * laisse le défilement et le pincement.
      */
-    touch-action: manipulation;
-    height: calc(100% - 40px);
-    background: rgba(0, 0, 0, calc(0.85 * var(--video-bg-opacity, 1)));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    container-type: size;
+  touch-action: manipulation;
+  height: calc(100% - 40px);
+  background: rgba(0, 0, 0, calc(0.85 * var(--video-bg-opacity, 1)));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  container-type: size;
 }
 
 /* Top Info Overlay (Title & Subtitle / Author) - Fades in/out on hover like bottom controls */
 .video-top-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 25;
-    display: flex;
-    flex-direction: row;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 10px 14px 14px 14px;
-    background: linear-gradient(to bottom, rgba(0, 0, 0, calc(0.92 * var(--video-bg-opacity, 1))) 0%, rgba(0, 0, 0, calc(0.4 * var(--video-bg-opacity, 1))) 70%, transparent 100%);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.25s ease;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 25;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px 14px 14px;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, calc(0.92 * var(--video-bg-opacity, 1))) 0%,
+    rgba(0, 0, 0, calc(0.4 * var(--video-bg-opacity, 1))) 70%,
+    transparent 100%
+  );
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
 }
 
 .video-window-body:hover .video-top-overlay,
 .video-floating-window:hover .video-top-overlay,
 .video-top-overlay:focus-within,
 .video-top-overlay.active {
-    opacity: 1;
-    pointer-events: auto;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 /* Colonne titre/auteur : min-width nulle pour que l'ellipse opère en ligne. */
 .video-top-overlay-text {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-    flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
 }
 
 /* Variante « incrustée sur l'image » de la roue de qualité. Le comportement
    commun aux deux roues vit dans quality.css, sous .quality-gear-btn. */
 .video-quality-btn {
-    background: rgba(0, 0, 0, 0.45);
-    border-color: rgba(255, 255, 255, 0.14);
-    color: rgba(255, 255, 255, 0.85);
+  background: rgba(0, 0, 0, 0.45);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .video-quality-btn:hover {
-    background: rgba(0, 0, 0, 0.7);
-    color: #ffffff;
+  background: rgba(0, 0, 0, 0.7);
+  color: #ffffff;
 }
 
 .video-info-title {
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: #ffffff;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 1.25;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
 }
 
 .video-info-author {
-    font-size: 0.74rem;
-    font-weight: 600;
-    color: var(--c-accent);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 1.25;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--c-accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
 }
 
 .video-aspect-wrapper {
-    position: relative;
-    aspect-ratio: 16 / 9;
-    width: min(100cqw, calc(100cqh * 16 / 9));
-    height: min(100cqh, calc(100cqw * 9 / 16));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    background: rgba(0, 0, 0, calc(0.85 * var(--video-bg-opacity, 1)));
+  position: relative;
+  aspect-ratio: 16 / 9;
+  width: min(100cqw, calc(100cqh * 16 / 9));
+  height: min(100cqh, calc(100cqw * 9 / 16));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: rgba(0, 0, 0, calc(0.85 * var(--video-bg-opacity, 1)));
 }
 
 .video-iframe-shield {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 20;
-    pointer-events: auto;
-    background: transparent;
-    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 32px), calc(100% - 32px) 100%, 0 100%);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  pointer-events: auto;
+  background: transparent;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 32px), calc(100% - 32px) 100%, 0 100%);
 }
 
 .video-canvas {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    border: none;
-    pointer-events: none;
-    z-index: 5;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  pointer-events: none;
+  z-index: 5;
 }
 
 .video-element {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    border: none;
-    object-fit: contain;
-    z-index: 10;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  object-fit: contain;
+  z-index: 10;
 }
 
 .video-placeholder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.6rem;
-    color: var(--text-muted);
-    font-size: 0.85rem;
-    text-align: center;
-    padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 1rem;
 }
 
 /* Coin de redimensionnement.
@@ -343,12 +356,12 @@ html[data-theme="light"] .floating-video-window {
    écrasait toute valeur posée ici. C'est aussi de là que viennent la taille
    (20px) et le dégradé d'accentuation du coin, communs à toutes les cartes. */
 .card-resize-handle.video-window-resize-handle {
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    cursor: se-resize;
-    z-index: 30;
-    pointer-events: auto !important;
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  cursor: se-resize;
+  z-index: 30;
+  pointer-events: auto !important;
 }
 
 /* Hide resize handle in Fullscreen mode (Separated rules so browsers do not drop the block) */
@@ -356,84 +369,89 @@ html[data-theme="light"] .floating-video-window {
 #video-floating-window.is-fullscreen .video-window-resize-handle,
 body.video-fullscreen-active #video-window-resize-handle,
 body.video-fullscreen-active .video-window-resize-handle {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 #video-floating-window:fullscreen #video-window-resize-handle,
 #video-floating-window:fullscreen .video-window-resize-handle {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 #video-floating-window:-webkit-full-screen #video-window-resize-handle,
 #video-floating-window:-webkit-full-screen .video-window-resize-handle {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 #video-floating-window:-moz-full-screen #video-window-resize-handle,
 #video-floating-window:-moz-full-screen .video-window-resize-handle {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 /* Custom Overlay Controls inside Floating Video Window */
 .video-custom-controls {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: linear-gradient(to top, rgba(0, 0, 0, calc(0.92 * var(--video-bg-opacity, 1))) 0%, rgba(0, 0, 0, calc(0.5 * var(--video-bg-opacity, 1))) 70%, transparent 100%);
-    /* Le dégradé va jusqu'au bord droit, mais la marge y réserve les 20px du
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, calc(0.92 * var(--video-bg-opacity, 1))) 0%,
+    rgba(0, 0, 0, calc(0.5 * var(--video-bg-opacity, 1))) 70%,
+    transparent 100%
+  );
+  /* Le dégradé va jusqu'au bord droit, mais la marge y réserve les 20px du
        coin de redimensionnement : ce dernier passe au-dessus de la barre, donc
        tout bouton placé dessous deviendrait à son tour insaisissable. */
-    padding: 10px 24px 8px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.25s ease;
-    z-index: 25;
+  padding: 10px 24px 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  z-index: 25;
 }
 
 /* Fullscreen mode: Occupy full width of the screen bottom */
 #video-floating-window.is-fullscreen .video-custom-controls,
 body.video-fullscreen-active #video-floating-window .video-custom-controls {
-    right: 0 !important;
-    padding-left: 20px !important;
-    padding-right: 20px !important;
-    padding-bottom: 14px !important;
+  right: 0 !important;
+  padding-left: 20px !important;
+  padding-right: 20px !important;
+  padding-bottom: 14px !important;
 }
 
 #video-floating-window:fullscreen .video-custom-controls {
-    right: 0 !important;
-    padding-left: 20px !important;
-    padding-right: 20px !important;
-    padding-bottom: 14px !important;
+  right: 0 !important;
+  padding-left: 20px !important;
+  padding-right: 20px !important;
+  padding-bottom: 14px !important;
 }
 
 #video-floating-window:-webkit-full-screen .video-custom-controls {
-    right: 0 !important;
-    padding-left: 20px !important;
-    padding-right: 20px !important;
-    padding-bottom: 14px !important;
+  right: 0 !important;
+  padding-left: 20px !important;
+  padding-right: 20px !important;
+  padding-bottom: 14px !important;
 }
 
 #video-floating-window:-moz-full-screen .video-custom-controls {
-    right: 0 !important;
-    padding-left: 20px !important;
-    padding-right: 20px !important;
-    padding-bottom: 14px !important;
+  right: 0 !important;
+  padding-left: 20px !important;
+  padding-right: 20px !important;
+  padding-bottom: 14px !important;
 }
 
 /* Synchronized Display Logic for Top and Bottom Overlays */
@@ -447,20 +465,20 @@ body.video-fullscreen-active #video-floating-window .video-custom-controls {
 .video-custom-controls:focus-within,
 .video-top-overlay.active,
 .video-custom-controls.active {
-    opacity: 1 !important;
-    pointer-events: auto !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 
 #video-floating-window.user-inactive:not(:hover) .video-top-overlay,
 #video-floating-window.user-inactive:not(:hover) .video-custom-controls,
 #video-floating-window.user-inactive.is-fullscreen .video-top-overlay,
 #video-floating-window.user-inactive.is-fullscreen .video-custom-controls {
-    opacity: 0 !important;
-    pointer-events: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 #video-floating-window.user-inactive.is-fullscreen {
-    cursor: none !important;
+  cursor: none !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -479,8 +497,8 @@ body.video-fullscreen-active #video-floating-window .video-custom-controls {
    ═══════════════════════════════════════════════════════════════ */
 
 .video-center-controls {
-    position: absolute;
-    /*
+  position: absolute;
+  /*
      * Centré sur ce que la barre laisse, et non sur le cadre entier.
      *
      * La barre du bas est haute : 139 px dans la fenêtre de 440 px par défaut,
@@ -490,17 +508,17 @@ body.video-fullscreen-active #video-floating-window .video-custom-controls {
      * n'est pas devinable en CSS puisqu'elle dépend du repli ; js/video.js la
      * mesure et la dépose ici, comme il le fait déjà pour le ruban de la doc.
      */
-    top: calc((100% - var(--video-controls-height, 0px)) / 2);
-    left: 50%;
-    transform: translate(-50%, -50%);
-    display: flex;
-    align-items: center;
-    /* Au-dessus de l'image et de son voile d'iframe, sous la barre et le titre,
+  top: calc((100% - var(--video-controls-height, 0px)) / 2);
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  /* Au-dessus de l'image et de son voile d'iframe, sous la barre et le titre,
        qu'elle ne croise de toute façon jamais. */
-    z-index: 22;
-    gap: clamp(14px, 6cqmin, 32px);
+  z-index: 22;
+  gap: clamp(14px, 6cqmin, 32px);
 
-    /*
+  /*
      * `visibility` plutôt qu'un jeu sur `pointer-events`.
      *
      * Une opacité nulle laisse l'élément cliquable : les trois boutons, posés
@@ -511,9 +529,11 @@ body.video-fullscreen-active #video-floating-window .video-custom-controls {
      * bouton. Le délai de transition la retient le temps du fondu, sans quoi la
      * couche disparaîtrait d'un coup au lieu de s'effacer.
      */
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.25s ease, visibility 0s linear 0.25s;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.25s ease,
+    visibility 0s linear 0.25s;
 }
 
 /* Révélées avec la barre, et par les mêmes conditions qu'elle. */
@@ -521,16 +541,16 @@ body.video-fullscreen-active #video-floating-window .video-custom-controls {
 .video-window-body:hover .video-center-controls,
 #video-floating-window:hover .video-center-controls,
 .video-center-controls.active {
-    opacity: 1;
-    visibility: visible;
-    transition-delay: 0s;
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
 }
 
 /* Effacées avec elle, par les mêmes conditions encore. */
 #video-floating-window.user-inactive:not(:hover) .video-center-controls,
 #video-floating-window.user-inactive.is-fullscreen .video-center-controls {
-    opacity: 0 !important;
-    visibility: hidden !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
 }
 
 /*
@@ -541,19 +561,19 @@ body.video-fullscreen-active #video-floating-window .video-custom-controls {
  * connaître la hauteur réelle de la barre.
  */
 #video-floating-window.center-controls-cramped .video-center-controls {
-    opacity: 0 !important;
-    visibility: hidden !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
 }
 
 .video-center-btn {
-    /* Le cercle suit la taille du cadre, entre deux bornes : assez grand pour
+  /* Le cercle suit la taille du cadre, entre deux bornes : assez grand pour
        le pouce sur un téléphone, jamais au point de manger l'image dans une
        petite fenêtre flottante. */
-    width: clamp(38px, 13cqmin, 52px);
-    height: clamp(38px, 13cqmin, 52px);
-    border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    /*
+  width: clamp(38px, 13cqmin, 52px);
+  height: clamp(38px, 13cqmin, 52px);
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  /*
      * Un fond translucide, et pas de verre dépoli.
      *
      * Ces cercles portaient un `backdrop-filter`, qui arrivait toujours en
@@ -569,72 +589,76 @@ body.video-fullscreen-active #video-floating-window .video-custom-controls {
      * l'œil suit sans heurt. Le fond noir à 45 % suffit à détacher les icônes
      * d'une image claire, ce que le flou ne faisait qu'appuyer.
      */
-    background: rgba(0, 0, 0, 0.45);
-    color: #ffffff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    padding: 0;
-    transition: background 0.15s ease, transform 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+  background: rgba(0, 0, 0, 0.45);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background 0.15s ease,
+    transform 0.15s ease,
+    opacity 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .video-center-btn svg {
-    width: 42%;
-    height: 42%;
+  width: 42%;
+  height: 42%;
 }
 
 .video-center-btn-main {
-    width: clamp(52px, 18cqmin, 72px);
-    height: clamp(52px, 18cqmin, 72px);
-    background: rgba(0, 0, 0, 0.55);
-    border-color: rgba(255, 255, 255, 0.22);
+  width: clamp(52px, 18cqmin, 72px);
+  height: clamp(52px, 18cqmin, 72px);
+  background: rgba(0, 0, 0, 0.55);
+  border-color: rgba(255, 255, 255, 0.22);
 }
 
 .video-center-btn:hover {
-    background: rgba(0, 0, 0, 0.7);
-    border-color: var(--c-accent);
-    transform: scale(1.06);
+  background: rgba(0, 0, 0, 0.7);
+  border-color: var(--c-accent);
+  transform: scale(1.06);
 }
 
 .video-center-btn:active {
-    transform: scale(0.94);
+  transform: scale(0.94);
 }
 
 .video-center-btn:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-    transform: none;
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .video-center-btn:disabled:hover {
-    background: rgba(0, 0, 0, 0.45);
-    border-color: rgba(255, 255, 255, 0.16);
-    transform: none;
+  background: rgba(0, 0, 0, 0.45);
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: none;
 }
 
 .video-timeline-container {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
 }
 
 .video-time-badge {
-    font-size: 0.68rem;
-    font-weight: 700;
-    color: rgba(255, 255, 255, 0.9);
-    font-family: 'Consolas', 'Fira Code', 'Monaco', 'Courier New', monospace;
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: "tnum";
-    min-width: 42px;
-    width: 42px;
-    text-align: center;
-    user-select: none;
-    letter-spacing: 0.3px;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
-    flex-shrink: 0;
-    white-space: nowrap;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  font-family: 'Consolas', 'Fira Code', 'Monaco', 'Courier New', monospace;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  min-width: 42px;
+  width: 42px;
+  text-align: center;
+  user-select: none;
+  letter-spacing: 0.3px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* La barre de progression est le composant de la carte « En cours de lecture »,
@@ -646,9 +670,9 @@ body.video-fullscreen-active #video-floating-window .video-custom-controls {
    La double classe est nécessaire : player.css est importé après video.css et
    déclare le composant à égalité de spécificité. */
 .progress-bar-wrapper.video-progress-wrapper {
-    flex: 1;
-    min-width: 60px;
-    margin-bottom: 0;
+  flex: 1;
+  min-width: 60px;
+  margin-bottom: 0;
 }
 
 /* Les deux groupes ne se compriment pas et la fenêtre descend à 300px de large :
@@ -656,168 +680,174 @@ body.video-fullscreen-active #video-floating-window .video-custom-controls {
    débordement, et devient inatteignable. Le repli sur une seconde ligne fait
    simplement remonter la barre. */
 .video-controls-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 8px;
-    width: 100%;
-    /* Réserve pour l'étiquette de mode du pad de vitesse, hors flux et posée
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  /* Réserve pour l'étiquette de mode du pad de vitesse, hors flux et posée
        au-dessus de lui (cf. `.speed-pad-indicator` dans components.css). Les
        6px d'écart de l'incrustation ne lui suffisent pas : sans cette réserve,
        elle viendrait se poser sur la ligne de progression. */
-    padding-top: 10px;
+  padding-top: 10px;
 }
 
 .video-controls-left,
 .video-controls-right {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .video-btn {
-    background: transparent;
-    border: none;
-    color: #ffffff;
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
-    flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease,
+    opacity 0.15s ease;
+  flex-shrink: 0;
 }
 
 .video-btn svg {
-    width: 15px;
-    height: 15px;
-    pointer-events: none;
+  width: 15px;
+  height: 15px;
+  pointer-events: none;
 }
 
 .video-btn:hover {
-    background: rgba(255, 255, 255, 0.18);
-    color: var(--c-accent);
-    transform: scale(1.05);
+  background: rgba(255, 255, 255, 0.18);
+  color: var(--c-accent);
+  transform: scale(1.05);
 }
 
 .video-volume-group {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .video-volume-slider {
-    width: 55px;
-    height: 4px;
-    accent-color: var(--c-accent);
-    cursor: pointer;
-    flex-shrink: 0;
+  width: 55px;
+  height: 4px;
+  accent-color: var(--c-accent);
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
 .video-time-display {
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.85);
-    user-select: none;
-    margin-left: 2px;
-    font-family: 'Consolas', 'Fira Code', 'Monaco', 'Courier New', monospace;
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: "tnum";
-    min-width: 75px;
-    text-align: center;
-    flex-shrink: 0;
-    white-space: nowrap;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  user-select: none;
+  margin-left: 2px;
+  font-family: 'Consolas', 'Fira Code', 'Monaco', 'Courier New', monospace;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  min-width: 75px;
+  text-align: center;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .video-speed-wrapper {
-    position: relative;
-    flex-shrink: 0;
+  position: relative;
+  flex-shrink: 0;
 }
 
 .video-speed-btn {
-    background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: #ffffff;
-    border-radius: 6px;
-    padding: 2px 8px;
-    font-size: 0.72rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-    font-family: 'Consolas', 'Fira Code', 'Monaco', 'Courier New', monospace;
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: "tnum";
-    flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+  font-family: 'Consolas', 'Fira Code', 'Monaco', 'Courier New', monospace;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  flex-shrink: 0;
 }
 
 .video-speed-btn:hover {
-    background: var(--c-accent);
-    border-color: var(--c-accent);
+  background: var(--c-accent);
+  border-color: var(--c-accent);
 }
 
 .video-speed-dropdown {
-    position: absolute;
-    bottom: 32px;
-    right: 0;
-    background: rgba(15, 12, 22, 0.95);
-    backdrop-filter: blur(12px);
-    border: 1px solid var(--border-card-hover);
-    border-radius: 8px;
-    padding: 4px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    z-index: 35;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+  position: absolute;
+  bottom: 32px;
+  right: 0;
+  background: rgba(15, 12, 22, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-card-hover);
+  border-radius: 8px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 35;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
 }
 
 .video-speed-option {
-    padding: 4px 10px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    border-radius: 4px;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: all 0.15s ease;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
 }
 
 .video-speed-option:hover,
 .video-speed-option.active {
-    background: var(--c-accent);
-    color: #ffffff;
+  background: var(--c-accent);
+  color: #ffffff;
 }
 
 .video-placeholder {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.8rem;
-    color: var(--text-muted);
-    font-size: 0.9rem;
-    text-align: center;
-    padding: 2rem;
-    z-index: 10;
-    pointer-events: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 2rem;
+  z-index: 10;
+  pointer-events: none;
 }
 
 /* Speed Pad inside Floating Video Window */
 .video-speed-pad-wrapper {
-    flex-shrink: 0;
-    pointer-events: auto !important;
+  flex-shrink: 0;
+  pointer-events: auto !important;
 }
-
 
 /* Selecteur de mode de lecture incrusté dans la fenêtre vidéo.
    Même composant que la carte « En cours de lecture », mais calé sur les autres
@@ -828,50 +858,50 @@ body.video-fullscreen-active #video-floating-window .video-custom-controls {
    La double classe est nécessaire : video.css est importé avant modals.css, et
    le composant de base y est déclaré à égalité de spécificité. */
 .play-mode-switch.video-play-mode-switch {
-    margin-left: 0;
-    padding: 2px;
-    border-radius: 8px;
-    gap: 1px;
-    background: rgba(0, 0, 0, 0.35);
-    border-color: rgba(255, 255, 255, 0.18);
-    flex-shrink: 0;
+  margin-left: 0;
+  padding: 2px;
+  border-radius: 8px;
+  gap: 1px;
+  background: rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.18);
+  flex-shrink: 0;
 }
 
 .video-play-mode-switch .mode-switch-btn {
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
-    color: rgba(255, 255, 255, 0.75);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.75);
 }
 
 .video-play-mode-switch .mode-switch-btn svg {
-    width: 15px;
-    height: 15px;
+  width: 15px;
+  height: 15px;
 }
 
 /* Le symbole plein du mode aléatoire, agrandi comme dans la carte et pour la
    même raison — voir css/modals.css. */
 .video-play-mode-switch .mode-switch-btn.mode-shuffle svg {
-    width: 18px;
-    height: 18px;
+  width: 18px;
+  height: 18px;
 }
 
 .video-play-mode-switch .mode-switch-btn:hover {
-    color: var(--c-accent);
-    background: rgba(255, 255, 255, 0.18);
+  color: var(--c-accent);
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .video-play-mode-switch .mode-switch-btn.active {
-    color: #ffffff;
-    box-shadow: none;
+  color: #ffffff;
+  box-shadow: none;
 }
 
 /* Double-click +10s / -10s Seek Indicator Ripple */
 .video-seek-ripple {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    /*
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  /*
      * La taille suit le cadre.
      *
      * Le transport du centre occupe 218 px sur une image de 390 — celle d'un
@@ -881,24 +911,24 @@ body.video-fullscreen-active #video-floating-window .video-custom-controls {
      * mesure donc sur le conteneur, comme les boutons qu'elle doit éviter, et
      * garde ses 90 px là où la place existe.
      */
-    width: clamp(56px, 18cqmin, 90px);
-    height: clamp(56px, 18cqmin, 90px);
-    /* Même raison qu'au transport du centre, un cran plus loin : cette pastille
+  width: clamp(56px, 18cqmin, 90px);
+  height: clamp(56px, 18cqmin, 90px);
+  /* Même raison qu'au transport du centre, un cran plus loin : cette pastille
        ne vit que six dixièmes de seconde, opacité animée de bout en bout. Le
        flou n'avait jamais le temps de se poser — il ne pouvait que sauter, ou
        ne rien faire. Le fond blanc à 25 % et l'ombre portée suffisent. */
-    background: rgba(255, 255, 255, 0.25);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #ffffff;
-    font-weight: 700;
-    font-size: 1.1rem;
-    pointer-events: none;
-    z-index: 100;
-    animation: seekRippleAnim 0.6s ease-out forwards;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 1.1rem;
+  pointer-events: none;
+  z-index: 100;
+  animation: seekRippleAnim 0.6s ease-out forwards;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
 }
 /*
  * Contre le bord, et non à 15 % de lui : c'est le seul endroit que le
@@ -907,14 +937,22 @@ body.video-fullscreen-active #video-floating-window .video-custom-controls {
  * sur les boutons.
  */
 .video-seek-ripple.left {
-    left: 6px;
+  left: 6px;
 }
 .video-seek-ripple.right {
-    right: 6px;
+  right: 6px;
 }
 @keyframes seekRippleAnim {
-    0% { opacity: 0; transform: translateY(-50%) scale(0.4); }
-    40% { opacity: 1; transform: translateY(-50%) scale(1.1); }
-    100% { opacity: 0; transform: translateY(-50%) scale(1.3); }
+  0% {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.4);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-50%) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-50%) scale(1.3);
+  }
 }
-

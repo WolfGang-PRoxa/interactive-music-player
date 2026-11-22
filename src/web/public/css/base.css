@@ -39,15 +39,15 @@
  */
 
 :root {
-    /*
+  /*
      * Position du curseur. `--blend-pct` sert aux mélanges de couleur,
      * `--blend` aux `calc()` sur les longueurs et les opacités, qui ne veulent
      * pas d'unité. Le script pose les deux ensemble.
      */
-    --blend-pct: 0%;
-    --blend: 0;
+  --blend-pct: 0%;
+  --blend: 0;
 
-    /*
+  /*
      * Le texte bascule, il ne se fond pas.
      *
      * Une bande de transition, si étroite soit-elle, ne sauve rien : le
@@ -66,47 +66,47 @@
      * media ou un attribut, pour que la marche suive la même variable que le
      * reste et ne puisse pas s'en désaccorder.
      */
-    --text-pct: clamp(0%, calc((var(--blend-pct) - 50%) * 1000), 100%);
+  --text-pct: clamp(0%, calc((var(--blend-pct) - 50%) * 1000), 100%);
 
-    /* ── Glassmorphism, le style par défaut ── */
-    --night-bg-main: #0a090f;
-    --night-bg-card: rgba(255, 255, 255, 0.03);
-    --night-border-card: rgba(255, 255, 255, 0.06);
-    --night-border-card-hover: rgba(255, 255, 255, 0.12);
-    --night-c-primary: #5865F2;   /* Blurple Discord */
-    --night-c-accent: #EB459E;    /* Neon pink */
-    --night-c-violet: #8e44ad;    /* Glow violet */
-    --night-c-success: #57F287;   /* Green status */
-    --night-c-error: #ED4245;     /* Red alert */
-    --night-text-main: #f5f4f8;
-    --night-text-muted: #8c899d;
-    --night-text-dark: #1e1b29;
-    --night-bg-dropdown: rgba(10, 9, 15, 0.96);
-    --night-bg-select: rgba(255, 255, 255, 0.03);
-    --night-bg-hover: rgba(255, 255, 255, 0.06);
-    --night-blur: 16px;
-    --night-decor: 0.25;
+  /* ── Glassmorphism, le style par défaut ── */
+  --night-bg-main: #0a090f;
+  --night-bg-card: rgba(255, 255, 255, 0.03);
+  --night-border-card: rgba(255, 255, 255, 0.06);
+  --night-border-card-hover: rgba(255, 255, 255, 0.12);
+  --night-c-primary: #5865f2; /* Blurple Discord */
+  --night-c-accent: #eb459e; /* Neon pink */
+  --night-c-violet: #8e44ad; /* Glow violet */
+  --night-c-success: #57f287; /* Green status */
+  --night-c-error: #ed4245; /* Red alert */
+  --night-text-main: #f5f4f8;
+  --night-text-muted: #8c899d;
+  --night-text-dark: #1e1b29;
+  --night-bg-dropdown: rgba(10, 9, 15, 0.96);
+  --night-bg-select: rgba(255, 255, 255, 0.03);
+  --night-bg-hover: rgba(255, 255, 255, 0.06);
+  --night-blur: 16px;
+  --night-decor: 0.25;
 
-    --day-bg-main: #f0edf6;
-    --day-bg-card: rgba(255, 255, 255, 0.45);
-    --day-border-card: rgba(0, 0, 0, 0.08);
-    --day-border-card-hover: rgba(0, 0, 0, 0.15);
-    /* Le verre garde ses couleurs de marque de jour comme de nuit. */
-    --day-c-primary: #5865F2;
-    --day-c-accent: #EB459E;
-    --day-c-violet: #8e44ad;
-    --day-c-success: #57F287;
-    --day-c-error: #ED4245;
-    --day-text-main: #1b1626;
-    --day-text-muted: #625f73;
-    --day-text-dark: #f5f4f8;
-    --day-bg-dropdown: rgba(240, 237, 246, 0.96);
-    --day-bg-select: rgba(0, 0, 0, 0.02);
-    --day-bg-hover: rgba(0, 0, 0, 0.05);
-    --day-blur: 20px;
-    --day-decor: 0.12;
+  --day-bg-main: #f0edf6;
+  --day-bg-card: rgba(255, 255, 255, 0.45);
+  --day-border-card: rgba(0, 0, 0, 0.08);
+  --day-border-card-hover: rgba(0, 0, 0, 0.15);
+  /* Le verre garde ses couleurs de marque de jour comme de nuit. */
+  --day-c-primary: #5865f2;
+  --day-c-accent: #eb459e;
+  --day-c-violet: #8e44ad;
+  --day-c-success: #57f287;
+  --day-c-error: #ed4245;
+  --day-text-main: #1b1626;
+  --day-text-muted: #625f73;
+  --day-text-dark: #f5f4f8;
+  --day-bg-dropdown: rgba(240, 237, 246, 0.96);
+  --day-bg-select: rgba(0, 0, 0, 0.02);
+  --day-bg-hover: rgba(0, 0, 0, 0.05);
+  --day-blur: 20px;
+  --day-decor: 0.12;
 
-    /*
+  /*
      * Les trois teintes du chemin de particules.
      *
      * Elles ont leurs propres jetons plutôt que d'emprunter `--c-primary` et
@@ -118,43 +118,47 @@
      *
      * Le verre garde les siennes de jour comme de nuit, comme ses accents.
      */
-    --night-particle-a: #5865F2;
-    --night-particle-b: #EB459E;
-    --night-particle-c: #8e44ad;
-    --day-particle-a: #5865F2;
-    --day-particle-b: #EB459E;
-    --day-particle-c: #8e44ad;
+  --night-particle-a: #5865f2;
+  --night-particle-b: #eb459e;
+  --night-particle-c: #8e44ad;
+  --day-particle-a: #5865f2;
+  --day-particle-b: #eb459e;
+  --day-particle-c: #8e44ad;
 
-    /* ── Le calcul, écrit une fois pour les quatre styles ── */
-    --bg-main: color-mix(in srgb, var(--day-bg-main) var(--blend-pct), var(--night-bg-main));
-    --bg-card: color-mix(in srgb, var(--day-bg-card) var(--blend-pct), var(--night-bg-card));
-    --border-card: color-mix(in srgb, var(--day-border-card) var(--blend-pct), var(--night-border-card));
-    --border-card-hover: color-mix(in srgb, var(--day-border-card-hover) var(--blend-pct), var(--night-border-card-hover));
-    --c-primary: color-mix(in srgb, var(--day-c-primary) var(--blend-pct), var(--night-c-primary));
-    --c-accent: color-mix(in srgb, var(--day-c-accent) var(--blend-pct), var(--night-c-accent));
-    --c-violet: color-mix(in srgb, var(--day-c-violet) var(--blend-pct), var(--night-c-violet));
-    --c-success: color-mix(in srgb, var(--day-c-success) var(--blend-pct), var(--night-c-success));
-    --c-error: color-mix(in srgb, var(--day-c-error) var(--blend-pct), var(--night-c-error));
-    --bg-dropdown: color-mix(in srgb, var(--day-bg-dropdown) var(--blend-pct), var(--night-bg-dropdown));
-    --bg-select: color-mix(in srgb, var(--day-bg-select) var(--blend-pct), var(--night-bg-select));
-    --bg-hover: color-mix(in srgb, var(--day-bg-hover) var(--blend-pct), var(--night-bg-hover));
-    --particle-a: color-mix(in srgb, var(--day-particle-a) var(--blend-pct), var(--night-particle-a));
-    --particle-b: color-mix(in srgb, var(--day-particle-b) var(--blend-pct), var(--night-particle-b));
-    --particle-c: color-mix(in srgb, var(--day-particle-c) var(--blend-pct), var(--night-particle-c));
+  /* ── Le calcul, écrit une fois pour les quatre styles ── */
+  --bg-main: color-mix(in srgb, var(--day-bg-main) var(--blend-pct), var(--night-bg-main));
+  --bg-card: color-mix(in srgb, var(--day-bg-card) var(--blend-pct), var(--night-bg-card));
+  --border-card: color-mix(in srgb, var(--day-border-card) var(--blend-pct), var(--night-border-card));
+  --border-card-hover: color-mix(
+    in srgb,
+    var(--day-border-card-hover) var(--blend-pct),
+    var(--night-border-card-hover)
+  );
+  --c-primary: color-mix(in srgb, var(--day-c-primary) var(--blend-pct), var(--night-c-primary));
+  --c-accent: color-mix(in srgb, var(--day-c-accent) var(--blend-pct), var(--night-c-accent));
+  --c-violet: color-mix(in srgb, var(--day-c-violet) var(--blend-pct), var(--night-c-violet));
+  --c-success: color-mix(in srgb, var(--day-c-success) var(--blend-pct), var(--night-c-success));
+  --c-error: color-mix(in srgb, var(--day-c-error) var(--blend-pct), var(--night-c-error));
+  --bg-dropdown: color-mix(in srgb, var(--day-bg-dropdown) var(--blend-pct), var(--night-bg-dropdown));
+  --bg-select: color-mix(in srgb, var(--day-bg-select) var(--blend-pct), var(--night-bg-select));
+  --bg-hover: color-mix(in srgb, var(--day-bg-hover) var(--blend-pct), var(--night-bg-hover));
+  --particle-a: color-mix(in srgb, var(--day-particle-a) var(--blend-pct), var(--night-particle-a));
+  --particle-b: color-mix(in srgb, var(--day-particle-b) var(--blend-pct), var(--night-particle-b));
+  --particle-c: color-mix(in srgb, var(--day-particle-c) var(--blend-pct), var(--night-particle-c));
 
-    /* Le texte traverse vite : voir `--text-pct` et l'en-tête. */
-    --text-main: color-mix(in srgb, var(--day-text-main) var(--text-pct), var(--night-text-main));
-    --text-muted: color-mix(in srgb, var(--day-text-muted) var(--text-pct), var(--night-text-muted));
-    --text-dark: color-mix(in srgb, var(--day-text-dark) var(--text-pct), var(--night-text-dark));
+  /* Le texte traverse vite : voir `--text-pct` et l'en-tête. */
+  --text-main: color-mix(in srgb, var(--day-text-main) var(--text-pct), var(--night-text-main));
+  --text-muted: color-mix(in srgb, var(--day-text-muted) var(--text-pct), var(--night-text-muted));
+  --text-dark: color-mix(in srgb, var(--day-text-dark) var(--text-pct), var(--night-text-dark));
 
-    /* Longueur et opacité : pas de mélange de couleur, une interpolation. */
-    --blur-val: calc(var(--night-blur) + (var(--day-blur) - var(--night-blur)) * var(--blend));
-    --decor-opacity: calc(var(--night-decor) + (var(--day-decor) - var(--night-decor)) * var(--blend));
+  /* Longueur et opacité : pas de mélange de couleur, une interpolation. */
+  --blur-val: calc(var(--night-blur) + (var(--day-blur) - var(--night-blur)) * var(--blend));
+  --decor-opacity: calc(var(--night-decor) + (var(--day-decor) - var(--night-decor)) * var(--blend));
 
-    --font-primary: 'Outfit', sans-serif;
+  --font-primary: 'Outfit', sans-serif;
 
-    /* Ne se mélange pas : bascule au pôle le plus proche. Voir l'en-tête. */
-    --shadow-card: 0 20px 40px rgba(0, 0, 0, 0.3);
+  /* Ne se mélange pas : bascule au pôle le plus proche. Voir l'en-tête. */
+  --shadow-card: 0 20px 40px rgba(0, 0, 0, 0.3);
 }
 
 /*
@@ -163,207 +167,207 @@
  * entre les deux — sans quoi une bascule ordinaire laisserait le tableau de
  * bord sur un réglage qu'on n'a pas demandé.
  */
-html[data-theme="light"] {
-    --blend-pct: 100%;
-    --blend: 1;
-    --shadow-card: 0 20px 40px rgba(31, 38, 135, 0.08);
+html[data-theme='light'] {
+  --blend-pct: 100%;
+  --blend: 1;
+  --shadow-card: 0 20px 40px rgba(31, 38, 135, 0.08);
 }
 
 /* ── Cyberpunk ── */
-html[data-style="neon-cyberpunk"] {
-    --night-bg-main: #05010c;
-    --night-bg-card: rgba(5, 1, 12, 0.95);
-    --night-border-card: #00f0ff;
-    --night-border-card-hover: #ff007f;
-    --night-c-primary: #00f0ff;
-    --night-c-accent: #ff007f;
-    --night-c-violet: #d600ff;
-    --night-c-success: #39ff14;
-    --night-c-error: #ff073a;
-    --night-text-main: #00f0ff;
-    --night-text-muted: #a100ff;
-    --night-text-dark: #05010c;
-    --night-bg-dropdown: rgba(5, 1, 12, 0.98);
-    --night-bg-select: rgba(0, 240, 255, 0.03);
-    --night-bg-hover: rgba(0, 240, 255, 0.1);
-    --night-blur: 0px;
-    --night-decor: 0.15;
+html[data-style='neon-cyberpunk'] {
+  --night-bg-main: #05010c;
+  --night-bg-card: rgba(5, 1, 12, 0.95);
+  --night-border-card: #00f0ff;
+  --night-border-card-hover: #ff007f;
+  --night-c-primary: #00f0ff;
+  --night-c-accent: #ff007f;
+  --night-c-violet: #d600ff;
+  --night-c-success: #39ff14;
+  --night-c-error: #ff073a;
+  --night-text-main: #00f0ff;
+  --night-text-muted: #a100ff;
+  --night-text-dark: #05010c;
+  --night-bg-dropdown: rgba(5, 1, 12, 0.98);
+  --night-bg-select: rgba(0, 240, 255, 0.03);
+  --night-bg-hover: rgba(0, 240, 255, 0.1);
+  --night-blur: 0px;
+  --night-decor: 0.15;
 
-    --day-bg-main: #f6f8fa;
-    --day-bg-card: #ffffff;
-    --day-border-card: #00b4d8;
-    --day-border-card-hover: #ff006e;
-    --day-c-primary: #00b4d8;
-    --day-c-accent: #ff006e;
-    --day-c-violet: #8338ec;
-    --day-c-success: #38b000;
-    --day-c-error: #d90429;
-    --day-text-main: #0f172a;
-    --day-text-muted: #64748b;
-    --day-text-dark: #ffffff;
-    --day-bg-dropdown: #ffffff;
-    --day-bg-select: rgba(0, 180, 216, 0.05);
-    --day-bg-hover: rgba(0, 180, 216, 0.08);
-    --day-blur: 0px;
-    --day-decor: 0.08;
+  --day-bg-main: #f6f8fa;
+  --day-bg-card: #ffffff;
+  --day-border-card: #00b4d8;
+  --day-border-card-hover: #ff006e;
+  --day-c-primary: #00b4d8;
+  --day-c-accent: #ff006e;
+  --day-c-violet: #8338ec;
+  --day-c-success: #38b000;
+  --day-c-error: #d90429;
+  --day-text-main: #0f172a;
+  --day-text-muted: #64748b;
+  --day-text-dark: #ffffff;
+  --day-bg-dropdown: #ffffff;
+  --day-bg-select: rgba(0, 180, 216, 0.05);
+  --day-bg-hover: rgba(0, 180, 216, 0.08);
+  --day-blur: 0px;
+  --day-decor: 0.08;
 
-    /* Néon franc sur presque-noir ; de jour, les mêmes teintes assombries pour
+  /* Néon franc sur presque-noir ; de jour, les mêmes teintes assombries pour
        tenir sur le blanc. */
-    --night-particle-a: #00f0ff;
-    --night-particle-b: #ff007f;
-    --night-particle-c: #d600ff;
-    --day-particle-a: #00b4d8;
-    --day-particle-b: #ff006e;
-    --day-particle-c: #8338ec;
+  --night-particle-a: #00f0ff;
+  --night-particle-b: #ff007f;
+  --night-particle-c: #d600ff;
+  --day-particle-a: #00b4d8;
+  --day-particle-b: #ff006e;
+  --day-particle-c: #8338ec;
 
-    --shadow-card: 0 0 15px rgba(0, 240, 255, 0.25), inset 0 0 15px rgba(0, 240, 255, 0.1);
+  --shadow-card: 0 0 15px rgba(0, 240, 255, 0.25), inset 0 0 15px rgba(0, 240, 255, 0.1);
 }
 
-html[data-theme="light"][data-style="neon-cyberpunk"] {
-    --shadow-card: 0 8px 20px rgba(0, 180, 216, 0.15);
+html[data-theme='light'][data-style='neon-cyberpunk'] {
+  --shadow-card: 0 8px 20px rgba(0, 180, 216, 0.15);
 }
 
 /* ── Minimalist ── */
-html[data-style="minimalist"] {
-    --night-bg-main: #0f0f11;
-    --night-bg-card: #161619;
-    --night-border-card: #232329;
-    --night-border-card-hover: #3d3d47;
-    --night-c-primary: #e4e4e7;
-    --night-c-accent: #a1a1aa;
-    --night-c-violet: #3f3f46;
-    --night-c-success: #52525b;
-    --night-c-error: #7f1d1d;
-    --night-text-main: #e4e4e7;
-    --night-text-muted: #71717a;
-    --night-text-dark: #000000;
-    --night-bg-dropdown: #161619;
-    --night-bg-select: #1b1b20;
-    --night-bg-hover: #232329;
-    --night-blur: 0px;
-    --night-decor: 0;
+html[data-style='minimalist'] {
+  --night-bg-main: #0f0f11;
+  --night-bg-card: #161619;
+  --night-border-card: #232329;
+  --night-border-card-hover: #3d3d47;
+  --night-c-primary: #e4e4e7;
+  --night-c-accent: #a1a1aa;
+  --night-c-violet: #3f3f46;
+  --night-c-success: #52525b;
+  --night-c-error: #7f1d1d;
+  --night-text-main: #e4e4e7;
+  --night-text-muted: #71717a;
+  --night-text-dark: #000000;
+  --night-bg-dropdown: #161619;
+  --night-bg-select: #1b1b20;
+  --night-bg-hover: #232329;
+  --night-blur: 0px;
+  --night-decor: 0;
 
-    --day-bg-main: #f4f4f5;
-    --day-bg-card: #ffffff;
-    --day-border-card: #e4e4e7;
-    --day-border-card-hover: #d4d4d8;
-    --day-c-primary: #18181b;
-    --day-c-accent: #71717a;
-    --day-c-violet: #d4d4d8;
-    --day-c-success: #d4d4d8;
-    --day-c-error: #fee2e2;
-    --day-text-main: #18181b;
-    --day-text-muted: #71717a;
-    --day-text-dark: #ffffff;
-    --day-bg-dropdown: #ffffff;
-    --day-bg-select: #f4f4f5;
-    --day-bg-hover: #e4e4e7;
-    --day-blur: 0px;
-    --day-decor: 0;
+  --day-bg-main: #f4f4f5;
+  --day-bg-card: #ffffff;
+  --day-border-card: #e4e4e7;
+  --day-border-card-hover: #d4d4d8;
+  --day-c-primary: #18181b;
+  --day-c-accent: #71717a;
+  --day-c-violet: #d4d4d8;
+  --day-c-success: #d4d4d8;
+  --day-c-error: #fee2e2;
+  --day-text-main: #18181b;
+  --day-text-muted: #71717a;
+  --day-text-dark: #ffffff;
+  --day-bg-dropdown: #ffffff;
+  --day-bg-select: #f4f4f5;
+  --day-bg-hover: #e4e4e7;
+  --day-blur: 0px;
+  --day-decor: 0;
 
-    /* Trois gris, et non les accents du style : ceux-ci sont trop proches de
+  /* Trois gris, et non les accents du style : ceux-ci sont trop proches de
        son fond pour faire des particules — c'est ce qui obligeait le script à
        écarter le troisième à la main. Une échelle tirée du fond vers le texte
        se voit, elle, parfaitement. */
-    --night-particle-a: #e4e4e7;
-    --night-particle-b: #a1a1aa;
-    --night-particle-c: #71717a;
-    --day-particle-a: #18181b;
-    --day-particle-b: #52525b;
-    --day-particle-c: #a1a1aa;
+  --night-particle-a: #e4e4e7;
+  --night-particle-b: #a1a1aa;
+  --night-particle-c: #71717a;
+  --day-particle-a: #18181b;
+  --day-particle-b: #52525b;
+  --day-particle-c: #a1a1aa;
 
-    --shadow-card: none;
+  --shadow-card: none;
 }
 
-html[data-theme="light"][data-style="minimalist"] {
-    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.05);
+html[data-theme='light'][data-style='minimalist'] {
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 /* ── Retro Synthwave ── */
-html[data-style="retro-synthwave"] {
-    --night-bg-main: #17072b;
-    --night-bg-card: rgba(32, 10, 58, 0.7);
-    --night-border-card: #ff5e62;
-    --night-border-card-hover: #ff9966;
-    --night-c-primary: #ff5e62;
-    --night-c-accent: #ff9966;
-    --night-c-violet: #ff007f;
-    --night-c-success: #00ffcc;
-    --night-c-error: #ff3366;
-    --night-text-main: #ffe3e3;
-    --night-text-muted: #b89dbd;
-    --night-text-dark: #17072b;
-    --night-bg-dropdown: rgba(23, 7, 43, 0.98);
-    --night-bg-select: rgba(255, 94, 98, 0.05);
-    --night-bg-hover: rgba(255, 94, 98, 0.12);
-    --night-blur: 12px;
-    --night-decor: 0.2;
+html[data-style='retro-synthwave'] {
+  --night-bg-main: #17072b;
+  --night-bg-card: rgba(32, 10, 58, 0.7);
+  --night-border-card: #ff5e62;
+  --night-border-card-hover: #ff9966;
+  --night-c-primary: #ff5e62;
+  --night-c-accent: #ff9966;
+  --night-c-violet: #ff007f;
+  --night-c-success: #00ffcc;
+  --night-c-error: #ff3366;
+  --night-text-main: #ffe3e3;
+  --night-text-muted: #b89dbd;
+  --night-text-dark: #17072b;
+  --night-bg-dropdown: rgba(23, 7, 43, 0.98);
+  --night-bg-select: rgba(255, 94, 98, 0.05);
+  --night-bg-hover: rgba(255, 94, 98, 0.12);
+  --night-blur: 12px;
+  --night-decor: 0.2;
 
-    --day-bg-main: #fff0f5;
-    --day-bg-card: rgba(255, 255, 255, 0.75);
-    --day-border-card: #ff9a9e;
-    --day-border-card-hover: #fecfef;
-    --day-c-primary: #ff758c;
-    --day-c-accent: #ff7eb3;
-    --day-c-violet: #c33764;
-    --day-c-success: #48c9b0;
-    --day-c-error: #ec7063;
-    --day-text-main: #4a0e2e;
-    --day-text-muted: #8b5a74;
-    --day-text-dark: #ffffff;
-    --day-bg-dropdown: rgba(255, 240, 245, 0.98);
-    --day-bg-select: rgba(255, 117, 140, 0.05);
-    --day-bg-hover: rgba(255, 117, 140, 0.08);
-    --day-blur: 12px;
-    --day-decor: 0.12;
+  --day-bg-main: #fff0f5;
+  --day-bg-card: rgba(255, 255, 255, 0.75);
+  --day-border-card: #ff9a9e;
+  --day-border-card-hover: #fecfef;
+  --day-c-primary: #ff758c;
+  --day-c-accent: #ff7eb3;
+  --day-c-violet: #c33764;
+  --day-c-success: #48c9b0;
+  --day-c-error: #ec7063;
+  --day-text-main: #4a0e2e;
+  --day-text-muted: #8b5a74;
+  --day-text-dark: #ffffff;
+  --day-bg-dropdown: rgba(255, 240, 245, 0.98);
+  --day-bg-select: rgba(255, 117, 140, 0.05);
+  --day-bg-hover: rgba(255, 117, 140, 0.08);
+  --day-blur: 12px;
+  --day-decor: 0.12;
 
-    /* Le dégradé de coucher de soleil du style, pris à ses trois bouts. */
-    --night-particle-a: #ff5e62;
-    --night-particle-b: #ff9966;
-    --night-particle-c: #ff007f;
-    --day-particle-a: #ff758c;
-    --day-particle-b: #ff7eb3;
-    --day-particle-c: #c33764;
+  /* Le dégradé de coucher de soleil du style, pris à ses trois bouts. */
+  --night-particle-a: #ff5e62;
+  --night-particle-b: #ff9966;
+  --night-particle-c: #ff007f;
+  --day-particle-a: #ff758c;
+  --day-particle-b: #ff7eb3;
+  --day-particle-c: #c33764;
 
-    --shadow-card: 0 8px 25px rgba(255, 94, 98, 0.15);
+  --shadow-card: 0 8px 25px rgba(255, 94, 98, 0.15);
 }
 
-html[data-theme="light"][data-style="retro-synthwave"] {
-    --shadow-card: 0 8px 25px rgba(255, 117, 140, 0.08);
+html[data-theme='light'][data-style='retro-synthwave'] {
+  --shadow-card: 0 8px 25px rgba(255, 117, 140, 0.08);
 }
 
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    /* Compatibilité scrollbar Firefox */
-    scrollbar-width: auto;
-    scrollbar-color: var(--border-card) transparent;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  /* Compatibilité scrollbar Firefox */
+  scrollbar-width: auto;
+  scrollbar-color: var(--border-card) transparent;
 }
 
 /* Scrollbars personnalisées WebKit (Chrome, Safari, Edge) */
 ::-webkit-scrollbar {
-    width: 12px;
-    height: 12px;
+  width: 12px;
+  height: 12px;
 }
 
 ::-webkit-scrollbar-track {
-    background: transparent;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-    background-color: var(--border-card);
-    border-radius: 20px;
-    border: 2px solid transparent;
-    background-clip: padding-box;
-    transition: background-color 0.2s ease;
+  background-color: var(--border-card);
+  border-radius: 20px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background-color: var(--text-muted);
-    border-radius: 20px;
-    border: 2px solid transparent;
-    background-clip: padding-box;
+  background-color: var(--text-muted);
+  border-radius: 20px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 /*
@@ -390,7 +394,7 @@ html[data-theme="light"][data-style="retro-synthwave"] {
  */
 html,
 body {
-    scrollbar-width: none;
+  scrollbar-width: none;
 }
 
 /*
@@ -401,20 +405,23 @@ body {
  */
 html::-webkit-scrollbar,
 body::-webkit-scrollbar {
-    display: none;
+  display: none;
 }
 
 body {
-    background-color: var(--bg-main);
-    color: var(--text-main);
-    font-family: var(--font-primary);
-    min-height: 100vh;
-    /* Suit la hauteur réellement visible quand la barre du navigateur
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  font-family: var(--font-primary);
+  min-height: 100vh;
+  /* Suit la hauteur réellement visible quand la barre du navigateur
        se rétracte ; ignoré par les navigateurs qui ne connaissent pas dvh. */
-    min-height: 100dvh;
-    overflow-x: hidden;
-    position: relative;
-    transition: background-color 0.3s ease, background 0.3s ease, color 0.3s ease !important;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  position: relative;
+  transition:
+    background-color 0.3s ease,
+    background 0.3s ease,
+    color 0.3s ease !important;
 }
 
 /*
@@ -431,23 +438,23 @@ body {
  * à la fermeture.
  */
 body.scroll-locked {
-    position: fixed;
-    left: 0;
-    right: 0;
-    width: 100%;
-    overflow: hidden;
-    /* Le rebond élastique subsiste même hors flux, et laisse entrevoir le vide
+  position: fixed;
+  left: 0;
+  right: 0;
+  width: 100%;
+  overflow: hidden;
+  /* Le rebond élastique subsiste même hors flux, et laisse entrevoir le vide
        au-delà des bords. */
-    overscroll-behavior: none;
+  overscroll-behavior: none;
 }
 
 /* Background Glowing Elements */
 .background-decor {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    /*
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  /*
      * lvh plutôt que vh : ce calque ne porte aucun contenu, il doit seulement
      * couvrir. Sur mobile, la barre du navigateur se rétracte au défilement et
      * révèle une bande que 100vh ne couvrait pas — on y voyait alors le fond
@@ -458,35 +465,35 @@ body.scroll-locked {
      * affichée, le débordement passe derrière elle et ne se voit pas ; barre
      * rétractée, la bande est déjà couverte.
      */
-    height: 100vh;
-    height: 100lvh;
-    z-index: -1;
-    overflow: hidden;
-    pointer-events: none;
+  height: 100vh;
+  height: 100lvh;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 .circle {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(140px);
-    opacity: var(--decor-opacity, 0.25);
-    transition: opacity 0.5s ease;
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(140px);
+  opacity: var(--decor-opacity, 0.25);
+  transition: opacity 0.5s ease;
 }
 
 .circle-1 {
-    top: -10%;
-    left: 10%;
-    width: 50vw;
-    height: 50vw;
-    background: radial-gradient(circle, var(--c-primary) 0%, transparent 70%);
+  top: -10%;
+  left: 10%;
+  width: 50vw;
+  height: 50vw;
+  background: radial-gradient(circle, var(--c-primary) 0%, transparent 70%);
 }
 
 .circle-2 {
-    bottom: -10%;
-    right: 5%;
-    width: 45vw;
-    height: 45vw;
-    background: radial-gradient(circle, var(--c-accent) 0%, transparent 70%);
+  bottom: -10%;
+  right: 5%;
+  width: 45vw;
+  height: 45vw;
+  background: radial-gradient(circle, var(--c-accent) 0%, transparent 70%);
 }
 
-/* App Container */
+/* App Container */

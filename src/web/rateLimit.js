@@ -44,9 +44,9 @@ const buckets = new Map();
  * à purger, et une minuterie retiendrait le process au moment de sortir.
  */
 function purge(now) {
-    for (const [key, bucket] of buckets.entries()) {
-        if (bucket.resetAt <= now) buckets.delete(key);
-    }
+  for (const [key, bucket] of buckets.entries()) {
+    if (bucket.resetAt <= now) buckets.delete(key);
+  }
 }
 
 /** Les adresses de la machine elle-même, telles que Node les rapporte. */
@@ -72,12 +72,12 @@ const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
  * @returns {string}
  */
 function originOf(req) {
-    const direct = req.socket?.remoteAddress || req.ip || 'inconnu';
-    const relayed = req.headers?.['cf-connecting-ip'];
-    if (LOOPBACK.has(direct) && typeof relayed === 'string' && relayed.trim()) {
-        return relayed.trim().slice(0, 64);
-    }
-    return req.ip || direct;
+  const direct = req.socket?.remoteAddress || req.ip || 'inconnu';
+  const relayed = req.headers?.['cf-connecting-ip'];
+  if (LOOPBACK.has(direct) && typeof relayed === 'string' && relayed.trim()) {
+    return relayed.trim().slice(0, 64);
+  }
+  return req.ip || direct;
 }
 
 /**
@@ -87,32 +87,33 @@ function originOf(req) {
  * @returns {import('express').RequestHandler}
  */
 function createLimiter({ name, limit, windowMs }) {
-    return (req, res, next) => {
-        const now = Date.now();
-        purge(now);
+  return (req, res, next) => {
+    const now = Date.now();
+    purge(now);
 
-        const key = `${name}:${originOf(req)}`;
-        const bucket = buckets.get(key);
+    const key = `${name}:${originOf(req)}`;
+    const bucket = buckets.get(key);
 
-        if (!bucket || bucket.resetAt <= now) {
-            buckets.set(key, { count: 1, resetAt: now + windowMs });
-            return next();
-        }
+    if (!bucket || bucket.resetAt <= now) {
+      buckets.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
 
-        bucket.count++;
-        if (bucket.count <= limit) return next();
+    bucket.count++;
+    if (bucket.count <= limit) return next();
 
-        // Une ligne par seau, au moment où il déborde, et non à chaque requête
-        // refusée : sans cela le journal se remplirait de la rafale qu'on
-        // cherche justement à contenir.
-        if (bucket.count === limit + 1) {
-            log.warn(`[RateLimit] ${name}: ${originOf(req)} exceeded `
-                + `${limit} requests in ${Math.round(windowMs / 1000)}s.`);
-        }
+    // Une ligne par seau, au moment où il déborde, et non à chaque requête
+    // refusée : sans cela le journal se remplirait de la rafale qu'on
+    // cherche justement à contenir.
+    if (bucket.count === limit + 1) {
+      log.warn(
+        `[RateLimit] ${name}: ${originOf(req)} exceeded ` + `${limit} requests in ${Math.round(windowMs / 1000)}s.`,
+      );
+    }
 
-        res.set('Retry-After', String(Math.ceil((bucket.resetAt - now) / 1000)));
-        return res.status(429).type('html').send(TOO_MANY_PAGE);
-    };
+    res.set('Retry-After', String(Math.ceil((bucket.resetAt - now) / 1000)));
+    return res.status(429).type('html').send(TOO_MANY_PAGE);
+  };
 }
 
 const TOO_MANY_PAGE = `<!doctype html>
@@ -131,7 +132,7 @@ const TOO_MANY_PAGE = `<!doctype html>
 
 /** Remet les compteurs à zéro. Réservé aux tests. */
 function reset() {
-    buckets.clear();
+  buckets.clear();
 }
 
 module.exports = { createLimiter, reset, originOf };

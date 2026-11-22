@@ -36,8 +36,8 @@ let resolvedToken;
  * (`https://`, `git+https://`, `git@github.com:`, avec ou sans `.git`).
  */
 function parseRepoUrl(url) {
-    const m = /github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(String(url || ''));
-    return m ? { owner: m[1], repo: m[2] } : null;
+  const m = /github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(String(url || ''));
+  return m ? { owner: m[1], repo: m[2] } : null;
 }
 
 /**
@@ -48,20 +48,21 @@ function parseRepoUrl(url) {
  * elle vient sans dépendre du dépôt Git local (que l'archive ne contient pas).
  */
 function repository() {
-    const raw = (process.env.IMP_REPO || '').trim();
-    if (raw) {
-        const direct = /^([^/\s]+)\/([^/\s]+)$/.exec(raw);
-        if (direct) return { owner: direct[1], repo: direct[2] };
-        const parsed = parseRepoUrl(raw);
-        if (parsed) return parsed;
-    }
+  const raw = (process.env.IMP_REPO || '').trim();
+  if (raw) {
+    const direct = /^([^/\s]+)\/([^/\s]+)$/.exec(raw);
+    if (direct) return { owner: direct[1], repo: direct[2] };
+    const parsed = parseRepoUrl(raw);
+    if (parsed) return parsed;
+  }
 
-    const pkg = locations.readPackage(locations.INSTALL_ROOT);
-    const fromPackage = pkg && pkg.repository
-        ? parseRepoUrl(typeof pkg.repository === 'string' ? pkg.repository : pkg.repository.url)
-        : null;
+  const pkg = locations.readPackage(locations.INSTALL_ROOT);
+  const fromPackage =
+    pkg && pkg.repository
+      ? parseRepoUrl(typeof pkg.repository === 'string' ? pkg.repository : pkg.repository.url)
+      : null;
 
-    return fromPackage || DEFAULT_REPO;
+  return fromPackage || DEFAULT_REPO;
 }
 
 /**
@@ -71,39 +72,39 @@ function repository() {
  * le résultat ne change pas en cours d'exécution.
  */
 function token() {
-    if (resolvedToken !== undefined) return resolvedToken;
+  if (resolvedToken !== undefined) return resolvedToken;
 
-    const fromEnv = (process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '').trim();
-    if (fromEnv) {
-        resolvedToken = fromEnv;
-        return resolvedToken;
-    }
-
-    try {
-        const output = execFileSync('gh', ['auth', 'token'], {
-            encoding: 'utf8',
-            timeout: 5000,
-            stdio: ['ignore', 'pipe', 'ignore'],
-            windowsHide: true,
-        }).trim();
-        resolvedToken = output || null;
-        if (resolvedToken) log.info('[Versions] GitHub token picked up from the gh CLI.');
-    } catch (e) {
-        // `gh` absent ou déconnecté : lecture anonyme, suffisante sur un dépôt public.
-        resolvedToken = null;
-    }
+  const fromEnv = (process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '').trim();
+  if (fromEnv) {
+    resolvedToken = fromEnv;
     return resolvedToken;
+  }
+
+  try {
+    const output = execFileSync('gh', ['auth', 'token'], {
+      encoding: 'utf8',
+      timeout: 5000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+      windowsHide: true,
+    }).trim();
+    resolvedToken = output || null;
+    if (resolvedToken) log.info('[Versions] GitHub token picked up from the gh CLI.');
+  } catch (e) {
+    // `gh` absent ou déconnecté : lecture anonyme, suffisante sur un dépôt public.
+    resolvedToken = null;
+  }
+  return resolvedToken;
 }
 
 function headers(withToken = true) {
-    const h = {
-        'User-Agent': AGENT,
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-    };
-    const t = withToken ? token() : null;
-    if (t) h.Authorization = `Bearer ${t}`;
-    return h;
+  const h = {
+    'User-Agent': AGENT,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+  const t = withToken ? token() : null;
+  if (t) h.Authorization = `Bearer ${t}`;
+  return h;
 }
 
 /**
@@ -111,11 +112,11 @@ function headers(withToken = true) {
  * messages compréhensibles plutôt qu'en trace technique.
  */
 class GitHubError extends Error {
-    constructor(message, status) {
-        super(message);
-        this.name = 'GitHubError';
-        this.status = status;
-    }
+  constructor(message, status) {
+    super(message);
+    this.name = 'GitHubError';
+    this.status = status;
+  }
 }
 
 /**
@@ -129,80 +130,73 @@ class GitHubError extends Error {
  * @returns {Promise<{ status: number, body: Buffer, headers: object }>}
  */
 function request(url, options = {}, onProgress = null, redirectsLeft = 5) {
-    return new Promise((resolve, reject) => {
-        const target = new URL(url);
-        const req = https.request(
-            target,
-            { method: 'GET', headers: options.headers || headers(), timeout: options.timeout || 30000 },
-            (res) => {
-                const status = res.statusCode || 0;
+  return new Promise((resolve, reject) => {
+    const target = new URL(url);
+    const req = https.request(
+      target,
+      { method: 'GET', headers: options.headers || headers(), timeout: options.timeout || 30000 },
+      (res) => {
+        const status = res.statusCode || 0;
 
-                if (status >= 300 && status < 400 && res.headers.location) {
-                    res.resume();
-                    if (redirectsLeft <= 0) {
-                        return reject(new GitHubError('Trop de redirections.', status));
-                    }
-                    const next = new URL(res.headers.location, target);
-                    const sameHost = next.host === target.host;
-                    const nextHeaders = { ...(options.headers || headers()) };
-                    if (!sameHost) delete nextHeaders.Authorization;
-                    return resolve(
-                        request(
-                            next.toString(),
-                            { ...options, headers: nextHeaders },
-                            onProgress,
-                            redirectsLeft - 1
-                        )
-                    );
-                }
+        if (status >= 300 && status < 400 && res.headers.location) {
+          res.resume();
+          if (redirectsLeft <= 0) {
+            return reject(new GitHubError('Trop de redirections.', status));
+          }
+          const next = new URL(res.headers.location, target);
+          const sameHost = next.host === target.host;
+          const nextHeaders = { ...(options.headers || headers()) };
+          if (!sameHost) delete nextHeaders.Authorization;
+          return resolve(request(next.toString(), { ...options, headers: nextHeaders }, onProgress, redirectsLeft - 1));
+        }
 
-                const total = Number(res.headers['content-length']) || null;
-                if (total && total > MAX_ARCHIVE_BYTES) {
-                    res.destroy();
-                    return reject(new GitHubError(`Archive trop volumineuse (${total} octets).`, status));
-                }
+        const total = Number(res.headers['content-length']) || null;
+        if (total && total > MAX_ARCHIVE_BYTES) {
+          res.destroy();
+          return reject(new GitHubError(`Archive trop volumineuse (${total} octets).`, status));
+        }
 
-                const chunks = [];
-                let received = 0;
-                res.on('data', (c) => {
-                    received += c.length;
-                    if (received > MAX_ARCHIVE_BYTES) {
-                        res.destroy();
-                        return reject(new GitHubError('Archive trop volumineuse.', status));
-                    }
-                    chunks.push(c);
-                    if (onProgress) onProgress(received, total);
-                });
-                res.on('end', () => resolve({ status, body: Buffer.concat(chunks), headers: res.headers }));
-                res.on('error', reject);
-            }
-        );
+        const chunks = [];
+        let received = 0;
+        res.on('data', (c) => {
+          received += c.length;
+          if (received > MAX_ARCHIVE_BYTES) {
+            res.destroy();
+            return reject(new GitHubError('Archive trop volumineuse.', status));
+          }
+          chunks.push(c);
+          if (onProgress) onProgress(received, total);
+        });
+        res.on('end', () => resolve({ status, body: Buffer.concat(chunks), headers: res.headers }));
+        res.on('error', reject);
+      },
+    );
 
-        req.on('timeout', () => req.destroy(new GitHubError('Délai dépassé.', 0)));
-        req.on('error', (err) => reject(new GitHubError(err.message, 0)));
-        req.end();
-    });
+    req.on('timeout', () => req.destroy(new GitHubError('Délai dépassé.', 0)));
+    req.on('error', (err) => reject(new GitHubError(err.message, 0)));
+    req.end();
+  });
 }
 
 /** Traduit un statut d'erreur de l'API en message affichable tel quel. */
 function apiErrorMessage(status, body) {
-    if (status === 404) {
-        return token()
-            ? 'Dépôt ou releases introuvables. Vérifiez que le jeton GitHub donne accès à ce dépôt.'
-            : 'Dépôt introuvable. S\'il est privé, renseignez GITHUB_TOKEN dans le fichier .env.';
-    }
-    if (status === 401) return 'Jeton GitHub refusé (expiré ou révoqué).';
-    if (status === 403 || status === 429) {
-        return token()
-            ? 'Quota GitHub atteint. Réessayez dans quelques minutes.'
-            : 'Quota GitHub atteint (60 requêtes/heure sans jeton). Renseignez GITHUB_TOKEN dans le .env pour le relever.';
-    }
-    let detail = '';
-    try {
-        const j = JSON.parse(body.toString('utf8'));
-        if (j && j.message) detail = ` — ${j.message}`;
-    } catch (e) {}
-    return `GitHub a répondu ${status}${detail}.`;
+  if (status === 404) {
+    return token()
+      ? 'Dépôt ou releases introuvables. Vérifiez que le jeton GitHub donne accès à ce dépôt.'
+      : "Dépôt introuvable. S'il est privé, renseignez GITHUB_TOKEN dans le fichier .env.";
+  }
+  if (status === 401) return 'Jeton GitHub refusé (expiré ou révoqué).';
+  if (status === 403 || status === 429) {
+    return token()
+      ? 'Quota GitHub atteint. Réessayez dans quelques minutes.'
+      : 'Quota GitHub atteint (60 requêtes/heure sans jeton). Renseignez GITHUB_TOKEN dans le .env pour le relever.';
+  }
+  let detail = '';
+  try {
+    const j = JSON.parse(body.toString('utf8'));
+    if (j && j.message) detail = ` — ${j.message}`;
+  } catch (e) {}
+  return `GitHub a répondu ${status}${detail}.`;
 }
 
 /**
@@ -216,38 +210,38 @@ function apiErrorMessage(status, body) {
  * @returns {Promise<Array<{ tag, name, publishedAt, prerelease, tarballUrl, htmlUrl }>>}
  */
 async function listReleases(options = {}) {
-    if (!options.force && releasesCache && Date.now() - releasesCache.date < CACHE_TTL_MS) {
-        return releasesCache.value;
-    }
+  if (!options.force && releasesCache && Date.now() - releasesCache.date < CACHE_TTL_MS) {
+    return releasesCache.value;
+  }
 
-    const { owner, repo } = repository();
-    const { status, body } = await request(`${API}/repos/${owner}/${repo}/releases?per_page=100`);
+  const { owner, repo } = repository();
+  const { status, body } = await request(`${API}/repos/${owner}/${repo}/releases?per_page=100`);
 
-    if (status !== 200) {
-        throw new GitHubError(apiErrorMessage(status, body), status);
-    }
+  if (status !== 200) {
+    throw new GitHubError(apiErrorMessage(status, body), status);
+  }
 
-    let raw;
-    try {
-        raw = JSON.parse(body.toString('utf8'));
-    } catch (e) {
-        throw new GitHubError('Réponse GitHub illisible.', status);
-    }
-    if (!Array.isArray(raw)) throw new GitHubError('Réponse GitHub inattendue.', status);
+  let raw;
+  try {
+    raw = JSON.parse(body.toString('utf8'));
+  } catch (e) {
+    throw new GitHubError('Réponse GitHub illisible.', status);
+  }
+  if (!Array.isArray(raw)) throw new GitHubError('Réponse GitHub inattendue.', status);
 
-    const releases = raw
-        .filter((r) => r && !r.draft && r.tag_name)
-        .map((r) => ({
-            tag: String(r.tag_name),
-            name: r.name ? String(r.name) : String(r.tag_name),
-            publishedAt: r.published_at || r.created_at || null,
-            prerelease: !!r.prerelease,
-            tarballUrl: r.tarball_url || `${API}/repos/${owner}/${repo}/tarball/${encodeURIComponent(r.tag_name)}`,
-            htmlUrl: r.html_url || null,
-        }));
+  const releases = raw
+    .filter((r) => r && !r.draft && r.tag_name)
+    .map((r) => ({
+      tag: String(r.tag_name),
+      name: r.name ? String(r.name) : String(r.tag_name),
+      publishedAt: r.published_at || r.created_at || null,
+      prerelease: !!r.prerelease,
+      tarballUrl: r.tarball_url || `${API}/repos/${owner}/${repo}/tarball/${encodeURIComponent(r.tag_name)}`,
+      htmlUrl: r.html_url || null,
+    }));
 
-    releasesCache = { date: Date.now(), value: releases };
-    return releases;
+  releasesCache = { date: Date.now(), value: releases };
+  return releases;
 }
 
 /**
@@ -258,25 +252,25 @@ async function listReleases(options = {}) {
  * @returns {Promise<Buffer>}
  */
 async function downloadArchive(tarballUrl, onProgress) {
-    const { status, body } = await request(tarballUrl, {}, onProgress);
-    if (status !== 200) {
-        throw new GitHubError(apiErrorMessage(status, body), status);
-    }
-    if (!body.length) throw new GitHubError('Archive vide reçue de GitHub.', status);
-    log.info(`[Versions] Archive downloaded: ${(body.length / 1024 / 1024).toFixed(1)} MB.`);
-    return body;
+  const { status, body } = await request(tarballUrl, {}, onProgress);
+  if (status !== 200) {
+    throw new GitHubError(apiErrorMessage(status, body), status);
+  }
+  if (!body.length) throw new GitHubError('Archive vide reçue de GitHub.', status);
+  log.info(`[Versions] Archive downloaded: ${(body.length / 1024 / 1024).toFixed(1)} MB.`);
+  return body;
 }
 
 /** Vide le cache des releases (après une installation, pour rafraîchir l'état). */
 function clearCache() {
-    releasesCache = null;
+  releasesCache = null;
 }
 
 module.exports = {
-    GitHubError,
-    repository,
-    token,
-    listReleases,
-    downloadArchive,
-    clearCache,
+  GitHubError,
+  repository,
+  token,
+  listReleases,
+  downloadArchive,
+  clearCache,
 };

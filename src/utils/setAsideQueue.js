@@ -33,7 +33,7 @@ const channelQueue = require('../audio/channelQueue');
  * @returns {object[]}
  */
 function readSetAsideQueue(settings) {
-    return channelQueue.read(settings);
+  return channelQueue.read(settings);
 }
 
 /**
@@ -44,7 +44,7 @@ function readSetAsideQueue(settings) {
  * @param {object} [settings] - Réglages déjà lus, s'ils sont sous la main
  */
 function writeSetAsideQueue(guildId, tracks, settings = null) {
-    channelQueue.write(guildId, tracks, settings);
+  channelQueue.write(guildId, tracks, settings);
 }
 
 /**
@@ -59,7 +59,7 @@ function writeSetAsideQueue(guildId, tracks, settings = null) {
 function convertForMode() {}
 
 module.exports = {
-    readSetAsideQueue,
-    writeSetAsideQueue,
-    convertForMode,
+  readSetAsideQueue,
+  writeSetAsideQueue,
+  convertForMode,
 };

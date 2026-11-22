@@ -16,59 +16,71 @@ const { ytdlp } = require('../../utils/youtubeNetwork');
  * avec repli youtube-dl pour YouTube Music et les albums non résolus.
  */
 async function searchLocalAwareTrack(player, url) {
-    const path = require('path');
-    const fs = require('fs');
-    const { QueryType } = require('discord-player');
+  const path = require('path');
+  const fs = require('fs');
+  const { QueryType } = require('discord-player');
 
-    let isLocalFile = false;
-    let queryTarget = url;
+  let isLocalFile = false;
+  let queryTarget = url;
+  try {
+    if (typeof url === 'string' && url.includes('music.youtube.com')) {
+      queryTarget = url.replace('music.youtube.com', 'www.youtube.com');
+    } else {
+      isLocalFile = fs.existsSync(path.resolve(url));
+    }
+  } catch (e) {
+    // Pas un chemin local valide
+  }
+
+  let searchResult = await player.search(queryTarget, {
+    requestedBy: null,
+    ...(isLocalFile ? { searchEngine: QueryType.FILE } : {}),
+  });
+
+  // Fallback pour YouTube Music & playlists d'albums (ex: OLAK5uy_...) non résolues par l'extracteur par défaut
+  if (
+    (!searchResult || !searchResult.tracks || searchResult.tracks.length === 0) &&
+    typeof url === 'string' &&
+    (url.includes('youtube') || url.includes('youtu.be'))
+  ) {
     try {
-        if (typeof url === 'string' && url.includes('music.youtube.com')) {
-            queryTarget = url.replace('music.youtube.com', 'www.youtube.com');
-        } else {
-            isLocalFile = fs.existsSync(path.resolve(url));
+      const info = await ytdlp(
+        url,
+        { dumpSingleJson: true, noCheckCertificates: true, noWarnings: true, flatPlaylist: true },
+        { windowsHide: true },
+      );
+      const entries = Array.isArray(info.entries) ? info.entries : info ? [info] : [];
+      const resolvedTracks = [];
+      for (const entry of entries) {
+        const videoUrl =
+          entry.url || entry.webpage_url || (entry.id ? `https://www.youtube.com/watch?v=${entry.id}` : null);
+        if (videoUrl) {
+          const sr = await player.search(videoUrl, { requestedBy: null });
+          if (sr && sr.tracks && sr.tracks.length > 0) {
+            resolvedTracks.push(sr.tracks[0]);
+          }
         }
+      }
+      if (resolvedTracks.length > 0) {
+        searchResult = {
+          tracks: resolvedTracks,
+          playlist:
+            resolvedTracks.length > 1
+              ? { title: info.title || 'Playlist YouTube Music', tracks: resolvedTracks }
+              : null,
+        };
+      }
     } catch (e) {
-        // Pas un chemin local valide
+      log.error('[YTM Fallback Error]:', e.message);
     }
+  }
 
-    let searchResult = await player.search(queryTarget, {
-        requestedBy: null,
-        ...(isLocalFile ? { searchEngine: QueryType.FILE } : {})
-    });
+  // Restaurer le nom propre du fichier (sans le préfixe timestamp d'upload)
+  if (isLocalFile && searchResult && searchResult.tracks && searchResult.tracks.length > 0) {
+    searchResult.tracks[0].title = getCleanFilename(url);
+  }
 
-    // Fallback pour YouTube Music & playlists d'albums (ex: OLAK5uy_...) non résolues par l'extracteur par défaut
-    if ((!searchResult || !searchResult.tracks || searchResult.tracks.length === 0) && typeof url === 'string' && (url.includes('youtube') || url.includes('youtu.be'))) {
-        try {
-            const info = await ytdlp(url, { dumpSingleJson: true, noCheckCertificates: true, noWarnings: true, flatPlaylist: true }, { windowsHide: true });
-            const entries = Array.isArray(info.entries) ? info.entries : (info ? [info] : []);
-            const resolvedTracks = [];
-            for (const entry of entries) {
-                const videoUrl = entry.url || entry.webpage_url || (entry.id ? `https://www.youtube.com/watch?v=${entry.id}` : null);
-                if (videoUrl) {
-                    const sr = await player.search(videoUrl, { requestedBy: null });
-                    if (sr && sr.tracks && sr.tracks.length > 0) {
-                        resolvedTracks.push(sr.tracks[0]);
-                    }
-                }
-            }
-            if (resolvedTracks.length > 0) {
-                searchResult = {
-                    tracks: resolvedTracks,
-                    playlist: resolvedTracks.length > 1 ? { title: info.title || 'Playlist YouTube Music', tracks: resolvedTracks } : null
-                };
-            }
-        } catch (e) {
-            log.error('[YTM Fallback Error]:', e.message);
-        }
-    }
-
-    // Restaurer le nom propre du fichier (sans le préfixe timestamp d'upload)
-    if (isLocalFile && searchResult && searchResult.tracks && searchResult.tracks.length > 0) {
-        searchResult.tracks[0].title = getCleanFilename(url);
-    }
-
-    return searchResult;
+  return searchResult;
 }
 
 /**
@@ -85,7 +97,7 @@ async function searchLocalAwareTrack(player, url) {
  * @returns {boolean}
  */
 function playlistIsSource(settings) {
-    return !!settings.activePlaybackSource && settings.activePlaybackSource !== 'queue';
+  return !!settings.activePlaybackSource && settings.activePlaybackSource !== 'queue';
 }
 
 /**
@@ -103,32 +115,34 @@ function playlistIsSource(settings) {
  *   à jouer, ni à ajouter au lecteur
  */
 function addToSetAsideQueue(currentGuildId, settings, tracks) {
-    if (!playlistIsSource(settings)) return false;
+  if (!playlistIsSource(settings)) return false;
 
-    const toStore = (Array.isArray(tracks) ? tracks : [tracks]).filter(t => t && t.url);
-    if (toStore.length === 0) return true;
+  const toStore = (Array.isArray(tracks) ? tracks : [tracks]).filter((t) => t && t.url);
+  if (toStore.length === 0) return true;
 
-    const toData = (t) => ({
-        title: t.title,
-        author: t.author || 'Inconnu',
-        duration: t.duration || '0:00',
-        durationMS: t.durationMS || 0,
-        thumbnail: t.thumbnail || null,
-        url: t.url,
-        queryType: t.queryType || 'youtube',
-        extractorName: t.extractor?.identifier || t.extractorName || null
-    });
+  const toData = (t) => ({
+    title: t.title,
+    author: t.author || 'Inconnu',
+    duration: t.duration || '0:00',
+    durationMS: t.durationMS || 0,
+    thumbnail: t.thumbnail || null,
+    url: t.url,
+    queryType: t.queryType || 'youtube',
+    extractorName: t.extractor?.identifier || t.extractorName || null,
+  });
 
-    // Une seule liste, quel que soit le mode : rien n'y joue tant que la
-    // playlist occupe le lecteur, et c'est au retour à la file que son premier
-    // titre reprendra la lecture.
-    const stored = readSetAsideQueue(settings);
-    toStore.forEach(t => stored.push(toData(t)));
-    writeSetAsideQueue(currentGuildId, stored, settings);
+  // Une seule liste, quel que soit le mode : rien n'y joue tant que la
+  // playlist occupe le lecteur, et c'est au retour à la file que son premier
+  // titre reprendra la lecture.
+  const stored = readSetAsideQueue(settings);
+  toStore.forEach((t) => stored.push(toData(t)));
+  writeSetAsideQueue(currentGuildId, stored, settings);
 
-    log.info(`[Queue] ${toStore.length} track(s) added to the pending queue; `
-        + 'the playlist in progress stays the playback source.');
-    return true;
+  log.info(
+    `[Queue] ${toStore.length} track(s) added to the pending queue; ` +
+      'the playlist in progress stays the playback source.',
+  );
+  return true;
 }
 
 /**
@@ -140,56 +154,56 @@ function addToSetAsideQueue(currentGuildId, settings, tracks) {
  * `ajouterALaFileEnAttente()`.
  */
 function switchToQueueSourceIfNeeded(currentGuildId, queue, settings) {
-    const oldSource = settings.activePlaybackSource || 'queue';
-    if (oldSource !== 'queue') {
-        const isPersonal = settings.broadcastMode === 'personal';
+  const oldSource = settings.activePlaybackSource || 'queue';
+  if (oldSource !== 'queue') {
+    const isPersonal = settings.broadcastMode === 'personal';
 
-        database.updateSettings(currentGuildId, {
-            activePlaybackSource: 'queue'
+    database.updateSettings(currentGuildId, {
+      activePlaybackSource: 'queue',
+    });
+
+    // La file mise de côté est une simple liste : c'est ici, au moment de
+    // reprendre, que son premier titre redevient la piste courante.
+    const setAside = readSetAsideQueue(settings);
+
+    if (isPersonal) {
+      if (queue && setAside.length > 0) {
+        const [first, ...rest] = setAside;
+        queue.virtualCurrentTrack = first;
+        queue.virtualTracks = rest;
+        queue.virtualProgressMs = 0;
+        queue.virtualIsPlaying = true;
+        queue.virtualIsPaused = false;
+      }
+    } else {
+      if (queue && setAside.length > 0) {
+        const { Track, useMainPlayer } = require('discord-player');
+        const player = useMainPlayer();
+        queue.tracks.clear();
+        const resolved = setAside.map((t) => {
+          const track = new Track(player, {
+            title: t.title,
+            author: t.author || 'Inconnu',
+            duration: t.duration || '0:00',
+            thumbnail: t.thumbnail || null,
+            url: t.url,
+            queryType: t.queryType || 'youtube',
+            raw: {},
+          });
+          if (t.extractorName) {
+            track.extractor = player.extractors.store.get(t.extractorName) || null;
+          }
+          return track;
         });
-
-        // La file mise de côté est une simple liste : c'est ici, au moment de
-        // reprendre, que son premier titre redevient la piste courante.
-        const setAside = readSetAsideQueue(settings);
-
-        if (isPersonal) {
-            if (queue && setAside.length > 0) {
-                const [first, ...rest] = setAside;
-                queue.virtualCurrentTrack = first;
-                queue.virtualTracks = rest;
-                queue.virtualProgressMs = 0;
-                queue.virtualIsPlaying = true;
-                queue.virtualIsPaused = false;
-            }
-        } else {
-            if (queue && setAside.length > 0) {
-                const { Track, useMainPlayer } = require('discord-player');
-                const player = useMainPlayer();
-                queue.tracks.clear();
-                const resolved = setAside.map(t => {
-                    const track = new Track(player, {
-                        title: t.title,
-                        author: t.author || 'Inconnu',
-                        duration: t.duration || '0:00',
-                        thumbnail: t.thumbnail || null,
-                        url: t.url,
-                        queryType: t.queryType || 'youtube',
-                        raw: {}
-                    });
-                    if (t.extractorName) {
-                        track.extractor = player.extractors.store.get(t.extractorName) || null;
-                    }
-                    return track;
-                });
-                queue.addTrack(resolved);
-            }
-        }
+        queue.addTrack(resolved);
+      }
     }
+  }
 }
 
 module.exports = {
-    searchLocalAwareTrack,
-    playlistIsSource,
-    addToSetAsideQueue,
-    switchToQueueSourceIfNeeded,
+  searchLocalAwareTrack,
+  playlistIsSource,
+  addToSetAsideQueue,
+  switchToQueueSourceIfNeeded,
 };

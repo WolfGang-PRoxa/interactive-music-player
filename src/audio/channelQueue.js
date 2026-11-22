@@ -65,13 +65,13 @@ const NO_CHANNEL = '__no_channel__';
  * @returns {string}
  */
 function keyOf(settings) {
-    return (settings && settings.lastVoiceChannelId) || NO_CHANNEL;
+  return (settings && settings.lastVoiceChannelId) || NO_CHANNEL;
 }
 
 /** Toutes les files rangées d'un serveur, sous une forme sûre à lire. */
 function allOf(settings) {
-    const stored = settings && settings.channelQueues;
-    return (stored && typeof stored === 'object') ? stored : {};
+  const stored = settings && settings.channelQueues;
+  return stored && typeof stored === 'object' ? stored : {};
 }
 
 /**
@@ -86,16 +86,16 @@ function allOf(settings) {
  * @returns {object[]}
  */
 function legacy(settings) {
-    const forms = [settings.queueBackupEveryone, settings.queueBackupPersonal];
-    for (const backup of forms) {
-        if (!backup) continue;
-        if (Array.isArray(backup.tracks) && backup.tracks.length) return backup.tracks.filter(Boolean);
-        // `pistes` : du temps où ce module portait des noms français.
-        if (Array.isArray(backup.pistes) && backup.pistes.length) return backup.pistes.filter(Boolean);
-        const flat = [backup.virtualCurrentTrack, ...(backup.virtualTracks || [])].filter(Boolean);
-        if (flat.length) return flat;
-    }
-    return [];
+  const forms = [settings.queueBackupEveryone, settings.queueBackupPersonal];
+  for (const backup of forms) {
+    if (!backup) continue;
+    if (Array.isArray(backup.tracks) && backup.tracks.length) return backup.tracks.filter(Boolean);
+    // `pistes` : du temps où ce module portait des noms français.
+    if (Array.isArray(backup.pistes) && backup.pistes.length) return backup.pistes.filter(Boolean);
+    const flat = [backup.virtualCurrentTrack, ...(backup.virtualTracks || [])].filter(Boolean);
+    if (flat.length) return flat;
+  }
+  return [];
 }
 
 /**
@@ -106,19 +106,19 @@ function legacy(settings) {
  * @returns {object[]}
  */
 function read(settings, channelId) {
-    if (!settings) return [];
-    const key = channelId || keyOf(settings);
+  if (!settings) return [];
+  const key = channelId || keyOf(settings);
 
-    const stored = allOf(settings)[key];
-    if (Array.isArray(stored)) return stored.filter(Boolean);
+  const stored = allOf(settings)[key];
+  if (Array.isArray(stored)) return stored.filter(Boolean);
 
-    /*
-     * Rien sous cette clé : la sauvegarde d'avant prend le relais, mais
-     * seulement pour le salon en jeu. La reverser à chaque salon donnerait la
-     * même file à tous, ce qui est précisément ce qu'on vient de défaire.
-     */
-    if (key === keyOf(settings)) return legacy(settings);
-    return [];
+  /*
+   * Rien sous cette clé : la sauvegarde d'avant prend le relais, mais
+   * seulement pour le salon en jeu. La reverser à chaque salon donnerait la
+   * même file à tous, ce qui est précisément ce qu'on vient de défaire.
+   */
+  if (key === keyOf(settings)) return legacy(settings);
+  return [];
 }
 
 /**
@@ -130,21 +130,21 @@ function read(settings, channelId) {
  * @param {string} [channelId]
  */
 function write(guildId, tracks, settings = null, channelId) {
-    const effective = settings || database.getSettings(guildId);
-    const key = channelId || keyOf(effective);
-    const cleaned = (tracks || []).filter(Boolean);
+  const effective = settings || database.getSettings(guildId);
+  const key = channelId || keyOf(effective);
+  const cleaned = (tracks || []).filter(Boolean);
 
-    const next = Object.assign({}, allOf(effective));
-    if (cleaned.length) next[key] = cleaned;
-    else delete next[key];   // un salon sans file n'a pas besoin d'une entrée vide
+  const next = Object.assign({}, allOf(effective));
+  if (cleaned.length) next[key] = cleaned;
+  else delete next[key]; // un salon sans file n'a pas besoin d'une entrée vide
 
-    database.updateSettings(guildId, {
-        channelQueues: next,
-        // La sauvegarde d'avant a été reversée : la laisser vivante ferait deux
-        // sources pour une même file, et l'on ne saurait plus laquelle croire.
-        queueBackupEveryone: null,
-        queueBackupPersonal: null,
-    });
+  database.updateSettings(guildId, {
+    channelQueues: next,
+    // La sauvegarde d'avant a été reversée : la laisser vivante ferait deux
+    // sources pour une même file, et l'on ne saurait plus laquelle croire.
+    queueBackupEveryone: null,
+    queueBackupPersonal: null,
+  });
 }
 
 /**
@@ -160,31 +160,31 @@ function write(guildId, tracks, settings = null, channelId) {
  * @param {object} settings
  */
 function mirror(guildId, live, settings) {
-    // Une playlist occupe le lecteur : ce qu'il porte n'est pas la file, et la
-    // recopier l'écraserait par des titres qui ne sont pas les siens.
-    const source = settings.activePlaybackSource || 'queue';
-    if (source !== 'queue') return;
+  // Une playlist occupe le lecteur : ce qu'il porte n'est pas la file, et la
+  // recopier l'écraserait par des titres qui ne sont pas les siens.
+  const source = settings.activePlaybackSource || 'queue';
+  if (source !== 'queue') return;
 
-    const stored = read(settings);
-    const at = stored.findIndex(transitions.isTransition);
-    const tail = at === -1 ? [] : stored.slice(at);
+  const stored = read(settings);
+  const at = stored.findIndex(transitions.isTransition);
+  const tail = at === -1 ? [] : stored.slice(at);
 
-    const next = [...(live || []).filter(Boolean), ...tail];
+  const next = [...(live || []).filter(Boolean), ...tail];
 
-    // Rien n'a bougé : une écriture par diffusion d'état, soit une par seconde,
-    // pour une liste qui ne change qu'aux gestes de l'utilisateur.
-    if (sameList(next, stored)) return;
+  // Rien n'a bougé : une écriture par diffusion d'état, soit une par seconde,
+  // pour une liste qui ne change qu'aux gestes de l'utilisateur.
+  if (sameList(next, stored)) return;
 
-    write(guildId, next, settings);
+  write(guildId, next, settings);
 }
 
 /** Deux listes portent-elles les mêmes éléments, dans le même ordre ? */
 function sameList(a, b) {
-    if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i += 1) {
-        if ((a[i] && a[i].url) !== (b[i] && b[i].url)) return false;
-    }
-    return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if ((a[i] && a[i].url) !== (b[i] && b[i].url)) return false;
+  }
+  return true;
 }
 
 /**
@@ -194,14 +194,14 @@ function sameList(a, b) {
  * @returns {object[]}
  */
 function playable(settings) {
-    return transitions.upTo(read(settings), 0).tracks;
+  return transitions.upTo(read(settings), 0).tracks;
 }
 
 module.exports = {
-    NO_CHANNEL,
-    keyOf,
-    read,
-    write,
-    mirror,
-    playable,
+  NO_CHANNEL,
+  keyOf,
+  read,
+  write,
+  mirror,
+  playable,
 };

@@ -22,30 +22,30 @@ const log = require('../utils/logger');
  * @param {number|string} vitesse
  */
 function applySpeed(queue, speed) {
-    if (!queue) return;
+  if (!queue) return;
 
-    const engine = activeEngine(queue);
-    if (engine) {
-        const value = parseFloat(speed) || 1;
-        engine.applySpeed(value).catch((err) => {
-            log.error('[PlaybackSettings] Speed change impossible:', err.message);
-        });
-        return;
+  const engine = activeEngine(queue);
+  if (engine) {
+    const value = parseFloat(speed) || 1;
+    engine.applySpeed(value).catch((err) => {
+      log.error('[PlaybackSettings] Speed change impossible:', err.message);
+    });
+    return;
+  }
+
+  try {
+    const enabledFilters = queue.filters.ffmpeg.getFiltersEnabled();
+    const withoutSpeed = enabledFilters.filter((f) => !f.startsWith('speed_'));
+
+    const rounded = Math.round((parseFloat(speed) || 1) * 100) / 100;
+    const filter = `speed_${String(rounded).replace('.', '_')}`;
+    if (filter !== 'speed_1' && filter !== 'speed_1_0' && filter !== 'speed_1_00') {
+      withoutSpeed.push(filter);
     }
-
-    try {
-        const enabledFilters = queue.filters.ffmpeg.getFiltersEnabled();
-        const withoutSpeed = enabledFilters.filter(f => !f.startsWith('speed_'));
-
-        const rounded = Math.round((parseFloat(speed) || 1) * 100) / 100;
-        const filter = `speed_${String(rounded).replace('.', '_')}`;
-        if (filter !== 'speed_1' && filter !== 'speed_1_0' && filter !== 'speed_1_00') {
-            withoutSpeed.push(filter);
-        }
-        queue.filters.ffmpeg.setFilters(withoutSpeed);
-    } catch (err) {
-        log.error('[PlaybackSettings] Error applying the speed filter:', err.message);
-    }
+    queue.filters.ffmpeg.setFilters(withoutSpeed);
+  } catch (err) {
+    log.error('[PlaybackSettings] Error applying the speed filter:', err.message);
+  }
 }
 
 /**
@@ -58,20 +58,20 @@ function applySpeed(queue, speed) {
  * @param {import('discord-player').GuildQueue} queue
  */
 function cancelMixEffects(queue) {
-    if (!queue) return;
+  if (!queue) return;
 
-    const engine = activeEngine(queue);
-    if (engine) {
-        engine.cancelCrossfade();
-        return;
-    }
+  const engine = activeEngine(queue);
+  if (engine) {
+    engine.cancelCrossfade();
+    return;
+  }
 
-    try {
-        const enabledFilters = queue.filters.ffmpeg.getFiltersEnabled();
-        queue.filters.ffmpeg.setFilters(enabledFilters.filter(f => f !== 'muffled'));
-    } catch (err) {
-        // Aucune chaîne de filtres montée : il n'y a rien à retirer
-    }
+  try {
+    const enabledFilters = queue.filters.ffmpeg.getFiltersEnabled();
+    queue.filters.ffmpeg.setFilters(enabledFilters.filter((f) => f !== 'muffled'));
+  } catch (err) {
+    // Aucune chaîne de filtres montée : il n'y a rien à retirer
+  }
 }
 
 /**
@@ -86,16 +86,16 @@ function cancelMixEffects(queue) {
  * @param {import('discord-player').GuildQueue} queue
  */
 function applyLoudness(queue) {
-    if (!queue) return;
+  if (!queue) return;
 
-    const engine = activeEngine(queue);
-    if (!engine) return;
+  const engine = activeEngine(queue);
+  if (!engine) return;
 
-    try {
-        engine.applyLoudness();
-    } catch (err) {
-        log.error('[PlaybackSettings] Loudness change impossible:', err.message);
-    }
+  try {
+    engine.applyLoudness();
+  } catch (err) {
+    log.error('[PlaybackSettings] Loudness change impossible:', err.message);
+  }
 }
 
 module.exports = { applySpeed, cancelMixEffects, applyLoudness };

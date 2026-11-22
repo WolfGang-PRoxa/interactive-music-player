@@ -55,7 +55,6 @@ const https = require('https');
 const { PassThrough } = require('stream');
 const { familyFor } = require('../utils/youtubeNetwork');
 
-
 /**
  * Taille d'une tranche.
  *
@@ -84,35 +83,35 @@ const pause = (ms) => new Promise((r) => setTimeout(r, ms));
  * @returns {Promise<import('http').IncomingMessage>}
  */
 function request(url, headers) {
-    return new Promise((resolve, reject) => {
-        let restantes = MAX_REDIRECTS;
+  return new Promise((resolve, reject) => {
+    let restantes = MAX_REDIRECTS;
 
-        const aller = (cible) => {
-            const module = cible.startsWith('http:') ? http : https;
-            // Par l'IPv4 si YouTube refuse l'IPv6 : voir utils/youtubeNetwork.
-            const req = module.get(cible, { headers, family: familyFor(cible) }, (res) => {
-                const code = res.statusCode;
+    const aller = (cible) => {
+      const module = cible.startsWith('http:') ? http : https;
+      // Par l'IPv4 si YouTube refuse l'IPv6 : voir utils/youtubeNetwork.
+      const req = module.get(cible, { headers, family: familyFor(cible) }, (res) => {
+        const code = res.statusCode;
 
-                if (code >= 300 && code < 400 && res.headers.location && restantes > 0) {
-                    restantes -= 1;
-                    res.resume();   // la réponse d'une redirection n'a pas de corps utile
-                    aller(new URL(res.headers.location, cible).toString());
-                    return;
-                }
-                if (code >= 400) {
-                    res.resume();
-                    reject(new Error(`HTTP ${code}`));
-                    return;
-                }
-                resolve(res);
-            });
+        if (code >= 300 && code < 400 && res.headers.location && restantes > 0) {
+          restantes -= 1;
+          res.resume(); // la réponse d'une redirection n'a pas de corps utile
+          aller(new URL(res.headers.location, cible).toString());
+          return;
+        }
+        if (code >= 400) {
+          res.resume();
+          reject(new Error(`HTTP ${code}`));
+          return;
+        }
+        resolve(res);
+      });
 
-            req.on('error', reject);
-            req.setTimeout(TIMEOUT_MS, () => req.destroy(new Error('délai dépassé')));
-        };
+      req.on('error', reject);
+      req.setTimeout(TIMEOUT_MS, () => req.destroy(new Error('délai dépassé')));
+    };
 
-        aller(url);
-    });
+    aller(url);
+  });
 }
 
 /**
@@ -130,15 +129,15 @@ function request(url, headers) {
  * @param {import('stream').Writable} out
  */
 function placeLibre(out) {
-    return new Promise((resolve) => {
-        const fini = () => {
-            out.off('drain', fini);
-            out.off('close', fini);
-            resolve();
-        };
-        out.once('drain', fini);
-        out.once('close', fini);
-    });
+  return new Promise((resolve) => {
+    const fini = () => {
+      out.off('drain', fini);
+      out.off('close', fini);
+      resolve();
+    };
+    out.once('drain', fini);
+    out.once('close', fini);
+  });
 }
 
 /**
@@ -164,33 +163,36 @@ function placeLibre(out) {
  * @param {{ ignorer: number, restant: number|null }} [fenetre]
  */
 async function verser(res, out, compteur, fenetre = null) {
-    let ignorer = fenetre ? fenetre.ignorer : 0;
-    let restant = fenetre ? fenetre.restant : null;
+  let ignorer = fenetre ? fenetre.ignorer : 0;
+  let restant = fenetre ? fenetre.restant : null;
 
-    for await (const brut of res) {
-        compteur.recus += brut.length;
+  for await (const brut of res) {
+    compteur.recus += brut.length;
 
-        let morceau = brut;
-        if (ignorer > 0) {
-            const saute = Math.min(ignorer, morceau.length);
-            ignorer -= saute;
-            morceau = morceau.subarray(saute);
-        }
-        if (restant !== null) {
-            if (restant <= 0) { res.destroy(); return; }
-            morceau = morceau.subarray(0, restant);
-            restant -= morceau.length;
-        }
-        if (!morceau.length) continue;
-
-        if (!out.write(morceau)) {
-            await placeLibre(out);
-            if (out.destroyed) {
-                res.destroy();
-                return;
-            }
-        }
+    let morceau = brut;
+    if (ignorer > 0) {
+      const saute = Math.min(ignorer, morceau.length);
+      ignorer -= saute;
+      morceau = morceau.subarray(saute);
     }
+    if (restant !== null) {
+      if (restant <= 0) {
+        res.destroy();
+        return;
+      }
+      morceau = morceau.subarray(0, restant);
+      restant -= morceau.length;
+    }
+    if (!morceau.length) continue;
+
+    if (!out.write(morceau)) {
+      await placeLibre(out);
+      if (out.destroyed) {
+        res.destroy();
+        return;
+      }
+    }
+  }
 }
 
 /**
@@ -209,77 +211,77 @@ async function verser(res, out, compteur, fenetre = null) {
  * @param {number|null} [options.end] - Dernier octet voulu, lui compris.
  * @returns {import('stream').Readable}
  */
-function chunkedFetch(url, {
-    headers = {}, chunkBytes = CHUNK_BYTES, start = 0, end = null,
-} = {}) {
-    const out = new PassThrough();
+function chunkedFetch(url, { headers = {}, chunkBytes = CHUNK_BYTES, start = 0, end = null } = {}) {
+  const out = new PassThrough();
 
-    (async () => {
-        let debut = start;
-        // La taille du fichier, apprise du `Content-Range` ; distincte de `end`,
-        // qui dit seulement jusqu'où va la commande.
-        let total = null;
-        let echecs = 0;
+  (async () => {
+    let debut = start;
+    // La taille du fichier, apprise du `Content-Range` ; distincte de `end`,
+    // qui dit seulement jusqu'où va la commande.
+    let total = null;
+    let echecs = 0;
 
-        for (;;) {
-            const compteur = { recus: 0 };
-            // Jamais au-delà de la borne : la dernière tranche est raccourcie.
-            const fin = end === null ? debut + chunkBytes - 1
-                : Math.min(debut + chunkBytes - 1, end);
-            const demandes = fin - debut + 1;
+    for (;;) {
+      const compteur = { recus: 0 };
+      // Jamais au-delà de la borne : la dernière tranche est raccourcie.
+      const fin = end === null ? debut + chunkBytes - 1 : Math.min(debut + chunkBytes - 1, end);
+      const demandes = fin - debut + 1;
 
-            try {
-                const res = await request(url, Object.assign({}, headers, {
-                    Range: `bytes=${debut}-${fin}`,
-                }));
+      try {
+        const res = await request(
+          url,
+          Object.assign({}, headers, {
+            Range: `bytes=${debut}-${fin}`,
+          }),
+        );
 
-                /*
-                 * 200 : la source ne sait pas découper et envoie tout, depuis le
-                 * premier octet. Rien à recoudre, et rien à demander de plus
-                 * après celle-ci — mais si l'appelant voulait une plage, c'est
-                 * ici qu'il faut la tailler, faute de quoi il recevrait le
-                 * fichier entier à la place des octets demandés.
-                 */
-                if (res.statusCode === 200) {
-                    await verser(res, out, compteur, {
-                        ignorer: start,
-                        restant: end === null ? null : end - start + 1,
-                    });
-                    break;
-                }
-
-                // « bytes 0-4194303/24600694 » : le dernier nombre dit où
-                // s'arrêter, et évite une requête de trop dans le vide.
-                const portee = /bytes \d+-\d+\/(\d+|\*)/.exec(res.headers['content-range'] || '');
-                if (portee && portee[1] !== '*') total = Number(portee[1]);
-
-                await verser(res, out, compteur);
-                echecs = 0;
-            } catch (err) {
-                // Ce qui est déjà parti reste acquis : on reprend après, sans
-                // le redemander — le renvoyer doublerait ces octets-là dans le
-                // fichier obtenu.
-                debut += compteur.recus;
-                echecs += 1;
-                if (echecs > RETRIES) throw err;
-                await pause(300 * echecs);
-                continue;
-            }
-
-            debut += compteur.recus;
-
-            if (out.destroyed) return;
-            if (!compteur.recus) break;
-            if (end !== null && debut > end) break;
-            if (total !== null && debut >= total) break;
-            // Taille inconnue : une tranche plus courte que demandée est la fin.
-            if (total === null && compteur.recus < demandes) break;
+        /*
+         * 200 : la source ne sait pas découper et envoie tout, depuis le
+         * premier octet. Rien à recoudre, et rien à demander de plus
+         * après celle-ci — mais si l'appelant voulait une plage, c'est
+         * ici qu'il faut la tailler, faute de quoi il recevrait le
+         * fichier entier à la place des octets demandés.
+         */
+        if (res.statusCode === 200) {
+          await verser(res, out, compteur, {
+            ignorer: start,
+            restant: end === null ? null : end - start + 1,
+          });
+          break;
         }
 
-        out.end();
-    })().catch((err) => out.destroy(err));
+        // « bytes 0-4194303/24600694 » : le dernier nombre dit où
+        // s'arrêter, et évite une requête de trop dans le vide.
+        const portee = /bytes \d+-\d+\/(\d+|\*)/.exec(res.headers['content-range'] || '');
+        if (portee && portee[1] !== '*') total = Number(portee[1]);
 
-    return out;
+        await verser(res, out, compteur);
+        echecs = 0;
+      } catch (err) {
+        // Ce qui est déjà parti reste acquis : on reprend après, sans
+        // le redemander — le renvoyer doublerait ces octets-là dans le
+        // fichier obtenu.
+        debut += compteur.recus;
+        echecs += 1;
+        if (echecs > RETRIES) throw err;
+        await pause(300 * echecs);
+        continue;
+      }
+
+      debut += compteur.recus;
+
+      if (out.destroyed) return;
+      if (!compteur.recus) break;
+      if (end !== null && debut > end) break;
+      if (total !== null && debut >= total) break;
+      // Taille inconnue : une tranche plus courte que demandée est la fin.
+      if (total === null && compteur.recus < demandes) break;
+    }
+
+    out.end();
+  })().catch((err) => out.destroy(err));
+
+  return out;
 }
 
 /**
@@ -299,11 +301,11 @@ function chunkedFetch(url, {
  * @returns {Promise<string>} `dest`.
  */
 async function fetchToFile(url, dest, options) {
-    const fs = require('fs');
-    const { pipeline } = require('stream/promises');
+  const fs = require('fs');
+  const { pipeline } = require('stream/promises');
 
-    await pipeline(chunkedFetch(url, options), fs.createWriteStream(dest));
-    return dest;
+  await pipeline(chunkedFetch(url, options), fs.createWriteStream(dest));
+  return dest;
 }
 
 /*

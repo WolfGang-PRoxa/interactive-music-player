@@ -58,29 +58,29 @@ const TYPE_PAR_DEFAUT = 'video/mp4';
  * @returns {{start: number, end: number}|{invalid: true}|null} null si absent ou illisible
  */
 function parseRange(rangeHeader, size) {
-    const m = /^bytes=(\d*)-(\d*)$/.exec(String(rangeHeader || '').trim());
-    if (!m) return null;
+  const m = /^bytes=(\d*)-(\d*)$/.exec(String(rangeHeader || '').trim());
+  if (!m) return null;
 
-    const [, rawStart, rawEnd] = m;
-    if (rawStart === '' && rawEnd === '') return null;
+  const [, rawStart, rawEnd] = m;
+  if (rawStart === '' && rawEnd === '') return null;
 
-    let start;
-    let end;
-    if (rawStart === '') {
-        // Forme suffixe : les N derniers octets
-        const n = parseInt(rawEnd, 10);
-        if (!Number.isFinite(n) || n <= 0) return null;
-        start = Math.max(0, size - n);
-        end = size - 1;
-    } else {
-        start = parseInt(rawStart, 10);
-        end = rawEnd === '' ? size - 1 : parseInt(rawEnd, 10);
-    }
+  let start;
+  let end;
+  if (rawStart === '') {
+    // Forme suffixe : les N derniers octets
+    const n = parseInt(rawEnd, 10);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    start = Math.max(0, size - n);
+    end = size - 1;
+  } else {
+    start = parseInt(rawStart, 10);
+    end = rawEnd === '' ? size - 1 : parseInt(rawEnd, 10);
+  }
 
-    if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
-    if (start >= size || start > end) return { invalid: true };
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  if (start >= size || start > end) return { invalid: true };
 
-    return { start, end: Math.min(end, size - 1) };
+  return { start, end: Math.min(end, size - 1) };
 }
 
 /**
@@ -100,21 +100,21 @@ function parseRange(rangeHeader, size) {
  * @returns {Promise<{ size: number|null, contentType: string, ranges: boolean }>}
  */
 async function probeRemote(url, headers = {}) {
-    const res = await openRequest(url, Object.assign({}, headers, { Range: 'bytes=0-0' }));
-    const ranges = res.statusCode === 206;
-    const portee = /bytes \d+-\d+\/(\d+)/.exec(res.headers['content-range'] || '');
+  const res = await openRequest(url, Object.assign({}, headers, { Range: 'bytes=0-0' }));
+  const ranges = res.statusCode === 206;
+  const portee = /bytes \d+-\d+\/(\d+)/.exec(res.headers['content-range'] || '');
 
-    // Détruire, et non `resume()` : sur une source qui ignore les plages, la
-    // réponse est le fichier entier, qu'il ne s'agit pas de télécharger pour
-    // connaître sa taille.
-    res.destroy();
+  // Détruire, et non `resume()` : sur une source qui ignore les plages, la
+  // réponse est le fichier entier, qu'il ne s'agit pas de télécharger pour
+  // connaître sa taille.
+  res.destroy();
 
-    const annoncee = Number(res.headers['content-length']);
-    return {
-        size: portee ? Number(portee[1]) : (Number.isFinite(annoncee) && !ranges ? annoncee : null),
-        contentType: res.headers['content-type'] || TYPE_PAR_DEFAUT,
-        ranges,
-    };
+  const annoncee = Number(res.headers['content-length']);
+  return {
+    size: portee ? Number(portee[1]) : Number.isFinite(annoncee) && !ranges ? annoncee : null,
+    contentType: res.headers['content-type'] || TYPE_PAR_DEFAUT,
+    ranges,
+  };
 }
 
 /**
@@ -134,51 +134,49 @@ async function probeRemote(url, headers = {}) {
  * @param {number} [source.chunkBytes] - Taille d'une tranche en amont.
  * @param {(message: string) => void} [source.onError]
  */
-function relayRemote(req, res, {
-    url, headers = {}, size, contentType = TYPE_PAR_DEFAUT, chunkBytes, onError,
-}) {
-    const plage = parseRange(req.headers.range, size);
+function relayRemote(req, res, { url, headers = {}, size, contentType = TYPE_PAR_DEFAUT, chunkBytes, onError }) {
+  const plage = parseRange(req.headers.range, size);
 
-    if (plage && plage.invalid) {
-        res.writeHead(416, { 'Content-Range': `bytes */${size}`, 'Accept-Ranges': 'bytes' });
-        return res.end();
-    }
+  if (plage && plage.invalid) {
+    res.writeHead(416, { 'Content-Range': `bytes */${size}`, 'Accept-Ranges': 'bytes' });
+    return res.end();
+  }
 
-    const start = plage ? plage.start : 0;
-    const end = plage ? plage.end : size - 1;
+  const start = plage ? plage.start : 0;
+  const end = plage ? plage.end : size - 1;
 
-    const entetes = {
-        'Content-Type': contentType,
-        'Content-Length': end - start + 1,
-        'Accept-Ranges': 'bytes',
-    };
-    if (plage) entetes['Content-Range'] = `bytes ${start}-${end}/${size}`;
+  const entetes = {
+    'Content-Type': contentType,
+    'Content-Length': end - start + 1,
+    'Accept-Ranges': 'bytes',
+  };
+  if (plage) entetes['Content-Range'] = `bytes ${start}-${end}/${size}`;
 
-    res.writeHead(plage ? 206 : 200, entetes);
+  res.writeHead(plage ? 206 : 200, entetes);
 
-    // Une balise <video> sonde parfois par un HEAD : les en-têtes suffisent, et
-    // aller chercher le moindre octet en amont serait du trafic pour rien.
-    if (req.method === 'HEAD') return res.end();
+  // Une balise <video> sonde parfois par un HEAD : les en-têtes suffisent, et
+  // aller chercher le moindre octet en amont serait du trafic pour rien.
+  if (req.method === 'HEAD') return res.end();
 
-    const flux = chunkedFetch(url, { headers, start, end, chunkBytes });
+  const flux = chunkedFetch(url, { headers, start, end, chunkBytes });
 
-    /*
-     * Le client qui s'en va coupe l'amont.
-     *
-     * Sans cela, changer de piste ou fermer l'onglet laisserait la boucle de
-     * tranches réclamer un fichier que plus personne n'attend — et une vidéo,
-     * ce sont des dizaines de mégaoctets tirés dans le vide.
-     */
-    res.on('close', () => flux.destroy());
+  /*
+   * Le client qui s'en va coupe l'amont.
+   *
+   * Sans cela, changer de piste ou fermer l'onglet laisserait la boucle de
+   * tranches réclamer un fichier que plus personne n'attend — et une vidéo,
+   * ce sont des dizaines de mégaoctets tirés dans le vide.
+   */
+  res.on('close', () => flux.destroy());
 
-    flux.on('error', (err) => {
-        if (onError) onError(err.message);
-        // Les en-têtes sont partis : il ne reste qu'à couper, ce que le client
-        // lit comme un flux tronqué — et il redemandera la plage manquante.
-        res.destroy();
-    });
+  flux.on('error', (err) => {
+    if (onError) onError(err.message);
+    // Les en-têtes sont partis : il ne reste qu'à couper, ce que le client
+    // lit comme un flux tronqué — et il redemandera la plage manquante.
+    res.destroy();
+  });
 
-    flux.pipe(res);
+  flux.pipe(res);
 }
 
 module.exports = { parseRange, probeRemote, relayRemote, TYPE_PAR_DEFAUT };

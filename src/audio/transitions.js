@@ -50,20 +50,20 @@ const QUEUE = 'queue';
  * @returns {object}
  */
 function create(target) {
-    const id = `${Date.now()}_${Math.floor(Math.random() * 100000)}`;
-    return {
-        isTransition: true,
-        id,
-        target,
-        url: `${PREFIX}${id}`,
-        // Titre et durée : uniquement pour le code qui lit une liste de pistes
-        // sans savoir qu'elle peut contenir autre chose. Ce n'est pas ce que
-        // l'interface affiche — elle rend sa propre ligne.
-        title: '',
-        author: '',
-        duration: '0:00',
-        thumbnail: null,
-    };
+  const id = `${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+  return {
+    isTransition: true,
+    id,
+    target,
+    url: `${PREFIX}${id}`,
+    // Titre et durée : uniquement pour le code qui lit une liste de pistes
+    // sans savoir qu'elle peut contenir autre chose. Ce n'est pas ce que
+    // l'interface affiche — elle rend sa propre ligne.
+    title: '',
+    author: '',
+    duration: '0:00',
+    thumbnail: null,
+  };
 }
 
 /**
@@ -78,14 +78,14 @@ function create(target) {
  * @returns {boolean}
  */
 function isTransition(item) {
-    if (!item) return false;
-    if (item.isTransition === true) return true;
-    return typeof item.url === 'string' && item.url.startsWith(PREFIX);
+  if (!item) return false;
+  if (item.isTransition === true) return true;
+  return typeof item.url === 'string' && item.url.startsWith(PREFIX);
 }
 
 /** Une liste débarrassée de ses aiguillages. */
 function withoutTransitions(list) {
-    return (Array.isArray(list) ? list : []).filter((t) => !isTransition(t));
+  return (Array.isArray(list) ? list : []).filter((t) => !isTransition(t));
 }
 
 /**
@@ -101,15 +101,15 @@ function withoutTransitions(list) {
  *   `at` est l'indice de la transition dans la liste d'origine, ou -1.
  */
 function upTo(tracks, startIndex) {
-    const list = Array.isArray(tracks) ? tracks : [];
-    const debut = Number.isInteger(startIndex) && startIndex > 0 ? startIndex : 0;
-    const sortie = [];
+  const list = Array.isArray(tracks) ? tracks : [];
+  const debut = Number.isInteger(startIndex) && startIndex > 0 ? startIndex : 0;
+  const sortie = [];
 
-    for (let i = debut; i < list.length; i += 1) {
-        if (isTransition(list[i])) return { tracks: sortie, transition: list[i], at: i };
-        sortie.push(list[i]);
-    }
-    return { tracks: sortie, transition: null, at: -1 };
+  for (let i = debut; i < list.length; i += 1) {
+    if (isTransition(list[i])) return { tracks: sortie, transition: list[i], at: i };
+    sortie.push(list[i]);
+  }
+  return { tracks: sortie, transition: null, at: -1 };
 }
 
 /**
@@ -126,12 +126,12 @@ function upTo(tracks, startIndex) {
  * @returns {{ transition: object, at: number }|null}
  */
 function nextAfter(tracks, currentIndex) {
-    const list = Array.isArray(tracks) ? tracks : [];
-    const at = (Number.isInteger(currentIndex) ? currentIndex : 0) + 1;
+  const list = Array.isArray(tracks) ? tracks : [];
+  const at = (Number.isInteger(currentIndex) ? currentIndex : 0) + 1;
 
-    if (at < 0 || at >= list.length) return null;
-    if (!isTransition(list[at])) return null;
-    return { transition: list[at], at };
+  if (at < 0 || at >= list.length) return null;
+  if (!isTransition(list[at])) return null;
+  return { transition: list[at], at };
 }
 
 /**
@@ -148,15 +148,15 @@ function nextAfter(tracks, currentIndex) {
  * @returns {{ id: string, name: string }[]}
  */
 function destinations(playlists, containerId) {
-    const sorties = [];
+  const sorties = [];
 
-    if (containerId !== QUEUE) sorties.push({ id: QUEUE, name: null });
+  if (containerId !== QUEUE) sorties.push({ id: QUEUE, name: null });
 
-    for (const p of Array.isArray(playlists) ? playlists : []) {
-        if (!p || !p.id || p.id === containerId) continue;
-        sorties.push({ id: p.id, name: p.name || '' });
-    }
-    return sorties;
+  for (const p of Array.isArray(playlists) ? playlists : []) {
+    if (!p || !p.id || p.id === containerId) continue;
+    sorties.push({ id: p.id, name: p.name || '' });
+  }
+  return sorties;
 }
 
 /**
@@ -170,20 +170,19 @@ function destinations(playlists, containerId) {
  * @returns {string|null}
  */
 function targetName(transition, playlists) {
-    if (!transition || transition.target === QUEUE) return null;
-    const found = (Array.isArray(playlists) ? playlists : [])
-        .find((p) => p && p.id === transition.target);
-    return found ? (found.name || '') : null;
+  if (!transition || transition.target === QUEUE) return null;
+  const found = (Array.isArray(playlists) ? playlists : []).find((p) => p && p.id === transition.target);
+  return found ? found.name || '' : null;
 }
 
 module.exports = {
-    PREFIX,
-    QUEUE,
-    create,
-    isTransition,
-    withoutTransitions,
-    upTo,
-    nextAfter,
-    destinations,
-    targetName,
+  PREFIX,
+  QUEUE,
+  create,
+  isTransition,
+  withoutTransitions,
+  upTo,
+  nextAfter,
+  destinations,
+  targetName,
 };

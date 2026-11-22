@@ -23,11 +23,11 @@ const log = require('../../../utils/logger');
  * @param {string|null} [error] - Ce qui vient d'échouer, le cas échéant.
  */
 function send(ws, state, error = null) {
-    try {
-        ws.send(JSON.stringify({ type: 'tunnelState', data: { ...state, ...discord(), error } }));
-    } catch (e) {
-        // Socket fermée entre-temps : rien à sauver.
-    }
+  try {
+    ws.send(JSON.stringify({ type: 'tunnelState', data: { ...state, ...discord(), error } }));
+  } catch (e) {
+    // Socket fermée entre-temps : rien à sauver.
+  }
 }
 
 /**
@@ -53,21 +53,21 @@ function send(ws, state, error = null) {
  * @returns {{ redirectUri: string, clientId: string, relay: boolean }}
  */
 function discord() {
-    const oauth = require('../../oauth');
-    return {
-        redirectUri: oauth.redirectUri(),
-        clientId: oauth.clientId(),
-        relay: oauth.usesRelay(),
-    };
+  const oauth = require('../../oauth');
+  return {
+    redirectUri: oauth.redirectUri(),
+    clientId: oauth.clientId(),
+    relay: oauth.usesRelay(),
+  };
 }
 
 /** Le port réellement servi, seul repère fiable de ce qu'il faut publier. */
 function dashboardPort(webServer) {
-    return webServer?.port || Number(process.env.PORT) || 3000;
+  return webServer?.port || Number(process.env.PORT) || 3000;
 }
 
 async function handleTunnelState(ctx) {
-    send(ctx.ws, cloudflare.inspect());
+  send(ctx.ws, cloudflare.inspect());
 }
 
 /**
@@ -78,19 +78,19 @@ async function handleTunnelState(ctx) {
  * exécutable unique, qui se pose dans `data/bin/` sans rien demander.
  */
 async function handleTunnelInstall(ctx) {
-    const { ws } = ctx;
-    const before = cloudflare.inspect();
-    // Apparu entre-temps — installé à la main, ou par un autre onglet : rien à
-    // rapporter par-dessus.
-    if (before.step !== cloudflare.STEP.ABSENT) return send(ws, before);
+  const { ws } = ctx;
+  const before = cloudflare.inspect();
+  // Apparu entre-temps — installé à la main, ou par un autre onglet : rien à
+  // rapporter par-dessus.
+  if (before.step !== cloudflare.STEP.ABSENT) return send(ws, before);
 
-    // L'état « téléchargement en cours » d'abord : il prend quelques secondes,
-    // et la fenêtre doit pouvoir le dire pendant ce temps.
-    const pending = cloudflare.download();
-    send(ws, cloudflare.inspect());
+  // L'état « téléchargement en cours » d'abord : il prend quelques secondes,
+  // et la fenêtre doit pouvoir le dire pendant ce temps.
+  const pending = cloudflare.download();
+  send(ws, cloudflare.inspect());
 
-    const res = await pending;
-    send(ws, cloudflare.inspect(), res.ok ? null : res.error);
+  const res = await pending;
+  send(ws, cloudflare.inspect(), res.ok ? null : res.error);
 }
 
 /**
@@ -101,23 +101,23 @@ async function handleTunnelInstall(ctx) {
  * Discord ne voit toujours que la porte.
  */
 async function handleTunnelMount(ctx) {
-    const { ws, webServer } = ctx;
-    const port = dashboardPort(webServer);
+  const { ws, webServer } = ctx;
+  const port = dashboardPort(webServer);
 
-    const res = await cloudflare.mount(port);
-    log.info(`[Tunnel] Publishing the dashboard: ${res.ok ? 'done' : 'failed'}.`);
-    send(ws, cloudflare.inspect(), res.ok ? null : res.error);
+  const res = await cloudflare.mount(port);
+  log.info(`[Tunnel] Publishing the dashboard: ${res.ok ? 'done' : 'failed'}.`);
+  send(ws, cloudflare.inspect(), res.ok ? null : res.error);
 }
 
 /** Retire la publication. */
 async function handleTunnelUnmount(ctx) {
-    const res = await cloudflare.unmount();
-    send(ctx.ws, cloudflare.inspect(), res.ok ? null : res.error);
+  const res = await cloudflare.unmount();
+  send(ctx.ws, cloudflare.inspect(), res.ok ? null : res.error);
 }
 
 module.exports = {
-    handleTunnelState,
-    handleTunnelInstall,
-    handleTunnelMount,
-    handleTunnelUnmount,
+  handleTunnelState,
+  handleTunnelInstall,
+  handleTunnelMount,
+  handleTunnelUnmount,
 };

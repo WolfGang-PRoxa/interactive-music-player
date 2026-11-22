@@ -60,19 +60,23 @@ const inventoryCache = new Map();
  * durée de vie utile, et c'est à chacune de décider ce qu'elle garde.
  */
 async function dump(url) {
-    try {
-        const info = await ytdlp(url, {
-            dumpSingleJson: true,
-            noCheckCertificates: true,
-            noWarnings: true,
-            preferFreeFormats: true,
-        }, { windowsHide: true });
-        return (info && info.entries && info.entries[0]) ? info.entries[0] : info;
-    } catch (err) {
-        // Source inconnue de l'outil, réseau coupé, page privée.
-        log.debug(`[VideoSource] No format list for ${url}: ${err.message}`);
-        return null;
-    }
+  try {
+    const info = await ytdlp(
+      url,
+      {
+        dumpSingleJson: true,
+        noCheckCertificates: true,
+        noWarnings: true,
+        preferFreeFormats: true,
+      },
+      { windowsHide: true },
+    );
+    return info && info.entries && info.entries[0] ? info.entries[0] : info;
+  } catch (err) {
+    // Source inconnue de l'outil, réseau coupé, page privée.
+    log.debug(`[VideoSource] No format list for ${url}: ${err.message}`);
+    return null;
+  }
 }
 
 /**
@@ -95,37 +99,42 @@ async function dump(url) {
  * @returns {Promise<{ heights: number[], audioKbps: number|null, known: boolean }>}
  */
 async function inventory(url) {
-    const inconnu = { heights: [], audioKbps: null, known: false };
-    if (!url || !/^https?:\/\//i.test(url)) return inconnu;
+  const inconnu = { heights: [], audioKbps: null, known: false };
+  if (!url || !/^https?:\/\//i.test(url)) return inconnu;
 
-    const cached = inventoryCache.get(url);
-    if (cached && Date.now() - cached.at < INVENTORY_TTL_MS) return cached.value;
+  const cached = inventoryCache.get(url);
+  if (cached && Date.now() - cached.at < INVENTORY_TTL_MS) return cached.value;
 
-    const entry = await dump(url);
-    const formats = (entry && Array.isArray(entry.formats)) ? entry.formats : [];
-    if (!formats.length) return inconnu;
+  const entry = await dump(url);
+  const formats = entry && Array.isArray(entry.formats) ? entry.formats : [];
+  if (!formats.length) return inconnu;
 
-    // Les définitions réellement présentes, sans doublon, de la plus haute à la
-    // plus basse : la même hauteur revient souvent en plusieurs codecs. Celles
-    // qui n'existent qu'en manifeste ne sont pas proposées — les offrir serait
-    // promettre un fichier qu'on ne saurait pas aller chercher.
-    const heights = [...new Set(videoTracks(entry)
+  // Les définitions réellement présentes, sans doublon, de la plus haute à la
+  // plus basse : la même hauteur revient souvent en plusieurs codecs. Celles
+  // qui n'existent qu'en manifeste ne sont pas proposées — les offrir serait
+  // promettre un fichier qu'on ne saurait pas aller chercher.
+  const heights = [
+    ...new Set(
+      videoTracks(entry)
         .map(definitionOf)
-        .filter((d) => d > 0))]
-        .sort((a, b) => b - a);
+        .filter((d) => d > 0),
+    ),
+  ].sort((a, b) => b - a);
 
-    // Le débit annoncé au menu doit être celui qu'on ira chercher : c'est la
-    // piste d'origine qui sera téléchargée, et non le doublage le mieux servi.
-    const debits = audioTracks(entry).map(nominalKbps).filter((v) => v > 0);
+  // Le débit annoncé au menu doit être celui qu'on ira chercher : c'est la
+  // piste d'origine qui sera téléchargée, et non le doublage le mieux servi.
+  const debits = audioTracks(entry)
+    .map(nominalKbps)
+    .filter((v) => v > 0);
 
-    const value = {
-        heights,
-        audioKbps: debits.length ? Math.max(...debits) : null,
-        known: true,
-    };
+  const value = {
+    heights,
+    audioKbps: debits.length ? Math.max(...debits) : null,
+    known: true,
+  };
 
-    inventoryCache.set(url, { at: Date.now(), value });
-    return value;
+  inventoryCache.set(url, { at: Date.now(), value });
+  return value;
 }
 
 /** Les barreaux du menu, du plus haut au plus bas. */
@@ -148,10 +157,10 @@ const AUDIO_LADDER = [320, 256, 192, 128, 96];
  * @returns {number} 0 quand le format n'a pas d'image.
  */
 function definitionOf(format) {
-    const w = Number(format && format.width) || 0;
-    const h = Number(format && format.height) || 0;
-    if (!h) return 0;
-    return w ? Math.min(w, h) : h;
+  const w = Number(format && format.width) || 0;
+  const h = Number(format && format.height) || 0;
+  if (!h) return 0;
+  return w ? Math.min(w, h) : h;
 }
 
 /**
@@ -184,17 +193,18 @@ const DIRECT_PROTOCOLS = new Set(['https', 'http']);
  * @returns {object[]}
  */
 function originalLanguage(formats, entry) {
-    const marques = formats.filter((f) => Number(f.language_preference) === 10);
-    if (marques.length) return marques;
+  const marques = formats.filter((f) => Number(f.language_preference) === 10);
+  if (marques.length) return marques;
 
-    const langue = entry && entry.language;
-    if (langue) {
-        const memeLangue = formats.filter(
-            (f) => f.language && String(f.language).toLowerCase() === String(langue).toLowerCase());
-        if (memeLangue.length) return memeLangue;
-    }
+  const langue = entry && entry.language;
+  if (langue) {
+    const memeLangue = formats.filter(
+      (f) => f.language && String(f.language).toLowerCase() === String(langue).toLowerCase(),
+    );
+    if (memeLangue.length) return memeLangue;
+  }
 
-    return formats;
+  return formats;
 }
 
 /**
@@ -204,19 +214,19 @@ function originalLanguage(formats, entry) {
  * @returns {object[]} Du meilleur débit au moindre.
  */
 function audioTracks(entry) {
-    const formats = (entry && Array.isArray(entry.formats)) ? entry.formats : [];
-    const utilisables = formats.filter((f) => f && f.url
-        && f.acodec && f.acodec !== 'none'
-        && DIRECT_PROTOCOLS.has(String(f.protocol)));
+  const formats = entry && Array.isArray(entry.formats) ? entry.formats : [];
+  const utilisables = formats.filter(
+    (f) => f && f.url && f.acodec && f.acodec !== 'none' && DIRECT_PROTOCOLS.has(String(f.protocol)),
+  );
 
-    // Le son seul d'abord. Un format complet ferait descendre l'image avec lui,
-    // pour rien quand on n'encode que du son — mais il vaut mieux que rien.
-    const seuls = utilisables.filter((f) => f.vcodec === 'none');
-    const pool = seuls.length ? seuls : utilisables;
+  // Le son seul d'abord. Un format complet ferait descendre l'image avec lui,
+  // pour rien quand on n'encode que du son — mais il vaut mieux que rien.
+  const seuls = utilisables.filter((f) => f.vcodec === 'none');
+  const pool = seuls.length ? seuls : utilisables;
 
-    return originalLanguage(pool, entry)
-        .slice()
-        .sort((a, b) => (Number(b.abr) || 0) - (Number(a.abr) || 0));
+  return originalLanguage(pool, entry)
+    .slice()
+    .sort((a, b) => (Number(b.abr) || 0) - (Number(a.abr) || 0));
 }
 
 /**
@@ -226,7 +236,7 @@ function audioTracks(entry) {
  * @returns {object|null}
  */
 function bestAudio(entry) {
-    return audioTracks(entry)[0] || null;
+  return audioTracks(entry)[0] || null;
 }
 
 /**
@@ -242,10 +252,10 @@ function bestAudio(entry) {
  * @returns {object[]}
  */
 function videoTracks(entry) {
-    const formats = (entry && Array.isArray(entry.formats)) ? entry.formats : [];
-    return formats.filter((f) => f && f.url
-        && f.vcodec && f.vcodec !== 'none' && f.height
-        && DIRECT_PROTOCOLS.has(String(f.protocol)));
+  const formats = entry && Array.isArray(entry.formats) ? entry.formats : [];
+  return formats.filter(
+    (f) => f && f.url && f.vcodec && f.vcodec !== 'none' && f.height && DIRECT_PROTOCOLS.has(String(f.protocol)),
+  );
 }
 
 /**
@@ -265,13 +275,13 @@ function videoTracks(entry) {
  * @returns {number} 0 quand la source n'annonce aucun débit.
  */
 function nominalKbps(format) {
-    const mesure = Number(format && format.abr) || 0;
-    if (!(mesure > 0)) return 0;
+  const mesure = Number(format && format.abr) || 0;
+  if (!(mesure > 0)) return 0;
 
-    // Cinq pour cent : de quoi absorber l'en-tête d'un conteneur, pas de quoi
-    // confondre deux barreaux voisins, le plus resserré allant de 96 à 128.
-    const barreau = AUDIO_LADDER.find((v) => mesure >= v && mesure <= v * 1.05);
-    return barreau || Math.round(mesure);
+  // Cinq pour cent : de quoi absorber l'en-tête d'un conteneur, pas de quoi
+  // confondre deux barreaux voisins, le plus resserré allant de 96 à 128.
+  const barreau = AUDIO_LADDER.find((v) => mesure >= v && mesure <= v * 1.05);
+  return barreau || Math.round(mesure);
 }
 
 /**
@@ -299,14 +309,14 @@ function nominalKbps(format) {
  * @returns {number|null}
  */
 function stepDown(ladder, requested, available) {
-    const has = [...new Set(available.map(Number))].filter((v) => Number.isFinite(v) && v > 0);
-    const target = Number(requested);
-    if (!has.length) return null;
+  const has = [...new Set(available.map(Number))].filter((v) => Number.isFinite(v) && v > 0);
+  const target = Number(requested);
+  if (!has.length) return null;
 
-    const below = has.filter((v) => v <= target).sort((a, b) => b - a);
-    if (below.length) return below[0];
+  const below = has.filter((v) => v <= target).sort((a, b) => b - a);
+  if (below.length) return below[0];
 
-    return has.sort((a, b) => a - b)[0];
+  return has.sort((a, b) => a - b)[0];
 }
 
 /**
@@ -328,18 +338,18 @@ function stepDown(ladder, requested, available) {
  *   `headers` : ceux que yt-dlp a employés, à rejouer en allant chercher `url`.
  */
 async function resolveAudio(url, kbps) {
-    if (!url || !/^https?:\/\//i.test(url)) return null;
+  if (!url || !/^https?:\/\//i.test(url)) return null;
 
-    const entry = await dump(url);
-    const sons = audioTracks(entry);
-    if (!sons.length) return null;
+  const entry = await dump(url);
+  const sons = audioTracks(entry);
+  if (!sons.length) return null;
 
-    const debits = sons.map(nominalKbps).filter((v) => v > 0);
-    if (!debits.length) return null;
+  const debits = sons.map(nominalKbps).filter((v) => v > 0);
+  if (!debits.length) return null;
 
-    const retenu = stepDown(AUDIO_LADDER, kbps, debits);
-    const exact = sons.find((f) => nominalKbps(f) === retenu);
-    return exact ? { url: exact.url, kbps: retenu, headers: exact.http_headers || {} } : null;
+  const retenu = stepDown(AUDIO_LADDER, kbps, debits);
+  const exact = sons.find((f) => nominalKbps(f) === retenu);
+  return exact ? { url: exact.url, kbps: retenu, headers: exact.http_headers || {} } : null;
 }
 
 /**
@@ -363,91 +373,96 @@ async function resolveAudio(url, kbps) {
  *   allant le chercher.
  */
 async function resolve(url, wanted = DEFAULT_HEIGHT) {
-    const ask = typeof wanted === 'object' && wanted !== null ? wanted : { height: wanted };
-    const height = Number.isFinite(Number(ask.height)) ? Number(ask.height) : DEFAULT_HEIGHT;
-    const audioKbps = Number.isFinite(Number(ask.audioKbps)) ? Number(ask.audioKbps) : null;
-    return resolveWith(url, height, audioKbps);
+  const ask = typeof wanted === 'object' && wanted !== null ? wanted : { height: wanted };
+  const height = Number.isFinite(Number(ask.height)) ? Number(ask.height) : DEFAULT_HEIGHT;
+  const audioKbps = Number.isFinite(Number(ask.audioKbps)) ? Number(ask.audioKbps) : null;
+  return resolveWith(url, height, audioKbps);
 }
 
 async function resolveWith(url, height, audioKbps) {
-    const vide = {
-        videoUrl: null, audioUrl: null, audioOnly: true, height: null, audioKbps: null,
-        videoHeaders: {}, audioHeaders: {},
-    };
-    if (!url || !/^https?:\/\//i.test(url)) return vide;
+  const vide = {
+    videoUrl: null,
+    audioUrl: null,
+    audioOnly: true,
+    height: null,
+    audioKbps: null,
+    videoHeaders: {},
+    audioHeaders: {},
+  };
+  if (!url || !/^https?:\/\//i.test(url)) return vide;
 
-    // Interrogation partagée avec `inventory` : une source qui ne répond pas
-    // n'a pas d'image, et l'appelant en fabriquera une plutôt que d'échouer.
-    const entry = await dump(url);
+  // Interrogation partagée avec `inventory` : une source qui ne répond pas
+  // n'a pas d'image, et l'appelant en fabriquera une plutôt que d'échouer.
+  const entry = await dump(url);
 
-    // Rien qu'on sache aller chercher : l'appelant fabriquera une image noire
-    // autour du son, plutôt que d'échouer sur une adresse qui refusera l'entrée.
-    const images = videoTracks(entry);
-    if (!images.length) return vide;
+  // Rien qu'on sache aller chercher : l'appelant fabriquera une image noire
+  // autour du son, plutôt que d'échouer sur une adresse qui refusera l'entrée.
+  const images = videoTracks(entry);
+  if (!images.length) return vide;
 
-    // ── L'image, pour son compte ──
-    const retenue = stepDown(VIDEO_LADDER, height, images.map(definitionOf));
-    const candidates = images.filter((f) => definitionOf(f) === retenue);
-    // À définition égale, le débit le plus élevé : c'est le même nombre de
-    // pixels, mieux servis.
-    const choisi = candidates.sort((a, b) => (b.tbr || 0) - (a.tbr || 0))[0];
-    if (!choisi || !choisi.url) return vide;
+  // ── L'image, pour son compte ──
+  const retenue = stepDown(VIDEO_LADDER, height, images.map(definitionOf));
+  const candidates = images.filter((f) => definitionOf(f) === retenue);
+  // À définition égale, le débit le plus élevé : c'est le même nombre de
+  // pixels, mieux servis.
+  const choisi = candidates.sort((a, b) => (b.tbr || 0) - (a.tbr || 0))[0];
+  if (!choisi || !choisi.url) return vide;
 
-    // ── Le son, pour le sien ──
-    let audioUrl = null;
-    let audioHeaders = {};
-    let sonRetenu = null;
+  // ── Le son, pour le sien ──
+  let audioUrl = null;
+  let audioHeaders = {};
+  let sonRetenu = null;
 
-    if (!choisi.acodec || choisi.acodec === 'none') {
-        // Déjà réduits à la langue d'origine, et déjà triés du meilleur débit
-        // au moindre : recoudre l'image avec un doublage passerait inaperçu
-        // jusqu'à la lecture.
-        const sons = audioTracks(entry);
-        const debits = sons.map(nominalKbps).filter((v) => v > 0);
+  if (!choisi.acodec || choisi.acodec === 'none') {
+    // Déjà réduits à la langue d'origine, et déjà triés du meilleur débit
+    // au moindre : recoudre l'image avec un doublage passerait inaperçu
+    // jusqu'à la lecture.
+    const sons = audioTracks(entry);
+    const debits = sons.map(nominalKbps).filter((v) => v > 0);
 
-        if (debits.length && audioKbps) {
-            sonRetenu = stepDown(AUDIO_LADDER, audioKbps, debits);
-            const exact = sons.filter((f) => nominalKbps(f) === sonRetenu);
-            audioUrl = (exact[0] || null) && exact[0].url;
-            if (audioUrl) audioHeaders = exact[0].http_headers || {};
-        }
-
-        // Aucun débit annoncé, ou aucune demande : le meilleur disponible, comme
-        // avant. Ne rien prendre laisserait une vidéo muette.
-        if (!audioUrl) {
-            const meilleur = sons[0];
-            audioUrl = meilleur ? meilleur.url : null;
-            audioHeaders = (meilleur && meilleur.http_headers) || {};
-            sonRetenu = meilleur ? nominalKbps(meilleur) || null : null;
-        }
-    } else {
-        // Format complet : son et image voyagent ensemble, et les séparer
-        // obligerait à réencoder l'image pour les recoudre.
-        sonRetenu = nominalKbps(choisi) || null;
+    if (debits.length && audioKbps) {
+      sonRetenu = stepDown(AUDIO_LADDER, audioKbps, debits);
+      const exact = sons.filter((f) => nominalKbps(f) === sonRetenu);
+      audioUrl = (exact[0] || null) && exact[0].url;
+      if (audioUrl) audioHeaders = exact[0].http_headers || {};
     }
 
-    return {
-        videoUrl: choisi.url,
-        audioUrl,
-        audioOnly: false,
-        height: definitionOf(choisi) || null,
-        audioKbps: sonRetenu,
-        videoHeaders: choisi.http_headers || {},
-        audioHeaders,
-    };
+    // Aucun débit annoncé, ou aucune demande : le meilleur disponible, comme
+    // avant. Ne rien prendre laisserait une vidéo muette.
+    if (!audioUrl) {
+      const meilleur = sons[0];
+      audioUrl = meilleur ? meilleur.url : null;
+      audioHeaders = (meilleur && meilleur.http_headers) || {};
+      sonRetenu = meilleur ? nominalKbps(meilleur) || null : null;
+    }
+  } else {
+    // Format complet : son et image voyagent ensemble, et les séparer
+    // obligerait à réencoder l'image pour les recoudre.
+    sonRetenu = nominalKbps(choisi) || null;
+  }
+
+  return {
+    videoUrl: choisi.url,
+    audioUrl,
+    audioOnly: false,
+    height: definitionOf(choisi) || null,
+    audioKbps: sonRetenu,
+    videoHeaders: choisi.http_headers || {},
+    audioHeaders,
+  };
 }
 
 module.exports = {
-    resolve,
-    resolveAudio,
-    inventory,
-    stepDown,
-    nominalKbps,
-    bestAudio,
-    videoTracks,
-    audioTracks,
-    originalLanguage,
-    VIDEO_LADDER,
-    AUDIO_LADDER,
-    DEFAULT_HEIGHT,
+  resolve,
+  resolveAudio,
+  inventory,
+  stepDown,
+  nominalKbps,
+  bestAudio,
+  videoTracks,
+  audioTracks,
+  originalLanguage,
+  VIDEO_LADDER,
+  AUDIO_LADDER,
+  DEFAULT_HEIGHT,
 };

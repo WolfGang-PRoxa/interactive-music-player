@@ -16,14 +16,14 @@ const path = require('path');
  * @returns {boolean}
  */
 function arePathsOrUrlsEqual(p1, p2) {
-    if (!p1 || !p2) return false;
-    try {
-        const norm1 = decodeURIComponent(p1).replace(/\\/g, '/').toLowerCase();
-        const norm2 = decodeURIComponent(p2).replace(/\\/g, '/').toLowerCase();
-        return norm1 === norm2;
-    } catch (e) {
-        return p1.replace(/\\/g, '/').toLowerCase() === p2.replace(/\\/g, '/').toLowerCase();
-    }
+  if (!p1 || !p2) return false;
+  try {
+    const norm1 = decodeURIComponent(p1).replace(/\\/g, '/').toLowerCase();
+    const norm2 = decodeURIComponent(p2).replace(/\\/g, '/').toLowerCase();
+    return norm1 === norm2;
+  } catch (e) {
+    return p1.replace(/\\/g, '/').toLowerCase() === p2.replace(/\\/g, '/').toLowerCase();
+  }
 }
 
 /**
@@ -39,11 +39,11 @@ function arePathsOrUrlsEqual(p1, p2) {
  * @returns {string}
  */
 function getCleanFilename(filePath) {
-    const base = path.basename(filePath);
-    return base.replace(/^(?:[0-9a-f]{12}|\d+)-/i, '');
+  const base = path.basename(filePath);
+  return base.replace(/^(?:[0-9a-f]{12}|\d+)-/i, '');
 }
 
 module.exports = {
-    arePathsOrUrlsEqual,
-    getCleanFilename,
+  arePathsOrUrlsEqual,
+  getCleanFilename,
 };

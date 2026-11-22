@@ -52,7 +52,7 @@ const MAX_16 = 32767;
  * @returns {number}
  */
 function bytesToMs(bytes) {
-    return bytes / BYTES_PER_MS;
+  return bytes / BYTES_PER_MS;
 }
 
 /**
@@ -66,22 +66,22 @@ function bytesToMs(bytes) {
  * @returns {number}
  */
 function msToBytes(ms) {
-    const raw = Math.round(ms * BYTES_PER_MS);
-    return raw - (raw % (CHANNELS * BYTES_PER_SAMPLE));
+  const raw = Math.round(ms * BYTES_PER_MS);
+  return raw - (raw % (CHANNELS * BYTES_PER_SAMPLE));
 }
 
 module.exports = {
-    SAMPLE_RATE,
-    CHANNELS,
-    BYTES_PER_SAMPLE,
-    FRAME_DURATION_MS,
-    SAMPLES_PER_FRAME,
-    VALUES_PER_FRAME,
-    BYTES_PER_FRAME,
-    BYTES_PER_MS,
-    SILENCE_FRAME,
-    MIN_16,
-    MAX_16,
-    bytesToMs,
-    msToBytes,
+  SAMPLE_RATE,
+  CHANNELS,
+  BYTES_PER_SAMPLE,
+  FRAME_DURATION_MS,
+  SAMPLES_PER_FRAME,
+  VALUES_PER_FRAME,
+  BYTES_PER_FRAME,
+  BYTES_PER_MS,
+  SILENCE_FRAME,
+  MIN_16,
+  MAX_16,
+  bytesToMs,
+  msToBytes,
 };

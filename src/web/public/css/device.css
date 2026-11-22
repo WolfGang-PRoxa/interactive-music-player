@@ -23,32 +23,32 @@
  * montre ce qui sera déposé, et doit donc rester net.
  */
 .drag-preview {
-    transform-origin: top left;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
-    border-radius: 12px;
-    overflow: hidden;
-    will-change: transform;
-    /* L'aperçu doit coller au pointeur, pas le poursuivre. */
-    transition: none !important;
-    animation: none !important;
-    /* Un fond opaque garantit la lisibilité : plusieurs cartes du tableau de
+  transform-origin: top left;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  border-radius: 12px;
+  overflow: hidden;
+  will-change: transform;
+  /* L'aperçu doit coller au pointeur, pas le poursuivre. */
+  transition: none !important;
+  animation: none !important;
+  /* Un fond opaque garantit la lisibilité : plusieurs cartes du tableau de
        bord sont translucides et laisseraient voir au travers. */
-    background-color: var(--bg-card, rgba(30, 32, 44, 0.98));
-    backdrop-filter: none !important;
+  background-color: var(--bg-card, rgba(30, 32, 44, 0.98));
+  backdrop-filter: none !important;
 }
 
 /* Au doigt seulement : un léger agrandissement signale que l'élément a bien
    été saisi. À la souris, la vignette est photographiée une fois pour toutes,
    une mise à l'échelle n'y apporterait rien. */
 body.touch-dragging .drag-preview {
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
-    outline: 2px solid var(--c-primary, #5865f2);
-    outline-offset: -2px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  outline: 2px solid var(--c-primary, #5865f2);
+  outline-offset: -2px;
 }
 
 .touch-drag-source {
-    opacity: 0.35;
-    filter: grayscale(0.4);
+  opacity: 0.35;
+  filter: grayscale(0.4);
 }
 
 /*
@@ -56,14 +56,14 @@ body.touch-dragging .drag-preview {
  * permanence casserait le défilement de toutes les listes.
  */
 body.touch-dragging {
-    user-select: none;
-    -webkit-user-select: none;
-    touch-action: none;
-    overscroll-behavior: contain;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  overscroll-behavior: contain;
 }
 
 body.touch-dragging * {
-    cursor: grabbing !important;
+  cursor: grabbing !important;
 }
 
 /* --- Modes tactiles, tablette et téléphone confondus -------------------- */
@@ -91,7 +91,7 @@ body.touch-dragging * {
  */
 [data-touch-mode="true"] .theme-toggle-btn,
 [data-touch-mode="true"] .btn-coffee-donate {
-    min-height: 44px;
+  min-height: 44px;
 }
 
 /*
@@ -114,10 +114,10 @@ body.touch-dragging * {
  * Les deux entrées par classe couvrent GitHub et le don, qui sont des liens et
  * qu'aucun sélecteur sur `button` n'atteint.
  */
-[data-touch-mode="true"] button:not(.card-resize-handle),
-[data-touch-mode="true"] .theme-toggle-btn,
-[data-touch-mode="true"] .btn-coffee-donate {
-    min-width: 44px;
+[data-touch-mode='true'] button:not(.card-resize-handle),
+[data-touch-mode='true'] .theme-toggle-btn,
+[data-touch-mode='true'] .btn-coffee-donate {
+  min-width: 44px;
 }
 
 /*
@@ -137,20 +137,20 @@ body.touch-dragging * {
  * La hauteur passe par une variable pour que `.switch-mini`, qui a son propre
  * gabarit, la redéfinisse par héritage plutôt que par une cascade à départager.
  */
-[data-touch-mode="true"] .switch {
-    --switch-rail-height: 24px;
+[data-touch-mode='true'] .switch {
+  --switch-rail-height: 24px;
 }
 
-[data-touch-mode="true"] .switch-mini {
-    --switch-rail-height: 18px;
+[data-touch-mode='true'] .switch-mini {
+  --switch-rail-height: 18px;
 }
 
-[data-touch-mode="true"] .switch > .switch-slider,
-[data-touch-mode="true"] .switch > .slider {
-    top: 50%;
-    bottom: auto;
-    height: var(--switch-rail-height);
-    transform: translateY(-50%);
+[data-touch-mode='true'] .switch > .switch-slider,
+[data-touch-mode='true'] .switch > .slider {
+  top: 50%;
+  bottom: auto;
+  height: var(--switch-rail-height);
+  transform: translateY(-50%);
 }
 
 /*
@@ -171,32 +171,32 @@ body.touch-dragging * {
  * `min-height` doit être explicitement rendue au plancher : sans cela, la
  * règle générale continuerait de l'emporter sur la hauteur donnée juste après.
  */
-[data-touch-mode="true"] .docs-mode-switch {
-    height: 44px;
+[data-touch-mode='true'] .docs-mode-switch {
+  height: 44px;
 }
 
-[data-touch-mode="true"] .docs-mode-btn {
-    min-height: 0;
-    height: 100%;
+[data-touch-mode='true'] .docs-mode-btn {
+  min-height: 0;
+  height: 100%;
 }
 
 /* Les infobulles au survol n'ont pas de sens sans souris : elles restent
    collées après l'appui et masquent ce qu'on vient de toucher. */
-[data-touch-mode="true"] .tooltip-container,
-[data-touch-mode="true"] #tooltip-layer {
-    display: none !important;
+[data-touch-mode='true'] .tooltip-container,
+[data-touch-mode='true'] #tooltip-layer {
+  display: none !important;
 }
 
 /* Poignée de redimensionnement des cartes : sans pointeur fin, elle ne sert
    qu'à déclencher des saisies involontaires. */
-[data-touch-mode="true"] .card-resize-handle {
-    display: none !important;
+[data-touch-mode='true'] .card-resize-handle {
+  display: none !important;
 }
 
 /* Indice de saisie sur les éléments déplaçables : rien ne signale autrement
    qu'un appui long les prend. */
-[data-touch-mode="true"] [draggable="true"] {
-    -webkit-touch-callout: none;
+[data-touch-mode='true'] [draggable='true'] {
+  -webkit-touch-callout: none;
 }
 
 /* --- Budget de composition ---------------------------------------------- */
@@ -252,7 +252,7 @@ body.touch-dragging * {
 [data-engine="webkit"] .is-preloading .preload-fill-bar::after,
 [data-engine="webkit"] .is-playing-now .playback-fill-bar::after,
 [data-engine="webkit"] .is-requalifying .requalify-fill-bar::after {
-    will-change: auto;
+  will-change: auto;
 }
 
 /*
@@ -281,11 +281,11 @@ body.touch-dragging * {
  * recentre quand il revient dans la fenêtre — voir `initSpeedPad` dans
  * js/speedPad.js. Il replaçait la roulette ; il ne pouvait pas la repeindre.
  */
-[data-touch-mode="true"] .speed-pad-track,
-[data-touch-mode="true"] .progress-fill,
-[data-engine="webkit"] .speed-pad-track,
-[data-engine="webkit"] .progress-fill {
-    will-change: auto;
+[data-touch-mode='true'] .speed-pad-track,
+[data-touch-mode='true'] .progress-fill,
+[data-engine='webkit'] .speed-pad-track,
+[data-engine='webkit'] .progress-fill {
+  will-change: auto;
 }
 
 /*
@@ -312,10 +312,10 @@ body.touch-dragging * {
  * deux autres leur carré arrondi. C'est le mouvement seul qui s'arrête, et
  * c'est lui qu'on échange contre une pochette visible partout sur la page.
  */
-[data-touch-mode="true"] .thumbnail-wrapper.anim-mode-spin,
-[data-touch-mode="true"] .thumbnail-wrapper.anim-mode-pulse,
-[data-touch-mode="true"] .icon-disc {
-    animation: none;
+[data-touch-mode='true'] .thumbnail-wrapper.anim-mode-spin,
+[data-touch-mode='true'] .thumbnail-wrapper.anim-mode-pulse,
+[data-touch-mode='true'] .icon-disc {
+  animation: none;
 }
 
 /*
@@ -336,16 +336,16 @@ body.touch-dragging * {
  *
  * Le panneau ouvert perd aussi son flou, son fond étant déjà opaque.
  */
-[data-touch-mode="true"] .custom-select-trigger,
-[data-touch-mode="true"] .custom-select-trigger:hover {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    background: var(--bg-dropdown, rgba(10, 9, 15, 0.96));
+[data-touch-mode='true'] .custom-select-trigger,
+[data-touch-mode='true'] .custom-select-trigger:hover {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: var(--bg-dropdown, rgba(10, 9, 15, 0.96));
 }
 
-[data-touch-mode="true"] .custom-select-options {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
+[data-touch-mode='true'] .custom-select-options {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 /* --- Plus de défilement dans le défilement ----------------------------- */
@@ -371,16 +371,16 @@ body.touch-dragging * {
  * En contrepartie, une playlist très fournie allonge d'autant sa carte. C'est
  * le comportement attendu sur téléphone, où l'on fait défiler la page entière.
  */
-[data-touch-mode="true"] .playlist-queue,
-[data-touch-mode="true"] .playlist-history,
-[data-touch-mode="true"] .playlist-tracks-list,
-[data-touch-mode="true"] .speakers-list {
-    max-height: none;
-    /* Les deux axes ensemble : `overflow-y: visible` avec un `overflow-x`
+[data-touch-mode='true'] .playlist-queue,
+[data-touch-mode='true'] .playlist-history,
+[data-touch-mode='true'] .playlist-tracks-list,
+[data-touch-mode='true'] .speakers-list {
+  max-height: none;
+  /* Les deux axes ensemble : `overflow-y: visible` avec un `overflow-x`
        différent de `visible` est ramené à `auto` par le navigateur, et le
        calque de défilement subsisterait. */
-    overflow-x: visible;
-    overflow-y: visible;
+  overflow-x: visible;
+  overflow-y: visible;
 }
 
 /*
@@ -405,31 +405,31 @@ body.touch-dragging * {
 
 /* --- Repli en une colonne, piloté par le mode -------------------------- */
 
-[data-device-mode="tablet"] .dashboard-grid,
-[data-device-mode="phone"] .dashboard-grid {
-    grid-template-columns: 1fr;
-    grid-auto-rows: auto;
+[data-device-mode='tablet'] .dashboard-grid,
+[data-device-mode='phone'] .dashboard-grid {
+  grid-template-columns: 1fr;
+  grid-auto-rows: auto;
 }
 
 /* Même raison qu'au repli géométrique de layout.css : les cartes empilées ne
    suivent plus la grille, il n'y a donc plus rien à tracer. */
-[data-device-mode="tablet"] .dashboard-grid::before,
-[data-device-mode="phone"] .dashboard-grid::before {
-    display: none;
+[data-device-mode='tablet'] .dashboard-grid::before,
+[data-device-mode='phone'] .dashboard-grid::before {
+  display: none;
 }
 
-[data-device-mode="tablet"] .card,
-[data-device-mode="phone"] .card {
-    grid-column: 1 / -1 !important;
-    grid-row: auto !important;
-    width: 100% !important;
-    height: auto !important;
+[data-device-mode='tablet'] .card,
+[data-device-mode='phone'] .card {
+  grid-column: 1 / -1 !important;
+  grid-row: auto !important;
+  width: 100% !important;
+  height: auto !important;
 }
 
 /* --- Téléphone --------------------------------------------------------- */
 
-[data-device-mode="phone"] .dashboard-grid {
-    gap: 12px;
+[data-device-mode='phone'] .dashboard-grid {
+  gap: 12px;
 }
 
 /*
@@ -445,9 +445,9 @@ body.touch-dragging * {
  * quoi le bord des cartes disparaît sous la découpe. `max()` choisit donc le
  * plus contraignant des deux, et cette règle ne change rien en paysage.
  */
-[data-device-mode="phone"] .app-container {
-    padding-left: max(1rem, env(safe-area-inset-left));
-    padding-right: max(1rem, env(safe-area-inset-right));
+[data-device-mode='phone'] .app-container {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
 }
 
 /*
@@ -463,8 +463,8 @@ body.touch-dragging * {
  * partout. L'écart vertical reste au-dessus des ~10 px dont déborde
  * l'étiquette du pad de vitesse.
  */
-[data-device-mode="phone"] .media-controls {
-    gap: 1rem;
+[data-device-mode='phone'] .media-controls {
+  gap: 1rem;
 }
 
 /*
@@ -476,15 +476,15 @@ body.touch-dragging * {
  * donner la largeur entière tant qu'à occuper une ligne — c'est l'action
  * principale de la carte, et une cible pleine largeur se vise sans regarder.
  */
-[data-device-mode="phone"] .search-box .primary-btn {
-    flex: 1 1 100%;
-    justify-content: center;
+[data-device-mode='phone'] .search-box .primary-btn {
+  flex: 1 1 100%;
+  justify-content: center;
 }
 
-[data-device-mode="phone"] .header-select,
-[data-device-mode="phone"] .styled-select {
-    min-width: 0;
-    width: 100%;
+[data-device-mode='phone'] .header-select,
+[data-device-mode='phone'] .styled-select {
+  min-width: 0;
+  width: 100%;
 }
 
 /*
@@ -501,10 +501,10 @@ body.touch-dragging * {
  * menu réclame pousserait les boutons hors du cadre au lieu de les faire
  * descendre.
  */
-[data-device-mode="phone"] .guild-selector-wrapper,
-[data-device-mode="phone"] .style-selector-wrapper {
-    flex: 1 1 100%;
-    min-width: 0;
+[data-device-mode='phone'] .guild-selector-wrapper,
+[data-device-mode='phone'] .style-selector-wrapper {
+  flex: 1 1 100%;
+  min-width: 0;
 }
 
 /*
@@ -526,24 +526,24 @@ body.touch-dragging * {
  * `flex: 0 0 auto` empêche par ailleurs le libellé de se laisser comprimer par
  * le menu, qui réclame toute la largeur disponible.
  */
-[data-device-mode="phone"] .header-style-group {
-    flex: 1 1 100%;
+[data-device-mode='phone'] .header-style-group {
+  flex: 1 1 100%;
 }
 
-[data-device-mode="phone"] .guild-selector-wrapper,
-[data-device-mode="phone"] .style-selector-wrapper {
-    gap: 0.8rem;
+[data-device-mode='phone'] .guild-selector-wrapper,
+[data-device-mode='phone'] .style-selector-wrapper {
+  gap: 0.8rem;
 }
 
-[data-device-mode="phone"] .guild-selector-wrapper > label,
-[data-device-mode="phone"] .style-selector-wrapper > label {
-    flex: 0 0 auto;
-    min-width: 4.75rem;
-    white-space: nowrap;
+[data-device-mode='phone'] .guild-selector-wrapper > label,
+[data-device-mode='phone'] .style-selector-wrapper > label {
+  flex: 0 0 auto;
+  min-width: 4.75rem;
+  white-space: nowrap;
 }
 
-[data-touch-mode="true"] .theme-controls-wrapper {
-    flex-wrap: wrap;
+[data-touch-mode='true'] .theme-controls-wrapper {
+  flex-wrap: wrap;
 }
 
 /*
@@ -569,26 +569,26 @@ body.touch-dragging * {
  * boutons ; sur téléphone, il ne sépare qu'eux, chaque autre section occupant sa
  * ligne entière.
  */
-[data-device-mode="phone"] .main-header {
-    column-gap: calc(1.2rem + 8px);
+[data-device-mode='phone'] .main-header {
+  column-gap: calc(1.2rem + 8px);
 }
 
-[data-device-mode="phone"] #share-controls-wrapper {
-    margin-right: auto;
+[data-device-mode='phone'] #share-controls-wrapper {
+  margin-right: auto;
 }
 
 /* Le titre est ce qui se comprime en premier faute de place ; réduit, il tient
    sur une ligne et rend la sienne aux commandes. */
-[data-device-mode="phone"] .main-header h1 {
-    font-size: 1.4rem;
+[data-device-mode='phone'] .main-header h1 {
+  font-size: 1.4rem;
 }
 
 /* Les lignes de réglage passent en colonne : côte à côte, le libellé et sa
    commande se disputent une largeur qui n'existe pas. */
-[data-device-mode="phone"] .setting-item-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.5rem;
+[data-device-mode='phone'] .setting-item-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
 }
 
 /*
@@ -606,14 +606,14 @@ body.touch-dragging * {
  * ensuite, qui lève le plancher du curseur et lui permet de se réduire pour
  * éviter ce report tant qu'il reste de quoi le manipuler.
  */
-[data-device-mode="phone"] .scroll-input-wrapper {
-    flex-wrap: wrap;
+[data-device-mode='phone'] .scroll-input-wrapper {
+  flex-wrap: wrap;
 }
 
-[data-device-mode="phone"] .scroll-input-wrapper .scroll-range,
-[data-device-mode="phone"] .scroll-input-wrapper input[type="range"] {
-    flex: 1 1 120px;
-    min-width: 0;
+[data-device-mode='phone'] .scroll-input-wrapper .scroll-range,
+[data-device-mode='phone'] .scroll-input-wrapper input[type='range'] {
+  flex: 1 1 120px;
+  min-width: 0;
 }
 
 /*
@@ -633,34 +633,34 @@ body.touch-dragging * {
  * Les retraits de sécurité restent, eux : plein écran ne veut pas dire sous la
  * découpe.
  */
-[data-device-mode="phone"] .settings-modal-box {
-    /*
+[data-device-mode='phone'] .settings-modal-box {
+  /*
      * `!important` n'est pas un choix de style : `.settings-modal-box` porte
      * lui-même `width: 94% !important` et `padding: 2.2rem !important`. Sans
      * cela, ces déclarations seraient ignorées quelle que soit leur spécificité,
      * et la boîte resterait une fenêtre de 94 % centrée.
      */
-    width: 100% !important;
-    max-width: 100% !important;
-    padding: 1.1rem !important;
-    padding-top: max(1.1rem, env(safe-area-inset-top)) !important;
-    padding-right: max(1.1rem, env(safe-area-inset-right)) !important;
-    padding-bottom: max(1.1rem, env(safe-area-inset-bottom)) !important;
-    padding-left: max(1.1rem, env(safe-area-inset-left)) !important;
-    height: 100vh;
-    height: 100dvh;
-    max-height: 100vh;
-    max-height: 100dvh;
-    border-radius: 0;
-    border-left: none;
-    border-right: none;
+  width: 100% !important;
+  max-width: 100% !important;
+  padding: 1.1rem !important;
+  padding-top: max(1.1rem, env(safe-area-inset-top)) !important;
+  padding-right: max(1.1rem, env(safe-area-inset-right)) !important;
+  padding-bottom: max(1.1rem, env(safe-area-inset-bottom)) !important;
+  padding-left: max(1.1rem, env(safe-area-inset-left)) !important;
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
 }
 
 /* La boîte a désormais une hauteur imposée et non plus un simple plafond :
    c'est au corps de la remplir et de défiler seul, sinon il la déborderait. */
-[data-device-mode="phone"] .settings-modal-body {
-    flex: 1;
-    min-height: 0;
+[data-device-mode='phone'] .settings-modal-body {
+  flex: 1;
+  min-height: 0;
 }
 
 /*
@@ -682,22 +682,22 @@ body.touch-dragging * {
  * justesse à 402 px de large, mais un téléphone plus étroit les aurait vus
  * déborder de la même façon.
  */
-[data-device-mode="phone"] .header-select-container,
-[data-device-mode="phone"] .setting-item-row .header-select-container {
-    min-width: 0;
-    width: 100%;
+[data-device-mode='phone'] .header-select-container,
+[data-device-mode='phone'] .setting-item-row .header-select-container {
+  min-width: 0;
+  width: 100%;
 }
 
 /* Le palier « petit écran » de docs.css ajuste l'intérieur de la fenêtre ; sa
    mise à plein écran est ici, pour valoir aussi en position couchée, où le
    téléphone dépasse la largeur de ce palier. */
-[data-device-mode="phone"] .docs-window {
-    width: 100vw;
-    height: 100vh;
-    height: 100dvh;
-    border-radius: 0;
-    border-left: none;
-    border-right: none;
+[data-device-mode='phone'] .docs-window {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
 }
 
 /*
@@ -720,20 +720,20 @@ body.touch-dragging * {
  * un remplissage, pas un retrait de la boîte. Un trait qui s'arrêterait avant le
  * bord se verrait davantage que ce qu'il protège.
  */
-[data-device-mode="phone"] .docs-header {
-    padding-left: max(1.4rem, env(safe-area-inset-left));
-    padding-right: max(1.4rem, env(safe-area-inset-right));
+[data-device-mode='phone'] .docs-header {
+  padding-left: max(1.4rem, env(safe-area-inset-left));
+  padding-right: max(1.4rem, env(safe-area-inset-right));
 }
 
-[data-device-mode="phone"] .docs-footer {
-    padding-left: max(1.4rem, env(safe-area-inset-left));
-    padding-right: max(1.4rem, env(safe-area-inset-right));
-    padding-bottom: max(0.7rem, env(safe-area-inset-bottom));
+[data-device-mode='phone'] .docs-footer {
+  padding-left: max(1.4rem, env(safe-area-inset-left));
+  padding-right: max(1.4rem, env(safe-area-inset-right));
+  padding-bottom: max(0.7rem, env(safe-area-inset-bottom));
 }
 
 /* Le sommaire longe le bord gauche tant qu'il est une colonne. */
-[data-device-mode="phone"] .docs-toc {
-    padding-left: max(0.7rem, env(safe-area-inset-left));
+[data-device-mode='phone'] .docs-toc {
+  padding-left: max(0.7rem, env(safe-area-inset-left));
 }
 
 /*
@@ -742,9 +742,9 @@ body.touch-dragging * {
  * là-bas, dans le palier qui décide ce retrait, et non ici où elle volerait de
  * la place au texte chaque fois que la colonne est présente.
  */
-[data-device-mode="phone"] .docs-reader {
-    padding-left: max(0.5rem, env(safe-area-inset-left));
-    padding-right: max(0.5rem, env(safe-area-inset-right));
+[data-device-mode='phone'] .docs-reader {
+  padding-left: max(0.5rem, env(safe-area-inset-left));
+  padding-right: max(0.5rem, env(safe-area-inset-right));
 }
 
 /*
@@ -764,45 +764,45 @@ body.touch-dragging * {
  * celui-ci ne fait que l'emporter par l'ordre de chargement ; couché, il est le
  * seul à parler. Toute retouche du tiroir doit donc se faire aux deux endroits.
  */
-[data-device-mode="phone"] .docs-body {
-    position: relative;
+[data-device-mode='phone'] .docs-body {
+  position: relative;
 }
 
-[data-device-mode="phone"] .docs-toc {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    z-index: 6;
-    width: min(78vw, 300px);
-    background: var(--bg-dropdown);
-    box-shadow: 14px 0 34px rgba(0, 0, 0, 0.5);
-    transform: translateX(-100%);
-    transition: transform 0.24s ease;
+[data-device-mode='phone'] .docs-toc {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 6;
+  width: min(78vw, 300px);
+  background: var(--bg-dropdown);
+  box-shadow: 14px 0 34px rgba(0, 0, 0, 0.5);
+  transform: translateX(-100%);
+  transition: transform 0.24s ease;
 }
 
-[data-device-mode="phone"] .docs-body.docs-toc-open .docs-toc {
-    transform: none;
+[data-device-mode='phone'] .docs-body.docs-toc-open .docs-toc {
+  transform: none;
 }
 
-[data-device-mode="phone"] .docs-toc-scrim {
-    display: block;
-    position: absolute;
-    inset: 0;
-    z-index: 5;
-    background: rgba(0, 0, 0, 0.5);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.24s ease;
+[data-device-mode='phone'] .docs-toc-scrim {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.24s ease;
 }
 
-[data-device-mode="phone"] .docs-body.docs-toc-open .docs-toc-scrim {
-    opacity: 1;
-    pointer-events: auto;
+[data-device-mode='phone'] .docs-body.docs-toc-open .docs-toc-scrim {
+  opacity: 1;
+  pointer-events: auto;
 }
 
-[data-device-mode="phone"] .docs-toc-toggle {
-    display: inline-flex;
+[data-device-mode='phone'] .docs-toc-toggle {
+  display: inline-flex;
 }
 
 /*
@@ -824,36 +824,36 @@ body.touch-dragging * {
  * page cachée dessous. Ici rien n'est caché.
  */
 @media (orientation: landscape) {
-    [data-device-mode="phone"] .docs-toc {
-        position: static;
-        z-index: auto;
-        width: 0;
-        padding-left: 0;
-        padding-right: 0;
-        border-right-width: 0;
-        overflow: hidden;
-        box-shadow: none;
-        transform: none;
-        transition:
-            width 0.24s ease,
-            padding 0.24s ease,
-            border-right-width 0.24s ease;
-    }
+  [data-device-mode='phone'] .docs-toc {
+    position: static;
+    z-index: auto;
+    width: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-right-width: 0;
+    overflow: hidden;
+    box-shadow: none;
+    transform: none;
+    transition:
+      width 0.24s ease,
+      padding 0.24s ease,
+      border-right-width 0.24s ease;
+  }
 
-    [data-device-mode="phone"] .docs-body.docs-toc-open .docs-toc {
-        width: min(46vw, 258px);
-        padding-left: max(0.7rem, env(safe-area-inset-left));
-        padding-right: 0.7rem;
-        border-right-width: 1px;
-        overflow-x: hidden;
-        overflow-y: auto;
-    }
+  [data-device-mode='phone'] .docs-body.docs-toc-open .docs-toc {
+    width: min(46vw, 258px);
+    padding-left: max(0.7rem, env(safe-area-inset-left));
+    padding-right: 0.7rem;
+    border-right-width: 1px;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
 
-    [data-device-mode="phone"] .docs-toc-scrim {
-        display: none;
-    }
+  [data-device-mode='phone'] .docs-toc-scrim {
+    display: none;
+  }
 
-    /*
+  /*
      * Le sommaire déployé prend le bord gauche, et avec lui le devoir de s'en
      * écarter — il porte déjà sa propre marge de sécurité. Le lecteur, repoussé
      * à plusieurs centaines de pixels de l'encoche, n'a plus rien à en craindre :
@@ -864,9 +864,9 @@ body.touch-dragging * {
      * feuille du navigateur, pas à la règle précédente. Elle reprend celle du
      * palier des fenêtres basses, seul en vigueur sur un téléphone couché.
      */
-    [data-device-mode="phone"] .docs-body.docs-toc-open .docs-reader {
-        padding-left: 0.4rem;
-    }
+  [data-device-mode='phone'] .docs-body.docs-toc-open .docs-reader {
+    padding-left: 0.4rem;
+  }
 }
 
 /*
@@ -888,30 +888,30 @@ body.touch-dragging * {
  * latéraux ne portent alors aucune réserve et il n'y a rien à rendre.
  */
 @media (orientation: landscape) {
-    /* Encoche à gauche : le bord droit n'a qu'un arrondi à dégager. */
-    [data-device-mode="phone"][data-notch="left"] .docs-header,
-    [data-device-mode="phone"][data-notch="left"] .docs-footer {
-        padding-right: 1.4rem;
-    }
+  /* Encoche à gauche : le bord droit n'a qu'un arrondi à dégager. */
+  [data-device-mode='phone'][data-notch='left'] .docs-header,
+  [data-device-mode='phone'][data-notch='left'] .docs-footer {
+    padding-right: 1.4rem;
+  }
 
-    [data-device-mode="phone"][data-notch="left"] .docs-reader {
-        padding-right: 0.9rem;
-    }
+  [data-device-mode='phone'][data-notch='left'] .docs-reader {
+    padding-right: 0.9rem;
+  }
 
-    /* Encoche à droite : symétrique, plus le sommaire qui longe ce bord-là. */
-    [data-device-mode="phone"][data-notch="right"] .docs-header,
-    [data-device-mode="phone"][data-notch="right"] .docs-footer {
-        padding-left: 1.4rem;
-    }
+  /* Encoche à droite : symétrique, plus le sommaire qui longe ce bord-là. */
+  [data-device-mode='phone'][data-notch='right'] .docs-header,
+  [data-device-mode='phone'][data-notch='right'] .docs-footer {
+    padding-left: 1.4rem;
+  }
 
-    [data-device-mode="phone"][data-notch="right"] .docs-reader {
-        padding-left: 0.9rem;
-    }
+  [data-device-mode='phone'][data-notch='right'] .docs-reader {
+    padding-left: 0.9rem;
+  }
 
-    [data-device-mode="phone"][data-notch="right"] .docs-toc,
-    [data-device-mode="phone"][data-notch="right"] .docs-body.docs-toc-open .docs-toc {
-        padding-left: 0.7rem;
-    }
+  [data-device-mode='phone'][data-notch='right'] .docs-toc,
+  [data-device-mode='phone'][data-notch='right'] .docs-body.docs-toc-open .docs-toc {
+    padding-left: 0.7rem;
+  }
 }
 
 /*
@@ -926,29 +926,29 @@ body.touch-dragging * {
  * seules les différences de forme sont commentées.
  */
 
-[data-device-mode="phone"] .changelog-window {
-    width: 100vw;
-    height: 100vh;
-    height: 100dvh;
-    border-radius: 0;
-    border-left: none;
-    border-right: none;
+[data-device-mode='phone'] .changelog-window {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
 }
 
-[data-device-mode="phone"] .changelog-header {
-    padding-left: max(1.4rem, env(safe-area-inset-left));
-    padding-right: max(1.4rem, env(safe-area-inset-right));
+[data-device-mode='phone'] .changelog-header {
+  padding-left: max(1.4rem, env(safe-area-inset-left));
+  padding-right: max(1.4rem, env(safe-area-inset-right));
 }
 
-[data-device-mode="phone"] .changelog-footer {
-    padding-left: max(1.4rem, env(safe-area-inset-left));
-    padding-right: max(1.4rem, env(safe-area-inset-right));
-    padding-bottom: max(0.7rem, env(safe-area-inset-bottom));
+[data-device-mode='phone'] .changelog-footer {
+  padding-left: max(1.4rem, env(safe-area-inset-left));
+  padding-right: max(1.4rem, env(safe-area-inset-right));
+  padding-bottom: max(0.7rem, env(safe-area-inset-bottom));
 }
 
 /* Le sommaire longe le bord gauche, colonne ou tiroir. */
-[data-device-mode="phone"] .changelog-toc {
-    padding-left: max(0.7rem, env(safe-area-inset-left));
+[data-device-mode='phone'] .changelog-toc {
+  padding-left: max(0.7rem, env(safe-area-inset-left));
 }
 
 /*
@@ -957,119 +957,119 @@ body.touch-dragging * {
  * debout. Les deux reçoivent la même marge : un filtre décalé d'un côté et une
  * entrée de l'autre se verraient.
  */
-[data-device-mode="phone"] .changelog-stream,
-[data-device-mode="phone"] .changelog-filters {
-    padding-left: max(1rem, env(safe-area-inset-left));
-    padding-right: max(1rem, env(safe-area-inset-right));
+[data-device-mode='phone'] .changelog-stream,
+[data-device-mode='phone'] .changelog-filters {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
 }
 
-[data-device-mode="phone"] .changelog-body {
-    position: relative;
+[data-device-mode='phone'] .changelog-body {
+  position: relative;
 }
 
-[data-device-mode="phone"] .changelog-toc {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    z-index: 6;
-    width: min(78vw, 300px);
-    background: var(--bg-dropdown);
-    box-shadow: 14px 0 34px rgba(0, 0, 0, 0.5);
-    transform: translateX(-100%);
-    transition: transform 0.24s ease;
+[data-device-mode='phone'] .changelog-toc {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 6;
+  width: min(78vw, 300px);
+  background: var(--bg-dropdown);
+  box-shadow: 14px 0 34px rgba(0, 0, 0, 0.5);
+  transform: translateX(-100%);
+  transition: transform 0.24s ease;
 }
 
-[data-device-mode="phone"] .changelog-body.changelog-toc-open .changelog-toc {
-    transform: none;
+[data-device-mode='phone'] .changelog-body.changelog-toc-open .changelog-toc {
+  transform: none;
 }
 
-[data-device-mode="phone"] .changelog-toc-scrim {
-    display: block;
-    position: absolute;
-    inset: 0;
-    z-index: 5;
-    background: rgba(0, 0, 0, 0.5);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.24s ease;
+[data-device-mode='phone'] .changelog-toc-scrim {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.24s ease;
 }
 
-[data-device-mode="phone"] .changelog-body.changelog-toc-open .changelog-toc-scrim {
-    opacity: 1;
-    pointer-events: auto;
+[data-device-mode='phone'] .changelog-body.changelog-toc-open .changelog-toc-scrim {
+  opacity: 1;
+  pointer-events: auto;
 }
 
-[data-device-mode="phone"] .changelog-toc-toggle {
-    display: inline-flex;
+[data-device-mode='phone'] .changelog-toc-toggle {
+  display: inline-flex;
 }
 
 /* Couché, le sommaire reprend sa colonne au lieu de se poser dessus. */
 @media (orientation: landscape) {
-    [data-device-mode="phone"] .changelog-toc {
-        position: static;
-        z-index: auto;
-        width: 0;
-        padding-left: 0;
-        padding-right: 0;
-        border-right-width: 0;
-        overflow: hidden;
-        box-shadow: none;
-        transform: none;
-        transition:
-            width 0.24s ease,
-            padding 0.24s ease,
-            border-right-width 0.24s ease;
-    }
+  [data-device-mode='phone'] .changelog-toc {
+    position: static;
+    z-index: auto;
+    width: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-right-width: 0;
+    overflow: hidden;
+    box-shadow: none;
+    transform: none;
+    transition:
+      width 0.24s ease,
+      padding 0.24s ease,
+      border-right-width 0.24s ease;
+  }
 
-    [data-device-mode="phone"] .changelog-body.changelog-toc-open .changelog-toc {
-        width: min(46vw, 234px);
-        padding-left: max(0.7rem, env(safe-area-inset-left));
-        padding-right: 0.7rem;
-        border-right-width: 1px;
-        overflow-x: hidden;
-        overflow-y: auto;
-    }
+  [data-device-mode='phone'] .changelog-body.changelog-toc-open .changelog-toc {
+    width: min(46vw, 234px);
+    padding-left: max(0.7rem, env(safe-area-inset-left));
+    padding-right: 0.7rem;
+    border-right-width: 1px;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
 
-    [data-device-mode="phone"] .changelog-toc-scrim {
-        display: none;
-    }
+  [data-device-mode='phone'] .changelog-toc-scrim {
+    display: none;
+  }
 
-    /* Le sommaire déployé prend le bord gauche, et le devoir de s'en écarter
+  /* Le sommaire déployé prend le bord gauche, et le devoir de s'en écarter
        avec : la frise, repoussée loin de l'encoche, n'a plus à le faire. */
-    [data-device-mode="phone"] .changelog-body.changelog-toc-open .changelog-stream,
-    [data-device-mode="phone"] .changelog-body.changelog-toc-open .changelog-filters {
-        padding-left: 1rem;
-    }
+  [data-device-mode='phone'] .changelog-body.changelog-toc-open .changelog-stream,
+  [data-device-mode='phone'] .changelog-body.changelog-toc-open .changelog-filters {
+    padding-left: 1rem;
+  }
 }
 
 @media (orientation: landscape) {
-    /* Encoche à gauche : le bord droit n'a qu'un arrondi à dégager. */
-    [data-device-mode="phone"][data-notch="left"] .changelog-header,
-    [data-device-mode="phone"][data-notch="left"] .changelog-footer {
-        padding-right: 1.4rem;
-    }
+  /* Encoche à gauche : le bord droit n'a qu'un arrondi à dégager. */
+  [data-device-mode='phone'][data-notch='left'] .changelog-header,
+  [data-device-mode='phone'][data-notch='left'] .changelog-footer {
+    padding-right: 1.4rem;
+  }
 
-    [data-device-mode="phone"][data-notch="left"] .changelog-stream,
-    [data-device-mode="phone"][data-notch="left"] .changelog-filters {
-        padding-right: 1rem;
-    }
+  [data-device-mode='phone'][data-notch='left'] .changelog-stream,
+  [data-device-mode='phone'][data-notch='left'] .changelog-filters {
+    padding-right: 1rem;
+  }
 
-    /* Encoche à droite : symétrique, plus le sommaire qui longe ce bord-là. */
-    [data-device-mode="phone"][data-notch="right"] .changelog-header,
-    [data-device-mode="phone"][data-notch="right"] .changelog-footer {
-        padding-left: 1.4rem;
-    }
+  /* Encoche à droite : symétrique, plus le sommaire qui longe ce bord-là. */
+  [data-device-mode='phone'][data-notch='right'] .changelog-header,
+  [data-device-mode='phone'][data-notch='right'] .changelog-footer {
+    padding-left: 1.4rem;
+  }
 
-    [data-device-mode="phone"][data-notch="right"] .changelog-stream,
-    [data-device-mode="phone"][data-notch="right"] .changelog-filters {
-        padding-left: 1rem;
-    }
+  [data-device-mode='phone'][data-notch='right'] .changelog-stream,
+  [data-device-mode='phone'][data-notch='right'] .changelog-filters {
+    padding-left: 1rem;
+  }
 
-    [data-device-mode="phone"][data-notch="right"] .changelog-toc,
-    [data-device-mode="phone"][data-notch="right"] .changelog-body.changelog-toc-open .changelog-toc {
-        padding-left: 0.7rem;
-    }
+  [data-device-mode='phone'][data-notch='right'] .changelog-toc,
+  [data-device-mode='phone'][data-notch='right'] .changelog-body.changelog-toc-open .changelog-toc {
+    padding-left: 0.7rem;
+  }
 }
 
 /*
@@ -1083,20 +1083,20 @@ body.touch-dragging * {
  * `min-height` doit être explicitement rendue au plancher : sans cela, la règle
  * générale continuerait de l'emporter sur la taille donnée juste après.
  */
-[data-touch-mode="true"] .changelog-search {
-    height: 44px;
+[data-touch-mode='true'] .changelog-search {
+  height: 44px;
 }
 
-[data-touch-mode="true"] .changelog-search-clear {
-    min-width: 0;
-    min-height: 0;
-    width: 30px;
-    height: 30px;
+[data-touch-mode='true'] .changelog-search-clear {
+  min-width: 0;
+  min-height: 0;
+  width: 30px;
+  height: 30px;
 }
 
-[data-touch-mode="true"] .changelog-search-clear svg {
-    width: 15px;
-    height: 15px;
+[data-touch-mode='true'] .changelog-search-clear svg {
+  width: 15px;
+  height: 15px;
 }
 
 /*
@@ -1110,9 +1110,9 @@ body.touch-dragging * {
  * On la redimensionne donc explicitement. La valeur suit le cadre tactile, non
  * le cadre déclaré : c'est le premier qu'on voit.
  */
-[data-touch-mode="true"] .drawer-close-btn {
-    font-size: 1.15rem;
-    line-height: 1;
+[data-touch-mode='true'] .drawer-close-btn {
+  font-size: 1.15rem;
+  line-height: 1;
 }
 
 /*
@@ -1129,26 +1129,26 @@ body.touch-dragging * {
  * a été voulue, et l'en-tête y gagne une ligne de hauteur — ce qui n'est pas de
  * trop sur un écran couché.
  */
-[data-device-mode="phone"] .drawer-header {
-    padding: 0.85rem 0.9rem;
+[data-device-mode='phone'] .drawer-header {
+  padding: 0.85rem 0.9rem;
 }
 
-[data-device-mode="phone"] .drawer-title-group {
-    gap: 7px;
+[data-device-mode='phone'] .drawer-title-group {
+  gap: 7px;
 }
 
-[data-device-mode="phone"] .drawer-title-icon {
-    width: 17px;
-    height: 17px;
+[data-device-mode='phone'] .drawer-title-icon {
+  width: 17px;
+  height: 17px;
 }
 
-[data-device-mode="phone"] .drawer-title {
-    font-size: 0.9rem;
+[data-device-mode='phone'] .drawer-title {
+  font-size: 0.9rem;
 }
 
-[data-device-mode="phone"] .live-pulse-badge {
-    font-size: 0.7rem;
-    padding: 2px 7px;
+[data-device-mode='phone'] .live-pulse-badge {
+  font-size: 0.7rem;
+  padding: 2px 7px;
 }
 
 /*
@@ -1171,22 +1171,22 @@ body.touch-dragging * {
  * et le menu déroulant, à l'étroit depuis le début, s'étale enfin sur la
  * sienne.
  */
-[data-device-mode="phone"] .track-details {
-    flex-wrap: wrap;
+[data-device-mode='phone'] .track-details {
+  flex-wrap: wrap;
 }
 
-[data-device-mode="phone"] .download-track-wrapper {
-    /* Une base de 100 % force le passage à la ligne : plus rien ne peut
+[data-device-mode='phone'] .download-track-wrapper {
+  /* Une base de 100 % force le passage à la ligne : plus rien ne peut
        l'accompagner sur la précédente. */
-    flex-basis: 100%;
-    margin-left: 0;
+  flex-basis: 100%;
+  margin-left: 0;
 }
 
-[data-device-mode="phone"] .download-format-select-container {
-    flex: 1;
-    /* Le plancher de 120 px n'a plus de raison d'être une fois la ligne à lui
+[data-device-mode='phone'] .download-format-select-container {
+  flex: 1;
+  /* Le plancher de 120 px n'a plus de raison d'être une fois la ligne à lui
        seul, et il l'empêcherait de se réduire si le bouton venait à grandir. */
-    min-width: 0;
+  min-width: 0;
 }
 
 /*
@@ -1200,18 +1200,18 @@ body.touch-dragging * {
 
 /* --- Tablette ---------------------------------------------------------- */
 
-[data-device-mode="tablet"] .dashboard-grid {
-    gap: 14px;
+[data-device-mode='tablet'] .dashboard-grid {
+  gap: 14px;
 }
 
 /*
  * Le tiroir occupe une part fixe de l'écran au bureau. Sur tablette en
  * portrait, cette part le rend inutilisable.
  */
-[data-device-mode="tablet"] .drawer-panel,
-[data-device-mode="phone"] .drawer-panel {
-    width: 100% !important;
-    max-width: 100% !important;
+[data-device-mode='tablet'] .drawer-panel,
+[data-device-mode='phone'] .drawer-panel {
+  width: 100% !important;
+  max-width: 100% !important;
 }
 
 /* ═══════════════════ Les couloirs des trois tiroirs ═══════════════════ */
@@ -1229,13 +1229,13 @@ body.touch-dragging * {
  * du côté libre se fait en un seul endroit, sur la variable. Une règle ajoutée
  * demain en hérite sans qu'on ait à penser à l'encoche.
  */
-[data-touch-mode="true"] {
-    /*
+[data-touch-mode='true'] {
+  /*
      * Par défaut, la réserve du système telle qu'il la déclare, des deux côtés.
      * C'est la valeur sûre : elle ne suppose rien du matériel.
      */
-    --drawer-inset-left: env(safe-area-inset-left);
-    --drawer-inset-right: env(safe-area-inset-right);
+  --drawer-inset-left: env(safe-area-inset-left);
+  --drawer-inset-right: env(safe-area-inset-right);
 }
 
 /*
@@ -1260,13 +1260,13 @@ body.touch-dragging * {
  * latéraux ne portent alors aucune réserve et il n'y a rien à rendre.
  */
 @media (orientation: landscape) {
-    [data-touch-mode="true"][data-notch="left"] {
-        --drawer-inset-right: min(0.9rem, env(safe-area-inset-right));
-    }
+  [data-touch-mode='true'][data-notch='left'] {
+    --drawer-inset-right: min(0.9rem, env(safe-area-inset-right));
+  }
 
-    [data-touch-mode="true"][data-notch="right"] {
-        --drawer-inset-left: min(0.9rem, env(safe-area-inset-left));
-    }
+  [data-touch-mode='true'][data-notch='right'] {
+    --drawer-inset-left: min(0.9rem, env(safe-area-inset-left));
+  }
 }
 
 /*
@@ -1276,14 +1276,14 @@ body.touch-dragging * {
  * rangées du tiroir le partagent, faute de quoi elles se désaligneraient dès
  * que la réserve du système dépasse l'une et pas l'autre.
  */
-[data-device-mode="tablet"] {
-    --drawer-gutter: 1.4rem;
-    --drawer-gutter-top: 1.2rem;
+[data-device-mode='tablet'] {
+  --drawer-gutter: 1.4rem;
+  --drawer-gutter-top: 1.2rem;
 }
 
-[data-device-mode="phone"] {
-    --drawer-gutter: 0.9rem;
-    --drawer-gutter-top: 0.85rem;
+[data-device-mode='phone'] {
+  --drawer-gutter: 0.9rem;
+  --drawer-gutter-top: 0.85rem;
 }
 
 /*
@@ -1297,20 +1297,20 @@ body.touch-dragging * {
  * reste du remplissage vertical, propre à chaque rangée, garde ce que
  * css/drawer.css lui donne.
  */
-[data-touch-mode="true"] .drawer-header {
-    padding-top: max(var(--drawer-gutter-top), env(safe-area-inset-top));
+[data-touch-mode='true'] .drawer-header {
+  padding-top: max(var(--drawer-gutter-top), env(safe-area-inset-top));
 }
 
-[data-touch-mode="true"] .drawer-header,
-[data-touch-mode="true"] .drawer-settings,
-[data-touch-mode="true"] .drawer-body,
-[data-touch-mode="true"] .drawer-footer {
-    padding-left: max(var(--drawer-gutter), var(--drawer-inset-left));
-    padding-right: max(var(--drawer-gutter), var(--drawer-inset-right));
+[data-touch-mode='true'] .drawer-header,
+[data-touch-mode='true'] .drawer-settings,
+[data-touch-mode='true'] .drawer-body,
+[data-touch-mode='true'] .drawer-footer {
+  padding-left: max(var(--drawer-gutter), var(--drawer-inset-left));
+  padding-right: max(var(--drawer-gutter), var(--drawer-inset-right));
 }
 
 /* Le pied est la dernière rangée : c'est lui qui longe le bord bas, et la barre
    d'accueil des téléphones sans bouton. */
-[data-touch-mode="true"] .drawer-footer {
-    padding-bottom: max(0.85rem, env(safe-area-inset-bottom));
+[data-touch-mode='true'] .drawer-footer {
+  padding-bottom: max(0.85rem, env(safe-area-inset-bottom));
 }

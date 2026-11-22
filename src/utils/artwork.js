@@ -41,8 +41,7 @@
  * configurable ni évitable en amont. La reconnaître ici est le seul point où
  * l'on puisse s'en défaire.
  */
-const REMOTE_PLACEHOLDER =
-    'https://upload.wikimedia.org/wikipedia/commons/2/2a/ITunes_12.2_logo.png';
+const REMOTE_PLACEHOLDER = 'https://upload.wikimedia.org/wikipedia/commons/2/2a/ITunes_12.2_logo.png';
 
 /** La même image, servie par le bot. Chemin absolu : elle est demandée depuis
  *  des pages et des contextes qui n'ont pas la même base. */
@@ -56,8 +55,8 @@ const LOCAL_PLACEHOLDER = '/img/itunes-fallback.png';
  *   icônes pour ce cas, et inventer une image ici les court-circuiterait.
  */
 function localise(thumbnail) {
-    if (!thumbnail) return null;
-    return thumbnail === REMOTE_PLACEHOLDER ? LOCAL_PLACEHOLDER : thumbnail;
+  if (!thumbnail) return null;
+  return thumbnail === REMOTE_PLACEHOLDER ? LOCAL_PLACEHOLDER : thumbnail;
 }
 
 module.exports = { localise, REMOTE_PLACEHOLDER, LOCAL_PLACEHOLDER };

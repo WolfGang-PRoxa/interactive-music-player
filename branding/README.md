@@ -3,11 +3,11 @@
 Les images de l'application Discord, telles qu'elles sont posées dans le
 portail des développeurs (onglet **Bot**).
 
-| Fichier | Usage | Taille |
-| --- | --- | --- |
-| `icon.svg` / `icon-1024.png` | Ancienne icône du bot (jusqu'au 2026-11-21) | 1024 × 1024 |
-| `banner.svg` / `banner-1360x480.png` | Bannière du profil du bot | 1360 × 480 (format 17:6) |
-| `app-icon.svg` / `app-icon-1024.png` | Icône de l'application de bureau et, depuis le 2026-11-21, du bot sur le portail Discord (fond transparent) | 1024 × 1024 |
+| Fichier                              | Usage                                                                                                       | Taille                   |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------- | ------------------------ |
+| `icon.svg` / `icon-1024.png`         | Ancienne icône du bot (jusqu'au 2026-11-21)                                                                 | 1024 × 1024              |
+| `banner.svg` / `banner-1360x480.png` | Bannière du profil du bot                                                                                   | 1360 × 480 (format 17:6) |
+| `app-icon.svg` / `app-icon-1024.png` | Icône de l'application de bureau et, depuis le 2026-11-21, du bot sur le portail Discord (fond transparent) | 1024 × 1024              |
 
 Les SVG sont les sources : les PNG en sont le rendu à taille réelle. Pour en
 refaire un après une retouche, ouvrir le SVG dans un navigateur et en faire une

@@ -45,103 +45,97 @@
 window.MusicPlayer = window.MusicPlayer || {};
 
 (function () {
-    'use strict';
+  'use strict';
 
-    /** Les listes concernées : celles où l'on fait défiler des pistes. */
-    const SELECTOR = '.playlist-queue, .playlist-history, .playlist-tracks-list';
+  /** Les listes concernées : celles où l'on fait défiler des pistes. */
+  const SELECTOR = '.playlist-queue, .playlist-history, .playlist-tracks-list';
 
-    /**
-     * Les ancrages qui, eux, ne bougent pas.
-     *
-     * Deux sont les conteneurs eux-mêmes ; le troisième est le parent de la
-     * liste des pistes, qui est recréée à chaque rendu de playlist et qu'on ne
-     * peut donc pas observer directement.
-     */
-    const ROOTS = [
-        'playlist-queue-container',
-        'playlist-history-container',
-        'active-playlist-content',
-    ];
+  /**
+   * Les ancrages qui, eux, ne bougent pas.
+   *
+   * Deux sont les conteneurs eux-mêmes ; le troisième est le parent de la
+   * liste des pistes, qui est recréée à chaque rendu de playlist et qu'on ne
+   * peut donc pas observer directement.
+   */
+  const ROOTS = ['playlist-queue-container', 'playlist-history-container', 'active-playlist-content'];
 
-    /** Hauteur maximale du dégradé, en pixels. */
-    const FADE_PX = 18;
+  /** Hauteur maximale du dégradé, en pixels. */
+  const FADE_PX = 18;
 
-    let scheduled = false;
+  let scheduled = false;
 
-    /** Un seul passage par image, quel que soit le nombre de réveils. */
-    function schedule() {
-        if (scheduled) return;
-        scheduled = true;
-        requestAnimationFrame(() => {
-            scheduled = false;
-            refresh();
-        });
+  /** Un seul passage par image, quel que soit le nombre de réveils. */
+  function schedule() {
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(() => {
+      scheduled = false;
+      refresh();
+    });
+  }
+
+  /**
+   * N'écrit que si la valeur change.
+   *
+   * Le défilement réveille cette fonction à chaque image ; réécrire la même
+   * valeur invaliderait le style pour rien.
+   */
+  function setFade(el, name, px) {
+    const value = `${px}px`;
+    if (el.style.getPropertyValue(name) !== value) {
+      el.style.setProperty(name, value);
     }
+  }
 
-    /**
-     * N'écrit que si la valeur change.
-     *
-     * Le défilement réveille cette fonction à chaque image ; réécrire la même
-     * valeur invaliderait le style pour rien.
-     */
-    function setFade(el, name, px) {
-        const value = `${px}px`;
-        if (el.style.getPropertyValue(name) !== value) {
-            el.style.setProperty(name, value);
-        }
+  /** Le dégradé de chaque bord vaut ce qu'il cache, dans la limite du plafond. */
+  function paint(el) {
+    const above = el.scrollTop;
+    const below = el.scrollHeight - el.clientHeight - el.scrollTop;
+    setFade(el, '--scroll-fade-top', Math.min(FADE_PX, Math.max(0, Math.round(above))));
+    setFade(el, '--scroll-fade-bottom', Math.min(FADE_PX, Math.max(0, Math.round(below))));
+  }
+
+  /*
+   * Les conteneurs déjà suivis en taille.
+   *
+   * Une carte redimensionnée par sa poignée ne déclenche ni défilement ni
+   * mutation : sans cet observateur, le dégradé garderait la mesure d'avant.
+   * La collection est faible, pour que les conteneurs remplacés s'oublient
+   * d'eux-mêmes.
+   */
+  const sized = new WeakSet();
+  const sizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(schedule) : null;
+
+  function refresh() {
+    const lists = document.querySelectorAll(SELECTOR);
+    for (const el of lists) {
+      if (sizeObserver && !sized.has(el)) {
+        sized.add(el);
+        sizeObserver.observe(el);
+      }
+      paint(el);
     }
+  }
 
-    /** Le dégradé de chaque bord vaut ce qu'il cache, dans la limite du plafond. */
-    function paint(el) {
-        const above = el.scrollTop;
-        const below = el.scrollHeight - el.clientHeight - el.scrollTop;
-        setFade(el, '--scroll-fade-top', Math.min(FADE_PX, Math.max(0, Math.round(above))));
-        setFade(el, '--scroll-fade-bottom', Math.min(FADE_PX, Math.max(0, Math.round(below))));
+  /**
+   * Le défilement ne remonte pas la page : il se capte à la descente.
+   *
+   * C'est ce qui permet de ne rien enregistrer sur les conteneurs eux-mêmes,
+   * et donc de survivre à leur reconstruction.
+   */
+  document.addEventListener('scroll', schedule, true);
+  window.addEventListener('resize', schedule);
+
+  if (typeof MutationObserver === 'function') {
+    const contentObserver = new MutationObserver(schedule);
+    for (const id of ROOTS) {
+      const root = document.getElementById(id);
+      if (root) contentObserver.observe(root, { childList: true, subtree: true });
     }
+  }
 
-    /*
-     * Les conteneurs déjà suivis en taille.
-     *
-     * Une carte redimensionnée par sa poignée ne déclenche ni défilement ni
-     * mutation : sans cet observateur, le dégradé garderait la mesure d'avant.
-     * La collection est faible, pour que les conteneurs remplacés s'oublient
-     * d'eux-mêmes.
-     */
-    const sized = new WeakSet();
-    const sizeObserver = typeof ResizeObserver === 'function'
-        ? new ResizeObserver(schedule)
-        : null;
+  /** Appelé par les rendus qui savent avoir tout réécrit. */
+  window.MusicPlayer.refreshScrollFades = schedule;
 
-    function refresh() {
-        const lists = document.querySelectorAll(SELECTOR);
-        for (const el of lists) {
-            if (sizeObserver && !sized.has(el)) {
-                sized.add(el);
-                sizeObserver.observe(el);
-            }
-            paint(el);
-        }
-    }
-
-    /**
-     * Le défilement ne remonte pas la page : il se capte à la descente.
-     *
-     * C'est ce qui permet de ne rien enregistrer sur les conteneurs eux-mêmes,
-     * et donc de survivre à leur reconstruction.
-     */
-    document.addEventListener('scroll', schedule, true);
-    window.addEventListener('resize', schedule);
-
-    if (typeof MutationObserver === 'function') {
-        const contentObserver = new MutationObserver(schedule);
-        for (const id of ROOTS) {
-            const root = document.getElementById(id);
-            if (root) contentObserver.observe(root, { childList: true, subtree: true });
-        }
-    }
-
-    /** Appelé par les rendus qui savent avoir tout réécrit. */
-    window.MusicPlayer.refreshScrollFades = schedule;
-
-    refresh();
+  refresh();
 })();

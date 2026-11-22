@@ -61,9 +61,9 @@ const MAX_ATTEMPTS = 3;
 const pending = new Map();
 
 function purge(now = Date.now()) {
-    for (const [id, demande] of pending.entries()) {
-        if (now - demande.createdAt > TTL_MS) pending.delete(id);
-    }
+  for (const [id, demande] of pending.entries()) {
+    if (now - demande.createdAt > TTL_MS) pending.delete(id);
+  }
 }
 
 /**
@@ -75,23 +75,25 @@ function purge(now = Date.now()) {
  * @returns {string} Par exemple « 4F2A-9K ».
  */
 function makeCode() {
-    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    const octets = crypto.randomBytes(6);
-    const chars = [...octets].map((b) => alphabet[b % alphabet.length]);
-    return `${chars.slice(0, 4).join('')}-${chars.slice(4).join('')}`;
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const octets = crypto.randomBytes(6);
+  const chars = [...octets].map((b) => alphabet[b % alphabet.length]);
+  return `${chars.slice(0, 4).join('')}-${chars.slice(4).join('')}`;
 }
 
 /** Retire ce qui n'est pas signifiant : tirets, espaces, casse. */
 function normalise(code) {
-    return String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return String(code || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
 }
 
 /** Comparaison à temps constant, comme celle du jeton dans web/auth.js. */
 function safeEquals(a, b) {
-    const bufA = Buffer.from(String(a));
-    const bufB = Buffer.from(String(b));
-    if (bufA.length !== bufB.length) return false;
-    return crypto.timingSafeEqual(bufA, bufB);
+  const bufA = Buffer.from(String(a));
+  const bufB = Buffer.from(String(b));
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
 }
 
 /**
@@ -103,39 +105,41 @@ function safeEquals(a, b) {
  *   Le code, lui, ne sort que par la console.
  */
 function open(user) {
-    purge();
+  purge();
 
-    const id = crypto.randomBytes(16).toString('hex');
-    const code = makeCode();
+  const id = crypto.randomBytes(16).toString('hex');
+  const code = makeCode();
 
-    pending.set(id, {
-        code: normalise(code),
-        userId: String(user.id),
-        username: user.username || String(user.id),
-        avatar: user.avatar || null,
-        createdAt: Date.now(),
-        attempts: 0,
-    });
+  pending.set(id, {
+    code: normalise(code),
+    userId: String(user.id),
+    username: user.username || String(user.id),
+    avatar: user.avatar || null,
+    createdAt: Date.now(),
+    attempts: 0,
+  });
 
-    /*
-     * Écrit en évidence, et pour la console seule.
-     *
-     * Ces lignes passent par le logger, donc par l'historique que le tableau de
-     * bord sert — au maître, et filtré pour les autres (voir logVisibility.js,
-     * où `[Owner]` ne figure pas dans les étiquettes ouvertes aux invités). Le
-     * code reste ainsi sous les yeux de qui est devant la machine.
-     */
-    log.warn('');
-    log.warn('  ╔══════════════════════════════════════════════════╗');
-    log.warn('  ║  DEMANDE DE REPRISE DE L\'INSTALLATION             ║');
-    log.warn('  ╚══════════════════════════════════════════════════╝');
-    log.warn(`  Compte demandeur : ${user.username || user.id} (${user.id})`);
-    log.warn(`  Code à recopier  : ${code}`);
-    log.warn(`  Valable ${Math.round(TTL_MS / 1000)} secondes. Ignorez ce message si `
-        + 'vous n\'êtes pas à l\'origine de cette demande.');
-    log.warn('');
+  /*
+   * Écrit en évidence, et pour la console seule.
+   *
+   * Ces lignes passent par le logger, donc par l'historique que le tableau de
+   * bord sert — au maître, et filtré pour les autres (voir logVisibility.js,
+   * où `[Owner]` ne figure pas dans les étiquettes ouvertes aux invités). Le
+   * code reste ainsi sous les yeux de qui est devant la machine.
+   */
+  log.warn('');
+  log.warn('  ╔══════════════════════════════════════════════════╗');
+  log.warn("  ║  DEMANDE DE REPRISE DE L'INSTALLATION             ║");
+  log.warn('  ╚══════════════════════════════════════════════════╝');
+  log.warn(`  Compte demandeur : ${user.username || user.id} (${user.id})`);
+  log.warn(`  Code à recopier  : ${code}`);
+  log.warn(
+    `  Valable ${Math.round(TTL_MS / 1000)} secondes. Ignorez ce message si ` +
+      "vous n'êtes pas à l'origine de cette demande.",
+  );
+  log.warn('');
 
-    return id;
+  return id;
 }
 
 /**
@@ -144,10 +148,10 @@ function open(user) {
  * @returns {{ username: string, userId: string }|null}
  */
 function peek(id) {
-    purge();
-    const demande = pending.get(id);
-    if (!demande) return null;
-    return { username: demande.username, userId: demande.userId };
+  purge();
+  const demande = pending.get(id);
+  if (!demande) return null;
+  return { username: demande.username, userId: demande.userId };
 }
 
 /**
@@ -159,46 +163,46 @@ function peek(id) {
  * @returns {{ ok: true } | { ok: false, reason: 'unknown'|'mismatch'|'wrong', left?: number }}
  */
 function confirm(id, code, sessionUserId) {
-    purge();
+  purge();
 
-    const demande = pending.get(id);
-    if (!demande) return { ok: false, reason: 'unknown' };
+  const demande = pending.get(id);
+  if (!demande) return { ok: false, reason: 'unknown' };
 
-    /*
-     * Le code ne vaut que pour celui qui l'a demandé.
-     *
-     * Sans cette vérification, un code aperçu dans la console servirait à
-     * n'importe quel compte connecté : il suffirait d'ouvrir le formulaire
-     * depuis une autre session pour s'approprier une demande faite par un autre.
-     */
-    if (String(sessionUserId) !== demande.userId) {
-        return { ok: false, reason: 'mismatch' };
+  /*
+   * Le code ne vaut que pour celui qui l'a demandé.
+   *
+   * Sans cette vérification, un code aperçu dans la console servirait à
+   * n'importe quel compte connecté : il suffirait d'ouvrir le formulaire
+   * depuis une autre session pour s'approprier une demande faite par un autre.
+   */
+  if (String(sessionUserId) !== demande.userId) {
+    return { ok: false, reason: 'mismatch' };
+  }
+
+  demande.attempts++;
+  if (!safeEquals(normalise(code), demande.code)) {
+    const left = MAX_ATTEMPTS - demande.attempts;
+    if (left <= 0) {
+      pending.delete(id);
+      log.warn(`[Owner] Transfer request closed: ${MAX_ATTEMPTS} wrong codes.`);
+      return { ok: false, reason: 'unknown' };
     }
+    log.warn(`[Owner] Wrong transfer code (${left} attempt(s) left).`);
+    return { ok: false, reason: 'wrong', left };
+  }
 
-    demande.attempts++;
-    if (!safeEquals(normalise(code), demande.code)) {
-        const left = MAX_ATTEMPTS - demande.attempts;
-        if (left <= 0) {
-            pending.delete(id);
-            log.warn(`[Owner] Transfer request closed: ${MAX_ATTEMPTS} wrong codes.`);
-            return { ok: false, reason: 'unknown' };
-        }
-        log.warn(`[Owner] Wrong transfer code (${left} attempt(s) left).`);
-        return { ok: false, reason: 'wrong', left };
-    }
-
-    pending.delete(id);
-    owner.transfer({
-        id: demande.userId,
-        username: demande.username,
-        avatar: demande.avatar,
-    });
-    return { ok: true };
+  pending.delete(id);
+  owner.transfer({
+    id: demande.userId,
+    username: demande.username,
+    avatar: demande.avatar,
+  });
+  return { ok: true };
 }
 
 /** Ferme toutes les demandes. Réservé aux tests. */
 function reset() {
-    pending.clear();
+  pending.clear();
 }
 
 module.exports = { TTL_MS, MAX_ATTEMPTS, open, peek, confirm, reset, makeCode, normalise };

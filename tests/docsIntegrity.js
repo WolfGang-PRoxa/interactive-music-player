@@ -30,8 +30,12 @@ const REFERENCE = 'fr';
 let failed = 0;
 let passed = 0;
 const check = (label, ok, detail = '') => {
-    if (ok) { passed++; }
-    else { failed++; console.log(`  FAIL ${label}${detail ? ` — ${detail}` : ''}`); }
+  if (ok) {
+    passed++;
+  } else {
+    failed++;
+    console.log(`  FAIL ${label}${detail ? ` — ${detail}` : ''}`);
+  }
 };
 
 /**
@@ -42,23 +46,23 @@ const check = (label, ok, detail = '') => {
  * liens que la fenêtre de lecture ne résoudrait pas.
  */
 function anchor(text) {
-    return String(text)
-        .toLowerCase()
-        .replace(/[^\p{L}\p{N}\s-]/gu, '')
-        .trim()
-        .replace(/\s+/g, '-');
+  return String(text)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, '')
+    .trim()
+    .replace(/\s+/g, '-');
 }
 
 /** Chemins Markdown d'une racine, relatifs à celle-ci. */
 function walk(dir, prefix = '') {
-    const out = [];
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        if (entry.name.startsWith('.')) continue;
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) out.push(...walk(full, `${prefix}${entry.name}/`));
-        else if (/\.md$/i.test(entry.name)) out.push(`${prefix}${entry.name}`);
-    }
-    return out.sort();
+  const out = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name.startsWith('.')) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...walk(full, `${prefix}${entry.name}/`));
+    else if (/\.md$/i.test(entry.name)) out.push(`${prefix}${entry.name}`);
+  }
+  return out.sort();
 }
 
 /**
@@ -68,111 +72,125 @@ function walk(dir, prefix = '') {
  * titre de niveau 1, et les documents en contiennent.
  */
 function headings(source) {
-    const out = [];
-    let inFence = false;
-    for (const line of source.split('\n')) {
-        if (/^\s*```/.test(line)) { inFence = !inFence; continue; }
-        if (inFence) continue;
-        const m = /^(#{1,6})\s+(.+?)\s*$/.exec(line);
-        if (m) out.push(anchor(m[2].replace(/`/g, '')));
+  const out = [];
+  let inFence = false;
+  for (const line of source.split('\n')) {
+    if (/^\s*```/.test(line)) {
+      inFence = !inFence;
+      continue;
     }
-    return out;
+    if (inFence) continue;
+    const m = /^(#{1,6})\s+(.+?)\s*$/.exec(line);
+    if (m) out.push(anchor(m[2].replace(/`/g, '')));
+  }
+  return out;
 }
 
 /** Ce qu'une traduction doit conserver de son original. */
 function skeleton(source) {
-    let fences = 0;
-    let tables = 0;
-    let titles = 0;
-    let inFence = false;
-    for (const line of source.split('\n')) {
-        if (/^\s*```/.test(line)) { fences++; inFence = !inFence; continue; }
-        if (inFence) continue;
-        if (/^\s*\|.*\|\s*$/.test(line)) tables++;
-        if (/^#{1,6}\s+/.test(line)) titles++;
+  let fences = 0;
+  let tables = 0;
+  let titles = 0;
+  let inFence = false;
+  for (const line of source.split('\n')) {
+    if (/^\s*```/.test(line)) {
+      fences++;
+      inFence = !inFence;
+      continue;
     }
-    return { fences, tables, titles };
+    if (inFence) continue;
+    if (/^\s*\|.*\|\s*$/.test(line)) tables++;
+    if (/^#{1,6}\s+/.test(line)) titles++;
+  }
+  return { fences, tables, titles };
 }
 
-const langs = fs.readdirSync(DOCS, { withFileTypes: true })
-    .filter((e) => e.isDirectory() && /^[a-z]{2}$/.test(e.name))
-    .map((e) => e.name);
+const langs = fs
+  .readdirSync(DOCS, { withFileTypes: true })
+  .filter((e) => e.isDirectory() && /^[a-z]{2}$/.test(e.name))
+  .map((e) => e.name);
 
 console.log(`\n=== Documentation corpus — languages: ${langs.join(', ')} ===\n`);
 
 check(`reference language « ${REFERENCE} » is present`, langs.includes(REFERENCE));
 if (!langs.includes(REFERENCE)) {
-    console.log(`\n=== ${passed} passed, ${failed} failed ===`);
-    process.exit(1);
+  console.log(`\n=== ${passed} passed, ${failed} failed ===`);
+  process.exit(1);
 }
 
 const referenceFiles = walk(path.join(DOCS, REFERENCE));
 const referenceSkeletons = {};
 for (const file of referenceFiles) {
-    referenceSkeletons[file] = skeleton(
-        fs.readFileSync(path.join(DOCS, REFERENCE, file), 'utf8')
-    );
+  referenceSkeletons[file] = skeleton(fs.readFileSync(path.join(DOCS, REFERENCE, file), 'utf8'));
 }
 
 for (const lang of langs) {
-    const base = path.join(DOCS, lang);
-    const files = walk(base);
+  const base = path.join(DOCS, lang);
+  const files = walk(base);
 
-    const missing = referenceFiles.filter((f) => !files.includes(f));
-    const extra = files.filter((f) => !referenceFiles.includes(f));
-    check(`${lang}: same files as ${REFERENCE}`,
-        missing.length === 0 && extra.length === 0,
-        [missing.length ? `missing: ${missing.join(', ')}` : '',
-         extra.length ? `extra: ${extra.join(', ')}` : ''].filter(Boolean).join(' ; '));
+  const missing = referenceFiles.filter((f) => !files.includes(f));
+  const extra = files.filter((f) => !referenceFiles.includes(f));
+  check(
+    `${lang}: same files as ${REFERENCE}`,
+    missing.length === 0 && extra.length === 0,
+    [missing.length ? `missing: ${missing.join(', ')}` : '', extra.length ? `extra: ${extra.join(', ')}` : '']
+      .filter(Boolean)
+      .join(' ; '),
+  );
 
-    const headingsOf = {};
-    for (const file of files) {
-        headingsOf[file] = headings(fs.readFileSync(path.join(base, file), 'utf8'));
+  const headingsOf = {};
+  for (const file of files) {
+    headingsOf[file] = headings(fs.readFileSync(path.join(base, file), 'utf8'));
+  }
+
+  for (const file of files) {
+    const source = fs.readFileSync(path.join(base, file), 'utf8');
+    const dir = path.posix.dirname(file) === '.' ? '' : path.posix.dirname(file);
+
+    if (referenceSkeletons[file]) {
+      const ref = referenceSkeletons[file];
+      const own = skeleton(source);
+      check(
+        `${lang}/${file}: structure preserved`,
+        ref.fences === own.fences && ref.titles === own.titles && ref.tables === own.tables,
+        `fences ${own.fences}/${ref.fences}, headings ${own.titles}/${ref.titles}, ` +
+          `table rows ${own.tables}/${ref.tables}`,
+      );
     }
 
-    for (const file of files) {
-        const source = fs.readFileSync(path.join(base, file), 'utf8');
-        const dir = path.posix.dirname(file) === '.' ? '' : path.posix.dirname(file);
+    for (const raw of [...source.matchAll(/\]\(([^)\s]+)\)/g)].map((m) => m[1])) {
+      if (/^https?:|^mailto:/i.test(raw)) continue;
 
-        if (referenceSkeletons[file]) {
-            const ref = referenceSkeletons[file];
-            const own = skeleton(source);
-            check(`${lang}/${file}: structure preserved`,
-                ref.fences === own.fences && ref.titles === own.titles && ref.tables === own.tables,
-                `fences ${own.fences}/${ref.fences}, headings ${own.titles}/${ref.titles}, `
-                + `table rows ${own.tables}/${ref.tables}`);
-        }
+      const [target, fragment] = raw.split('#');
 
-        for (const raw of [...source.matchAll(/\]\(([^)\s]+)\)/g)].map((m) => m[1])) {
-            if (/^https?:|^mailto:/i.test(raw)) continue;
+      // Ancre dans le document courant.
+      if (!target) {
+        check(
+          `${lang}/${file}: anchor #${fragment}`,
+          headingsOf[file].includes(fragment),
+          `headings: ${headingsOf[file].slice(0, 5).join(', ')}…`,
+        );
+        continue;
+      }
 
-            const [target, fragment] = raw.split('#');
+      const resolved = path.posix.normalize(dir ? `${dir}/${target}` : target);
 
-            // Ancre dans le document courant.
-            if (!target) {
-                check(`${lang}/${file}: anchor #${fragment}`,
-                    headingsOf[file].includes(fragment),
-                    `headings: ${headingsOf[file].slice(0, 5).join(', ')}…`);
-                continue;
-            }
+      // Lien vers le code source : il sort de docs/ et vise le dépôt.
+      if (resolved.startsWith('../')) {
+        check(`${lang}/${file} : source ${target}`, fs.existsSync(path.resolve(base, dir, target)));
+        continue;
+      }
 
-            const resolved = path.posix.normalize(dir ? `${dir}/${target}` : target);
-
-            // Lien vers le code source : il sort de docs/ et vise le dépôt.
-            if (resolved.startsWith('../')) {
-                check(`${lang}/${file} : source ${target}`,
-                    fs.existsSync(path.resolve(base, dir, target)));
-                continue;
-            }
-
-            check(`${lang}/${file} : document ${resolved}`, files.includes(resolved));
-            if (fragment && files.includes(resolved)) {
-                check(`${lang}/${file}: anchor ${resolved}#${fragment}`,
-                    headingsOf[resolved].includes(fragment),
-                    `headings: ${headingsOf[resolved].slice(0, 5).join(', ')}…`);
-            }
-        }
+      check(`${lang}/${file} : document ${resolved}`, files.includes(resolved));
+      if (fragment && files.includes(resolved)) {
+        check(
+          `${lang}/${file}: anchor ${resolved}#${fragment}`,
+          headingsOf[resolved].includes(fragment),
+          `headings: ${headingsOf[resolved].slice(0, 5).join(', ')}…`,
+        );
+      }
     }
+  }
 }
 
 console.log(`=== ${passed} passed, ${failed} failed ===`);

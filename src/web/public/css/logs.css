@@ -1,176 +1,188 @@
 /* Floating Terminal Logs Window Styling */
 
 .floating-logs-window {
-    --logs-bg-opacity: 1;
-    position: fixed;
-    z-index: 9998;
-    top: 120px;
-    left: 120px;
-    width: 520px;
-    height: 320px;
-    display: flex;
-    flex-direction: column;
-    background: color-mix(in srgb, rgba(255, 255, 255, calc(0.92 * var(--logs-bg-opacity, 1))) var(--blend-pct), rgba(18, 18, 26, calc(0.88 * var(--logs-bg-opacity, 1))));
-    backdrop-filter: blur(calc(16px * var(--logs-bg-opacity, 1)));
-    -webkit-backdrop-filter: blur(calc(16px * var(--logs-bg-opacity, 1)));
-    border: 1px solid var(--border-card);
-    border-radius: 12px;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, calc(0.5 * var(--logs-bg-opacity, 1))), 0 0 20px rgba(235, 69, 158, calc(0.15 * var(--logs-bg-opacity, 1)));
-    overflow: hidden;
-    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --logs-bg-opacity: 1;
+  position: fixed;
+  z-index: 9998;
+  top: 120px;
+  left: 120px;
+  width: 520px;
+  height: 320px;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(
+    in srgb,
+    rgba(255, 255, 255, calc(0.92 * var(--logs-bg-opacity, 1))) var(--blend-pct),
+    rgba(18, 18, 26, calc(0.88 * var(--logs-bg-opacity, 1)))
+  );
+  backdrop-filter: blur(calc(16px * var(--logs-bg-opacity, 1)));
+  -webkit-backdrop-filter: blur(calc(16px * var(--logs-bg-opacity, 1)));
+  border: 1px solid var(--border-card);
+  border-radius: 12px;
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, calc(0.5 * var(--logs-bg-opacity, 1))),
+    0 0 20px rgba(235, 69, 158, calc(0.15 * var(--logs-bg-opacity, 1)));
+  overflow: hidden;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-html[data-theme="light"] .floating-logs-window {
-    box-shadow: 0 16px 40px rgba(0, 0, 0, calc(0.12 * var(--logs-bg-opacity, 1))), 0 0 15px rgba(235, 69, 158, calc(0.1 * var(--logs-bg-opacity, 1)));
+html[data-theme='light'] .floating-logs-window {
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, calc(0.12 * var(--logs-bg-opacity, 1))),
+    0 0 15px rgba(235, 69, 158, calc(0.1 * var(--logs-bg-opacity, 1)));
 }
 
-html[data-style="neon-cyberpunk"] .floating-logs-window {
-    background: rgba(10, 10, 20, calc(0.92 * var(--logs-bg-opacity, 1)));
-    border-color: rgba(0, 240, 255, 0.4);
-    box-shadow: 0 0 25px rgba(0, 240, 255, calc(0.25 * var(--logs-bg-opacity, 1)));
+html[data-style='neon-cyberpunk'] .floating-logs-window {
+  background: rgba(10, 10, 20, calc(0.92 * var(--logs-bg-opacity, 1)));
+  border-color: rgba(0, 240, 255, 0.4);
+  box-shadow: 0 0 25px rgba(0, 240, 255, calc(0.25 * var(--logs-bg-opacity, 1)));
 }
 
-html[data-style="retro-synthwave"] .floating-logs-window {
-    background: rgba(20, 10, 30, calc(0.92 * var(--logs-bg-opacity, 1)));
-    border-color: rgba(255, 110, 199, 0.4);
-    box-shadow: 0 0 25px rgba(255, 110, 199, calc(0.25 * var(--logs-bg-opacity, 1)));
+html[data-style='retro-synthwave'] .floating-logs-window {
+  background: rgba(20, 10, 30, calc(0.92 * var(--logs-bg-opacity, 1)));
+  border-color: rgba(255, 110, 199, 0.4);
+  box-shadow: 0 0 25px rgba(255, 110, 199, calc(0.25 * var(--logs-bg-opacity, 1)));
 }
 
 .floating-logs-window.hidden {
-    display: none !important;
-    opacity: 0;
-    pointer-events: none;
+  display: none !important;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* Header */
 .logs-window-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 14px;
-    background: color-mix(in srgb, rgba(240, 240, 245, calc(0.7 * var(--logs-bg-opacity, 1))) var(--blend-pct), rgba(0, 0, 0, calc(0.35 * var(--logs-bg-opacity, 1))));
-    border-bottom: 1px solid var(--border-card);
-    cursor: move;
-    user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: color-mix(
+    in srgb,
+    rgba(240, 240, 245, calc(0.7 * var(--logs-bg-opacity, 1))) var(--blend-pct),
+    rgba(0, 0, 0, calc(0.35 * var(--logs-bg-opacity, 1)))
+  );
+  border-bottom: 1px solid var(--border-card);
+  cursor: move;
+  user-select: none;
 }
 
 .logs-header-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: var(--text-main);
-    letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: 0.5px;
 }
 
 .logs-header-filters {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    margin: 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 8px;
 }
 
 .log-filter-btn {
-    background: color-mix(in srgb, rgba(0, 0, 0, 0.05) var(--blend-pct), rgba(255, 255, 255, 0.06));
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-color: color-mix(in srgb, rgba(0, 0, 0, 0.15) var(--blend-pct), rgba(255, 255, 255, 0.14));
-    color: var(--text-muted);
-    font-size: 0.65rem;
-    font-weight: 700;
-    padding: 2px 7px;
-    border-radius: 4px;
-    cursor: pointer;
-    text-transform: uppercase;
-    transition: all 0.2s ease;
-    letter-spacing: 0.3px;
+  background: color-mix(in srgb, rgba(0, 0, 0, 0.05) var(--blend-pct), rgba(255, 255, 255, 0.06));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-color: color-mix(in srgb, rgba(0, 0, 0, 0.15) var(--blend-pct), rgba(255, 255, 255, 0.14));
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.2s ease;
+  letter-spacing: 0.3px;
 }
 
 .log-filter-btn:hover {
-    color: var(--text-main);
-    background: rgba(255, 255, 255, 0.15);
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .log-filter-btn.active {
-    background: var(--c-accent);
-    color: #ffffff;
-    border-color: var(--c-accent);
-    box-shadow: 0 0 8px rgba(235, 69, 158, 0.4);
+  background: var(--c-accent);
+  color: #ffffff;
+  border-color: var(--c-accent);
+  box-shadow: 0 0 8px rgba(235, 69, 158, 0.4);
 }
 
 .log-filter-btn.tag-info.active {
-    background: rgba(0, 240, 255, 0.25);
-    color: #00f0ff;
-    border-color: #00f0ff;
-    box-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+  background: rgba(0, 240, 255, 0.25);
+  color: #00f0ff;
+  border-color: #00f0ff;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
 }
 
 .log-filter-btn.tag-warn.active {
-    background: rgba(255, 190, 11, 0.25);
-    color: #ffbe0b;
-    border-color: #ffbe0b;
-    box-shadow: 0 0 8px rgba(255, 190, 11, 0.4);
+  background: rgba(255, 190, 11, 0.25);
+  color: #ffbe0b;
+  border-color: #ffbe0b;
+  box-shadow: 0 0 8px rgba(255, 190, 11, 0.4);
 }
 
 .log-filter-btn.tag-error.active {
-    background: rgba(255, 0, 85, 0.3);
-    color: #ff0055;
-    border-color: #ff0055;
-    box-shadow: 0 0 10px rgba(255, 0, 85, 0.5);
+  background: rgba(255, 0, 85, 0.3);
+  color: #ff0055;
+  border-color: #ff0055;
+  box-shadow: 0 0 10px rgba(255, 0, 85, 0.5);
 }
 
 .log-filter-btn.tag-success.active {
-    background: rgba(0, 255, 135, 0.25);
-    color: #00ff87;
-    border-color: #00ff87;
-    box-shadow: 0 0 8px rgba(0, 255, 135, 0.4);
+  background: rgba(0, 255, 135, 0.25);
+  color: #00ff87;
+  border-color: #00ff87;
+  box-shadow: 0 0 8px rgba(0, 255, 135, 0.4);
 }
 
 .log-filter-btn.tag-debug.active {
-    background: rgba(168, 128, 255, 0.25);
-    color: #a880ff;
-    border-color: #a880ff;
-    box-shadow: 0 0 8px rgba(168, 128, 255, 0.4);
+  background: rgba(168, 128, 255, 0.25);
+  color: #a880ff;
+  border-color: #a880ff;
+  box-shadow: 0 0 8px rgba(168, 128, 255, 0.4);
 }
 
 .log-entry.filtered-out {
-    display: none !important;
+  display: none !important;
 }
 
 /* Opacity Slider Control in Header */
 .logs-header-opacity {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    margin-left: auto;
-    margin-right: 6px;
-    background: color-mix(in srgb, rgba(0, 0, 0, 0.05) var(--blend-pct), rgba(0, 0, 0, 0.25));
-    padding: 3px 8px;
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-color: color-mix(in srgb, rgba(0, 0, 0, 0.12) var(--blend-pct), rgba(255, 255, 255, 0.08));
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  margin-right: 6px;
+  background: color-mix(in srgb, rgba(0, 0, 0, 0.05) var(--blend-pct), rgba(0, 0, 0, 0.25));
+  padding: 3px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-color: color-mix(in srgb, rgba(0, 0, 0, 0.12) var(--blend-pct), rgba(255, 255, 255, 0.08));
 }
 
 .logs-opacity-slider {
-    width: 55px;
-    height: 4px;
-    accent-color: var(--c-accent);
-    cursor: pointer;
+  width: 55px;
+  height: 4px;
+  accent-color: var(--c-accent);
+  cursor: pointer;
 }
 
 .logs-opacity-val {
-    font-size: 0.65rem;
-    font-weight: 700;
-    color: var(--text-secondary);
-    min-width: 28px;
-    text-align: right;
-    font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  min-width: 28px;
+  text-align: right;
+  font-family: var(--font-mono);
 }
 
 .logs-header-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /*
@@ -191,18 +203,18 @@ html[data-style="retro-synthwave"] .floating-logs-window {
  * cyberpunk et synthwave.
  */
 .logs-control-btn {
-    background: var(--bg-select);
-    border: 1px solid var(--border-card);
-    color: var(--text-muted);
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    /*
+  background: var(--bg-select);
+  border: 1px solid var(--border-card);
+  color: var(--text-muted);
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  /*
      * Un en-tête étroit ne doit pas les aplatir. Sans ce plancher, la
      * répartition flex rabote les trois carrés en même temps que les filtres,
      * et une bordure sur un carré devenu rectangle se voit bien plus qu'une
@@ -210,23 +222,23 @@ html[data-style="retro-synthwave"] .floating-logs-window {
      * texte et se compriment sans se déformer — même raisonnement que pour
      * `.clear-btn` et `.card-lock-btn`.
      */
-    flex-shrink: 0;
+  flex-shrink: 0;
 }
 
 .logs-control-btn svg {
-    width: 15px;
-    height: 15px;
+  width: 15px;
+  height: 15px;
 }
 
 .logs-control-btn:hover {
-    background: var(--bg-hover);
-    border-color: var(--border-card-hover);
-    color: var(--text-main);
-    transform: scale(1.05);
+  background: var(--bg-hover);
+  border-color: var(--border-card-hover);
+  color: var(--text-main);
+  transform: scale(1.05);
 }
 
 .logs-control-btn:active {
-    transform: scale(0.95);
+  transform: scale(0.95);
 }
 
 /*
@@ -236,22 +248,26 @@ html[data-style="retro-synthwave"] .floating-logs-window {
  */
 .logs-control-btn.btn-clear-logs:hover,
 .logs-control-btn.btn-close-logs:hover {
-    background: rgba(237, 66, 69, 0.2);
-    border-color: var(--c-error);
-    color: var(--c-error);
+  background: rgba(237, 66, 69, 0.2);
+  border-color: var(--c-error);
+  color: var(--c-error);
 }
 
 /* Body & Terminal Container */
 .logs-window-body {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: color-mix(in srgb, rgba(30, 30, 40, calc(0.85 * var(--logs-bg-opacity, 1))) var(--blend-pct), rgba(0, 0, 0, calc(0.45 * var(--logs-bg-opacity, 1))));
-    font-family: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
-    font-size: 0.78rem;
-    line-height: 1.45;
-    /*
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: color-mix(
+    in srgb,
+    rgba(30, 30, 40, calc(0.85 * var(--logs-bg-opacity, 1))) var(--blend-pct),
+    rgba(0, 0, 0, calc(0.45 * var(--logs-bg-opacity, 1)))
+  );
+  font-family: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  /*
      * Le terminal est le seul bloc de texte long du tableau de bord, et à ce
      * titre le seul que les navigateurs mobiles grossissent d'eux-mêmes :
      * l'agrandissement automatique gonfle les paragraphes d'une page conçue
@@ -263,162 +279,166 @@ html[data-style="retro-synthwave"] .floating-logs-window {
      * `100 %` désigne la taille demandée ici, et non l'absence d'ajustement :
      * le zoom du lecteur, lui, continue de s'appliquer.
      */
-    -webkit-text-size-adjust: 100%;
-    text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 .logs-terminal-container {
-    flex: 1;
-    padding: 10px 12px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    word-break: break-word;
-    scroll-behavior: smooth;
+  flex: 1;
+  padding: 10px 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  word-break: break-word;
+  scroll-behavior: smooth;
 }
 
 /* Terminal Custom Scrollbar */
 .logs-terminal-container::-webkit-scrollbar {
-    width: 6px;
+  width: 6px;
 }
 
 .logs-terminal-container::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .logs-terminal-container::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
 }
 
 .logs-terminal-container::-webkit-scrollbar-thumb:hover {
-    background: var(--c-accent);
+  background: var(--c-accent);
 }
 
 /* Log Entry Styling */
 .log-entry {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 2px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-    color: #e0e0e0;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  color: #e0e0e0;
 }
 
 .log-timestamp {
-    color: #8888a0;
-    /* Relatifs au terminal, comme l'étiquette juste dessous : sa taille varie
+  color: #8888a0;
+  /* Relatifs au terminal, comme l'étiquette juste dessous : sa taille varie
        avec l'écran (voir css/touchDrawers.css) et les deux suivent du même
        rapport. 0,92 em de 0,78 rem redonnent les 0,72 rem d'origine. */
-    font-size: 0.92em;
-    flex-shrink: 0;
-    font-weight: 500;
+  font-size: 0.92em;
+  flex-shrink: 0;
+  font-weight: 500;
 }
 
 .log-tag {
-    font-size: 0.9em;
-    font-weight: 700;
-    padding: 1px 5px;
-    border-radius: 3px;
-    text-transform: uppercase;
-    flex-shrink: 0;
-    letter-spacing: 0.5px;
+  font-size: 0.9em;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
 }
 
 .log-tag.tag-info {
-    background: rgba(0, 240, 255, 0.15);
-    color: #00f0ff;
-    border: 1px solid rgba(0, 240, 255, 0.3);
+  background: rgba(0, 240, 255, 0.15);
+  color: #00f0ff;
+  border: 1px solid rgba(0, 240, 255, 0.3);
 }
 
 .log-tag.tag-warn {
-    background: rgba(255, 190, 11, 0.15);
-    color: #ffbe0b;
-    border: 1px solid rgba(255, 190, 11, 0.3);
+  background: rgba(255, 190, 11, 0.15);
+  color: #ffbe0b;
+  border: 1px solid rgba(255, 190, 11, 0.3);
 }
 
 .log-tag.tag-error {
-    background: rgba(255, 0, 85, 0.2);
-    color: #ff0055;
-    border: 1px solid rgba(255, 0, 85, 0.4);
-    box-shadow: 0 0 8px rgba(255, 0, 85, 0.3);
+  background: rgba(255, 0, 85, 0.2);
+  color: #ff0055;
+  border: 1px solid rgba(255, 0, 85, 0.4);
+  box-shadow: 0 0 8px rgba(255, 0, 85, 0.3);
 }
 
 .log-tag.tag-success {
-    background: rgba(0, 255, 135, 0.15);
-    color: #00ff87;
-    border: 1px solid rgba(0, 255, 135, 0.3);
+  background: rgba(0, 255, 135, 0.15);
+  color: #00ff87;
+  border: 1px solid rgba(0, 255, 135, 0.3);
 }
 
 .log-tag.tag-debug {
-    background: rgba(168, 128, 255, 0.15);
-    color: #a880ff;
-    border: 1px solid rgba(168, 128, 255, 0.3);
+  background: rgba(168, 128, 255, 0.15);
+  color: #a880ff;
+  border: 1px solid rgba(168, 128, 255, 0.3);
 }
 
 .log-content {
-    flex: 1;
-    color: #d8d8e8;
-    white-space: pre-wrap;
-    word-break: break-all;
+  flex: 1;
+  color: #d8d8e8;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 /* Module Bracket Highlighting */
 .log-module {
-    color: var(--c-accent);
-    font-weight: 600;
+  color: var(--c-accent);
+  font-weight: 600;
 }
 
 /* Empty State */
 .logs-empty {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    color: #666680;
-    font-style: italic;
-    font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #666680;
+  font-style: italic;
+  font-size: 0.8rem;
 }
 
 /* Resize Handle */
 .logs-window-resize-handle {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    width: 14px;
-    height: 14px;
-    cursor: se-resize;
-    z-index: 10;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  cursor: se-resize;
+  z-index: 10;
 }
 
 /* Scroll To Bottom Floating Button */
 .logs-scroll-bottom-btn {
-    position: absolute;
-    bottom: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--c-accent);
-    color: #ffffff;
-    border: none;
-    border-radius: 20px;
-    padding: 5px 14px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5), 0 0 10px rgba(235, 69, 158, 0.4);
-    z-index: 5;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--c-accent);
+  color: #ffffff;
+  border: none;
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.5),
+    0 0 10px rgba(235, 69, 158, 0.4);
+  z-index: 5;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .logs-scroll-bottom-btn.hidden {
-    display: none !important;
+  display: none !important;
 }
 
 .logs-scroll-bottom-btn:hover {
-    transform: translateX(-50%) translateY(-2px);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6), 0 0 14px rgba(235, 69, 158, 0.6);
+  transform: translateX(-50%) translateY(-2px);
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.6),
+    0 0 14px rgba(235, 69, 158, 0.6);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -426,134 +446,145 @@ html[data-style="retro-synthwave"] .floating-logs-window {
    ═══════════════════════════════════════════════════════════════ */
 
 .log-entry {
-    position: relative;
-    /* Place pour le bouton de copie, sans décaler le texte au survol */
-    padding-right: 26px;
-    border-radius: 3px;
-    cursor: default;
-    transition: background 0.12s ease;
+  position: relative;
+  /* Place pour le bouton de copie, sans décaler le texte au survol */
+  padding-right: 26px;
+  border-radius: 3px;
+  cursor: default;
+  transition: background 0.12s ease;
 }
 
 .log-entry:hover {
-    background: rgba(255, 255, 255, 0.045);
+  background: rgba(255, 255, 255, 0.045);
 }
 
 .log-entry.log-selected {
-    background: rgba(88, 101, 242, 0.22);
-    box-shadow: inset 2px 0 0 var(--c-accent);
+  background: rgba(88, 101, 242, 0.22);
+  box-shadow: inset 2px 0 0 var(--c-accent);
 }
 
 .log-entry.log-selected:hover {
-    background: rgba(88, 101, 242, 0.3);
+  background: rgba(88, 101, 242, 0.3);
 }
 
 /* --- Bouton de copie par ligne --- */
 
 .log-copy-btn {
-    position: absolute;
-    top: 1px;
-    right: 2px;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.45);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 4px;
-    color: var(--text-muted);
-    cursor: pointer;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.12s ease,
+    color 0.12s ease,
+    border-color 0.12s ease;
 }
 
 .log-copy-btn svg {
-    width: 11px;
-    height: 11px;
+  width: 11px;
+  height: 11px;
 }
 
 .log-entry:hover .log-copy-btn,
 .log-copy-btn:focus-visible {
-    opacity: 1;
-    pointer-events: auto;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .log-copy-btn:hover {
-    color: var(--c-accent);
-    border-color: var(--c-accent);
+  color: var(--c-accent);
+  border-color: var(--c-accent);
 }
 
 /* --- Barre d'action de sélection --- */
 
 .logs-selection-bar {
-    position: absolute;
-    bottom: 8px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 5px 8px 5px 12px;
-    background: rgba(18, 18, 26, 0.96);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 20px;
-    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
-    z-index: 6;
-    animation: logs-selection-in 0.14s ease;
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px 5px 12px;
+  background: rgba(18, 18, 26, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 20px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
+  z-index: 6;
+  animation: logs-selection-in 0.14s ease;
 }
 
 .logs-selection-bar.hidden {
-    display: none !important;
+  display: none !important;
 }
 
 @keyframes logs-selection-in {
-    from { opacity: 0; transform: translateX(-50%) translateY(6px); }
-    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 .logs-selection-count {
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: #e0e0e0;
-    white-space: nowrap;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #e0e0e0;
+  white-space: nowrap;
 }
 
 .logs-selection-btn {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 4px 10px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    font-family: inherit;
-    color: #fff;
-    background: var(--c-accent);
-    border: 1px solid transparent;
-    border-radius: 14px;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: filter 0.15s ease, background 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: #fff;
+  background: var(--c-accent);
+  border: 1px solid transparent;
+  border-radius: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    filter 0.15s ease,
+    background 0.15s ease;
 }
 
 .logs-selection-btn svg {
-    width: 11px;
-    height: 11px;
+  width: 11px;
+  height: 11px;
 }
 
 .logs-selection-btn:hover {
-    filter: brightness(1.15);
+  filter: brightness(1.15);
 }
 
 .logs-selection-btn.secondary {
-    background: transparent;
-    color: var(--text-muted);
-    border-color: rgba(255, 255, 255, 0.16);
+  background: transparent;
+  color: var(--text-muted);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
 .logs-selection-btn.secondary:hover {
-    color: #e0e0e0;
-    border-color: rgba(255, 255, 255, 0.3);
-    filter: none;
+  color: #e0e0e0;
+  border-color: rgba(255, 255, 255, 0.3);
+  filter: none;
 }

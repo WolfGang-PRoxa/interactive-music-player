@@ -67,36 +67,36 @@ let store = null;
 let saveTimer = null;
 
 function load() {
-    if (store) return store;
+  if (store) return store;
 
-    cleanStaleTemp(GUESTS_FILE);
-    const raw = readJsonSafe(GUESTS_FILE, '[Guests]');
-    store = raw && typeof raw === 'object' ? raw : {};
+  cleanStaleTemp(GUESTS_FILE);
+  const raw = readJsonSafe(GUESTS_FILE, '[Guests]');
+  store = raw && typeof raw === 'object' ? raw : {};
 
-    const count = Object.keys(store).length;
-    if (count) log.info(`[Guests] ${count} known account(s) loaded.`);
+  const count = Object.keys(store).length;
+  if (count) log.info(`[Guests] ${count} known account(s) loaded.`);
 
-    return store;
+  return store;
 }
 
 function save() {
-    if (!store) return;
-    try {
-        writeJsonAtomic(GUESTS_FILE, store);
-    } catch (err) {
-        log.error(`[Guests] Cannot save the guest book: ${err.message}`);
-    }
+  if (!store) return;
+  try {
+    writeJsonAtomic(GUESTS_FILE, store);
+  } catch (err) {
+    log.error(`[Guests] Cannot save the guest book: ${err.message}`);
+  }
 }
 
 /** Programme une écriture, en repoussant celle déjà prévue. */
 function saveSoon() {
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-        saveTimer = null;
-        save();
-    }, SAVE_DEBOUNCE_MS);
-    // Une écriture en attente ne doit pas retenir le process au moment de sortir.
-    if (typeof saveTimer.unref === 'function') saveTimer.unref();
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    save();
+  }, SAVE_DEBOUNCE_MS);
+  // Une écriture en attente ne doit pas retenir le process au moment de sortir.
+  if (typeof saveTimer.unref === 'function') saveTimer.unref();
 }
 
 /**
@@ -107,8 +107,8 @@ function saveSoon() {
  * l'image, et 64 pixels suffisent à une pastille.
  */
 function avatarUrl(user) {
-    if (!user || !user.avatar) return null;
-    return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`;
+  if (!user || !user.avatar) return null;
+  return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`;
 }
 
 /**
@@ -126,25 +126,25 @@ function avatarUrl(user) {
  * @returns {object} La fiche enregistrée.
  */
 function remember(user) {
-    load();
-    if (!user || !user.id) return null;
+  load();
+  if (!user || !user.id) return null;
 
-    const id = String(user.id);
-    const now = Date.now();
-    const known = store[id];
+  const id = String(user.id);
+  const now = Date.now();
+  const known = store[id];
 
-    store[id] = {
-        userId: id,
-        username: user.username || known?.username || '',
-        displayName: user.global_name || user.username || known?.displayName || id,
-        avatar: avatarUrl(user) || known?.avatar || null,
-        firstSeenAt: known?.firstSeenAt || now,
-        lastSeenAt: now,
-    };
+  store[id] = {
+    userId: id,
+    username: user.username || known?.username || '',
+    displayName: user.global_name || user.username || known?.displayName || id,
+    avatar: avatarUrl(user) || known?.avatar || null,
+    firstSeenAt: known?.firstSeenAt || now,
+    lastSeenAt: now,
+  };
 
-    save();
-    if (!known) log.info(`[Guests] New account known: ${store[id].displayName} (${id}).`);
-    return store[id];
+  save();
+  if (!known) log.info(`[Guests] New account known: ${store[id].displayName} (${id}).`);
+  return store[id];
 }
 
 /**
@@ -153,13 +153,13 @@ function remember(user) {
  * @returns {object|null}
  */
 function get(userId) {
-    load();
-    return store[String(userId)] || null;
+  load();
+  return store[String(userId)] || null;
 }
 
 /** Ce compte s'est-il déjà authentifié auprès de ce bot ? */
 function isKnown(userId) {
-    return get(userId) !== null;
+  return get(userId) !== null;
 }
 
 /**
@@ -174,16 +174,16 @@ function isKnown(userId) {
  *   sait de plus frais, pour les fiches d'avant le carnet.
  */
 function touch(userId, refresh = {}) {
-    load();
-    const id = String(userId || '');
-    const known = store[id];
-    if (!known) return null;
+  load();
+  const id = String(userId || '');
+  const known = store[id];
+  if (!known) return null;
 
-    known.lastSeenAt = Date.now();
-    if (refresh.displayName) known.displayName = refresh.displayName;
-    if (refresh.avatar) known.avatar = refresh.avatar;
-    saveSoon();
-    return known;
+  known.lastSeenAt = Date.now();
+  if (refresh.displayName) known.displayName = refresh.displayName;
+  if (refresh.avatar) known.avatar = refresh.avatar;
+  saveSoon();
+  return known;
 }
 
 /**
@@ -198,13 +198,13 @@ function touch(userId, refresh = {}) {
  * @returns {boolean} La fiche existait-elle.
  */
 function forget(userId) {
-    load();
-    const id = String(userId || '');
-    if (!store[id]) return false;
-    delete store[id];
-    save();
-    log.info(`[Guests] Account ${id} dropped from the guest book.`);
-    return true;
+  load();
+  const id = String(userId || '');
+  if (!store[id]) return false;
+  delete store[id];
+  save();
+  log.info(`[Guests] Account ${id} dropped from the guest book.`);
+  return true;
 }
 
 /**
@@ -214,10 +214,10 @@ function forget(userId) {
  *   firstSeenAt: number, lastSeenAt: number }>}
  */
 function list() {
-    load();
-    return Object.values(store)
-        .filter(Boolean)
-        .sort((a, b) => (b.lastSeenAt || 0) - (a.lastSeenAt || 0));
+  load();
+  return Object.values(store)
+    .filter(Boolean)
+    .sort((a, b) => (b.lastSeenAt || 0) - (a.lastSeenAt || 0));
 }
 
 /**
@@ -235,59 +235,59 @@ function list() {
  * @returns {number} Nombre de fiches créées.
  */
 function adopt(known) {
-    load();
-    let created = 0;
+  load();
+  let created = 0;
 
-    for (const entry of known || []) {
-        if (!entry || !entry.userId) continue;
-        const id = String(entry.userId);
-        if (store[id]) continue;
+  for (const entry of known || []) {
+    if (!entry || !entry.userId) continue;
+    const id = String(entry.userId);
+    if (store[id]) continue;
 
-        store[id] = {
-            userId: id,
-            username: '',
-            displayName: entry.displayName || id,
-            avatar: entry.avatar || null,
-            firstSeenAt: entry.lastSeenAt || Date.now(),
-            lastSeenAt: entry.lastSeenAt || Date.now(),
-        };
-        created++;
-    }
+    store[id] = {
+      userId: id,
+      username: '',
+      displayName: entry.displayName || id,
+      avatar: entry.avatar || null,
+      firstSeenAt: entry.lastSeenAt || Date.now(),
+      lastSeenAt: entry.lastSeenAt || Date.now(),
+    };
+    created++;
+  }
 
-    if (created) {
-        save();
-        log.info(`[Guests] ${created} account(s) taken over from the open sessions.`);
-    }
-    return created;
+  if (created) {
+    save();
+    log.info(`[Guests] ${created} account(s) taken over from the open sessions.`);
+  }
+  return created;
 }
 
 /** Écrit sans attendre le délai — à l'extinction du process. */
 function flush() {
-    if (saveTimer) {
-        clearTimeout(saveTimer);
-        saveTimer = null;
-    }
-    save();
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  save();
 }
 
 /** Repart de zéro. Réservé aux tests. */
 function reset() {
-    store = null;
-    if (saveTimer) {
-        clearTimeout(saveTimer);
-        saveTimer = null;
-    }
+  store = null;
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
 }
 
 module.exports = {
-    GUESTS_FILE,
-    remember,
-    get,
-    isKnown,
-    touch,
-    forget,
-    list,
-    adopt,
-    flush,
-    reset,
+  GUESTS_FILE,
+  remember,
+  get,
+  isKnown,
+  touch,
+  forget,
+  list,
+  adopt,
+  flush,
+  reset,
 };

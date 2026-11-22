@@ -25,8 +25,13 @@ const path = require('path');
 let failed = 0;
 let passed = 0;
 const check = (label, ok, detail = '') => {
-    if (ok) { passed++; console.log(`  ok    ${label}${detail ? ` — ${detail}` : ''}`); }
-    else { failed++; console.log(`  FAIL ${label}${detail ? ` — ${detail}` : ''}`); }
+  if (ok) {
+    passed++;
+    console.log(`  ok    ${label}${detail ? ` — ${detail}` : ''}`);
+  } else {
+    failed++;
+    console.log(`  FAIL ${label}${detail ? ` — ${detail}` : ''}`);
+  }
 };
 
 /**
@@ -38,8 +43,8 @@ const check = (label, ok, detail = '') => {
  * sur les propriétés de la session.
  */
 function stub(moduleName, exports) {
-    const resolved = require.resolve(moduleName);
-    require.cache[resolved] = { id: resolved, filename: resolved, loaded: true, exports };
+  const resolved = require.resolve(moduleName);
+  require.cache[resolved] = { id: resolved, filename: resolved, loaded: true, exports };
 }
 
 stub('discord-player', { GuildQueue: function GuildQueue() {} });
@@ -56,37 +61,39 @@ const { foldVirtualElapsed } = require('../src/audio/PlaybackSession');
  */
 let clock = 1_000_000;
 Date.now = () => clock;
-const advance = (ms) => { clock += ms; };
+const advance = (ms) => {
+  clock += ms;
+};
 
 /** Une file en cours de lecture, telle que la voit le mode personnel. */
 function playing(extra = {}) {
-    return {
-        virtualIsPlaying: true,
-        virtualIsPaused: false,
-        virtualProgressMs: 0,
-        virtualLastUpdated: Date.now(),
-        ...extra,
-    };
+  return {
+    virtualIsPlaying: true,
+    virtualIsPaused: false,
+    virtualProgressMs: 0,
+    virtualLastUpdated: Date.now(),
+    ...extra,
+  };
 }
 
 /** Le tour de boucle du serveur, une fois par seconde. */
 function tick(queue, speed = 1) {
-    advance(1000);
-    foldVirtualElapsed(queue, speed);
+  advance(1000);
+  foldVirtualElapsed(queue, speed);
 }
 
 /** Ce que fait le gestionnaire de pause. */
 function pause(queue, speed = 1) {
-    foldVirtualElapsed(queue, speed);
-    queue.virtualIsPlaying = false;
-    queue.virtualIsPaused = true;
+  foldVirtualElapsed(queue, speed);
+  queue.virtualIsPlaying = false;
+  queue.virtualIsPaused = true;
 }
 
 /** Ce que fait le gestionnaire de reprise. */
 function resume(queue) {
-    queue.virtualIsPlaying = true;
-    queue.virtualIsPaused = false;
-    queue.virtualLastUpdated = Date.now();
+  queue.virtualIsPlaying = true;
+  queue.virtualIsPaused = false;
+  queue.virtualLastUpdated = Date.now();
 }
 
 console.log('\n=== Précision de la pause — mode personnel ===\n');
@@ -94,135 +101,161 @@ console.log('\n=== Précision de la pause — mode personnel ===\n');
 // ─────────────────── Une pause entre deux tours ───────────────────
 
 {
-    const queue = playing();
-    tick(queue);            // 1 000 ms comptées par la boucle
-    advance(400);           // puis 400 ms qu'aucun tour n'a encore vues
-    pause(queue);
+  const queue = playing();
+  tick(queue); // 1 000 ms comptées par la boucle
+  advance(400); // puis 400 ms qu'aucun tour n'a encore vues
+  pause(queue);
 
-    check('la fraction de seconde en cours est comptée',
-        queue.virtualProgressMs === 1400, `${queue.virtualProgressMs} ms`);
+  check(
+    'la fraction de seconde en cours est comptée',
+    queue.virtualProgressMs === 1400,
+    `${queue.virtualProgressMs} ms`,
+  );
 }
 
 {
-    // Le pire cas : la pause tombe juste avant le tour suivant.
-    const queue = playing();
-    tick(queue);
-    advance(999);
-    pause(queue);
+  // Le pire cas : la pause tombe juste avant le tour suivant.
+  const queue = playing();
+  tick(queue);
+  advance(999);
+  pause(queue);
 
-    check('  … même à 999 ms du dernier tour',
-        queue.virtualProgressMs === 1999, `${queue.virtualProgressMs} ms`);
+  check('  … même à 999 ms du dernier tour', queue.virtualProgressMs === 1999, `${queue.virtualProgressMs} ms`);
 }
 
 {
-    // Et le cas limite inverse : la pause suit immédiatement un tour.
-    const queue = playing();
-    tick(queue);
-    pause(queue);
+  // Et le cas limite inverse : la pause suit immédiatement un tour.
+  const queue = playing();
+  tick(queue);
+  pause(queue);
 
-    check('  … et rien n’est compté deux fois quand elle suit un tour',
-        queue.virtualProgressMs === 1000, `${queue.virtualProgressMs} ms`);
+  check(
+    '  … et rien n’est compté deux fois quand elle suit un tour',
+    queue.virtualProgressMs === 1000,
+    `${queue.virtualProgressMs} ms`,
+  );
 }
 
 // ─────────────────── L'erreur ne s'accumule pas ───────────────────
 
 {
-    /*
-     * Dix pauses, chacune à 700 ms du dernier tour. Avec l'ancien calcul la
-     * position perdait sept secondes en tout — bien au-delà des deux secondes
-     * au bout desquelles le navigateur se recale, ce qui produisait le saut.
-     */
-    const queue = playing();
-    let real = 0;
+  /*
+   * Dix pauses, chacune à 700 ms du dernier tour. Avec l'ancien calcul la
+   * position perdait sept secondes en tout — bien au-delà des deux secondes
+   * au bout desquelles le navigateur se recale, ce qui produisait le saut.
+   */
+  const queue = playing();
+  let real = 0;
 
-    for (let i = 0; i < 10; i++) {
-        tick(queue);   real += 1000;
-        advance(700);  real += 700;
-        pause(queue);
+  for (let i = 0; i < 10; i++) {
+    tick(queue);
+    real += 1000;
+    advance(700);
+    real += 700;
+    pause(queue);
 
-        advance(5000); // le temps passé à l'arrêt ne compte pas
-        resume(queue);
-    }
+    advance(5000); // le temps passé à l'arrêt ne compte pas
+    resume(queue);
+  }
 
-    check('dix pauses ne dérivent pas d’une milliseconde',
-        queue.virtualProgressMs === real, `${queue.virtualProgressMs} ms pour ${real} ms jouées`);
-    check('  … donc en deçà des 2 s au-delà desquelles le navigateur saute',
-        Math.abs(queue.virtualProgressMs - real) < 2000);
+  check(
+    'dix pauses ne dérivent pas d’une milliseconde',
+    queue.virtualProgressMs === real,
+    `${queue.virtualProgressMs} ms pour ${real} ms jouées`,
+  );
+  check(
+    '  … donc en deçà des 2 s au-delà desquelles le navigateur saute',
+    Math.abs(queue.virtualProgressMs - real) < 2000,
+  );
 }
 
 // ─────────────────── Ce qui ne doit rien compter ───────────────────
 
 {
-    const queue = playing();
-    tick(queue);
-    pause(queue);
+  const queue = playing();
+  tick(queue);
+  pause(queue);
 
-    advance(30000);
-    foldVirtualElapsed(queue);   // un tour de boucle pendant la pause
-    check('le temps passé en pause n’avance pas le morceau',
-        queue.virtualProgressMs === 1000, `${queue.virtualProgressMs} ms`);
+  advance(30000);
+  foldVirtualElapsed(queue); // un tour de boucle pendant la pause
+  check(
+    'le temps passé en pause n’avance pas le morceau',
+    queue.virtualProgressMs === 1000,
+    `${queue.virtualProgressMs} ms`,
+  );
 
-    pause(queue);                // une seconde pause, sur une lecture arrêtée
-    check('  … et une pause sur une pause n’avance rien non plus',
-        queue.virtualProgressMs === 1000, `${queue.virtualProgressMs} ms`);
+  pause(queue); // une seconde pause, sur une lecture arrêtée
+  check(
+    '  … et une pause sur une pause n’avance rien non plus',
+    queue.virtualProgressMs === 1000,
+    `${queue.virtualProgressMs} ms`,
+  );
 }
 
 {
-    const queue = playing({ virtualIsPlaying: false });
-    advance(4000);
-    foldVirtualElapsed(queue);
-    check('une file à l’arrêt ne compte rien',
-        queue.virtualProgressMs === 0, `${queue.virtualProgressMs} ms`);
-    check('  … mais son repère est repoussé, sans dette à solder plus tard',
-        queue.virtualLastUpdated === Date.now());
+  const queue = playing({ virtualIsPlaying: false });
+  advance(4000);
+  foldVirtualElapsed(queue);
+  check('une file à l’arrêt ne compte rien', queue.virtualProgressMs === 0, `${queue.virtualProgressMs} ms`);
+  check('  … mais son repère est repoussé, sans dette à solder plus tard', queue.virtualLastUpdated === Date.now());
 }
 
 // ─────────────────── Vitesse et horloge ───────────────────
 
 {
-    // Le morceau est étiré par le décodeur : une seconde d'horloge ne vaut plus
-    // une seconde de morceau.
-    const queue = playing();
-    advance(1000);
-    foldVirtualElapsed(queue, 2);
-    check('à vitesse double, une seconde d’horloge vaut deux secondes de morceau',
-        queue.virtualProgressMs === 2000, `${queue.virtualProgressMs} ms`);
+  // Le morceau est étiré par le décodeur : une seconde d'horloge ne vaut plus
+  // une seconde de morceau.
+  const queue = playing();
+  advance(1000);
+  foldVirtualElapsed(queue, 2);
+  check(
+    'à vitesse double, une seconde d’horloge vaut deux secondes de morceau',
+    queue.virtualProgressMs === 2000,
+    `${queue.virtualProgressMs} ms`,
+  );
 
-    advance(1000);
-    foldVirtualElapsed(queue, 0.5);
-    check('  … et une demie à vitesse moitié',
-        queue.virtualProgressMs === 2500, `${queue.virtualProgressMs} ms`);
+  advance(1000);
+  foldVirtualElapsed(queue, 0.5);
+  check('  … et une demie à vitesse moitié', queue.virtualProgressMs === 2500, `${queue.virtualProgressMs} ms`);
 }
 
 {
-    const queue = playing();
-    advance(1000);
-    foldVirtualElapsed(queue, 0);
-    check('une vitesse nulle est ignorée plutôt que de figer le morceau',
-        queue.virtualProgressMs === 1000, `${queue.virtualProgressMs} ms`);
+  const queue = playing();
+  advance(1000);
+  foldVirtualElapsed(queue, 0);
+  check(
+    'une vitesse nulle est ignorée plutôt que de figer le morceau',
+    queue.virtualProgressMs === 1000,
+    `${queue.virtualProgressMs} ms`,
+  );
 }
 
 {
-    // Reprise de veille, ajustement d'horloge : le temps peut reculer.
-    const queue = playing();
-    advance(2000);
-    foldVirtualElapsed(queue);
-    clock -= 5000;
-    foldVirtualElapsed(queue);
-    check('une horloge qui recule ne fait pas reculer le morceau',
-        queue.virtualProgressMs === 2000, `${queue.virtualProgressMs} ms`);
+  // Reprise de veille, ajustement d'horloge : le temps peut reculer.
+  const queue = playing();
+  advance(2000);
+  foldVirtualElapsed(queue);
+  clock -= 5000;
+  foldVirtualElapsed(queue);
+  check(
+    'une horloge qui recule ne fait pas reculer le morceau',
+    queue.virtualProgressMs === 2000,
+    `${queue.virtualProgressMs} ms`,
+  );
 }
 
 {
-    const queue = playing({ virtualLastUpdated: 0 });
-    advance(3000);
-    foldVirtualElapsed(queue);
-    check('un repère jamais posé ne compte pas depuis 1970',
-        queue.virtualProgressMs === 0, `${queue.virtualProgressMs} ms`);
+  const queue = playing({ virtualLastUpdated: 0 });
+  advance(3000);
+  foldVirtualElapsed(queue);
+  check(
+    'un repère jamais posé ne compte pas depuis 1970',
+    queue.virtualProgressMs === 0,
+    `${queue.virtualProgressMs} ms`,
+  );
 }
 
-check('une file absente ne fait pas tomber le serveur',
-    foldVirtualElapsed(null) === 0);
+check('une file absente ne fait pas tomber le serveur', foldVirtualElapsed(null) === 0);
 
 // ═════════ Côté navigateur : l'affichage ne change pas de source ═════════
 
@@ -247,38 +280,39 @@ const vm = require('vm');
 
 /** Extrait une fonction de app.js, par équilibrage des accolades. */
 function extractFunction(source, name) {
-    const start = source.indexOf(`function ${name}(`);
-    if (start === -1) throw new Error(`${name} introuvable dans app.js`);
+  const start = source.indexOf(`function ${name}(`);
+  if (start === -1) throw new Error(`${name} introuvable dans app.js`);
 
-    let depth = 0;
-    for (let end = source.indexOf('{', start); end < source.length; end++) {
-        if (source[end] === '{') depth++;
-        else if (source[end] === '}' && --depth === 0) return source.slice(start, end + 1);
-    }
-    throw new Error(`accolades non refermées pour ${name}`);
+  let depth = 0;
+  for (let end = source.indexOf('{', start); end < source.length; end++) {
+    if (source[end] === '{') depth++;
+    else if (source[end] === '}' && --depth === 0) return source.slice(start, end + 1);
+  }
+  throw new Error(`accolades non refermées pour ${name}`);
 }
 
-const appSource = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'web', 'public', 'app.js'), 'utf8'
-);
+const appSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'web', 'public', 'app.js'), 'utf8');
 
 const SERVER_RATIO = 99400 / 200000;
 
 /** Un libellé de fortune : son texte, ses classes, ses attributs. */
 function fakeLabel() {
-    const classes = new Set();
-    const attributes = new Map();
-    return {
-        textContent: '',
-        classList: {
-            toggle: (name, on) => { if (on) classes.add(name); else classes.delete(name); },
-            remove: (name) => classes.delete(name),
-            contains: (name) => classes.has(name),
-        },
-        setAttribute: (name, value) => attributes.set(name, String(value)),
-        removeAttribute: (name) => attributes.delete(name),
-        getAttribute: (name) => (attributes.has(name) ? attributes.get(name) : null),
-    };
+  const classes = new Set();
+  const attributes = new Map();
+  return {
+    textContent: '',
+    classList: {
+      toggle: (name, on) => {
+        if (on) classes.add(name);
+        else classes.delete(name);
+      },
+      remove: (name) => classes.delete(name),
+      contains: (name) => classes.has(name),
+    },
+    setAttribute: (name, value) => attributes.set(name, String(value)),
+    removeAttribute: (name) => attributes.delete(name),
+    getAttribute: (name) => (attributes.has(name) ? attributes.get(name) : null),
+  };
 }
 
 /**
@@ -289,101 +323,101 @@ function fakeLabel() {
  * savoir qu'elles ne viennent plus de sa fermeture.
  */
 function mountRenderer({ personal = true, totalMs = 200000 } = {}) {
-    const context = {
-        isSeeking: false,
-        state: {
-            settings: { broadcastMode: personal ? 'personal' : 'everyone', playbackSpeed: '1.0' },
-            isPaused: false,
-            currentTrack: { title: 'Essai' },
-            progress: { currentMs: 99400, totalMs },
-        },
-        // L'élément est à 100 s ; le serveur, lui, en est encore à 99,4 s.
-        personalAudio: { duration: totalMs / 1000, currentTime: 100, paused: false },
-        progressBar: { style: {} },
-        timeCurrent: { textContent: '' },
-        timeTotal: fakeLabel(),
-        baseProgressMs: 99400,
-        baseTotalMs: totalMs,
-        lastProgressTimestamp: 1000,
-        isTrackPlaying: true,
-        window: { MusicPlayer: { currentSpeed: '1.0' } },
-        // Figée : l'extrapolation de la branche serveur doit être reproductible.
-        performance: { now: () => 1000 },
-        formatMs: (ms) => String(Math.round(ms)),
-        syncVideoProgress: () => {},
-    };
-    context.globalThis = context;
-    vm.createContext(context);
-    // La règle « l'élément fait-il foi ? » vit à part depuis que la vidéo la
-    // partage (voir `heardPositionMs`) : elle entre au banc avec la fonction.
-    vm.runInContext(extractFunction(appSource, 'audioHoldsPosition'), context,
-        { filename: 'app.js:audioHoldsPosition' });
-    // De même pour la durée et son affichage, qui tiennent compte d'un flux
-    // dont la fin n'est pas encore connue.
-    vm.runInContext(extractFunction(appSource, 'heardDurationSecs'), context,
-        { filename: 'app.js:heardDurationSecs' });
-    vm.runInContext(extractFunction(appSource, 'paintTotal'), context,
-        { filename: 'app.js:paintTotal' });
-    vm.runInContext(extractFunction(appSource, 'renderSmoothProgress'), context,
-        { filename: 'app.js:renderSmoothProgress' });
+  const context = {
+    isSeeking: false,
+    state: {
+      settings: { broadcastMode: personal ? 'personal' : 'everyone', playbackSpeed: '1.0' },
+      isPaused: false,
+      currentTrack: { title: 'Essai' },
+      progress: { currentMs: 99400, totalMs },
+    },
+    // L'élément est à 100 s ; le serveur, lui, en est encore à 99,4 s.
+    personalAudio: { duration: totalMs / 1000, currentTime: 100, paused: false },
+    progressBar: { style: {} },
+    timeCurrent: { textContent: '' },
+    timeTotal: fakeLabel(),
+    baseProgressMs: 99400,
+    baseTotalMs: totalMs,
+    lastProgressTimestamp: 1000,
+    isTrackPlaying: true,
+    window: { MusicPlayer: { currentSpeed: '1.0' } },
+    // Figée : l'extrapolation de la branche serveur doit être reproductible.
+    performance: { now: () => 1000 },
+    formatMs: (ms) => String(Math.round(ms)),
+    syncVideoProgress: () => {},
+  };
+  context.globalThis = context;
+  vm.createContext(context);
+  // La règle « l'élément fait-il foi ? » vit à part depuis que la vidéo la
+  // partage (voir `heardPositionMs`) : elle entre au banc avec la fonction.
+  vm.runInContext(extractFunction(appSource, 'audioHoldsPosition'), context, { filename: 'app.js:audioHoldsPosition' });
+  // De même pour la durée et son affichage, qui tiennent compte d'un flux
+  // dont la fin n'est pas encore connue.
+  vm.runInContext(extractFunction(appSource, 'heardDurationSecs'), context, { filename: 'app.js:heardDurationSecs' });
+  vm.runInContext(extractFunction(appSource, 'paintTotal'), context, { filename: 'app.js:paintTotal' });
+  vm.runInContext(extractFunction(appSource, 'renderSmoothProgress'), context, {
+    filename: 'app.js:renderSmoothProgress',
+  });
 
-    return {
-        context,
-        render() {
-            vm.runInContext('renderSmoothProgress()', context);
-            return context.window.MusicPlayer.currentProgressRatio;
-        },
-        /** Ce que devient l'affichage une fois la pause confirmée par le serveur. */
-        pause() {
-            context.state.isPaused = true;
-            context.personalAudio.paused = true;
-            context.isTrackPlaying = false;
-        },
-    };
+  return {
+    context,
+    render() {
+      vm.runInContext('renderSmoothProgress()', context);
+      return context.window.MusicPlayer.currentProgressRatio;
+    },
+    /** Ce que devient l'affichage une fois la pause confirmée par le serveur. */
+    pause() {
+      context.state.isPaused = true;
+      context.personalAudio.paused = true;
+      context.isTrackPlaying = false;
+    },
+  };
 }
 
 console.log('=== Précision de la pause — affichage du navigateur ===\n');
 
 {
-    const bench = mountRenderer();
-    const playing = bench.render();
-    check('en lecture, la barre suit l’élément audio',
-        playing === 0.5, String(playing));
+  const bench = mountRenderer();
+  const playing = bench.render();
+  check('en lecture, la barre suit l’élément audio', playing === 0.5, String(playing));
 
-    bench.pause();
-    const paused = bench.render();
-    check('la pause ne fait pas reculer la barre',
-        paused === playing, `${playing} puis ${paused}`);
-    check('  … elle ne retombe pas sur l’estimation du serveur',
-        paused !== SERVER_RATIO, `celle-ci vaut ${SERVER_RATIO}`);
+  bench.pause();
+  const paused = bench.render();
+  check('la pause ne fait pas reculer la barre', paused === playing, `${playing} puis ${paused}`);
+  check(
+    '  … elle ne retombe pas sur l’estimation du serveur',
+    paused !== SERVER_RATIO,
+    `celle-ci vaut ${SERVER_RATIO}`,
+  );
 }
 
 {
-    // L'élément est arrêté sans que l'utilisateur l'ait demandé — chargement,
-    // bascule de piste. Il porte encore la position d'avant ; le serveur sait.
-    const bench = mountRenderer();
-    bench.context.personalAudio.paused = true;   // sans state.isPaused
-    check('un élément arrêté pour un chargement ne fait pas foi',
-        bench.render() === SERVER_RATIO, String(bench.render()));
+  // L'élément est arrêté sans que l'utilisateur l'ait demandé — chargement,
+  // bascule de piste. Il porte encore la position d'avant ; le serveur sait.
+  const bench = mountRenderer();
+  bench.context.personalAudio.paused = true; // sans state.isPaused
+  check(
+    'un élément arrêté pour un chargement ne fait pas foi',
+    bench.render() === SERVER_RATIO,
+    String(bench.render()),
+  );
 }
 
 {
-    // Rechargement de la page pendant une pause : l'élément repart de zéro, et
-    // c'est le serveur qui sait où l'on en était.
-    const bench = mountRenderer();
-    bench.pause();
-    bench.context.personalAudio.currentTime = 0;
-    check('une position nulle laisse la main au serveur',
-        bench.render() === SERVER_RATIO, String(bench.render()));
+  // Rechargement de la page pendant une pause : l'élément repart de zéro, et
+  // c'est le serveur qui sait où l'on en était.
+  const bench = mountRenderer();
+  bench.pause();
+  bench.context.personalAudio.currentTime = 0;
+  check('une position nulle laisse la main au serveur', bench.render() === SERVER_RATIO, String(bench.render()));
 }
 
 {
-    // En diffusion commune, le son ne sort pas du navigateur : son élément
-    // audio n'a rien à dire de la position.
-    const bench = mountRenderer({ personal: false });
-    bench.pause();
-    check('en diffusion commune, le serveur reste la référence',
-        bench.render() === SERVER_RATIO, String(bench.render()));
+  // En diffusion commune, le son ne sort pas du navigateur : son élément
+  // audio n'a rien à dire de la position.
+  const bench = mountRenderer({ personal: false });
+  bench.pause();
+  check('en diffusion commune, le serveur reste la référence', bench.render() === SERVER_RATIO, String(bench.render()));
 }
 
 console.log('\n=== La durée d’un flux dont la fin est inconnue ===\n');
@@ -394,47 +428,57 @@ console.log('\n=== La durée d’un flux dont la fin est inconnue ===\n');
  * restait à zéro, et le total s'écrivait « Infinity:NaN:NaN ».
  */
 {
-    const bench = mountRenderer();
-    bench.context.formatMs = (ms) => `${Math.round(ms)} ms`;
-    bench.context.personalAudio.duration = Infinity;
-    const ratio = bench.render();
-    check('la barre avance sur la durée des métadonnées',
-        ratio === 100 / 200, String(ratio));
-    check('  … que le total affiche', bench.context.timeTotal.textContent === '200000 ms',
-        bench.context.timeTotal.textContent);
-    check('  … sans se dire en attente', !bench.context.timeTotal.classList.contains('is-pending'));
+  const bench = mountRenderer();
+  bench.context.formatMs = (ms) => `${Math.round(ms)} ms`;
+  bench.context.personalAudio.duration = Infinity;
+  const ratio = bench.render();
+  check('la barre avance sur la durée des métadonnées', ratio === 100 / 200, String(ratio));
+  check(
+    '  … que le total affiche',
+    bench.context.timeTotal.textContent === '200000 ms',
+    bench.context.timeTotal.textContent,
+  );
+  check('  … sans se dire en attente', !bench.context.timeTotal.classList.contains('is-pending'));
 }
 
 {
-    // Ni l'élément ni les métadonnées ne la connaissent.
-    const bench = mountRenderer();
-    bench.context.personalAudio.duration = Infinity;
-    bench.context.baseTotalMs = 0;
-    const ratio = bench.render();
-    check('sans durée connue, la barre ne s’invente pas de progression', ratio === 0, String(ratio));
-    check('  … et le total se dit en attente plutôt que « 0:00 » ou « NaN »',
-        bench.context.timeTotal.classList.contains('is-pending')
-        && bench.context.timeTotal.getAttribute('aria-busy') === 'true');
+  // Ni l'élément ni les métadonnées ne la connaissent.
+  const bench = mountRenderer();
+  bench.context.personalAudio.duration = Infinity;
+  bench.context.baseTotalMs = 0;
+  const ratio = bench.render();
+  check('sans durée connue, la barre ne s’invente pas de progression', ratio === 0, String(ratio));
+  check(
+    '  … et le total se dit en attente plutôt que « 0:00 » ou « NaN »',
+    bench.context.timeTotal.classList.contains('is-pending') &&
+      bench.context.timeTotal.getAttribute('aria-busy') === 'true',
+  );
 
-    // La durée arrive : l'attente se lève.
-    bench.context.personalAudio.duration = 200;
-    bench.render();
-    check('  … et se lève quand la durée arrive',
-        !bench.context.timeTotal.classList.contains('is-pending')
-        && bench.context.timeTotal.getAttribute('aria-busy') === null);
+  // La durée arrive : l'attente se lève.
+  bench.context.personalAudio.duration = 200;
+  bench.render();
+  check(
+    '  … et se lève quand la durée arrive',
+    !bench.context.timeTotal.classList.contains('is-pending') &&
+      bench.context.timeTotal.getAttribute('aria-busy') === null,
+  );
 }
 
 {
-    // Le formateur lui-même ne doit plus rien écrire d'illisible.
-    const context = { window: { MusicPlayer: {} } };
-    vm.createContext(context);
-    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'web', 'public', 'js', 'player.js'), 'utf8')
-        .split('window.MusicPlayer.parseDurationMs')[0], context);
-    const format = context.window.MusicPlayer.formatMs;
-    const { formatMs: serverFormat } = require(path.join(__dirname, '..', 'src', 'utils', 'duration.js'));
-    check('formatMs écrit « 0:00 » pour l’infini, côté navigateur', format(Infinity) === '0:00', format(Infinity));
-    check('  … comme côté serveur', serverFormat(Infinity) === '0:00', serverFormat(Infinity));
-    check('  … et une durée ordinaire comme avant', format(125000) === '2:05' && serverFormat(3725000) === '1:02:05');
+  // Le formateur lui-même ne doit plus rien écrire d'illisible.
+  const context = { window: { MusicPlayer: {} } };
+  vm.createContext(context);
+  vm.runInContext(
+    fs
+      .readFileSync(path.join(__dirname, '..', 'src', 'web', 'public', 'js', 'player.js'), 'utf8')
+      .split('window.MusicPlayer.parseDurationMs')[0],
+    context,
+  );
+  const format = context.window.MusicPlayer.formatMs;
+  const { formatMs: serverFormat } = require(path.join(__dirname, '..', 'src', 'utils', 'duration.js'));
+  check('formatMs écrit « 0:00 » pour l’infini, côté navigateur', format(Infinity) === '0:00', format(Infinity));
+  check('  … comme côté serveur', serverFormat(Infinity) === '0:00', serverFormat(Infinity));
+  check('  … et une durée ordinaire comme avant', format(125000) === '2:05' && serverFormat(3725000) === '1:02:05');
 }
 
 console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);

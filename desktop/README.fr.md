@@ -14,18 +14,18 @@ autre ordinateur, un invité, exactement comme avant.
 
 ## Ce qu'elle fait
 
-| | |
-|---|---|
-| **Aucun prérequis** | Node.js est embarqué ; l'installeur apporte le bot et toutes ses dépendances |
-| **Première configuration guidée** | Coller le jeton suffit : il est vérifié auprès de Discord, `.env` est écrit, l'invitation préparée |
-| **Tableau de bord intégré** | Il s'ouvre dans la fenêtre de l'application une fois le bot prêt ; *Ouvrir dans le navigateur* reste à un clic |
-| **Zone de notification** | Fermer la fenêtre ne coupe rien : le bot continue, l'icône permet de rouvrir, redémarrer, éteindre |
-| **Redémarrage et versions** | Le redémarrage du tableau de bord et la bascule de version passent par l'application, qui relance le bon code |
-| **Démarrage avec la session** | À cocher dans le menu de l'icône : le bot démarre en arrière-plan, sans fenêtre |
-| **Une seule instance** | Rouvrir l'application montre celle qui tourne déjà |
+|                                   |                                                                                                                |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| **Aucun prérequis**               | Node.js est embarqué ; l'installeur apporte le bot et toutes ses dépendances                                   |
+| **Première configuration guidée** | Coller le jeton suffit : il est vérifié auprès de Discord, `.env` est écrit, l'invitation préparée             |
+| **Tableau de bord intégré**       | Il s'ouvre dans la fenêtre de l'application une fois le bot prêt ; _Ouvrir dans le navigateur_ reste à un clic |
+| **Zone de notification**          | Fermer la fenêtre ne coupe rien : le bot continue, l'icône permet de rouvrir, redémarrer, éteindre             |
+| **Redémarrage et versions**       | Le redémarrage du tableau de bord et la bascule de version passent par l'application, qui relance le bon code  |
+| **Démarrage avec la session**     | À cocher dans le menu de l'icône : le bot démarre en arrière-plan, sans fenêtre                                |
+| **Une seule instance**            | Rouvrir l'application montre celle qui tourne déjà                                                             |
 
 Fermer la fenêtre de lancement alors que rien ne tourne quitte l'application.
-*Quitter* depuis l'icône éteint le bot en douceur — fondu, sauvegarde de l'état
+_Quitter_ depuis l'icône éteint le bot en douceur — fondu, sauvegarde de l'état
 de lecture — avant de fermer.
 
 ---
@@ -39,29 +39,29 @@ protégé votre ordinateur » et un éditeur inconnu.
 
 Pour installer quand même : **Informations complémentaires**, puis
 **Exécuter quand même**. Le navigateur peut aussi demander de confirmer le
-téléchargement (*Conserver*).
+téléchargement (_Conserver_).
 
 Sous Linux, l'AppImage n'a besoin que d'être rendu exécutable
-(`chmod +x`, ou *Propriétés → Autoriser l'exécution*). Selon la distribution,
-la zone de notification demande l'extension *AppIndicator* (GNOME) et
+(`chmod +x`, ou _Propriétés → Autoriser l'exécution_). Selon la distribution,
+la zone de notification demande l'extension _AppIndicator_ (GNOME) et
 l'AppImage la bibliothèque `libfuse2`. Le paquet `.deb` installe ce qu'il faut.
 
 Chaque fichier est construit par le workflow public
 [`.github/workflows/desktop.yml`](../.github/workflows/desktop.yml), à partir du
 code de ce dépôt : chaque fichier joint à une release se rattache au run qui l'a
-produit, dans l'onglet *Actions*.
+produit, dans l'onglet _Actions_.
 
 ---
 
 ## Où sont les fichiers
 
-| Quoi | Où |
-|---|---|
-| Le bot, sa configuration et ses données | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\bot\` |
-| `.env` | dans ce même dossier `bot\` |
-| Playlists, réglages, journaux | `bot\data\` |
-| Node.js embarqué | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\runtime\` |
-| Réglages de l'application | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\settings.json` |
+| Quoi                                    | Où                                                                        |
+| --------------------------------------- | ------------------------------------------------------------------------- |
+| Le bot, sa configuration et ses données | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\bot\`          |
+| `.env`                                  | dans ce même dossier `bot\`                                               |
+| Playlists, réglages, journaux           | `bot\data\`                                                               |
+| Node.js embarqué                        | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\runtime\`      |
+| Réglages de l'application               | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\settings.json` |
 
 Sous Linux, le même dossier est `~/.local/share/com.wolfgangproxa.interactive-music-player/`.
 
@@ -71,12 +71,12 @@ Une mise à jour de l'application remplace le code du bot et le runtime, jamais
 ### Garder une installation existante
 
 Un clone du dépôt, avec son `.env` et ses `data/`, peut être lancé tel quel :
-dans l'assistant, *Utiliser une installation existante…*, puis choisir le
+dans l'assistant, _Utiliser une installation existante…_, puis choisir le
 dossier qui contient `src` et `package.json`. L'application lance alors ce
 dossier avec le Node de la machine s'il en a un — celui qui a installé ses
 `node_modules` —, et installe les dépendances si elles manquent.
 
-*Revenir au dossier de l'application*, en bas de la fenêtre, défait ce choix.
+_Revenir au dossier de l'application_, en bas de la fenêtre, défait ce choix.
 
 ### Un bot déjà lancé
 
@@ -92,8 +92,8 @@ L'installeur Windows se construit sous Windows, l'AppImage et le `.deb` sous
 Ubuntu, par le workflow
 [`.github/workflows/desktop.yml`](../.github/workflows/desktop.yml) : à chaque
 modification de `desktop/` poussée sur `main`, et à la demande depuis l'onglet
-*Actions*. Pousser une étiquette `v*`, ou lancer le workflow à la main en
-remplissant *release* (`v0.0.1`…), publie en plus la release, avec les notes de
+_Actions_. Pousser une étiquette `v*`, ou lancer le workflow à la main en
+remplissant _release_ (`v0.0.1`…), publie en plus la release, avec les notes de
 `.github/releases/<étiquette>.md` et un fichier `SHA256SUMS.txt`.
 
 En local, avec Node 24 et Rust :
@@ -107,7 +107,7 @@ npm run build -- --bundles appimage,deb   # Linux → bundle/appimage/ et bundle
 ```
 
 Sous Linux, Tauri demande d'abord WebKitGTK et ses voisines : la liste exacte
-est dans l'étape *Bibliothèques système* du workflow.
+est dans l'étape _Bibliothèques système_ du workflow.
 
 La charge utile se prépare sur la plateforme visée : npm y télécharge les
 binaires propres à chacune (FFmpeg, yt-dlp, chiffrement DAVE).

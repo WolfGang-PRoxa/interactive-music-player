@@ -60,81 +60,85 @@
 window.MusicPlayer = window.MusicPlayer || {};
 
 (function () {
-    'use strict';
+  'use strict';
 
-    /**
-     * La zone d'un curseur : la boîte qui le contient.
-     *
-     * Le parent, et non une classe : les conteneurs ne portent pas le même nom
-     * d'un endroit à l'autre — le cadre des réglages, la ligne du tiroir, le
-     * groupe d'opacité d'une fenêtre. Le parent, lui, est toujours le bon, et se
-     * lit sans table de correspondance à tenir à jour.
-     *
-     * @param {HTMLInputElement} range
-     * @returns {HTMLElement}
+  /**
+   * La zone d'un curseur : la boîte qui le contient.
+   *
+   * Le parent, et non une classe : les conteneurs ne portent pas le même nom
+   * d'un endroit à l'autre — le cadre des réglages, la ligne du tiroir, le
+   * groupe d'opacité d'une fenêtre. Le parent, lui, est toujours le bon, et se
+   * lit sans table de correspondance à tenir à jour.
+   *
+   * @param {HTMLInputElement} range
+   * @returns {HTMLElement}
+   */
+  function zoneOf(range) {
+    return (range && range.parentElement) || range;
+  }
+
+  /** Un écran tactile n'a rien à armer — voir l'en-tête du module. */
+  function isTouch() {
+    const deviceMode = window.MusicPlayer.deviceMode;
+    return Boolean(deviceMode && typeof deviceMode.isTouch === 'function' && deviceMode.isTouch());
+  }
+
+  /**
+   * Arme un curseur au clic dans sa zone, et y règle à la molette une fois
+   * armé.
+   *
+   * @param {HTMLInputElement} range curseur à armer
+   * @param {(wheel: WheelEvent) => void} applyNotch applique un cran de molette
+   */
+  window.MusicPlayer.armRange = function (range, applyNotch) {
+    if (!range) return;
+
+    const zone = zoneOf(range);
+    // Deux jeux d'écouteurs sur la même zone feraient le travail deux fois,
+    // et une initialisation rejouée n'a pas à s'en préoccuper.
+    if (zone.dataset.rangeArmed === 'true') return;
+    zone.dataset.rangeArmed = 'true';
+
+    /*
+     * `mousedown` et non `pointerdown` : c'est à l'appui de la souris que le
+     * navigateur attache le déplacement de la pastille et le glissement qui
+     * suit, et c'est donc lui qu'il faut refuser. Prendre l'événement de
+     * pointeur reviendrait au même sur un écran tactile, où l'on ne veut
+     * précisément rien changer.
      */
-    function zoneOf(range) {
-        return (range && range.parentElement) || range;
-    }
+    zone.addEventListener('mousedown', (e) => {
+      if (isTouch()) return;
 
-    /** Un écran tactile n'a rien à armer — voir l'en-tête du module. */
-    function isTouch() {
-        const deviceMode = window.MusicPlayer.deviceMode;
-        return Boolean(deviceMode && typeof deviceMode.isTouch === 'function' && deviceMode.isTouch());
-    }
+      // Les commandes de la ligne gardent leur geste.
+      if (e.target && e.target.closest && e.target.closest('button')) return;
 
-    /**
-     * Arme un curseur au clic dans sa zone, et y règle à la molette une fois
-     * armé.
-     *
-     * @param {HTMLInputElement} range curseur à armer
-     * @param {(wheel: WheelEvent) => void} applyNotch applique un cran de molette
-     */
-    window.MusicPlayer.armRange = function (range, applyNotch) {
-        if (!range) return;
+      // Déjà armé : le clic reprend son office natif.
+      if (document.activeElement === range) return;
 
-        const zone = zoneOf(range);
-        // Deux jeux d'écouteurs sur la même zone feraient le travail deux fois,
-        // et une initialisation rejouée n'a pas à s'en préoccuper.
-        if (zone.dataset.rangeArmed === 'true') return;
-        zone.dataset.rangeArmed = 'true';
+      e.preventDefault();
+      /*
+       * `preventScroll` parce que le curseur est sous le pointeur, donc
+       * déjà à l'écran : le seul effet que le défilement automatique
+       * pourrait avoir ici serait de déplacer la page sous la main qui
+       * vient de cliquer.
+       */
+      range.focus({ preventScroll: true });
+    });
 
-        /*
-         * `mousedown` et non `pointerdown` : c'est à l'appui de la souris que le
-         * navigateur attache le déplacement de la pastille et le glissement qui
-         * suit, et c'est donc lui qu'il faut refuser. Prendre l'événement de
-         * pointeur reviendrait au même sur un écran tactile, où l'on ne veut
-         * précisément rien changer.
-         */
-        zone.addEventListener('mousedown', (e) => {
-            if (isTouch()) return;
+    if (typeof applyNotch !== 'function') return;
 
-            // Les commandes de la ligne gardent leur geste.
-            if (e.target && e.target.closest && e.target.closest('button')) return;
-
-            // Déjà armé : le clic reprend son office natif.
-            if (document.activeElement === range) return;
-
-            e.preventDefault();
-            /*
-             * `preventScroll` parce que le curseur est sous le pointeur, donc
-             * déjà à l'écran : le seul effet que le défilement automatique
-             * pourrait avoir ici serait de déplacer la page sous la main qui
-             * vient de cliquer.
-             */
-            range.focus({ preventScroll: true });
-        });
-
-        if (typeof applyNotch !== 'function') return;
-
-        zone.addEventListener('wheel', (e) => {
-            // Pas armé : la molette appartient au panneau, qui défile comme
-            // partout ailleurs. C'est aussi ce qui rend le geste non passif
-            // nécessaire — il refuse le défilement dans un cas et le laisse dans
-            // l'autre.
-            if (document.activeElement !== range) return;
-            e.preventDefault();
-            applyNotch(e);
-        }, { passive: false });
-    };
+    zone.addEventListener(
+      'wheel',
+      (e) => {
+        // Pas armé : la molette appartient au panneau, qui défile comme
+        // partout ailleurs. C'est aussi ce qui rend le geste non passif
+        // nécessaire — il refuse le défilement dans un cas et le laisse dans
+        // l'autre.
+        if (document.activeElement !== range) return;
+        e.preventDefault();
+        applyNotch(e);
+      },
+      { passive: false },
+    );
+  };
 })();

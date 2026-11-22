@@ -3,7 +3,7 @@
 # Interactive Music Player
 
 Bot Discord de musique avec **atténuation automatique du volume à la parole**
-(*ducking*) et **tableau de bord web temps réel**.
+(_ducking_) et **tableau de bord web temps réel**.
 
 La musique baisse dès qu'une personne prend la parole dans le salon vocal, puis
 remonte progressivement une fois le silence revenu — sans intervention, sans
@@ -23,26 +23,26 @@ latence perceptible.
 
 ## En bref
 
-| | |
-|---|---|
-| **Ducking configurable** | Niveau, délai de garde et durée de fondu réglables ; exclusion possible par participant |
-| **Tableau de bord temps réel** | Contrôle complet, file d'attente en glisser-déposer, playlists, journaux, statistiques |
-| **Deux modes de diffusion** | Dans le salon vocal, ou dans votre navigateur sans déranger le serveur |
-| **Sources multiples** | YouTube, Spotify, SoundCloud, Apple Music, fichiers et dossiers locaux |
-| **Préchargement** | Les pistes à venir sont mises en cache : démarrage instantané, résistance aux coupures réseau |
-| **Reprise après redémarrage** | Le bot repart sur la piste interrompue, à sa position exacte |
-| **Vitesse et enchaînement** | 0,20× à 3,05× ; fondu enchaîné entre pistes, par volume ou avec effet |
-| **Niveau sonore (LUFS)** | Sonie mesurée par piste, réglable au décibel près, et synchronisable sur une cible commune |
-| **Aucune dépendance externe** | Ni base de données, ni build, ni FFmpeg à installer |
+|                                |                                                                                               |
+| ------------------------------ | --------------------------------------------------------------------------------------------- |
+| **Ducking configurable**       | Niveau, délai de garde et durée de fondu réglables ; exclusion possible par participant       |
+| **Tableau de bord temps réel** | Contrôle complet, file d'attente en glisser-déposer, playlists, journaux, statistiques        |
+| **Deux modes de diffusion**    | Dans le salon vocal, ou dans votre navigateur sans déranger le serveur                        |
+| **Sources multiples**          | YouTube, Spotify, SoundCloud, Apple Music, fichiers et dossiers locaux                        |
+| **Préchargement**              | Les pistes à venir sont mises en cache : démarrage instantané, résistance aux coupures réseau |
+| **Reprise après redémarrage**  | Le bot repart sur la piste interrompue, à sa position exacte                                  |
+| **Vitesse et enchaînement**    | 0,20× à 3,05× ; fondu enchaîné entre pistes, par volume ou avec effet                         |
+| **Niveau sonore (LUFS)**       | Sonie mesurée par piste, réglable au décibel près, et synchronisable sur une cible commune    |
+| **Aucune dépendance externe**  | Ni base de données, ni build, ni FFmpeg à installer                                           |
 
 ---
 
 ## Documentation
 
-| Pour | Document |
-|---|---|
-| Utiliser le bot et le tableau de bord | **[Guide utilisateur](docs/fr/GUIDE.md)** |
-| Comprendre ou modifier le code | **[Documentation technique](docs/fr/technique/README.md)** |
+| Pour                                  | Document                                                   |
+| ------------------------------------- | ---------------------------------------------------------- |
+| Utiliser le bot et le tableau de bord | **[Guide utilisateur](docs/fr/GUIDE.md)**                  |
+| Comprendre ou modifier le code        | **[Documentation technique](docs/fr/technique/README.md)** |
 
 La documentation technique couvre l'[architecture](docs/fr/technique/01-architecture.md),
 la [chaîne audio](docs/fr/technique/02-lecture-audio.md), le
@@ -56,7 +56,7 @@ la [chaîne audio](docs/fr/technique/02-lecture-audio.md), le
 
 ---
 
-## Application de bureau *(Windows, Linux)*
+## Application de bureau _(Windows, Linux)_
 
 Le plus simple : **l'installeur**. Il apporte Node.js, le bot et ses
 dépendances — aucun prérequis —, puis l'application guide la première
@@ -66,13 +66,13 @@ navigateur, comme avant.
 
 Tout est joint aux [releases](https://github.com/WolfGang-PRoxa/interactive-music-player/releases) :
 
-| Système | Fichier |
-|---|---|
-| Windows 10 et 11 | `…_x64-setup.exe`, l'installeur |
+| Système                    | Fichier                                                   |
+| -------------------------- | --------------------------------------------------------- |
+| Windows 10 et 11           | `…_x64-setup.exe`, l'installeur                           |
 | Linux (toute distribution) | `…_amd64.AppImage` : le rendre exécutable, puis le lancer |
-| Debian, Ubuntu et dérivées | `…_amd64.deb` : `sudo apt install ./…_amd64.deb` |
+| Debian, Ubuntu et dérivées | `…_amd64.deb` : `sudo apt install ./…_amd64.deb`          |
 
-Chaque fichier est produit par le workflow *Application de bureau*, et
+Chaque fichier est produit par le workflow _Application de bureau_, et
 `SHA256SUMS.txt` donne son empreinte. Tout le détail est dans
 [desktop/README.fr.md](desktop/README.fr.md).
 
@@ -117,7 +117,7 @@ elle vous accompagne, et se charge de tout ce qui suit.
 
 Il vous reste deux gestes : créer l'application sur le portail, que le bouton
 ouvre pour vous (**New Application**, puis onglet **Bot** → **Reset Token** →
-**Copy**), et cliquer sur *Inviter*. Le jeton copié est reconnu sans que vous
+**Copy**), et cliquer sur _Inviter_. Le jeton copié est reconnu sans que vous
 ayez à le coller, l'identifiant de l'application en est déduit, `.env` est écrit,
 les dépendances installées, les commandes enregistrées, et l'URL d'invitation
 assemblée avec les bonnes portées et permissions.
@@ -137,7 +137,7 @@ Commencez par `npm install`, puis :
    confidentiel.
 4. Invitez le bot via **OAuth2 → URL Generator**, en cochant les portées `bot`
    et `applications.commands`, puis les permissions :
-   *View Channels*, *Connect*, *Speak*, *Manage Channels*, *Move Members*.
+   _View Channels_, _Connect_, _Speak_, _Manage Channels_, _Move Members_.
 
 Puis créez le fichier de configuration :
 
@@ -163,8 +163,8 @@ npm start
 
 > **Aucune intention privilégiée n'est requise.** Le bot n'utilise que
 > `Guilds`, `GuildVoiceStates` et `GuildMessages`, toutes trois non
-> privilégiées. Il est inutile d'activer *Presence*, *Server Members* ou
-> *Message Content*.
+> privilégiées. Il est inutile d'activer _Presence_, _Server Members_ ou
+> _Message Content_.
 
 ### 3. Aller plus loin dans la configuration
 
@@ -177,7 +177,7 @@ Définir `GUILD_ID` dans `.env` rend les commandes disponibles immédiatement su
 ce serveur ; sans cette variable, le déploiement est global et peut prendre
 jusqu'à une heure.
 
-### 4. Le raccourci *(Windows, facultatif)*
+### 4. Le raccourci _(Windows, facultatif)_
 
 Pour avoir le bot sous la main ailleurs que dans le dossier du projet, double-cliquez
 plutôt sur **`Create shortcut.vbs`**, à la racine du projet. Un
@@ -237,12 +237,12 @@ met yt-dlp à jour sans attendre une nouvelle version du bot.
 
 ## Où sont les données
 
-| Quoi | Depuis le code source | Application de bureau |
-|---|---|---|
-| Configuration (`.env`) | racine du projet | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\bot\` |
-| Réglages, état de lecture, playlists, jeton du tableau de bord | `data/` | `bot\data\` |
-| Journaux | `data/logs/` | `bot\data\logs\` |
-| Versions téléchargées depuis le tableau de bord | `versions/` | `bot\versions\` |
+| Quoi                                                           | Depuis le code source | Application de bureau                                            |
+| -------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------- |
+| Configuration (`.env`)                                         | racine du projet      | `%LOCALAPPDATA%\com.wolfgangproxa.interactive-music-player\bot\` |
+| Réglages, état de lecture, playlists, jeton du tableau de bord | `data/`               | `bot\data\`                                                      |
+| Journaux                                                       | `data/logs/`          | `bot\data\logs\`                                                 |
+| Versions téléchargées depuis le tableau de bord                | `versions/`           | `bot\versions\`                                                  |
 
 Sous Linux, le dossier de l'application de bureau est
 `~/.local/share/com.wolfgangproxa.interactive-music-player/`. Rien de tout cela
@@ -252,16 +252,16 @@ n'est versionné, et rien ne quitte la machine.
 
 ## Commandes
 
-| Commande | Action |
-|---|---|
-| `/play query:<recherche, URL ou chemin>` | Lance ou met en file une piste |
-| `/playlist path:<dossier> [shuffle]` | Charge un dossier local entier |
-| `/queue [page]` | Affiche la file d'attente |
-| `/pause` `/resume` `/skip` `/stop` | Contrôle de la lecture |
-| `/nowplaying` | Piste en cours et progression |
-| `/volume level:<0-100>` | Volume de référence |
-| `/ducking toggle\|level\|delay\|fade\|status` | Réglages du ducking |
-| `/broadcast mode:<everyone\|personal>` | Mode de diffusion *(administrateur)* |
+| Commande                                      | Action                               |
+| --------------------------------------------- | ------------------------------------ |
+| `/play query:<recherche, URL ou chemin>`      | Lance ou met en file une piste       |
+| `/playlist path:<dossier> [shuffle]`          | Charge un dossier local entier       |
+| `/queue [page]`                               | Affiche la file d'attente            |
+| `/pause` `/resume` `/skip` `/stop`            | Contrôle de la lecture               |
+| `/nowplaying`                                 | Piste en cours et progression        |
+| `/volume level:<0-100>`                       | Volume de référence                  |
+| `/ducking toggle\|level\|delay\|fade\|status` | Réglages du ducking                  |
+| `/broadcast mode:<everyone\|personal>`        | Mode de diffusion _(administrateur)_ |
 
 Détail et exemples dans le [guide utilisateur](docs/fr/GUIDE.md#référence-complète-des-commandes-discord).
 
@@ -295,20 +295,20 @@ Arborescence détaillée et carte des dépendances :
 
 ## Développement
 
-| Commande | Effet |
-|---|---|
-| `npm install` | Installe les dépendances (FFmpeg et yt-dlp compris) |
-| `npm start` | Démarre le bot |
-| `npm run dev` | Démarre avec redémarrage au changement de fichier |
-| `npm run deploy` | Enregistre les commandes slash auprès de Discord |
-| `npm test` | Lance tous les tests automatisés |
-| `npm run check` | Vérifie la mise en forme (Prettier) et le code (ESLint) |
-| `npm run format` | Met en forme tout le projet avec Prettier |
-| `npm run lint` | Lance ESLint seul |
-| `npm run update-ytdlp` | Met à jour yt-dlp |
-| `Start bot.vbs` | *(Windows)* Démarre le bot sans console, par double-clic |
-| `Create shortcut.vbs` | *(Windows)* Assistant de création du raccourci de lancement |
-| `tools/start-bot.vbs` | *(Windows)* Cible du raccourci : démarrage sans console |
+| Commande               | Effet                                                       |
+| ---------------------- | ----------------------------------------------------------- |
+| `npm install`          | Installe les dépendances (FFmpeg et yt-dlp compris)         |
+| `npm start`            | Démarre le bot                                              |
+| `npm run dev`          | Démarre avec redémarrage au changement de fichier           |
+| `npm run deploy`       | Enregistre les commandes slash auprès de Discord            |
+| `npm test`             | Lance tous les tests automatisés                            |
+| `npm run check`        | Vérifie la mise en forme (Prettier) et le code (ESLint)     |
+| `npm run format`       | Met en forme tout le projet avec Prettier                   |
+| `npm run lint`         | Lance ESLint seul                                           |
+| `npm run update-ytdlp` | Met à jour yt-dlp                                           |
+| `Start bot.vbs`        | _(Windows)_ Démarre le bot sans console, par double-clic    |
+| `Create shortcut.vbs`  | _(Windows)_ Assistant de création du raccourci de lancement |
+| `tools/start-bot.vbs`  | _(Windows)_ Cible du raccourci : démarrage sans console     |
 
 L'intégration continue lance `npm run check` et `npm test` à chaque push. Le
 dernier étage du test de fumée démarre le vrai bot : il demande un
@@ -328,7 +328,7 @@ portée `applications.commands`. Sans `GUILD_ID`, la propagation globale peut
 prendre une heure.
 
 **Le bot ne rejoint pas le salon vocal**
-Vérifiez les permissions *Connect* et *Speak* sur le salon, et que vous y êtes
+Vérifiez les permissions _Connect_ et _Speak_ sur le salon, et que vous y êtes
 vous-même connecté au moment de la commande.
 
 **Le ducking ne réagit pas**
@@ -353,7 +353,7 @@ remonte à l'auteur — pas de télémétrie, pas de statistiques, pas de serveu
 central. Aucun audio n'est enregistré : le ducking ne lit que l'événement
 « untel parle », jamais ce qui est dit.
 
-| Document | Français | English |
-|---|---|---|
-| Conditions d'utilisation | **[CONDITIONS.md](CONDITIONS.md)** | **[TERMS.md](TERMS.md)** |
+| Document                     | Français                                     | English                      |
+| ---------------------------- | -------------------------------------------- | ---------------------------- |
+| Conditions d'utilisation     | **[CONDITIONS.md](CONDITIONS.md)**           | **[TERMS.md](TERMS.md)**     |
 | Politique de confidentialité | **[CONFIDENTIALITE.md](CONFIDENTIALITE.md)** | **[PRIVACY.md](PRIVACY.md)** |

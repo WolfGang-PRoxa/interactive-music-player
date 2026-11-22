@@ -78,181 +78,181 @@ const FIELD_FILTERED = Symbol('champs');
  * rubrique.
  */
 const ACTION_DEFS = [
-    /* ── Mener la lecture en cours ────────────────────────────────────── */
-    {
-        key: 'playback.transport',
-        group: 'playback',
-        messages: ['resume', 'pause', 'stop'],
-    },
-    {
-        key: 'playback.skip',
-        group: 'playback',
-        messages: ['skip', 'previous'],
-    },
-    {
-        key: 'playback.seek',
-        group: 'playback',
-        messages: ['seek'],
-    },
-    {
-        key: 'playback.mode',
-        group: 'playback',
-        messages: ['setPlayMode'],
-    },
-    {
-        // Choisir entre la file et une playlist, c'est décider de ce qui joue —
-        // pas modifier une collection. D'où `playback` plutôt que `playlists`.
-        // Le bouton lecture d'un lecteur vide démarre la source choisie sans
-        // rien y ajouter : il relève du même geste.
-        key: 'playback.source',
-        group: 'playback',
-        messages: ['setActivePlaybackSource', 'startPlaybackSource'],
-    },
-    {
-        key: 'playback.speed',
-        group: 'playback',
-        settings: ['playbackSpeed'],
-    },
-    {
-        key: 'playback.mix',
-        group: 'playback',
-        settings: ['mixEnabled', 'mixDuration', 'mixType'],
-    },
-    {
-        key: 'playback.loudness',
-        group: 'playback',
-        settings: ['lufsSyncEnabled', 'lufsSyncTarget'],
-    },
+  /* ── Mener la lecture en cours ────────────────────────────────────── */
+  {
+    key: 'playback.transport',
+    group: 'playback',
+    messages: ['resume', 'pause', 'stop'],
+  },
+  {
+    key: 'playback.skip',
+    group: 'playback',
+    messages: ['skip', 'previous'],
+  },
+  {
+    key: 'playback.seek',
+    group: 'playback',
+    messages: ['seek'],
+  },
+  {
+    key: 'playback.mode',
+    group: 'playback',
+    messages: ['setPlayMode'],
+  },
+  {
+    // Choisir entre la file et une playlist, c'est décider de ce qui joue —
+    // pas modifier une collection. D'où `playback` plutôt que `playlists`.
+    // Le bouton lecture d'un lecteur vide démarre la source choisie sans
+    // rien y ajouter : il relève du même geste.
+    key: 'playback.source',
+    group: 'playback',
+    messages: ['setActivePlaybackSource', 'startPlaybackSource'],
+  },
+  {
+    key: 'playback.speed',
+    group: 'playback',
+    settings: ['playbackSpeed'],
+  },
+  {
+    key: 'playback.mix',
+    group: 'playback',
+    settings: ['mixEnabled', 'mixDuration', 'mixType'],
+  },
+  {
+    key: 'playback.loudness',
+    group: 'playback',
+    settings: ['lufsSyncEnabled', 'lufsSyncTarget'],
+  },
 
-    /* ── Décider de ce qui passe ensuite ──────────────────────────────── */
-    {
-        // `play` porte mal son nom : c'est l'ajout d'un résultat de recherche à
-        // la file. Le bouton lecture, lui, envoie `resume`.
-        key: 'queue.add',
-        group: 'queue',
-        messages: ['play'],
-    },
-    {
-        // Passer devant tout le monde n'est pas ajouter : celui à qui l'on
-        // permet de proposer une piste n'a pas forcément le droit d'interrompre
-        // celle qui joue.
-        key: 'queue.playNow',
-        group: 'queue',
-        messages: ['playNow'],
-    },
-    {
-        key: 'queue.remove',
-        group: 'queue',
-        messages: ['removeTrack'],
-    },
-    {
-        key: 'queue.reorder',
-        group: 'queue',
-        messages: ['moveOrInsertTrack'],
-    },
-    {
-        key: 'queue.history',
-        group: 'queue',
-        messages: ['clearHistory', 'removeFromHistory'],
-    },
-    {
-        // Écrire un fichier sur le disque du bot n'est pas piloter la lecture :
-        // c'est ajouter, comme les autres destinations de la même boîte.
-        key: 'queue.download',
-        group: 'queue',
-        messages: ['downloadTrack'],
-    },
-    {
-        // Tout effacer d'un geste se coche à part de « retirer une piste » :
-        // c'est la même rubrique, ce n'est pas la même portée.
-        key: 'queue.clear',
-        group: 'queue',
-        messages: ['clearQueue'],
-    },
+  /* ── Décider de ce qui passe ensuite ──────────────────────────────── */
+  {
+    // `play` porte mal son nom : c'est l'ajout d'un résultat de recherche à
+    // la file. Le bouton lecture, lui, envoie `resume`.
+    key: 'queue.add',
+    group: 'queue',
+    messages: ['play'],
+  },
+  {
+    // Passer devant tout le monde n'est pas ajouter : celui à qui l'on
+    // permet de proposer une piste n'a pas forcément le droit d'interrompre
+    // celle qui joue.
+    key: 'queue.playNow',
+    group: 'queue',
+    messages: ['playNow'],
+  },
+  {
+    key: 'queue.remove',
+    group: 'queue',
+    messages: ['removeTrack'],
+  },
+  {
+    key: 'queue.reorder',
+    group: 'queue',
+    messages: ['moveOrInsertTrack'],
+  },
+  {
+    key: 'queue.history',
+    group: 'queue',
+    messages: ['clearHistory', 'removeFromHistory'],
+  },
+  {
+    // Écrire un fichier sur le disque du bot n'est pas piloter la lecture :
+    // c'est ajouter, comme les autres destinations de la même boîte.
+    key: 'queue.download',
+    group: 'queue',
+    messages: ['downloadTrack'],
+  },
+  {
+    // Tout effacer d'un geste se coche à part de « retirer une piste » :
+    // c'est la même rubrique, ce n'est pas la même portée.
+    key: 'queue.clear',
+    group: 'queue',
+    messages: ['clearQueue'],
+  },
 
-    /* ── Tenir les collections enregistrées ───────────────────────────── */
-    {
-        key: 'playlists.create',
-        group: 'playlists',
-        messages: ['createPlaylist'],
-    },
-    {
-        key: 'playlists.addTrack',
-        group: 'playlists',
-        messages: ['addPlaylistTrack', 'addTrackToPlaylist'],
-    },
-    {
-        key: 'playlists.removeTrack',
-        group: 'playlists',
-        messages: ['removeTrackFromPlaylist'],
-    },
-    {
-        key: 'playlists.reorderTracks',
-        group: 'playlists',
-        messages: ['movePlaylistTrack'],
-    },
-    {
-        key: 'playlists.rename',
-        group: 'playlists',
-        messages: ['renamePlaylist'],
-    },
-    {
-        key: 'playlists.organise',
-        group: 'playlists',
-        messages: ['reorderPlaylists'],
-    },
-    {
-        // Poser un aiguillage revient à réécrire une playlist, et le modifier
-        // relève du même droit que le poser — dans une playlist comme dans la
-        // file : c'est une seule fonctionnalité.
-        key: 'playlists.transitions',
-        group: 'playlists',
-        messages: ['insertTransition', 'setTransitionTarget'],
-    },
-    {
-        // Détruire une collection se coche à part du reste : c'est le seul
-        // geste de cette rubrique qu'on ne peut pas défaire.
-        key: 'playlists.delete',
-        group: 'playlists',
-        messages: ['deletePlaylist'],
-    },
+  /* ── Tenir les collections enregistrées ───────────────────────────── */
+  {
+    key: 'playlists.create',
+    group: 'playlists',
+    messages: ['createPlaylist'],
+  },
+  {
+    key: 'playlists.addTrack',
+    group: 'playlists',
+    messages: ['addPlaylistTrack', 'addTrackToPlaylist'],
+  },
+  {
+    key: 'playlists.removeTrack',
+    group: 'playlists',
+    messages: ['removeTrackFromPlaylist'],
+  },
+  {
+    key: 'playlists.reorderTracks',
+    group: 'playlists',
+    messages: ['movePlaylistTrack'],
+  },
+  {
+    key: 'playlists.rename',
+    group: 'playlists',
+    messages: ['renamePlaylist'],
+  },
+  {
+    key: 'playlists.organise',
+    group: 'playlists',
+    messages: ['reorderPlaylists'],
+  },
+  {
+    // Poser un aiguillage revient à réécrire une playlist, et le modifier
+    // relève du même droit que le poser — dans une playlist comme dans la
+    // file : c'est une seule fonctionnalité.
+    key: 'playlists.transitions',
+    group: 'playlists',
+    messages: ['insertTransition', 'setTransitionTarget'],
+  },
+  {
+    // Détruire une collection se coche à part du reste : c'est le seul
+    // geste de cette rubrique qu'on ne peut pas défaire.
+    key: 'playlists.delete',
+    group: 'playlists',
+    messages: ['deletePlaylist'],
+  },
 
-    /* ── Volume, atténuation, diffusion, qualité ──────────────────────── */
-    {
-        key: 'volume.level',
-        group: 'volume',
-        settings: ['baseVolume'],
-    },
-    {
-        key: 'volume.ducking',
-        group: 'volume',
-        messages: ['toggleVoiceDetection'],
-        settings: ['duckingEnabled', 'duckingLevel', 'duckingDelay', 'duckingFade'],
-    },
-    {
-        key: 'volume.quality',
-        group: 'volume',
-        messages: ['requestTrackFormats', 'setTrackQuality'],
-        settings: ['importAudioQuality', 'importVideoQuality'],
-    },
-    {
-        key: 'volume.trackGain',
-        group: 'volume',
-        messages: ['requestTrackLoudness', 'setTrackLoudness'],
-    },
-    {
-        key: 'volume.broadcast',
-        group: 'volume',
-        settings: ['broadcastMode'],
-    },
-    {
-        // Déplacer le bot d'un salon à l'autre s'entend de tous ceux qui y
-        // sont : le geste le plus visible de la rubrique, et le dernier qu'on
-        // confie.
-        key: 'volume.channel',
-        group: 'volume',
-        messages: ['selectChannel'],
-    },
+  /* ── Volume, atténuation, diffusion, qualité ──────────────────────── */
+  {
+    key: 'volume.level',
+    group: 'volume',
+    settings: ['baseVolume'],
+  },
+  {
+    key: 'volume.ducking',
+    group: 'volume',
+    messages: ['toggleVoiceDetection'],
+    settings: ['duckingEnabled', 'duckingLevel', 'duckingDelay', 'duckingFade'],
+  },
+  {
+    key: 'volume.quality',
+    group: 'volume',
+    messages: ['requestTrackFormats', 'setTrackQuality'],
+    settings: ['importAudioQuality', 'importVideoQuality'],
+  },
+  {
+    key: 'volume.trackGain',
+    group: 'volume',
+    messages: ['requestTrackLoudness', 'setTrackLoudness'],
+  },
+  {
+    key: 'volume.broadcast',
+    group: 'volume',
+    settings: ['broadcastMode'],
+  },
+  {
+    // Déplacer le bot d'un salon à l'autre s'entend de tous ceux qui y
+    // sont : le geste le plus visible de la rubrique, et le dernier qu'on
+    // confie.
+    key: 'volume.channel',
+    group: 'volume',
+    messages: ['selectChannel'],
+  },
 ];
 
 /** Les droits, dans l'ordre du catalogue. */
@@ -260,14 +260,14 @@ const ACTIONS = ACTION_DEFS.map((def) => def.key);
 
 /** Rubrique → droits qu'elle contient, dans l'ordre. */
 const GROUP_ACTIONS = GROUPS.reduce((acc, group) => {
-    acc[group] = ACTION_DEFS.filter((def) => def.group === group).map((def) => def.key);
-    return acc;
+  acc[group] = ACTION_DEFS.filter((def) => def.group === group).map((def) => def.key);
+  return acc;
 }, {});
 
 /** Droit → rubrique. */
 const ACTION_GROUP = ACTION_DEFS.reduce((acc, def) => {
-    acc[def.key] = def.group;
-    return acc;
+  acc[def.key] = def.group;
+  return acc;
 }, {});
 
 /**
@@ -281,49 +281,49 @@ const ACTION_GROUP = ACTION_DEFS.reduce((acc, def) => {
  * diraient plus la même chose.
  */
 const MESSAGE_RIGHTS = {
-    // Synchronisation et télémétrie
-    requestState: ALWAYS,
-    clientLog: ALWAYS,
-    memoryStream: ALWAYS,
-    syncProgress: ALWAYS,
-    startupFadeinConsumed: ALWAYS,
+  // Synchronisation et télémétrie
+  requestState: ALWAYS,
+  clientLog: ALWAYS,
+  memoryStream: ALWAYS,
+  syncProgress: ALWAYS,
+  startupFadeinConsumed: ALWAYS,
 
-    // Demander un droit ne l'accorde pas : c'est le maître qui répond, et le
-    // handler refuse ce qui n'a pas lieu d'être demandé (voir shareHandlers).
-    requestRight: ALWAYS,
+  // Demander un droit ne l'accorde pas : c'est le maître qui répond, et le
+  // handler refuse ce qui n'a pas lieu d'être demandé (voir shareHandlers).
+  requestRight: ALWAYS,
 
-    // Réparti champ par champ — voir SETTINGS_RIGHTS
-    updateSettings: FIELD_FILTERED,
+  // Réparti champ par champ — voir SETTINGS_RIGHTS
+  updateSettings: FIELD_FILTERED,
 
-    // Maître seul
-    leaveGuild: MASTER_ONLY,
-    setDefaultChannel: MASTER_ONLY,
-    restartBot: MASTER_ONLY,
-    shutdownBot: MASTER_ONLY,
-    listVersions: MASTER_ONLY,
-    installVersion: MASTER_ONLY,
-    uninstallVersion: MASTER_ONLY,
+  // Maître seul
+  leaveGuild: MASTER_ONLY,
+  setDefaultChannel: MASTER_ONLY,
+  restartBot: MASTER_ONLY,
+  shutdownBot: MASTER_ONLY,
+  listVersions: MASTER_ONLY,
+  installVersion: MASTER_ONLY,
+  uninstallVersion: MASTER_ONLY,
 
-    // Partage du contrôle : seul le maître distribue les droits, sans quoi un
-    // invité s'accorderait les siens.
-    admitGuest: MASTER_ONLY,
-    tunnelState: MASTER_ONLY,
+  // Partage du contrôle : seul le maître distribue les droits, sans quoi un
+  // invité s'accorderait les siens.
+  admitGuest: MASTER_ONLY,
+  tunnelState: MASTER_ONLY,
 
-    // Le fichier .env : un invité n'a rien à y lire, encore moins à y écrire.
-    configState: MASTER_ONLY,
-    configUpdate: MASTER_ONLY,
-    tunnelInstall: MASTER_ONLY,
-    tunnelMount: MASTER_ONLY,
-    tunnelUnmount: MASTER_ONLY,
-    shareControl: MASTER_ONLY,
-    revokeControl: MASTER_ONLY,
-    sendInviteLink: MASTER_ONLY,
-    answerRightRequest: MASTER_ONLY,
-    muteRightRequests: MASTER_ONLY,
+  // Le fichier .env : un invité n'a rien à y lire, encore moins à y écrire.
+  configState: MASTER_ONLY,
+  configUpdate: MASTER_ONLY,
+  tunnelInstall: MASTER_ONLY,
+  tunnelMount: MASTER_ONLY,
+  tunnelUnmount: MASTER_ONLY,
+  shareControl: MASTER_ONLY,
+  revokeControl: MASTER_ONLY,
+  sendInviteLink: MASTER_ONLY,
+  answerRightRequest: MASTER_ONLY,
+  muteRightRequests: MASTER_ONLY,
 };
 
 for (const def of ACTION_DEFS) {
-    for (const type of def.messages || []) MESSAGE_RIGHTS[type] = def.key;
+  for (const type of def.messages || []) MESSAGE_RIGHTS[type] = def.key;
 }
 
 /**
@@ -338,7 +338,7 @@ for (const def of ACTION_DEFS) {
  */
 const SETTINGS_RIGHTS = {};
 for (const def of ACTION_DEFS) {
-    for (const field of def.settings || []) SETTINGS_RIGHTS[field] = def.key;
+  for (const field of def.settings || []) SETTINGS_RIGHTS[field] = def.key;
 }
 
 /**
@@ -352,58 +352,58 @@ for (const def of ACTION_DEFS) {
  * Le fil conducteur : l'auditeur propose, le DJ mène, le co-hôte administre.
  */
 const PRESETS = {
-    /*
-     * Celui qui écoute avec vous.
-     *
-     * Il glisse une piste dans la file et l'y retrouve. Il ne coupe pas ce qui
-     * joue, ne double personne, n'efface rien : c'est le droit d'être entendu,
-     * pas celui de décider.
-     */
-    listener: ['queue.add'],
+  /*
+   * Celui qui écoute avec vous.
+   *
+   * Il glisse une piste dans la file et l'y retrouve. Il ne coupe pas ce qui
+   * joue, ne double personne, n'efface rien : c'est le droit d'être entendu,
+   * pas celui de décider.
+   */
+  listener: ['queue.add'],
 
-    /*
-     * Celui qui tient la musique.
-     *
-     * Tout ce qui touche à ce qui sort des enceintes — mener, enchaîner,
-     * garnir, ajuster le niveau et la qualité —, et rien de ce qui touche à
-     * l'installation : ni le salon vocal, ni le mode de diffusion, ni la
-     * destruction des collections.
-     */
-    dj: [
-        ...GROUP_ACTIONS.playback,
-        ...GROUP_ACTIONS.queue,
-        'playlists.addTrack',
-        'playlists.removeTrack',
-        'playlists.reorderTracks',
-        'playlists.transitions',
-        'volume.level',
-        'volume.quality',
-        'volume.trackGain',
-    ],
+  /*
+   * Celui qui tient la musique.
+   *
+   * Tout ce qui touche à ce qui sort des enceintes — mener, enchaîner,
+   * garnir, ajuster le niveau et la qualité —, et rien de ce qui touche à
+   * l'installation : ni le salon vocal, ni le mode de diffusion, ni la
+   * destruction des collections.
+   */
+  dj: [
+    ...GROUP_ACTIONS.playback,
+    ...GROUP_ACTIONS.queue,
+    'playlists.addTrack',
+    'playlists.removeTrack',
+    'playlists.reorderTracks',
+    'playlists.transitions',
+    'volume.level',
+    'volume.quality',
+    'volume.trackGain',
+  ],
 
-    /*
-     * Celui qui remplace le maître quand il n'est pas là.
-     *
-     * Tout ce qui se partage. Ce qui ne se partage pas — éteindre, changer de
-     * version, distribuer les droits — reste hors de portée : voir l'en-tête.
-     */
-    cohost: [...ACTIONS],
+  /*
+   * Celui qui remplace le maître quand il n'est pas là.
+   *
+   * Tout ce qui se partage. Ce qui ne se partage pas — éteindre, changer de
+   * version, distribuer les droits — reste hors de portée : voir l'en-tête.
+   */
+  cohost: [...ACTIONS],
 };
 
 /** Droits d'un invité à qui rien n'a été accordé. */
 function noPermissions() {
-    return ACTIONS.reduce((acc, key) => {
-        acc[key] = false;
-        return acc;
-    }, {});
+  return ACTIONS.reduce((acc, key) => {
+    acc[key] = false;
+    return acc;
+  }, {});
 }
 
 /** Droits du maître : tout ce qui se partage, sans exception. */
 function allPermissions() {
-    return ACTIONS.reduce((acc, key) => {
-        acc[key] = true;
-        return acc;
-    }, {});
+  return ACTIONS.reduce((acc, key) => {
+    acc[key] = true;
+    return acc;
+  }, {});
 }
 
 /**
@@ -425,29 +425,29 @@ function allPermissions() {
  * @returns {Object<string, boolean>} Un booléen par droit du catalogue.
  */
 function sanitize(raw) {
-    const clean = noPermissions();
-    if (!raw || typeof raw !== 'object') return clean;
+  const clean = noPermissions();
+  if (!raw || typeof raw !== 'object') return clean;
 
-    for (const group of GROUPS) {
-        if (raw[group] !== true) continue;
-        for (const key of GROUP_ACTIONS[group]) clean[key] = true;
-    }
+  for (const group of GROUPS) {
+    if (raw[group] !== true) continue;
+    for (const key of GROUP_ACTIONS[group]) clean[key] = true;
+  }
 
-    for (const key of ACTIONS) {
-        if (Object.prototype.hasOwnProperty.call(raw, key)) clean[key] = raw[key] === true;
-    }
+  for (const key of ACTIONS) {
+    if (Object.prototype.hasOwnProperty.call(raw, key)) clean[key] = raw[key] === true;
+  }
 
-    return clean;
+  return clean;
 }
 
 /** Cet invité a-t-il au moins un droit ? */
 function hasAny(permissions) {
-    return ACTIONS.some((key) => permissions && permissions[key] === true);
+  return ACTIONS.some((key) => permissions && permissions[key] === true);
 }
 
 /** Les droits accordés, nommés, dans l'ordre du catalogue. */
 function granted(permissions) {
-    return ACTIONS.filter((key) => permissions && permissions[key] === true);
+  return ACTIONS.filter((key) => permissions && permissions[key] === true);
 }
 
 /**
@@ -461,10 +461,10 @@ function granted(permissions) {
  * @returns {'none'|'partial'|'all'}
  */
 function groupState(permissions, group) {
-    const keys = GROUP_ACTIONS[group] || [];
-    const on = keys.filter((key) => permissions && permissions[key] === true).length;
-    if (on === 0) return 'none';
-    return on === keys.length ? 'all' : 'partial';
+  const keys = GROUP_ACTIONS[group] || [];
+  const on = keys.filter((key) => permissions && permissions[key] === true).length;
+  if (on === 0) return 'none';
+  return on === keys.length ? 'all' : 'partial';
 }
 
 /**
@@ -473,12 +473,14 @@ function groupState(permissions, group) {
  * @returns {Object<string, boolean>}
  */
 function presetPermissions(name) {
-    const keys = PRESETS[name];
-    if (!keys) return noPermissions();
-    return sanitize(keys.reduce((acc, key) => {
-        acc[key] = true;
-        return acc;
-    }, {}));
+  const keys = PRESETS[name];
+  if (!keys) return noPermissions();
+  return sanitize(
+    keys.reduce((acc, key) => {
+      acc[key] = true;
+      return acc;
+    }, {}),
+  );
 }
 
 /**
@@ -495,12 +497,12 @@ function presetPermissions(name) {
  * @returns {string|null}
  */
 function matchPreset(permissions) {
-    if (!hasAny(permissions)) return null;
-    for (const name of Object.keys(PRESETS)) {
-        const reference = presetPermissions(name);
-        if (ACTIONS.every((key) => Boolean(permissions[key]) === reference[key])) return name;
-    }
-    return null;
+  if (!hasAny(permissions)) return null;
+  for (const name of Object.keys(PRESETS)) {
+    const reference = presetPermissions(name);
+    if (ACTIONS.every((key) => Boolean(permissions[key]) === reference[key])) return name;
+  }
+  return null;
 }
 
 /**
@@ -511,18 +513,18 @@ function matchPreset(permissions) {
  * @returns {boolean}
  */
 function canSend(identity, type) {
-    if (identity && identity.master) return true;
+  if (identity && identity.master) return true;
 
-    const required = Object.prototype.hasOwnProperty.call(MESSAGE_RIGHTS, type)
-        ? MESSAGE_RIGHTS[type]
-        // Message inconnu : fermé par défaut. Voir l'en-tête du module.
-        : MASTER_ONLY;
+  const required = Object.prototype.hasOwnProperty.call(MESSAGE_RIGHTS, type)
+    ? MESSAGE_RIGHTS[type]
+    : // Message inconnu : fermé par défaut. Voir l'en-tête du module.
+      MASTER_ONLY;
 
-    if (required === ALWAYS) return true;
-    if (required === FIELD_FILTERED) return true;
-    if (required === MASTER_ONLY) return false;
+  if (required === ALWAYS) return true;
+  if (required === FIELD_FILTERED) return true;
+  if (required === MASTER_ONLY) return false;
 
-    return Boolean(identity && identity.permissions && identity.permissions[required]);
+  return Boolean(identity && identity.permissions && identity.permissions[required]);
 }
 
 /**
@@ -533,19 +535,19 @@ function canSend(identity, type) {
  * @returns {{ allowed: object, refused: string[] }}
  */
 function filterSettings(identity, data) {
-    if (identity && identity.master) return { allowed: data || {}, refused: [] };
+  if (identity && identity.master) return { allowed: data || {}, refused: [] };
 
-    const allowed = {};
-    const refused = [];
-    const permissions = (identity && identity.permissions) || noPermissions();
+  const allowed = {};
+  const refused = [];
+  const permissions = (identity && identity.permissions) || noPermissions();
 
-    for (const [field, value] of Object.entries(data || {})) {
-        const right = SETTINGS_RIGHTS[field];
-        if (right && permissions[right]) allowed[field] = value;
-        else refused.push(field);
-    }
+  for (const [field, value] of Object.entries(data || {})) {
+    const right = SETTINGS_RIGHTS[field];
+    if (right && permissions[right]) allowed[field] = value;
+    else refused.push(field);
+  }
 
-    return { allowed, refused };
+  return { allowed, refused };
 }
 
 /**
@@ -560,34 +562,34 @@ function filterSettings(identity, data) {
  * @returns {string|null}
  */
 function rightOf(type, refusedFields = []) {
-    if (type === 'updateSettings') {
-        const rights = refusedFields.map((field) => SETTINGS_RIGHTS[field]).filter(Boolean);
-        return rights.length ? rights[0] : null;
-    }
-    const required = MESSAGE_RIGHTS[type];
-    return typeof required === 'string' ? required : null;
+  if (type === 'updateSettings') {
+    const rights = refusedFields.map((field) => SETTINGS_RIGHTS[field]).filter(Boolean);
+    return rights.length ? rights[0] : null;
+  }
+  const required = MESSAGE_RIGHTS[type];
+  return typeof required === 'string' ? required : null;
 }
 
 module.exports = {
-    GROUPS,
-    GROUP_ACTIONS,
-    ACTION_GROUP,
-    ACTIONS,
-    ACTION_DEFS,
-    PRESETS,
-    MASTER_ONLY,
-    FIELD_FILTERED,
-    MESSAGE_RIGHTS,
-    SETTINGS_RIGHTS,
-    noPermissions,
-    allPermissions,
-    sanitize,
-    hasAny,
-    granted,
-    groupState,
-    presetPermissions,
-    matchPreset,
-    canSend,
-    filterSettings,
-    rightOf,
+  GROUPS,
+  GROUP_ACTIONS,
+  ACTION_GROUP,
+  ACTIONS,
+  ACTION_DEFS,
+  PRESETS,
+  MASTER_ONLY,
+  FIELD_FILTERED,
+  MESSAGE_RIGHTS,
+  SETTINGS_RIGHTS,
+  noPermissions,
+  allPermissions,
+  sanitize,
+  hasAny,
+  granted,
+  groupState,
+  presetPermissions,
+  matchPreset,
+  canSend,
+  filterSettings,
+  rightOf,
 };

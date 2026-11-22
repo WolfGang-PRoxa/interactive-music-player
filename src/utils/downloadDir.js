@@ -42,46 +42,46 @@ const DEFAULT_DIR = path.join(process.cwd(), 'data', 'downloads');
  * @returns {{ ok: boolean, resolved?: string, reason?: string }}
  */
 function validate(candidate) {
-    if (typeof candidate !== 'string' || !candidate.trim()) {
-        return { ok: false, reason: 'empty' };
-    }
+  if (typeof candidate !== 'string' || !candidate.trim()) {
+    return { ok: false, reason: 'empty' };
+  }
 
-    // L'octet nul tronque le chemin au niveau des appels système : ce qui est
-    // vérifié ici ne serait alors pas ce qui est ouvert plus bas.
-    if (candidate.includes('\0')) {
-        return { ok: false, reason: 'invalid' };
-    }
+  // L'octet nul tronque le chemin au niveau des appels système : ce qui est
+  // vérifié ici ne serait alors pas ce qui est ouvert plus bas.
+  if (candidate.includes('\0')) {
+    return { ok: false, reason: 'invalid' };
+  }
 
-    let resolved;
-    try {
-        resolved = path.resolve(candidate.trim());
-    } catch (e) {
-        return { ok: false, reason: 'invalid' };
-    }
+  let resolved;
+  try {
+    resolved = path.resolve(candidate.trim());
+  } catch (e) {
+    return { ok: false, reason: 'invalid' };
+  }
 
-    let stat;
-    try {
-        stat = fs.statSync(resolved);
-    } catch (e) {
-        return { ok: false, reason: 'missing' };
-    }
+  let stat;
+  try {
+    stat = fs.statSync(resolved);
+  } catch (e) {
+    return { ok: false, reason: 'missing' };
+  }
 
-    if (!stat.isDirectory()) {
-        return { ok: false, reason: 'notADirectory' };
-    }
+  if (!stat.isDirectory()) {
+    return { ok: false, reason: 'notADirectory' };
+  }
 
-    // L'écriture est éprouvée, non supposée : un dossier peut exister, être
-    // lisible, et refuser qu'on y crée quoi que ce soit — un point de montage
-    // en lecture seule, un dossier système, un partage réseau déconnecté. Le
-    // découvrir au moment du téléchargement laisserait l'utilisateur devant un
-    // échec sans rapport apparent avec son choix.
-    try {
-        fs.accessSync(resolved, fs.constants.W_OK);
-    } catch (e) {
-        return { ok: false, reason: 'notWritable' };
-    }
+  // L'écriture est éprouvée, non supposée : un dossier peut exister, être
+  // lisible, et refuser qu'on y crée quoi que ce soit — un point de montage
+  // en lecture seule, un dossier système, un partage réseau déconnecté. Le
+  // découvrir au moment du téléchargement laisserait l'utilisateur devant un
+  // échec sans rapport apparent avec son choix.
+  try {
+    fs.accessSync(resolved, fs.constants.W_OK);
+  } catch (e) {
+    return { ok: false, reason: 'notWritable' };
+  }
 
-    return { ok: true, resolved };
+  return { ok: true, resolved };
 }
 
 /**
@@ -95,8 +95,8 @@ function validate(candidate) {
  * @returns {string} Le chemin, prêt à recevoir.
  */
 function ensure(dir) {
-    fs.mkdirSync(dir, { recursive: true });
-    return dir;
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
 }
 
 /**
@@ -112,20 +112,20 @@ function ensure(dir) {
  * @returns {string}
  */
 function safeFilename(title, extension) {
-    const base = String(title || 'piste')
-        .replace(/[\\/:*?"<>|]/g, '-')
-        // Les caractères de contrôle ne se voient pas et cassent les outils qui
-        // liront ce dossier ensuite.
-        // eslint-disable-next-line no-control-regex
-        .replace(/[\x00-\x1f\x7f]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim()
-        // Un point final est ignoré par Windows, ce qui ferait deux fichiers
-        // impossibles à distinguer.
-        .replace(/\.+$/, '')
-        .slice(0, 120);
+  const base = String(title || 'piste')
+    .replace(/[\\/:*?"<>|]/g, '-')
+    // Les caractères de contrôle ne se voient pas et cassent les outils qui
+    // liront ce dossier ensuite.
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\x00-\x1f\x7f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    // Un point final est ignoré par Windows, ce qui ferait deux fichiers
+    // impossibles à distinguer.
+    .replace(/\.+$/, '')
+    .slice(0, 120);
 
-    return `${base || 'piste'}${extension}`;
+  return `${base || 'piste'}${extension}`;
 }
 
 /**
@@ -140,19 +140,19 @@ function safeFilename(title, extension) {
  * @returns {string}
  */
 function uniquePath(dir, filename) {
-    const extension = path.extname(filename);
-    const base = filename.slice(0, filename.length - extension.length);
+  const extension = path.extname(filename);
+  const base = filename.slice(0, filename.length - extension.length);
 
-    let candidate = path.join(dir, filename);
-    let index = 2;
-    while (fs.existsSync(candidate)) {
-        candidate = path.join(dir, `${base} (${index})${extension}`);
-        index++;
-        // Garde-fou : un dossier contenant mille homonymes signale autre chose
-        // qu'un besoin de numéroter.
-        if (index > 1000) break;
-    }
-    return candidate;
+  let candidate = path.join(dir, filename);
+  let index = 2;
+  while (fs.existsSync(candidate)) {
+    candidate = path.join(dir, `${base} (${index})${extension}`);
+    index++;
+    // Garde-fou : un dossier contenant mille homonymes signale autre chose
+    // qu'un besoin de numéroter.
+    if (index > 1000) break;
+  }
+  return candidate;
 }
 
 /**
@@ -172,28 +172,28 @@ let rootsCachedAt = 0;
 const ROOTS_TTL_MS = 30000;
 
 function listRoots() {
-    if (process.platform !== 'win32') return ['/'];
+  if (process.platform !== 'win32') return ['/'];
 
-    // Un disque réseau déconnecté fait attendre `existsSync` de longues
-    // secondes. Le résultat est donc gardé un moment : parcourir une
-    // arborescence enchaîne les requêtes, et les vingt-quatre sondages n'ont
-    // pas à être refaits à chacune.
-    const now = Date.now();
-    if (rootsCache && now - rootsCachedAt < ROOTS_TTL_MS) return rootsCache;
+  // Un disque réseau déconnecté fait attendre `existsSync` de longues
+  // secondes. Le résultat est donc gardé un moment : parcourir une
+  // arborescence enchaîne les requêtes, et les vingt-quatre sondages n'ont
+  // pas à être refaits à chacune.
+  const now = Date.now();
+  if (rootsCache && now - rootsCachedAt < ROOTS_TTL_MS) return rootsCache;
 
-    const found = [];
-    for (let code = 'C'.charCodeAt(0); code <= 'Z'.charCodeAt(0); code++) {
-        const root = `${String.fromCharCode(code)}:\\`;
-        try {
-            if (fs.existsSync(root)) found.push(root);
-        } catch (e) {
-            // Disque protégé ou injoignable : il n'a pas sa place dans la liste.
-        }
+  const found = [];
+  for (let code = 'C'.charCodeAt(0); code <= 'Z'.charCodeAt(0); code++) {
+    const root = `${String.fromCharCode(code)}:\\`;
+    try {
+      if (fs.existsSync(root)) found.push(root);
+    } catch (e) {
+      // Disque protégé ou injoignable : il n'a pas sa place dans la liste.
     }
+  }
 
-    rootsCache = found;
-    rootsCachedAt = now;
-    return found;
+  rootsCache = found;
+  rootsCachedAt = now;
+  return found;
 }
 
 /**
@@ -215,38 +215,38 @@ function listRoots() {
  *
  * @returns {string|null} null si le dossier reste introuvable.
  */
-let downloadsLookup;   // undefined : pas encore cherché ; null : introuvable
+let downloadsLookup; // undefined : pas encore cherché ; null : introuvable
 
 function userDownloadsDir() {
-    // La recherche est faite une fois — le dossier ne se déplace pas deux fois
-    // dans une vie de processus, et sous Windows elle lance un programme. Son
-    // existence, elle, est revérifiée à chaque appel : c'est le cas où le
-    // chemin trouvé ne vaut plus rien, et il ne coûte qu'un `stat`.
-    if (downloadsLookup === undefined) downloadsLookup = locateDownloads();
-    if (!downloadsLookup) return null;
+  // La recherche est faite une fois — le dossier ne se déplace pas deux fois
+  // dans une vie de processus, et sous Windows elle lance un programme. Son
+  // existence, elle, est revérifiée à chaque appel : c'est le cas où le
+  // chemin trouvé ne vaut plus rien, et il ne coûte qu'un `stat`.
+  if (downloadsLookup === undefined) downloadsLookup = locateDownloads();
+  if (!downloadsLookup) return null;
 
-    try {
-        if (fs.statSync(downloadsLookup).isDirectory()) return downloadsLookup;
-    } catch (e) {
-        // Supprimé ou déconnecté depuis : autant ne rien proposer.
-    }
-    return null;
+  try {
+    if (fs.statSync(downloadsLookup).isDirectory()) return downloadsLookup;
+  } catch (e) {
+    // Supprimé ou déconnecté depuis : autant ne rien proposer.
+  }
+  return null;
 }
 
 /** Où le système déclare son dossier de téléchargement. */
 function locateDownloads() {
-    const fallback = path.join(os.homedir(), 'Downloads');
+  const fallback = path.join(os.homedir(), 'Downloads');
 
-    if (process.platform === 'win32') {
-        return registryDownloads() || fallback;
-    }
+  if (process.platform === 'win32') {
+    return registryDownloads() || fallback;
+  }
 
-    // macOS ne traduit pas ses dossiers personnels sur le disque ; Linux, si.
-    if (process.platform === 'linux') {
-        return xdgDownloads() || fallback;
-    }
+  // macOS ne traduit pas ses dossiers personnels sur le disque ; Linux, si.
+  if (process.platform === 'linux') {
+    return xdgDownloads() || fallback;
+  }
 
-    return fallback;
+  return fallback;
 }
 
 /**
@@ -260,38 +260,38 @@ function locateDownloads() {
  * se traduit pas, lui.
  */
 function registryDownloads() {
-    const KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders';
-    const VALUE = '{374DE290-123F-4565-9164-39C4925E467B}';
+  const KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders';
+  const VALUE = '{374DE290-123F-4565-9164-39C4925E467B}';
 
-    let output;
-    try {
-        output = cp.execFileSync('reg', ['query', KEY, '/v', VALUE], {
-            encoding: 'utf8',
-            windowsHide: true,
-            timeout: 4000,
-            stdio: ['ignore', 'pipe', 'ignore'],
-        });
-    } catch (e) {
-        // Valeur absente, `reg` introuvable, poste verrouillé : on retombera
-        // sur le chemin par défaut, qui est juste dans l'immense majorité des cas.
-        return null;
-    }
-
-    // « <nom>    REG_EXPAND_SZ    <chemin> », le chemin pouvant contenir des
-    // espaces : on coupe sur le type, pas sur les blancs.
-    const match = output.match(/REG_(?:EXPAND_)?SZ\s+(.+)/);
-    if (!match) return null;
-
-    const raw = match[1].trim();
-    if (!raw) return null;
-
-    // %USERPROFILE%, %HOMEDRIVE%… : les variables que Windows y laisse.
-    const expanded = raw.replace(/%([^%]+)%/g, (whole, name) => {
-        const value = process.env[name] || process.env[name.toUpperCase()];
-        return value === undefined ? whole : value;
+  let output;
+  try {
+    output = cp.execFileSync('reg', ['query', KEY, '/v', VALUE], {
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 4000,
+      stdio: ['ignore', 'pipe', 'ignore'],
     });
+  } catch (e) {
+    // Valeur absente, `reg` introuvable, poste verrouillé : on retombera
+    // sur le chemin par défaut, qui est juste dans l'immense majorité des cas.
+    return null;
+  }
 
-    return expanded.includes('%') ? null : expanded;
+  // « <nom>    REG_EXPAND_SZ    <chemin> », le chemin pouvant contenir des
+  // espaces : on coupe sur le type, pas sur les blancs.
+  const match = output.match(/REG_(?:EXPAND_)?SZ\s+(.+)/);
+  if (!match) return null;
+
+  const raw = match[1].trim();
+  if (!raw) return null;
+
+  // %USERPROFILE%, %HOMEDRIVE%… : les variables que Windows y laisse.
+  const expanded = raw.replace(/%([^%]+)%/g, (whole, name) => {
+    const value = process.env[name] || process.env[name.toUpperCase()];
+    return value === undefined ? whole : value;
+  });
+
+  return expanded.includes('%') ? null : expanded;
 }
 
 /**
@@ -302,14 +302,14 @@ function registryDownloads() {
  * « $HOME/Téléchargements », et `~/Downloads` n'existe pas.
  */
 function xdgDownloads() {
-    try {
-        const text = fs.readFileSync(path.join(os.homedir(), '.config', 'user-dirs.dirs'), 'utf8');
-        const match = text.match(/^\s*XDG_DOWNLOAD_DIR\s*=\s*"([^"]*)"/m);
-        if (!match || !match[1]) return null;
-        return match[1].replace(/^\$HOME\b/, os.homedir());
-    } catch (e) {
-        return null;
-    }
+  try {
+    const text = fs.readFileSync(path.join(os.homedir(), '.config', 'user-dirs.dirs'), 'utf8');
+    const match = text.match(/^\s*XDG_DOWNLOAD_DIR\s*=\s*"([^"]*)"/m);
+    if (!match || !match[1]) return null;
+    return match[1].replace(/^\$HOME\b/, os.homedir());
+  } catch (e) {
+    return null;
+  }
 }
 
 /**
@@ -325,28 +325,28 @@ function xdgDownloads() {
  * @returns {string|null} null si même la racine se refuse.
  */
 function nearestReadable(start) {
-    let current = path.resolve(start);
+  let current = path.resolve(start);
 
-    for (let depth = 0; depth < 64; depth++) {
-        try {
-            fs.readdirSync(current);
-            return current;
-        } catch (e) {
-            const parent = path.dirname(current);
-            if (parent === current) return null;
-            current = parent;
-        }
+  for (let depth = 0; depth < 64; depth++) {
+    try {
+      fs.readdirSync(current);
+      return current;
+    } catch (e) {
+      const parent = path.dirname(current);
+      if (parent === current) return null;
+      current = parent;
     }
-    return null;
+  }
+  return null;
 }
 
 module.exports = {
-    DEFAULT_DIR,
-    validate,
-    ensure,
-    safeFilename,
-    uniquePath,
-    listRoots,
-    nearestReadable,
-    userDownloadsDir,
+  DEFAULT_DIR,
+  validate,
+  ensure,
+  safeFilename,
+  uniquePath,
+  listRoots,
+  nearestReadable,
+  userDownloadsDir,
 };

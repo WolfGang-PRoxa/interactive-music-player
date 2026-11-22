@@ -132,42 +132,44 @@ let ipv4Dispatcher = null;
 
 /** La voie en cours, après avoir levé un repli dont l'heure est passée. */
 function currentLevel() {
-    if (level === ROUTE.DEFAULT) return level;
-    if (now() - levelSince >= IPV4_WINDOW_MS) {
-        level = ROUTE.DEFAULT;
-        exhausted = false;
-        log.info('[YouTube] One hour has passed: back to IPv6, anonymously.');
-        return level;
-    }
+  if (level === ROUTE.DEFAULT) return level;
+  if (now() - levelSince >= IPV4_WINDOW_MS) {
+    level = ROUTE.DEFAULT;
+    exhausted = false;
+    log.info('[YouTube] One hour has passed: back to IPv6, anonymously.');
     return level;
+  }
+  return level;
 }
 
 /** L'IPv4 est-elle la route ? */
 function onIpv4() {
-    return currentLevel() >= ROUTE.IPV4;
+  return currentLevel() >= ROUTE.IPV4;
 }
 
 /** Passe à l'IPv4, pour une heure. */
 function escalate(to, source) {
-    if (currentLevel() >= to) return;
-    level = to;
-    levelSince = now();
-    log.warn(`[YouTube] Refused as a bot over IPv6 (${source}): falling back to IPv4 for one hour.`);
+  if (currentLevel() >= to) return;
+  level = to;
+  levelSince = now();
+  log.warn(`[YouTube] Refused as a bot over IPv6 (${source}): falling back to IPv4 for one hour.`);
 }
 
 /** Refusé par la dernière voie : on arrête d'insister. */
 function refusedEverywhere(source) {
-    // Le travail de fond s'arrête à chaque refus, même déjà signalé : c'est
-    // la preuve que le signalement tient toujours.
-    pausedUntil = now() + BACKGROUND_PAUSE_MS;
-    if (exhausted) return;
-    exhausted = true;
-    log.error(`[YouTube] Refused as a bot over IPv4 as well (${source}): nothing will load until `
-        + 'YouTube lifts the flag. Background extractions paused for 30 minutes.');
+  // Le travail de fond s'arrête à chaque refus, même déjà signalé : c'est
+  // la preuve que le signalement tient toujours.
+  pausedUntil = now() + BACKGROUND_PAUSE_MS;
+  if (exhausted) return;
+  exhausted = true;
+  log.error(
+    `[YouTube] Refused as a bot over IPv4 as well (${source}): nothing will load until ` +
+      'YouTube lifts the flag. Background extractions paused for 30 minutes.',
+  );
 }
 
 function isBotCheck(text) {
-    return BOT_CHECK.test(String(text || ''));
+  return BOT_CHECK.test(String(text || ''));
 }
 
 /**
@@ -178,22 +180,22 @@ function isBotCheck(text) {
  * @returns {4|undefined}
  */
 function familyFor(url) {
-    let host;
-    try {
-        host = new URL(url).hostname;
-    } catch (e) {
-        return undefined;
-    }
-    return YOUTUBE_HOST.test(host) && onIpv4() ? 4 : undefined;
+  let host;
+  try {
+    host = new URL(url).hostname;
+  } catch (e) {
+    return undefined;
+  }
+  return YOUTUBE_HOST.test(host) && onIpv4() ? 4 : undefined;
 }
 
 /** L'adresse mène-t-elle à YouTube ? */
 function isYoutubeUrl(url) {
-    try {
-        return YOUTUBE_HOST.test(new URL(url).hostname);
-    } catch (e) {
-        return false;
-    }
+  try {
+    return YOUTUBE_HOST.test(new URL(url).hostname);
+  } catch (e) {
+    return false;
+  }
 }
 
 /**
@@ -204,20 +206,19 @@ function isYoutubeUrl(url) {
  * qu'on a collé sont la même vidéo, et ne doivent coûter qu'une extraction.
  */
 function videoKey(url) {
-    try {
-        const u = new URL(url);
-        const host = u.hostname.toLowerCase().replace(/^(www|m|music)\./, '');
-        if (host === 'youtu.be') return `youtube:${u.pathname.slice(1)}`;
-        if (host === 'youtube.com') {
-            const id = u.searchParams.get('v')
-                || (u.pathname.match(/^\/(?:shorts|embed|live)\/([^/]+)/) || [])[1];
-            // Une liste de lecture n'est pas une vidéo : elle garde son adresse.
-            if (id && !u.pathname.startsWith('/playlist')) return `youtube:${id}`;
-        }
-    } catch (e) {
-        // Une recherche (`ytsearch1:…`) n'est pas une adresse : elle se garde telle quelle.
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase().replace(/^(www|m|music)\./, '');
+    if (host === 'youtu.be') return `youtube:${u.pathname.slice(1)}`;
+    if (host === 'youtube.com') {
+      const id = u.searchParams.get('v') || (u.pathname.match(/^\/(?:shorts|embed|live)\/([^/]+)/) || [])[1];
+      // Une liste de lecture n'est pas une vidéo : elle garde son adresse.
+      if (id && !u.pathname.startsWith('/playlist')) return `youtube:${id}`;
     }
-    return url;
+  } catch (e) {
+    // Une recherche (`ytsearch1:…`) n'est pas une adresse : elle se garde telle quelle.
+  }
+  return url;
 }
 
 /**
@@ -228,10 +229,12 @@ function videoKey(url) {
  * route — famille d'adresses — n'y entrent pas : la vidéo est la même.
  */
 function dumpKey(url, flags) {
-    if (!flags || !flags.dumpSingleJson) return null;
-    const { forceIpv4, ...rest } = flags;
-    const stable = Object.keys(rest).sort().map((name) => `${name}=${JSON.stringify(rest[name])}`);
-    return `${videoKey(url)}|${stable.join('&')}`;
+  if (!flags || !flags.dumpSingleJson) return null;
+  const { forceIpv4, ...rest } = flags;
+  const stable = Object.keys(rest)
+    .sort()
+    .map((name) => `${name}=${JSON.stringify(rest[name])}`);
+  return `${videoKey(url)}|${stable.join('&')}`;
 }
 
 /**
@@ -241,30 +244,30 @@ function dumpKey(url, flags) {
  * `expire=` en secondes. La plus proche décide, moins une marge.
  */
 function keepUntil(value) {
-    let until = now() + DUMP_TTL_MS;
-    const formats = (value && Array.isArray(value.formats)) ? value.formats : [];
-    for (const format of formats) {
-        const match = /[?&/]expire[=/](\d+)/.exec((format && format.url) || '');
-        if (match) until = Math.min(until, Number(match[1]) * 1000 - EXPIRY_MARGIN_MS);
-    }
-    return until;
+  let until = now() + DUMP_TTL_MS;
+  const formats = value && Array.isArray(value.formats) ? value.formats : [];
+  for (const format of formats) {
+    const match = /[?&/]expire[=/](\d+)/.exec((format && format.url) || '');
+    if (match) until = Math.min(until, Number(match[1]) * 1000 - EXPIRY_MARGIN_MS);
+  }
+  return until;
 }
 
 function keep(key, value) {
-    const until = keepUntil(value);
-    if (until <= now()) return;
-    dumps.delete(key);
-    dumps.set(key, { until, value });
-    // La plus ancienne s'en va : l'ordre d'insertion d'une Map est celui-là.
-    while (dumps.size > DUMP_CACHE_SIZE) dumps.delete(dumps.keys().next().value);
+  const until = keepUntil(value);
+  if (until <= now()) return;
+  dumps.delete(key);
+  dumps.set(key, { until, value });
+  // La plus ancienne s'en va : l'ordre d'insertion d'une Map est celui-là.
+  while (dumps.size > DUMP_CACHE_SIZE) dumps.delete(dumps.keys().next().value);
 }
 
 function kept(key) {
-    const entry = key && dumps.get(key);
-    if (!entry) return null;
-    if (entry.until > now()) return entry.value;
-    dumps.delete(key);
-    return null;
+  const entry = key && dumps.get(key);
+  if (!entry) return null;
+  if (entry.until > now()) return entry.value;
+  dumps.delete(key);
+  return null;
 }
 
 /**
@@ -272,7 +275,7 @@ function kept(key) {
  * doit pouvoir modifier celle des autres en triant ses formats.
  */
 function copy(value) {
-    return value && typeof value === 'object' ? structuredClone(value) : value;
+  return value && typeof value === 'object' ? structuredClone(value) : value;
 }
 
 /**
@@ -283,45 +286,45 @@ function copy(value) {
  * continuent de le trouver.
  */
 async function extract(url, flags, options) {
-    const youtubedl = require('youtube-dl-exec');
+  const youtubedl = require('youtube-dl-exec');
 
-    const routes = [ROUTE.DEFAULT, ROUTE.IPV4].filter((r) => r >= currentLevel());
+  const routes = [ROUTE.DEFAULT, ROUTE.IPV4].filter((r) => r >= currentLevel());
 
-    let refusal = null;
-    for (let i = 0; i < routes.length; i++) {
-        const routeFlags = routes[i] === ROUTE.DEFAULT ? flags : { ...flags, forceIpv4: true };
-        try {
-            lastExtractionAt = now();
-            return await youtubedl(url, routeFlags, options);
-        } catch (err) {
-            if (!isBotCheck(err && err.message)) throw err;
-            refusal = err;
-            if (i < routes.length - 1) escalate(routes[i + 1], 'yt-dlp');
-        }
+  let refusal = null;
+  for (let i = 0; i < routes.length; i++) {
+    const routeFlags = routes[i] === ROUTE.DEFAULT ? flags : { ...flags, forceIpv4: true };
+    try {
+      lastExtractionAt = now();
+      return await youtubedl(url, routeFlags, options);
+    } catch (err) {
+      if (!isBotCheck(err && err.message)) throw err;
+      refusal = err;
+      if (i < routes.length - 1) escalate(routes[i + 1], 'yt-dlp');
     }
+  }
 
-    refusedEverywhere('yt-dlp');
-    throw refusal;
+  refusedEverywhere('yt-dlp');
+  throw refusal;
 }
 
 /**
  * Une extraction gardée, en cours, ou lancée — dans cet ordre.
  */
 function fetchDump(key, url, flags, options) {
-    const hit = kept(key);
-    if (hit) return Promise.resolve(hit);
-    if (key && running.has(key)) return running.get(key);
+  const hit = kept(key);
+  if (hit) return Promise.resolve(hit);
+  if (key && running.has(key)) return running.get(key);
 
-    const pending = extract(url, flags, options)
-        .then((value) => {
-            if (key) keep(key, value);
-            return value;
-        })
-        .finally(() => {
-            if (key) running.delete(key);
-        });
-    if (key) running.set(key, pending);
-    return pending;
+  const pending = extract(url, flags, options)
+    .then((value) => {
+      if (key) keep(key, value);
+      return value;
+    })
+    .finally(() => {
+      if (key) running.delete(key);
+    });
+  if (key) running.set(key, pending);
+  return pending;
 }
 
 /**
@@ -332,26 +335,26 @@ function fetchDump(key, url, flags, options) {
  * garder une demi-heure bloquerait tout le reste.
  */
 function paced(task) {
-    const turn = backgroundChain.then(async () => {
-        const refuse = () => {
-            if (now() < pausedUntil) {
-                const err = new Error('YouTube refused recently: background extractions are paused.');
-                // Reconnu par le préchargement, qui ne doit ni se rabattre sur
-                // une autre demande à YouTube, ni soupçonner yt-dlp.
-                err.code = 'YOUTUBE_PAUSED';
-                throw err;
-            }
-        };
-        refuse();
-        const gap = BACKGROUND_GAP_MS.min + random() * (BACKGROUND_GAP_MS.max - BACKGROUND_GAP_MS.min);
-        const wait = lastExtractionAt + gap - now();
-        if (wait > 0) await sleep(wait);
-        refuse();
-        return task();
-    });
-    // La file continue même si une extraction échoue : la suivante n'y est pour rien.
-    backgroundChain = turn.catch(() => {});
-    return turn;
+  const turn = backgroundChain.then(async () => {
+    const refuse = () => {
+      if (now() < pausedUntil) {
+        const err = new Error('YouTube refused recently: background extractions are paused.');
+        // Reconnu par le préchargement, qui ne doit ni se rabattre sur
+        // une autre demande à YouTube, ni soupçonner yt-dlp.
+        err.code = 'YOUTUBE_PAUSED';
+        throw err;
+      }
+    };
+    refuse();
+    const gap = BACKGROUND_GAP_MS.min + random() * (BACKGROUND_GAP_MS.max - BACKGROUND_GAP_MS.min);
+    const wait = lastExtractionAt + gap - now();
+    if (wait > 0) await sleep(wait);
+    refuse();
+    return task();
+  });
+  // La file continue même si une extraction échoue : la suivante n'y est pour rien.
+  backgroundChain = turn.catch(() => {});
+  return turn;
 }
 
 /**
@@ -367,35 +370,35 @@ function paced(task) {
  *   son tour dans la file espacée, et se refuse pendant une pause.
  */
 async function ytdlp(url, flags, options, { background = false } = {}) {
-    const key = dumpKey(url, flags);
+  const key = dumpKey(url, flags);
 
-    // Déjà là : ni file, ni attente — ce qu'on sert sans rien demander à
-    // YouTube n'a rien à espacer.
-    const hit = kept(key);
-    if (hit) return copy(hit);
-    if (key && running.has(key)) return copy(await running.get(key));
+  // Déjà là : ni file, ni attente — ce qu'on sert sans rien demander à
+  // YouTube n'a rien à espacer.
+  const hit = kept(key);
+  if (hit) return copy(hit);
+  if (key && running.has(key)) return copy(await running.get(key));
 
-    const value = background
-        ? await paced(() => fetchDump(key, url, flags, options))
-        : await fetchDump(key, url, flags, options);
-    return key ? copy(value) : value;
+  const value = background
+    ? await paced(() => fetchDump(key, url, flags, options))
+    : await fetchDump(key, url, flags, options);
+  return key ? copy(value) : value;
 }
 
 /** L'appel est-il celui qui décrit une vidéo — le seul que YouTube refuse ainsi ? */
 function isPlayerCall(input) {
-    const url = typeof input === 'string' ? input : (input && input.url) || String(input);
-    return /\/youtubei\/v1\/player\b/.test(url);
+  const url = typeof input === 'string' ? input : (input && input.url) || String(input);
+  return /\/youtubei\/v1\/player\b/.test(url);
 }
 
 /** Lit la réponse sur une copie : l'original reste entier pour youtubei. */
 async function refusedAsBot(response) {
-    try {
-        const data = await response.clone().json();
-        const status = data && data.playabilityStatus;
-        return !!status && status.status === 'LOGIN_REQUIRED' && isBotCheck(status.reason);
-    } catch (e) {
-        return false;
-    }
+  try {
+    const data = await response.clone().json();
+    const status = data && data.playabilityStatus;
+    return !!status && status.status === 'LOGIN_REQUIRED' && isBotCheck(status.reason);
+  } catch (e) {
+    return false;
+  }
 }
 
 /**
@@ -415,11 +418,11 @@ async function refusedAsBot(response) {
  * @param {Function} fetchImpl
  */
 async function ipv4Agent(fetchImpl) {
-    if (ipv4Dispatcher) return ipv4Dispatcher;
-    const key = Symbol.for('undici.globalDispatcher.1');
-    if (!globalThis[key]) await fetchImpl('data:,');
-    ipv4Dispatcher = new globalThis[key].constructor({ connect: { family: 4 } });
-    return ipv4Dispatcher;
+  if (ipv4Dispatcher) return ipv4Dispatcher;
+  const key = Symbol.for('undici.globalDispatcher.1');
+  if (!globalThis[key]) await fetchImpl('data:,');
+  ipv4Dispatcher = new globalThis[key].constructor({ connect: { family: 4 } });
+  return ipv4Dispatcher;
 }
 
 /**
@@ -432,28 +435,28 @@ async function ipv4Agent(fetchImpl) {
  * @param {Function} [agentFor4]
  */
 function wrapFetch(original, agentFor4 = () => ipv4Agent(original)) {
-    return async function fetchWithIpv4Fallback(input, init = {}) {
-        // Un mandataire configuré décide seul de la route.
-        if (init.dispatcher) return original(input, init);
+  return async function fetchWithIpv4Fallback(input, init = {}) {
+    // Un mandataire configuré décide seul de la route.
+    if (init.dispatcher) return original(input, init);
 
-        const player = isPlayerCall(input);
-        let route = currentLevel();
+    const player = isPlayerCall(input);
+    let route = currentLevel();
 
-        if (route === ROUTE.DEFAULT) {
-            const response = await original(input, init);
-            if (!player || !(await refusedAsBot(response))) return response;
-            escalate(ROUTE.IPV4, 'youtubei');
-            route = ROUTE.IPV4;
-        }
+    if (route === ROUTE.DEFAULT) {
+      const response = await original(input, init);
+      if (!player || !(await refusedAsBot(response))) return response;
+      escalate(ROUTE.IPV4, 'youtubei');
+      route = ROUTE.IPV4;
+    }
 
-        // Rejouable : youtubei passe le corps dans `init`, sous forme de texte,
-        // et non dans la requête — il n'a pas été consommé.
-        const ipv4 = { ...init, dispatcher: await agentFor4() };
+    // Rejouable : youtubei passe le corps dans `init`, sous forme de texte,
+    // et non dans la requête — il n'a pas été consommé.
+    const ipv4 = { ...init, dispatcher: await agentFor4() };
 
-        const response = await original(input, ipv4);
-        if (player && await refusedAsBot(response)) refusedEverywhere('youtubei');
-        return response;
-    };
+    const response = await original(input, ipv4);
+    if (player && (await refusedAsBot(response))) refusedEverywhere('youtubei');
+    return response;
+  };
 }
 
 /**
@@ -464,33 +467,35 @@ function wrapFetch(original, agentFor4 = () => ipv4Agent(original)) {
  * sessions déjà ouvertes comme pour les suivantes.
  */
 function installYoutubeiFallback() {
-    const { Platform } = require('youtubei.js');
-    const shim = Platform.shim;
-    if (shim.fetch && shim.fetch.name === 'fetchWithIpv4Fallback') return;
-    shim.fetch = wrapFetch(shim.fetch);
+  const { Platform } = require('youtubei.js');
+  const shim = Platform.shim;
+  if (shim.fetch && shim.fetch.name === 'fetchWithIpv4Fallback') return;
+  shim.fetch = wrapFetch(shim.fetch);
 }
 
 module.exports = {
-    ytdlp,
-    familyFor,
-    isYoutubeUrl,
-    installYoutubeiFallback,
-    wrapFetch,
-    isBotCheck,
-    /** Pour les tests : horloge, attente et hasard factices, et retour à l'état de départ. */
-    _setClock(fn) { now = fn; },
-    _setTiming({ sleep: s, random: r } = {}) {
-        if (s) sleep = s;
-        if (r) random = r;
-    },
-    _reset() {
-        level = ROUTE.DEFAULT;
-        levelSince = 0;
-        exhausted = false;
-        dumps.clear();
-        running.clear();
-        lastExtractionAt = 0;
-        backgroundChain = Promise.resolve();
-        pausedUntil = 0;
-    },
+  ytdlp,
+  familyFor,
+  isYoutubeUrl,
+  installYoutubeiFallback,
+  wrapFetch,
+  isBotCheck,
+  /** Pour les tests : horloge, attente et hasard factices, et retour à l'état de départ. */
+  _setClock(fn) {
+    now = fn;
+  },
+  _setTiming({ sleep: s, random: r } = {}) {
+    if (s) sleep = s;
+    if (r) random = r;
+  },
+  _reset() {
+    level = ROUTE.DEFAULT;
+    levelSince = 0;
+    exhausted = false;
+    dumps.clear();
+    running.clear();
+    lastExtractionAt = 0;
+    backgroundChain = Promise.resolve();
+    pausedUntil = 0;
+  },
 };

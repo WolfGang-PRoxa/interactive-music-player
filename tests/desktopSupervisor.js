@@ -31,20 +31,20 @@ let passed = 0;
 let failed = 0;
 
 function test(name, fn) {
-    try {
-        fn();
-        console.log(`  ok    ${name}`);
-        passed++;
-    } catch (err) {
-        console.log(`  FAIL  ${name}`);
-        console.log(`        ${err.message}`);
-        failed++;
-    }
+  try {
+    fn();
+    console.log(`  ok    ${name}`);
+    passed++;
+  } catch (err) {
+    console.log(`  FAIL  ${name}`);
+    console.log(`        ${err.message}`);
+    failed++;
+  }
 }
 
 /** Un serveur web factice : restartProcess ne fait que le fermer. */
 function fakeWebServer() {
-    return { wss: { close() {} }, server: { close() {} } };
+  return { wss: { close() {} }, server: { close() {} } };
 }
 
 /**
@@ -53,72 +53,72 @@ function fakeWebServer() {
  * la vraie.
  */
 function intercept(fn) {
-    const realExit = process.exit;
-    const realSpawn = childProcess.spawn;
-    const seen = { exitCode: null, spawned: 0 };
-    // Seule la première sortie compte : la vraie ne rend pas la main, et le
-    // `catch` de la fonction, qui rattrape l'exception levée ici pour imiter
-    // cette coupure, appellerait sinon une seconde sortie en erreur.
-    process.exit = (code) => {
-        if (seen.exitCode === null) seen.exitCode = code;
-        throw new Error('__exit__');
-    };
-    childProcess.spawn = () => {
-        seen.spawned++;
-        return { unref() {} };
-    };
-    try {
-        fn();
-    } catch (err) {
-        if (err.message !== '__exit__') throw err;
-    } finally {
-        process.exit = realExit;
-        childProcess.spawn = realSpawn;
-    }
-    return seen;
+  const realExit = process.exit;
+  const realSpawn = childProcess.spawn;
+  const seen = { exitCode: null, spawned: 0 };
+  // Seule la première sortie compte : la vraie ne rend pas la main, et le
+  // `catch` de la fonction, qui rattrape l'exception levée ici pour imiter
+  // cette coupure, appellerait sinon une seconde sortie en erreur.
+  process.exit = (code) => {
+    if (seen.exitCode === null) seen.exitCode = code;
+    throw new Error('__exit__');
+  };
+  childProcess.spawn = () => {
+    seen.spawned++;
+    return { unref() {} };
+  };
+  try {
+    fn();
+  } catch (err) {
+    if (err.message !== '__exit__') throw err;
+  } finally {
+    process.exit = realExit;
+    childProcess.spawn = realSpawn;
+  }
+  return seen;
 }
 
-console.log('\nSupervision par l\'application de bureau\n');
+console.log("\nSupervision par l'application de bureau\n");
 
 test('la supervision se lit dans IMP_SUPERVISOR=desktop, et nulle part ailleurs', () => {
-    assert.strictEqual(supervisor.isSupervised({ IMP_SUPERVISOR: 'desktop' }), true);
-    assert.strictEqual(supervisor.isSupervised({ IMP_SUPERVISOR: '1' }), false);
-    assert.strictEqual(supervisor.isSupervised({}), false);
+  assert.strictEqual(supervisor.isSupervised({ IMP_SUPERVISOR: 'desktop' }), true);
+  assert.strictEqual(supervisor.isSupervised({ IMP_SUPERVISOR: '1' }), false);
+  assert.strictEqual(supervisor.isSupervised({}), false);
 });
 
 test('le code de relance est 75, distinct des sorties ordinaires du bot', () => {
-    assert.strictEqual(supervisor.RESTART_EXIT_CODE, 75);
+  assert.strictEqual(supervisor.RESTART_EXIT_CODE, 75);
 });
 
 test('la demande de relance porte un chemin absolu, dans data/', () => {
-    const file = supervisor.writeRestartRequest(path.join('versions', 'v2', 'src', 'index.js'), bac);
-    assert.strictEqual(file, path.join(bac, 'data', supervisor.RESTART_REQUEST));
-    const request = JSON.parse(fs.readFileSync(file, 'utf8'));
-    assert.ok(path.isAbsolute(request.entryPoint));
-    assert.ok(request.entryPoint.endsWith(path.join('versions', 'v2', 'src', 'index.js')));
-    fs.unlinkSync(file);
+  const file = supervisor.writeRestartRequest(path.join('versions', 'v2', 'src', 'index.js'), bac);
+  assert.strictEqual(file, path.join(bac, 'data', supervisor.RESTART_REQUEST));
+  const request = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.ok(path.isAbsolute(request.entryPoint));
+  assert.ok(request.entryPoint.endsWith(path.join('versions', 'v2', 'src', 'index.js')));
+  fs.unlinkSync(file);
 });
 
 test('supervisé, un redémarrage dépose sa demande et sort en 75, sans rien détacher', () => {
-    process.env.IMP_SUPERVISOR = 'desktop';
-    try {
-        const target = path.join(bac, 'versions', 'v3', 'src', 'index.js');
-        const seen = intercept(() => systemHandlers.restartProcess(fakeWebServer(), { entryPoint: target }));
-        assert.strictEqual(seen.exitCode, 75);
-        assert.strictEqual(seen.spawned, 0);
-        const request = JSON.parse(fs.readFileSync(path.join(bac, 'data', supervisor.RESTART_REQUEST), 'utf8'));
-        assert.strictEqual(request.entryPoint, target);
-    } finally {
-        delete process.env.IMP_SUPERVISOR;
-        fs.rmSync(path.join(bac, 'data', supervisor.RESTART_REQUEST), { force: true });
-    }
+  process.env.IMP_SUPERVISOR = 'desktop';
+  try {
+    const target = path.join(bac, 'versions', 'v3', 'src', 'index.js');
+    const seen = intercept(() => systemHandlers.restartProcess(fakeWebServer(), { entryPoint: target }));
+    assert.strictEqual(seen.exitCode, 75);
+    assert.strictEqual(seen.spawned, 0);
+    const request = JSON.parse(fs.readFileSync(path.join(bac, 'data', supervisor.RESTART_REQUEST), 'utf8'));
+    assert.strictEqual(request.entryPoint, target);
+  } finally {
+    delete process.env.IMP_SUPERVISOR;
+    fs.rmSync(path.join(bac, 'data', supervisor.RESTART_REQUEST), { force: true });
+  }
 });
 
 test('hors application, le redémarrage se fait comme avant : instance détachée, sortie en 0', () => {
-    const seen = intercept(() => systemHandlers.restartProcess(fakeWebServer(), { entryPoint: __filename }));
-    assert.strictEqual(seen.exitCode, 0);
-    assert.strictEqual(seen.spawned, 1);
-    assert.ok(!fs.existsSync(path.join(bac, 'data', supervisor.RESTART_REQUEST)));
+  const seen = intercept(() => systemHandlers.restartProcess(fakeWebServer(), { entryPoint: __filename }));
+  assert.strictEqual(seen.exitCode, 0);
+  assert.strictEqual(seen.spawned, 1);
+  assert.ok(!fs.existsSync(path.join(bac, 'data', supervisor.RESTART_REQUEST)));
 });
 
 // Windows refuse d'effacer le dossier courant d'un processus : on en sort d'abord.

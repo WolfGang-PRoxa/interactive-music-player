@@ -5,24 +5,24 @@
 window.MusicPlayer = window.MusicPlayer || {};
 
 window.MusicPlayer.state = {
-    currentTrack: null,
-    progress: null,
-    isPlaying: false,
-    isPaused: false,
-    volume: 70,
-    settings: {
-        duckingEnabled: true,
-        duckingLevel: 20,
-        duckingDelay: 800,
-        duckingFade: 200,
-        broadcastMode: 'everyone'
-    },
-    queue: [],
-    speakers: [],
-    members: [],
-    playlists: [],
-    activePlaybackSource: 'queue',
-    playlistCurrentIndex: 0
+  currentTrack: null,
+  progress: null,
+  isPlaying: false,
+  isPaused: false,
+  volume: 70,
+  settings: {
+    duckingEnabled: true,
+    duckingLevel: 20,
+    duckingDelay: 800,
+    duckingFade: 200,
+    broadcastMode: 'everyone',
+  },
+  queue: [],
+  speakers: [],
+  members: [],
+  playlists: [],
+  activePlaybackSource: 'queue',
+  playlistCurrentIndex: 0,
 };
 
 window.MusicPlayer.currentGuildId = null;
@@ -31,181 +31,190 @@ window.MusicPlayer.customBroadcastSelect = null;
 window.MusicPlayer.customSpeedSelect = null;
 
 const defaultDashboardSettings = {
-    language: 'fr',
-    tooltipDelay: 0.25,
-    toast: {
-        inDuration: 0.35,
-        holdDuration: 4,
-        outDuration: 0.35
-    },
-    videoDefaultPos: {
-        x: 100,
-        y: 100
-    },
-    videoDefaultSize: {
-        width: 440,
-        height: 280
-    },
-    fadeoutEnabled: true,
-    fadeoutDuration: 5,
-    fadeinEnabled: false,
-    fadeinDuration: 5,
-    /** Secondes d'attente avant que le bot ne quitte un salon vidé. */
-    presenceDepartureDelay: 30,
-    /** Trace la grille 48 colonnes sous les cartes du tableau de bord. */
-    showGrid: false,
-    bounce: {
-        load: true,
-        style: true,
-        theme: true,
-        guild: true,
-        channel: true
-    },
-    holdDuration: {
-        playlist: 1.5,
-        queue: 1.5,
-        history: 1.5
-    },
-    preloading: {
-        enabled: true,
-        queueCount: 3,
-        historyCount: 3,
-        playlistCount: 3
-    },
-    guildsActiveState: {}
+  language: 'fr',
+  tooltipDelay: 0.25,
+  toast: {
+    inDuration: 0.35,
+    holdDuration: 4,
+    outDuration: 0.35,
+  },
+  videoDefaultPos: {
+    x: 100,
+    y: 100,
+  },
+  videoDefaultSize: {
+    width: 440,
+    height: 280,
+  },
+  fadeoutEnabled: true,
+  fadeoutDuration: 5,
+  fadeinEnabled: false,
+  fadeinDuration: 5,
+  /** Secondes d'attente avant que le bot ne quitte un salon vidé. */
+  presenceDepartureDelay: 30,
+  /** Trace la grille 48 colonnes sous les cartes du tableau de bord. */
+  showGrid: false,
+  bounce: {
+    load: true,
+    style: true,
+    theme: true,
+    guild: true,
+    channel: true,
+  },
+  holdDuration: {
+    playlist: 1.5,
+    queue: 1.5,
+    history: 1.5,
+  },
+  preloading: {
+    enabled: true,
+    queueCount: 3,
+    historyCount: 3,
+    playlistCount: 3,
+  },
+  guildsActiveState: {},
 };
 
 function loadDashboardSettings() {
-    try {
-        const raw = localStorage.getItem('dashboardAdvancedSettings');
-        if (raw) {
-            const parsed = JSON.parse(raw);
-            return {
-                ...defaultDashboardSettings,
-                ...parsed,
-                toast: { ...defaultDashboardSettings.toast, ...(parsed.toast || {}) },
-                videoDefaultPos: { ...defaultDashboardSettings.videoDefaultPos, ...(parsed.videoDefaultPos || {}) },
-                videoDefaultSize: { ...defaultDashboardSettings.videoDefaultSize, ...(parsed.videoDefaultSize || {}) },
-                bounce: { ...defaultDashboardSettings.bounce, ...(parsed.bounce || {}) },
-                holdDuration: { ...defaultDashboardSettings.holdDuration, ...(parsed.holdDuration || {}) },
-                preloading: { ...defaultDashboardSettings.preloading, ...(parsed.preloading || {}) },
-                guildsActiveState: { ...(parsed.guildsActiveState || {}) }
-            };
-        }
-    } catch (e) {}
-    return defaultDashboardSettings;
+  try {
+    const raw = localStorage.getItem('dashboardAdvancedSettings');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        ...defaultDashboardSettings,
+        ...parsed,
+        toast: { ...defaultDashboardSettings.toast, ...(parsed.toast || {}) },
+        videoDefaultPos: { ...defaultDashboardSettings.videoDefaultPos, ...(parsed.videoDefaultPos || {}) },
+        videoDefaultSize: { ...defaultDashboardSettings.videoDefaultSize, ...(parsed.videoDefaultSize || {}) },
+        bounce: { ...defaultDashboardSettings.bounce, ...(parsed.bounce || {}) },
+        holdDuration: { ...defaultDashboardSettings.holdDuration, ...(parsed.holdDuration || {}) },
+        preloading: { ...defaultDashboardSettings.preloading, ...(parsed.preloading || {}) },
+        guildsActiveState: { ...(parsed.guildsActiveState || {}) },
+      };
+    }
+  } catch (e) {}
+  return defaultDashboardSettings;
 }
 
 window.MusicPlayer.dashboardSettings = loadDashboardSettings();
 
-window.MusicPlayer.saveDashboardSettings = function() {
-    try {
-        localStorage.setItem('dashboardAdvancedSettings', JSON.stringify(window.MusicPlayer.dashboardSettings));
-    } catch (e) {}
+window.MusicPlayer.saveDashboardSettings = function () {
+  try {
+    localStorage.setItem('dashboardAdvancedSettings', JSON.stringify(window.MusicPlayer.dashboardSettings));
+  } catch (e) {}
 };
 
-window.MusicPlayer.applyLanguage = async function(lang) {
-    if (typeof loadLocale === 'function') {
-        await loadLocale(lang);
+window.MusicPlayer.applyLanguage = async function (lang) {
+  if (typeof loadLocale === 'function') {
+    await loadLocale(lang);
+  }
+  const translations = window.translations || {};
+  const dict = translations[lang] || translations['fr'] || {};
+
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    const key = el.getAttribute('data-i18n');
+    if (dict[key]) {
+      el.textContent = dict[key];
     }
-    const translations = window.translations || {};
-    const dict = translations[lang] || translations['fr'] || {};
-    
-    document.querySelectorAll('[data-i18n]').forEach(el => {
-        const key = el.getAttribute('data-i18n');
-        if (dict[key]) {
-            el.textContent = dict[key];
-        }
-    });
+  });
 
-    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-        const key = el.getAttribute('data-i18n-placeholder');
-        if (dict[key]) {
-            el.placeholder = dict[key];
-        }
-    });
-
-    document.querySelectorAll('[data-i18n-tooltip]').forEach(el => {
-        const key = el.getAttribute('data-i18n-tooltip');
-        if (dict[key]) {
-            el.setAttribute('data-tooltip', dict[key]);
-        }
-    });
-
-    document.querySelectorAll('[data-i18n-label]').forEach(el => {
-        const key = el.getAttribute('data-i18n-label');
-        if (dict[key]) {
-            el.setAttribute('label', dict[key]);
-        }
-    });
-
-    // Redessiner les libellés construits en JavaScript, hors de portée des
-    // attributs data-i18n : options du sélecteur de source, valeurs du tiroir,
-    // et tooltips dont la clé dépend de l'état (verrouillé/déverrouillé,
-    // détection activée/désactivée…).
-    ['updatePlaylistsUI', 'updateQueueUI', 'updateHistoryUI', 'updateSpeakersUI',
-     'refreshDrawerLabels', 'refreshMemoryBreakdown',
-     'refreshDownloadTarget', 'refreshShuffleHint'].forEach(nameOf => {
-        if (typeof window.MusicPlayer[nameOf] === 'function') {
-            try { window.MusicPlayer[nameOf](); } catch (e) {}
-        }
-    });
-
-    // Synchroniser tous les menus déroulants personnalisés (CustomSelect)
-    document.querySelectorAll('select').forEach(select => {
-        if (select._customSelect) {
-            select._customSelect._lastSignature = null;
-            select._customSelect.sync();
-        }
-    });
-
-    if (window.MusicPlayer.state && !window.MusicPlayer.state.currentTrack) {
-        const titleEl = document.getElementById('track-title');
-        const authorEl = document.getElementById('track-author');
-        if (titleEl) titleEl.textContent = dict.no_track_playing || 'Aucune musique en cours';
-        if (authorEl) authorEl.textContent = dict.play_from_search || 'Lancez un morceau depuis la recherche';
+  document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    if (dict[key]) {
+      el.placeholder = dict[key];
     }
+  });
 
-    const speedIndicator = document.getElementById('speed-pad-indicator');
-    if (speedIndicator && !speedIndicator.classList.contains('precise-active')) {
-        speedIndicator.textContent = (dict.speed_classic || 'Classique').toUpperCase();
+  document.querySelectorAll('[data-i18n-tooltip]').forEach((el) => {
+    const key = el.getAttribute('data-i18n-tooltip');
+    if (dict[key]) {
+      el.setAttribute('data-tooltip', dict[key]);
     }
+  });
 
-    if (typeof window.MusicPlayer.updateUI === 'function') window.MusicPlayer.updateUI();
-    if (typeof window.MusicPlayer.renderQueue === 'function') window.MusicPlayer.renderQueue();
-    if (typeof window.MusicPlayer.renderHistory === 'function') window.MusicPlayer.renderHistory();
-    if (typeof window.MusicPlayer.renderPlaylists === 'function') window.MusicPlayer.renderPlaylists();
-
-    /*
-     * La documentation embarquée est livrée dans les mêmes langues que
-     * l'interface, et suit donc ce réglage-ci : rien ne justifierait de lire le
-     * tableau de bord dans une langue et sa documentation dans une autre.
-     *
-     * Elle se recharge à part, sans être attendue : ses pages viennent du
-     * serveur, et l'aller-retour n'a pas à retarder la traduction du reste, qui
-     * est déjà en mémoire. La fenêtre de lecture se repeint quand la réponse
-     * arrive ; fermée, elle n'a rien à faire du tout.
-     */
-    if (typeof window.MusicPlayer.refreshDocsLanguage === 'function') {
-        window.MusicPlayer.refreshDocsLanguage().catch(() => {});
+  document.querySelectorAll('[data-i18n-label]').forEach((el) => {
+    const key = el.getAttribute('data-i18n-label');
+    if (dict[key]) {
+      el.setAttribute('label', dict[key]);
     }
+  });
 
-    /*
-     * Le journal des modifications suit le même chemin, pour la même raison, et
-     * doublement : son contenu n'est écrit qu'en deux langues et peut donc ne pas
-     * changer, mais tout son habillage — les dates en toutes lettres, les
-     * libellés de catégorie, les comptes — change à chaque fois.
-     */
-    if (typeof window.MusicPlayer.refreshChangelogLanguage === 'function') {
-        window.MusicPlayer.refreshChangelogLanguage().catch(() => {});
+  // Redessiner les libellés construits en JavaScript, hors de portée des
+  // attributs data-i18n : options du sélecteur de source, valeurs du tiroir,
+  // et tooltips dont la clé dépend de l'état (verrouillé/déverrouillé,
+  // détection activée/désactivée…).
+  [
+    'updatePlaylistsUI',
+    'updateQueueUI',
+    'updateHistoryUI',
+    'updateSpeakersUI',
+    'refreshDrawerLabels',
+    'refreshMemoryBreakdown',
+    'refreshDownloadTarget',
+    'refreshShuffleHint',
+  ].forEach((nameOf) => {
+    if (typeof window.MusicPlayer[nameOf] === 'function') {
+      try {
+        window.MusicPlayer[nameOf]();
+      } catch (e) {}
     }
+  });
+
+  // Synchroniser tous les menus déroulants personnalisés (CustomSelect)
+  document.querySelectorAll('select').forEach((select) => {
+    if (select._customSelect) {
+      select._customSelect._lastSignature = null;
+      select._customSelect.sync();
+    }
+  });
+
+  if (window.MusicPlayer.state && !window.MusicPlayer.state.currentTrack) {
+    const titleEl = document.getElementById('track-title');
+    const authorEl = document.getElementById('track-author');
+    if (titleEl) titleEl.textContent = dict.no_track_playing || 'Aucune musique en cours';
+    if (authorEl) authorEl.textContent = dict.play_from_search || 'Lancez un morceau depuis la recherche';
+  }
+
+  const speedIndicator = document.getElementById('speed-pad-indicator');
+  if (speedIndicator && !speedIndicator.classList.contains('precise-active')) {
+    speedIndicator.textContent = (dict.speed_classic || 'Classique').toUpperCase();
+  }
+
+  if (typeof window.MusicPlayer.updateUI === 'function') window.MusicPlayer.updateUI();
+  if (typeof window.MusicPlayer.renderQueue === 'function') window.MusicPlayer.renderQueue();
+  if (typeof window.MusicPlayer.renderHistory === 'function') window.MusicPlayer.renderHistory();
+  if (typeof window.MusicPlayer.renderPlaylists === 'function') window.MusicPlayer.renderPlaylists();
+
+  /*
+   * La documentation embarquée est livrée dans les mêmes langues que
+   * l'interface, et suit donc ce réglage-ci : rien ne justifierait de lire le
+   * tableau de bord dans une langue et sa documentation dans une autre.
+   *
+   * Elle se recharge à part, sans être attendue : ses pages viennent du
+   * serveur, et l'aller-retour n'a pas à retarder la traduction du reste, qui
+   * est déjà en mémoire. La fenêtre de lecture se repeint quand la réponse
+   * arrive ; fermée, elle n'a rien à faire du tout.
+   */
+  if (typeof window.MusicPlayer.refreshDocsLanguage === 'function') {
+    window.MusicPlayer.refreshDocsLanguage().catch(() => {});
+  }
+
+  /*
+   * Le journal des modifications suit le même chemin, pour la même raison, et
+   * doublement : son contenu n'est écrit qu'en deux langues et peut donc ne pas
+   * changer, mais tout son habillage — les dates en toutes lettres, les
+   * libellés de catégorie, les comptes — change à chaque fois.
+   */
+  if (typeof window.MusicPlayer.refreshChangelogLanguage === 'function') {
+    window.MusicPlayer.refreshChangelogLanguage().catch(() => {});
+  }
 };
 
-window.MusicPlayer.t = function(key) {
-    const lang = (window.MusicPlayer.dashboardSettings && window.MusicPlayer.dashboardSettings.language) || 'fr';
-    const translations = window.translations || {};
-    const dict = translations[lang] || translations['fr'] || {};
-    return dict[key] || key;
+window.MusicPlayer.t = function (key) {
+  const lang = (window.MusicPlayer.dashboardSettings && window.MusicPlayer.dashboardSettings.language) || 'fr';
+  const translations = window.translations || {};
+  const dict = translations[lang] || translations['fr'] || {};
+  return dict[key] || key;
 };
 
 /**
@@ -229,13 +238,13 @@ const TRACK_START_SEC = 1.5;
  * @param {number} positionSecs - Position à laquelle la piste va reprendre.
  * @returns {number} Durée du fondu en secondes, 0 pour aucun.
  */
-window.MusicPlayer.openingFadeMs = function(state, positionSecs) {
-    const settings = (state && state.settings) || {};
-    if (!settings.mixEnabled) return 0;
-    if (!(Number(positionSecs) < TRACK_START_SEC)) return 0;
+window.MusicPlayer.openingFadeMs = function (state, positionSecs) {
+  const settings = (state && state.settings) || {};
+  if (!settings.mixEnabled) return 0;
+  if (!(Number(positionSecs) < TRACK_START_SEC)) return 0;
 
-    const duration = parseFloat(settings.mixDuration);
-    return duration > 0 ? duration : 5;
+  const duration = parseFloat(settings.mixDuration);
+  return duration > 0 ? duration : 5;
 };
 
 /**
@@ -255,65 +264,65 @@ window.MusicPlayer.openingFadeMs = function(state, positionSecs) {
  * @param {object} [state] - État courant ; celui du lecteur par défaut.
  * @returns {object|null} La piste suivante, ou null s'il n'y en a pas.
  */
-window.MusicPlayer.nextTrackOf = function(state) {
-    const snapshot = state || window.MusicPlayer.state || {};
+window.MusicPlayer.nextTrackOf = function (state) {
+  const snapshot = state || window.MusicPlayer.state || {};
 
-    /*
-     * En lecture aléatoire, il n'y a pas de titre suivant à préparer.
-     *
-     * Le tirage n'a lieu qu'à la fin du morceau, côté serveur : préparer le
-     * premier de la file reviendrait à croiser vers un titre qu'il ne jouera
-     * pas, et le fondu se ferait vers un morceau que personne ne demande. Le
-     * moteur de mixage de la diffusion commune tient déjà ce raisonnement —
-     * voir `_predictableNextTrack` dans audio/mix/MixEngine.js.
-     *
-     * L'enchaînement est donc net, et c'est le préchargement du bot qui fait
-     * qu'il reste immédiat : d'où l'invitation à tout précharger que porte le
-     * bouton du mode aléatoire.
-     */
-    if (snapshot.shuffle) return null;
+  /*
+   * En lecture aléatoire, il n'y a pas de titre suivant à préparer.
+   *
+   * Le tirage n'a lieu qu'à la fin du morceau, côté serveur : préparer le
+   * premier de la file reviendrait à croiser vers un titre qu'il ne jouera
+   * pas, et le fondu se ferait vers un morceau que personne ne demande. Le
+   * moteur de mixage de la diffusion commune tient déjà ce raisonnement —
+   * voir `_predictableNextTrack` dans audio/mix/MixEngine.js.
+   *
+   * L'enchaînement est donc net, et c'est le préchargement du bot qui fait
+   * qu'il reste immédiat : d'où l'invitation à tout précharger que porte le
+   * bouton du mode aléatoire.
+   */
+  if (snapshot.shuffle) return null;
 
-    const source = snapshot.activePlaybackSource;
+  const source = snapshot.activePlaybackSource;
 
-    let candidate = null;
+  let candidate = null;
 
-    if (source && source !== 'queue') {
-        const playlist = (snapshot.playlists || []).find(p => p.id === source);
-        const tracks = (playlist && playlist.tracks) || [];
-        if (tracks.length === 0) return null;
+  if (source && source !== 'queue') {
+    const playlist = (snapshot.playlists || []).find((p) => p.id === source);
+    const tracks = (playlist && playlist.tracks) || [];
+    if (tracks.length === 0) return null;
 
-        const index = typeof snapshot.playlistCurrentIndex === 'number' ? snapshot.playlistCurrentIndex : 0;
-        if (index + 1 < tracks.length) candidate = tracks[index + 1];
+    const index = typeof snapshot.playlistCurrentIndex === 'number' ? snapshot.playlistCurrentIndex : 0;
+    if (index + 1 < tracks.length) candidate = tracks[index + 1];
 
-        // Dernier titre : la lecture en boucle enchaîne sur le premier. Sinon
-        // la playlist est finie, et la file d'attente prend le relais — le
-        // serveur bascule alors la source (WebServer.advanceToQueue), si bien
-        // que le titre préparé ici est bien celui qu'il jouera.
-        else if (snapshot.loopPlaylist) candidate = tracks[0];
-    }
+    // Dernier titre : la lecture en boucle enchaîne sur le premier. Sinon
+    // la playlist est finie, et la file d'attente prend le relais — le
+    // serveur bascule alors la source (WebServer.advanceToQueue), si bien
+    // que le titre préparé ici est bien celui qu'il jouera.
+    else if (snapshot.loopPlaylist) candidate = tracks[0];
+  }
 
-    if (!candidate) candidate = (snapshot.queue && snapshot.queue[0]) || null;
+  if (!candidate) candidate = (snapshot.queue && snapshot.queue[0]) || null;
 
-    /*
-     * Un aiguillage n'est pas un morceau, et le préparer comme tel était un
-     * fondu vers rien.
-     *
-     * Le navigateur monte le titre suivant en fond pour le croiser avec celui
-     * qui s'achève. Rendu l'aiguillage lui-même, il en prenait l'adresse
-     * `transition:` pour une source à charger : l'élément restait muet, le
-     * fondu se faisait vers du silence, et l'on entendait le morceau sortant se
-     * prolonger seul. Le journal en gardait la trace — « entrant « — » », un
-     * titre vide, celui qu'un aiguillage porte.
-     *
-     * Ce qui suit vraiment est le premier titre de la source vers laquelle il
-     * mène. C'est la même chose que fera le serveur en atteignant l'aiguillage :
-     * les deux prédisent donc le même morceau, et le croisement se fait vers le
-     * bon fichier.
-     */
-    if (window.MusicPlayer.isTransition(candidate)) {
-        return window.MusicPlayer.firstOfSource(snapshot, candidate.target);
-    }
-    return candidate;
+  /*
+   * Un aiguillage n'est pas un morceau, et le préparer comme tel était un
+   * fondu vers rien.
+   *
+   * Le navigateur monte le titre suivant en fond pour le croiser avec celui
+   * qui s'achève. Rendu l'aiguillage lui-même, il en prenait l'adresse
+   * `transition:` pour une source à charger : l'élément restait muet, le
+   * fondu se faisait vers du silence, et l'on entendait le morceau sortant se
+   * prolonger seul. Le journal en gardait la trace — « entrant « — » », un
+   * titre vide, celui qu'un aiguillage porte.
+   *
+   * Ce qui suit vraiment est le premier titre de la source vers laquelle il
+   * mène. C'est la même chose que fera le serveur en atteignant l'aiguillage :
+   * les deux prédisent donc le même morceau, et le croisement se fait vers le
+   * bon fichier.
+   */
+  if (window.MusicPlayer.isTransition(candidate)) {
+    return window.MusicPlayer.firstOfSource(snapshot, candidate.target);
+  }
+  return candidate;
 };
 
 /**
@@ -329,13 +338,14 @@ window.MusicPlayer.nextTrackOf = function(state) {
  * @param {string} target - `queue`, ou l'identifiant d'une playlist.
  * @returns {object|null}
  */
-window.MusicPlayer.firstOfSource = function(snapshot, target) {
-    const list = target === 'queue'
-        ? (snapshot.queue || [])
-        : (((snapshot.playlists || []).find(p => p.id === target) || {}).tracks || []);
+window.MusicPlayer.firstOfSource = function (snapshot, target) {
+  const list =
+    target === 'queue'
+      ? snapshot.queue || []
+      : ((snapshot.playlists || []).find((p) => p.id === target) || {}).tracks || [];
 
-    const first = list[0] || null;
-    return window.MusicPlayer.isTransition(first) ? null : first;
+  const first = list[0] || null;
+  return window.MusicPlayer.isTransition(first) ? null : first;
 };
 
 /**
@@ -350,21 +360,21 @@ window.MusicPlayer.firstOfSource = function(snapshot, target) {
  * @param {string} guildId
  * @returns {boolean}
  */
-window.MusicPlayer.isGuildVisible = function(guildId) {
-    const states = (window.MusicPlayer.dashboardSettings || {}).guildsActiveState || {};
-    return states[guildId] !== false;
+window.MusicPlayer.isGuildVisible = function (guildId) {
+  const states = (window.MusicPlayer.dashboardSettings || {}).guildsActiveState || {};
+  return states[guildId] !== false;
 };
 
 /** Filtre une liste de serveurs sur leur visibilité. */
-window.MusicPlayer.visibleGuilds = function(guilds) {
-    return (guilds || []).filter(g => window.MusicPlayer.isGuildVisible(g.id));
+window.MusicPlayer.visibleGuilds = function (guilds) {
+  return (guilds || []).filter((g) => window.MusicPlayer.isGuildVisible(g.id));
 };
 
-window.MusicPlayer.checkIsDefaultChannel = function(guildId, channelId) {
-    const state = window.MusicPlayer.state;
-    if (!state || !state.guilds) return false;
-    const targetGuild = state.guilds.find(g => g.id === guildId);
-    return targetGuild && targetGuild.defaultVoiceChannelId === channelId;
+window.MusicPlayer.checkIsDefaultChannel = function (guildId, channelId) {
+  const state = window.MusicPlayer.state;
+  if (!state || !state.guilds) return false;
+  const targetGuild = state.guilds.find((g) => g.id === guildId);
+  return targetGuild && targetGuild.defaultVoiceChannelId === channelId;
 };
 
 /**
@@ -379,28 +389,28 @@ window.MusicPlayer.checkIsDefaultChannel = function(guildId, channelId) {
  * @param {string} texte
  * @returns {Promise<boolean>} true si la copie a abouti
  */
-window.MusicPlayer.copyToClipboard = async function(text) {
-    if (!text) return false;
+window.MusicPlayer.copyToClipboard = async function (text) {
+  if (!text) return false;
 
-    try {
-        if (navigator.clipboard && window.isSecureContext) {
-            await navigator.clipboard.writeText(text);
-            return true;
-        }
-    } catch (err) {}
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (err) {}
 
-    try {
-        const helper = document.createElement('textarea');
-        helper.value = text;
-        helper.setAttribute('readonly', '');
-        helper.style.position = 'fixed';
-        helper.style.opacity = '0';
-        document.body.appendChild(helper);
-        helper.select();
-        const copy = document.execCommand('copy');
-        document.body.removeChild(helper);
-        return copy;
-    } catch (err) {}
+  try {
+    const helper = document.createElement('textarea');
+    helper.value = text;
+    helper.setAttribute('readonly', '');
+    helper.style.position = 'fixed';
+    helper.style.opacity = '0';
+    document.body.appendChild(helper);
+    helper.select();
+    const copy = document.execCommand('copy');
+    document.body.removeChild(helper);
+    return copy;
+  } catch (err) {}
 
-    return false;
+  return false;
 };

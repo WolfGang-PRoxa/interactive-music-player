@@ -36,17 +36,17 @@ const MAX_UNCOMPRESSED_BYTES = 512 * 1024 * 1024;
 
 /** Le bloc est-il entièrement nul ? Deux de suite marquent la fin de l'archive. */
 function isEmptyBlock(block) {
-    for (let i = 0; i < block.length; i++) {
-        if (block[i] !== 0) return false;
-    }
-    return true;
+  for (let i = 0; i < block.length; i++) {
+    if (block[i] !== 0) return false;
+  }
+  return true;
 }
 
 /** Chaîne terminée par un octet nul, telle que stockée dans un en-tête tar. */
 function readString(block, start, length) {
-    const slice = block.subarray(start, start + length);
-    const end = slice.indexOf(0);
-    return slice.toString('utf8', 0, end === -1 ? slice.length : end).trim();
+  const slice = block.subarray(start, start + length);
+  const end = slice.indexOf(0);
+  return slice.toString('utf8', 0, end === -1 ? slice.length : end).trim();
 }
 
 /**
@@ -59,15 +59,15 @@ function readString(block, start, length) {
  * la lecture de toute la suite de l'archive.
  */
 function readNumber(block, start, length) {
-    const slice = block.subarray(start, start + length);
-    if (slice.length && (slice[0] & 0x80) !== 0) {
-        let value = 0;
-        for (let i = 1; i < slice.length; i++) value = value * 256 + slice[i];
-        return value;
-    }
-    const text = readString(block, start, length).replace(/[^0-7]/g, '');
-    if (!text) return 0;
-    return parseInt(text, 8) || 0;
+  const slice = block.subarray(start, start + length);
+  if (slice.length && (slice[0] & 0x80) !== 0) {
+    let value = 0;
+    for (let i = 1; i < slice.length; i++) value = value * 256 + slice[i];
+    return value;
+  }
+  const text = readString(block, start, length).replace(/[^0-7]/g, '');
+  if (!text) return 0;
+  return parseInt(text, 8) || 0;
 }
 
 /**
@@ -75,21 +75,21 @@ function readNumber(block, start, length) {
  * qui nous intéresse. Format : `<longueur totale> <clé>=<valeur>\n`.
  */
 function paxPath(data) {
-    const text = data.toString('utf8');
-    let position = 0;
-    while (position < text.length) {
-        const space = text.indexOf(' ', position);
-        if (space === -1) break;
-        const length = parseInt(text.slice(position, space), 10);
-        if (!Number.isFinite(length) || length <= 0) break;
-        const record = text.slice(space + 1, position + length - 1);
-        const eq = record.indexOf('=');
-        if (eq !== -1 && record.slice(0, eq) === 'path') {
-            return record.slice(eq + 1);
-        }
-        position += length;
+  const text = data.toString('utf8');
+  let position = 0;
+  while (position < text.length) {
+    const space = text.indexOf(' ', position);
+    if (space === -1) break;
+    const length = parseInt(text.slice(position, space), 10);
+    if (!Number.isFinite(length) || length <= 0) break;
+    const record = text.slice(space + 1, position + length - 1);
+    const eq = record.indexOf('=');
+    if (eq !== -1 && record.slice(0, eq) === 'path') {
+      return record.slice(eq + 1);
     }
-    return null;
+    position += length;
+  }
+  return null;
 }
 
 /**
@@ -100,9 +100,9 @@ function paxPath(data) {
  * d'entrée introuvable.
  */
 function stripComponents(entryPath, n) {
-    const segments = entryPath.split('/').filter((s) => s !== '' && s !== '.');
-    if (segments.length <= n) return null;
-    return segments.slice(n).join('/');
+  const segments = entryPath.split('/').filter((s) => s !== '' && s !== '.');
+  if (segments.length <= n) return null;
+  return segments.slice(n).join('/');
 }
 
 /**
@@ -114,98 +114,98 @@ function stripComponents(entryPath, n) {
  * @returns {{ fichiers: number, octets: number }}
  */
 function extractTarGz(archive, destination, options = {}) {
-    const stripCount = options.stripComponents !== undefined ? options.stripComponents : 1;
-    const root = path.resolve(destination);
-    fs.mkdirSync(root, { recursive: true });
+  const stripCount = options.stripComponents !== undefined ? options.stripComponents : 1;
+  const root = path.resolve(destination);
+  fs.mkdirSync(root, { recursive: true });
 
-    /*
-     * Un plafond à la décompression.
-     *
-     * Sans lui, une archive de quelques kilooctets peut en rendre plusieurs
-     * gigaoctets — un taux de mille pour un est banal sur du contenu répétitif —
-     * et `gunzipSync` les alloue d'un bloc avant que la moindre ligne d'ici ne
-     * s'exécute. Le process tombe alors sur un dépassement mémoire, sans trace.
-     *
-     * L'archive vient de GitHub et l'installation est réservée au maître : le
-     * cas est improbable. Mais le garde-fou tient en un argument, et l'absence
-     * de plafond sur une décompression est de celles qui ne se remarquent que
-     * le jour où elles servent.
-     */
-    const tar = zlib.gunzipSync(archive, { maxOutputLength: MAX_UNCOMPRESSED_BYTES });
+  /*
+   * Un plafond à la décompression.
+   *
+   * Sans lui, une archive de quelques kilooctets peut en rendre plusieurs
+   * gigaoctets — un taux de mille pour un est banal sur du contenu répétitif —
+   * et `gunzipSync` les alloue d'un bloc avant que la moindre ligne d'ici ne
+   * s'exécute. Le process tombe alors sur un dépassement mémoire, sans trace.
+   *
+   * L'archive vient de GitHub et l'installation est réservée au maître : le
+   * cas est improbable. Mais le garde-fou tient en un argument, et l'absence
+   * de plafond sur une décompression est de celles qui ne se remarquent que
+   * le jour où elles servent.
+   */
+  const tar = zlib.gunzipSync(archive, { maxOutputLength: MAX_UNCOMPRESSED_BYTES });
 
-    let position = 0;
-    let pendingName = null;
-    let files = 0;
-    let bytes = 0;
+  let position = 0;
+  let pendingName = null;
+  let files = 0;
+  let bytes = 0;
 
-    while (position + BLOCK_SIZE <= tar.length) {
-        const header = tar.subarray(position, position + BLOCK_SIZE);
-        if (isEmptyBlock(header)) break;
+  while (position + BLOCK_SIZE <= tar.length) {
+    const header = tar.subarray(position, position + BLOCK_SIZE);
+    if (isEmptyBlock(header)) break;
 
-        const typeFlag = String.fromCharCode(header[156]);
-        const size = readNumber(header, 124, 12);
-        position += BLOCK_SIZE;
+    const typeFlag = String.fromCharCode(header[156]);
+    const size = readNumber(header, 124, 12);
+    position += BLOCK_SIZE;
 
-        const data = tar.subarray(position, position + size);
-        // Le contenu est complété jusqu'au bloc suivant.
-        position += Math.ceil(size / BLOCK_SIZE) * BLOCK_SIZE;
+    const data = tar.subarray(position, position + size);
+    // Le contenu est complété jusqu'au bloc suivant.
+    position += Math.ceil(size / BLOCK_SIZE) * BLOCK_SIZE;
 
-        // Entrées porteuses du nom de l'entrée suivante : mémorisées, jamais écrites.
-        if (typeFlag === 'L') {
-            pendingName = data.toString('utf8').replace(/\0+$/, '');
-            continue;
-        }
-        if (typeFlag === 'x') {
-            const entryPath = paxPath(data);
-            if (entryPath) pendingName = entryPath;
-            continue;
-        }
-        // En-tête pax global et noms de liens longs : sans objet ici.
-        if (typeFlag === 'g' || typeFlag === 'K') continue;
+    // Entrées porteuses du nom de l'entrée suivante : mémorisées, jamais écrites.
+    if (typeFlag === 'L') {
+      pendingName = data.toString('utf8').replace(/\0+$/, '');
+      continue;
+    }
+    if (typeFlag === 'x') {
+      const entryPath = paxPath(data);
+      if (entryPath) pendingName = entryPath;
+      continue;
+    }
+    // En-tête pax global et noms de liens longs : sans objet ici.
+    if (typeFlag === 'g' || typeFlag === 'K') continue;
 
-        const prefix = readString(header, 345, 155);
-        const shortName = readString(header, 0, 100);
-        const rawName = pendingName || (prefix ? `${prefix}/${shortName}` : shortName);
-        pendingName = null;
+    const prefix = readString(header, 345, 155);
+    const shortName = readString(header, 0, 100);
+    const rawName = pendingName || (prefix ? `${prefix}/${shortName}` : shortName);
+    pendingName = null;
 
-        // Liens matériels et symboliques : ignorés. Une archive de code source
-        // n'en contient pas, et Windows exige des privilèges pour les recréer.
-        if (typeFlag === '1' || typeFlag === '2') continue;
-        // Périphériques et FIFO : hors sujet pour du code source.
-        if (typeFlag === '3' || typeFlag === '4' || typeFlag === '6') continue;
+    // Liens matériels et symboliques : ignorés. Une archive de code source
+    // n'en contient pas, et Windows exige des privilèges pour les recréer.
+    if (typeFlag === '1' || typeFlag === '2') continue;
+    // Périphériques et FIFO : hors sujet pour du code source.
+    if (typeFlag === '3' || typeFlag === '4' || typeFlag === '6') continue;
 
-        const relative = stripComponents(rawName, stripCount);
-        if (!relative) continue;
+    const relative = stripComponents(rawName, stripCount);
+    if (!relative) continue;
 
-        const target = path.resolve(root, relative);
-        const insideTarget = path.relative(root, target);
-        const escapes =
-            !insideTarget ||
-            path.isAbsolute(insideTarget) ||
-            insideTarget === '..' ||
-            insideTarget.startsWith(`..${path.sep}`);
-        if (escapes) {
-            throw new Error(`Archive entry outside the destination folder: ${rawName}`);
-        }
-
-        if (typeFlag === '5') {
-            fs.mkdirSync(target, { recursive: true });
-            continue;
-        }
-
-        if (typeFlag === '0' || typeFlag === '\0' || header[156] === 0) {
-            fs.mkdirSync(path.dirname(target), { recursive: true });
-            fs.writeFileSync(target, data);
-            files++;
-            bytes += size;
-        }
+    const target = path.resolve(root, relative);
+    const insideTarget = path.relative(root, target);
+    const escapes =
+      !insideTarget ||
+      path.isAbsolute(insideTarget) ||
+      insideTarget === '..' ||
+      insideTarget.startsWith(`..${path.sep}`);
+    if (escapes) {
+      throw new Error(`Archive entry outside the destination folder: ${rawName}`);
     }
 
-    if (files === 0) {
-        throw new Error('Empty or unreadable archive: no file extracted.');
+    if (typeFlag === '5') {
+      fs.mkdirSync(target, { recursive: true });
+      continue;
     }
 
-    return { files, bytes };
+    if (typeFlag === '0' || typeFlag === '\0' || header[156] === 0) {
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, data);
+      files++;
+      bytes += size;
+    }
+  }
+
+  if (files === 0) {
+    throw new Error('Empty or unreadable archive: no file extracted.');
+  }
+
+  return { files, bytes };
 }
 
 module.exports = { extractTarGz };

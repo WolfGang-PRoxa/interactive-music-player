@@ -44,20 +44,20 @@ const log = require('../utils/logger');
 
 /** États possibles, du plus démuni au plus complet. */
 const STEP = {
-    /** `cloudflared` est introuvable : il reste à le télécharger. */
-    ABSENT: 'absent',
-    /** Le téléchargement est en cours. */
-    DOWNLOADING: 'downloading',
-    /** Adresse fixe demandée (jeton présent), mais aucune adresse déclarée. */
-    NEEDS_ADDRESS: 'needsAddress',
-    /** Tout est en place ; le tunnel reste à ouvrir. */
-    READY: 'ready',
-    /** Le tunnel est lancé, Cloudflare n'a pas encore confirmé. */
-    STARTING: 'starting',
-    /** Le tableau de bord est joignable depuis l'internet. */
-    SERVING: 'serving',
-    /** Le tunnel s'est arrêté sans qu'on le lui demande. */
-    FAILED: 'failed',
+  /** `cloudflared` est introuvable : il reste à le télécharger. */
+  ABSENT: 'absent',
+  /** Le téléchargement est en cours. */
+  DOWNLOADING: 'downloading',
+  /** Adresse fixe demandée (jeton présent), mais aucune adresse déclarée. */
+  NEEDS_ADDRESS: 'needsAddress',
+  /** Tout est en place ; le tunnel reste à ouvrir. */
+  READY: 'ready',
+  /** Le tunnel est lancé, Cloudflare n'a pas encore confirmé. */
+  STARTING: 'starting',
+  /** Le tableau de bord est joignable depuis l'internet. */
+  SERVING: 'serving',
+  /** Le tunnel s'est arrêté sans qu'on le lui demande. */
+  FAILED: 'failed',
 };
 
 const MODE = { QUICK: 'quick', NAMED: 'named' };
@@ -75,12 +75,9 @@ const EXE = process.platform === 'win32' ? 'cloudflared.exe' : 'cloudflared';
  * paquet — n'a pas à le retélécharger.
  */
 const KNOWN_PATHS = {
-    win32: [
-        'C:\\Program Files (x86)\\cloudflared\\cloudflared.exe',
-        'C:\\Program Files\\cloudflared\\cloudflared.exe',
-    ],
-    darwin: ['/opt/homebrew/bin/cloudflared', '/usr/local/bin/cloudflared'],
-    linux: ['/usr/bin/cloudflared', '/usr/local/bin/cloudflared'],
+  win32: ['C:\\Program Files (x86)\\cloudflared\\cloudflared.exe', 'C:\\Program Files\\cloudflared\\cloudflared.exe'],
+  darwin: ['/opt/homebrew/bin/cloudflared', '/usr/local/bin/cloudflared'],
+  linux: ['/usr/bin/cloudflared', '/usr/local/bin/cloudflared'],
 };
 
 /** Le temps laissé à Cloudflare pour confirmer un tunnel, avant d'en rendre compte. */
@@ -111,26 +108,26 @@ const CONNECTED = /Registered tunnel connection|Connection [0-9a-f-]+ registered
  * @returns {string|null}
  */
 function cliPath() {
-    const forced = (process.env.CLOUDFLARED_PATH || '').trim();
-    const candidates = [
-        ...(forced ? [forced] : []),
-        path.join(BIN_DIR, EXE),
-        ...(KNOWN_PATHS[process.platform] || []),
-    ];
-    for (const candidate of candidates) {
-        try {
-            if (fs.statSync(candidate).isFile()) return candidate;
-        } catch (e) { /* absent */ }
+  const forced = (process.env.CLOUDFLARED_PATH || '').trim();
+  const candidates = [...(forced ? [forced] : []), path.join(BIN_DIR, EXE), ...(KNOWN_PATHS[process.platform] || [])];
+  for (const candidate of candidates) {
+    try {
+      if (fs.statSync(candidate).isFile()) return candidate;
+    } catch (e) {
+      /* absent */
     }
+  }
 
-    // Le PATH en dernier : un chemin connu est plus sûr qu'un homonyme.
-    for (const dir of (process.env.PATH || '').split(path.delimiter).filter(Boolean)) {
-        const candidate = path.join(dir, EXE);
-        try {
-            if (fs.statSync(candidate).isFile()) return candidate;
-        } catch (e) { /* un PATH peut contenir n'importe quoi */ }
+  // Le PATH en dernier : un chemin connu est plus sûr qu'un homonyme.
+  for (const dir of (process.env.PATH || '').split(path.delimiter).filter(Boolean)) {
+    const candidate = path.join(dir, EXE);
+    try {
+      if (fs.statSync(candidate).isFile()) return candidate;
+    } catch (e) {
+      /* un PATH peut contenir n'importe quoi */
     }
-    return null;
+  }
+  return null;
 }
 
 /**
@@ -145,53 +142,53 @@ function cliPath() {
  * @returns {{ url: string, direct: boolean }}
  */
 function installer(platform = process.platform, arch = process.arch) {
-    const base = 'https://github.com/cloudflare/cloudflared/releases/latest/download/';
-    if (platform === 'win32') {
-        // Pas de version ARM pour Windows : l'émulation fait tourner celle-ci.
-        return { url: `${base}cloudflared-windows-${arch === 'ia32' ? '386' : 'amd64'}.exe`, direct: true };
-    }
-    if (platform === 'linux') {
-        const name = { x64: 'amd64', arm64: 'arm64', arm: 'arm', ia32: '386' }[arch];
-        if (name) return { url: `${base}cloudflared-linux-${name}`, direct: true };
-    }
-    return {
-        url: 'https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/',
-        direct: false,
-    };
+  const base = 'https://github.com/cloudflare/cloudflared/releases/latest/download/';
+  if (platform === 'win32') {
+    // Pas de version ARM pour Windows : l'émulation fait tourner celle-ci.
+    return { url: `${base}cloudflared-windows-${arch === 'ia32' ? '386' : 'amd64'}.exe`, direct: true };
+  }
+  if (platform === 'linux') {
+    const name = { x64: 'amd64', arm64: 'arm64', arm: 'arm', ia32: '386' }[arch];
+    if (name) return { url: `${base}cloudflared-linux-${name}`, direct: true };
+  }
+  return {
+    url: 'https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/',
+    direct: false,
+  };
 }
 
 /* ═════════════════════ Le mode ═════════════════════ */
 
 /** Le jeton d'un tunnel nommé, ou ''. Il ne quitte jamais ce module. */
 function tunnelToken() {
-    return (process.env.CLOUDFLARE_TUNNEL_TOKEN || '').trim();
+  return (process.env.CLOUDFLARE_TUNNEL_TOKEN || '').trim();
 }
 
 function declaredUrl() {
-    return (process.env.PUBLIC_URL || '').trim().replace(/\/+$/, '');
+  return (process.env.PUBLIC_URL || '').trim().replace(/\/+$/, '');
 }
 
 function currentMode() {
-    return tunnelToken() ? MODE.NAMED : MODE.QUICK;
+  return tunnelToken() ? MODE.NAMED : MODE.QUICK;
 }
 
 /* ═════════════════════ Le souvenir du geste ═════════════════════ */
 
 function remembered() {
-    try {
-        return JSON.parse(fs.readFileSync(MEMORY_FILE, 'utf8')).published === true;
-    } catch (e) {
-        return false;
-    }
+  try {
+    return JSON.parse(fs.readFileSync(MEMORY_FILE, 'utf8')).published === true;
+  } catch (e) {
+    return false;
+  }
 }
 
 function remember(published) {
-    try {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-        fs.writeFileSync(MEMORY_FILE, JSON.stringify({ published }, null, 2));
-    } catch (err) {
-        log.warn(`[Tunnel] Cannot remember the sharing choice: ${err.message}`);
-    }
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(MEMORY_FILE, JSON.stringify({ published }, null, 2));
+  } catch (err) {
+    log.warn(`[Tunnel] Cannot remember the sharing choice: ${err.message}`);
+  }
 }
 
 /* ═════════════════════ Le processus ═════════════════════ */
@@ -202,13 +199,13 @@ function remember(published) {
  * `phase` : idle (rien ne tourne), starting, up, exited (arrêté de lui-même).
  */
 const run = {
-    phase: 'idle',
-    mode: null,
-    url: null,
-    connected: false,
-    error: null,
-    child: null,
-    stopping: false,
+  phase: 'idle',
+  mode: null,
+  url: null,
+  connected: false,
+  error: null,
+  child: null,
+  stopping: false,
 };
 
 /** Pour qui attend la confirmation d'un lancement. */
@@ -218,9 +215,9 @@ let waiters = [];
 let downloading = null;
 
 function settleWaiters() {
-    const pending = waiters;
-    waiters = [];
-    pending.forEach((resolve) => resolve());
+  const pending = waiters;
+  waiters = [];
+  pending.forEach((resolve) => resolve());
 }
 
 /**
@@ -233,27 +230,30 @@ function settleWaiters() {
  * @param {string} text
  */
 function readOutput(text) {
-    for (const line of String(text).split(/\r?\n/)) {
-        if (!line.trim()) continue;
+  for (const line of String(text).split(/\r?\n/)) {
+    if (!line.trim()) continue;
 
-        if (run.mode === MODE.QUICK && !run.url) {
-            const found = QUICK_URL.exec(line);
-            if (found) run.url = found[0].toLowerCase();
-        }
-        if (CONNECTED.test(line)) run.connected = true;
-        if (/\bERR\b|error=|failed to/i.test(line)) {
-            // Sans l'horodatage ni le niveau : c'est la cause qu'on veut lire.
-            run.error = line.replace(/^\S+\s+(ERR|WRN|INF)\s+/, '').trim().slice(0, 300);
-        }
+    if (run.mode === MODE.QUICK && !run.url) {
+      const found = QUICK_URL.exec(line);
+      if (found) run.url = found[0].toLowerCase();
     }
+    if (CONNECTED.test(line)) run.connected = true;
+    if (/\bERR\b|error=|failed to/i.test(line)) {
+      // Sans l'horodatage ni le niveau : c'est la cause qu'on veut lire.
+      run.error = line
+        .replace(/^\S+\s+(ERR|WRN|INF)\s+/, '')
+        .trim()
+        .slice(0, 300);
+    }
+  }
 
-    const ready = run.connected && (run.mode === MODE.NAMED || run.url);
-    if (ready && run.phase === 'starting') {
-        run.phase = 'up';
-        run.error = null;
-        log.success(`[Tunnel] Dashboard published on the internet at ${sharedUrl()}`);
-        settleWaiters();
-    }
+  const ready = run.connected && (run.mode === MODE.NAMED || run.url);
+  if (ready && run.phase === 'starting') {
+    run.phase = 'up';
+    run.error = null;
+    log.success(`[Tunnel] Dashboard published on the internet at ${sharedUrl()}`);
+    settleWaiters();
+  }
 }
 
 /**
@@ -268,8 +268,8 @@ function readOutput(text) {
  * @returns {string[]}
  */
 function commandArgs(mode, port) {
-    if (mode === MODE.NAMED) return ['tunnel', '--no-autoupdate', 'run'];
-    return ['tunnel', '--no-autoupdate', '--url', `http://127.0.0.1:${port}`];
+  if (mode === MODE.NAMED) return ['tunnel', '--no-autoupdate', 'run'];
+  return ['tunnel', '--no-autoupdate', '--url', `http://127.0.0.1:${port}`];
 }
 
 /**
@@ -282,65 +282,72 @@ function commandArgs(mode, port) {
  * @returns {Promise<{ ok: boolean, error: string|null }>}
  */
 async function mount(port, { waitMs = START_WAIT_MS } = {}) {
-    if (run.phase === 'starting' || run.phase === 'up') return { ok: true, error: null };
+  if (run.phase === 'starting' || run.phase === 'up') return { ok: true, error: null };
 
-    const bin = cliPath();
-    if (!bin) return { ok: false, error: 'cloudflared introuvable' };
+  const bin = cliPath();
+  if (!bin) return { ok: false, error: 'cloudflared introuvable' };
 
-    const mode = currentMode();
-    if (mode === MODE.NAMED && !declaredUrl()) {
-        return { ok: false, error: 'PUBLIC_URL manquante pour le tunnel nommé' };
-    }
+  const mode = currentMode();
+  if (mode === MODE.NAMED && !declaredUrl()) {
+    return { ok: false, error: 'PUBLIC_URL manquante pour le tunnel nommé' };
+  }
 
+  Object.assign(run, {
+    phase: 'starting',
+    mode,
+    url: null,
+    connected: false,
+    error: null,
+    stopping: false,
+  });
+
+  const env = { ...process.env };
+  if (mode === MODE.NAMED) env.TUNNEL_TOKEN = tunnelToken();
+  else delete env.TUNNEL_TOKEN;
+
+  let child;
+  try {
+    child = spawn(bin, commandArgs(mode, port), {
+      env,
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (err) {
+    Object.assign(run, { phase: 'exited', error: err.message, child: null });
+    return { ok: false, error: err.message };
+  }
+  run.child = child;
+
+  child.stdout.on('data', readOutput);
+  child.stderr.on('data', readOutput);
+  child.on('error', (err) => {
+    run.error = err.message;
+  });
+  child.on('exit', (code) => {
+    if (run.child !== child) return;
+    const deliberate = run.stopping;
     Object.assign(run, {
-        phase: 'starting', mode, url: null, connected: false, error: null, stopping: false,
+      phase: deliberate ? 'idle' : 'exited',
+      child: null,
+      url: null,
+      connected: false,
+      error: deliberate ? null : run.error || `cloudflared stopped (code ${code})`,
     });
+    if (!deliberate) log.warn(`[Tunnel] The tunnel stopped by itself: ${run.error}`);
+    settleWaiters();
+  });
 
-    const env = { ...process.env };
-    if (mode === MODE.NAMED) env.TUNNEL_TOKEN = tunnelToken();
-    else delete env.TUNNEL_TOKEN;
+  remember(true);
 
-    let child;
-    try {
-        child = spawn(bin, commandArgs(mode, port), {
-            env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
-        });
-    } catch (err) {
-        Object.assign(run, { phase: 'exited', error: err.message, child: null });
-        return { ok: false, error: err.message };
-    }
-    run.child = child;
+  await new Promise((resolve) => {
+    waiters.push(resolve);
+    setTimeout(resolve, waitMs).unref?.();
+  });
 
-    child.stdout.on('data', readOutput);
-    child.stderr.on('data', readOutput);
-    child.on('error', (err) => {
-        run.error = err.message;
-    });
-    child.on('exit', (code) => {
-        if (run.child !== child) return;
-        const deliberate = run.stopping;
-        Object.assign(run, {
-            phase: deliberate ? 'idle' : 'exited',
-            child: null,
-            url: null,
-            connected: false,
-            error: deliberate ? null : (run.error || `cloudflared stopped (code ${code})`),
-        });
-        if (!deliberate) log.warn(`[Tunnel] The tunnel stopped by itself: ${run.error}`);
-        settleWaiters();
-    });
-
-    remember(true);
-
-    await new Promise((resolve) => {
-        waiters.push(resolve);
-        setTimeout(resolve, waitMs).unref?.();
-    });
-
-    if (run.phase === 'up') return { ok: true, error: null };
-    if (run.phase === 'exited') return { ok: false, error: run.error };
-    // Toujours en attente : ce n'est pas un échec, Cloudflare peut être lent.
-    return { ok: true, error: null };
+  if (run.phase === 'up') return { ok: true, error: null };
+  if (run.phase === 'exited') return { ok: false, error: run.error };
+  // Toujours en attente : ce n'est pas un échec, Cloudflare peut être lent.
+  return { ok: true, error: null };
 }
 
 /**
@@ -348,32 +355,40 @@ async function mount(port, { waitMs = START_WAIT_MS } = {}) {
  * @returns {Promise<{ ok: boolean, error: string|null }>}
  */
 async function unmount() {
-    remember(false);
-    const child = run.child;
-    if (!child) {
-        Object.assign(run, { phase: 'idle', url: null, connected: false, error: null });
-        return { ok: true, error: null };
-    }
-
-    run.stopping = true;
-    await new Promise((resolve) => {
-        child.once('exit', resolve);
-        child.kill();
-        // Un processus figé ne doit pas tenir la fenêtre en otage.
-        setTimeout(() => {
-            try { child.kill('SIGKILL'); } catch (e) { /* déjà parti */ }
-            resolve();
-        }, 5000).unref?.();
-    });
-    log.info('[Tunnel] Dashboard withdrawn from the internet.');
+  remember(false);
+  const child = run.child;
+  if (!child) {
+    Object.assign(run, { phase: 'idle', url: null, connected: false, error: null });
     return { ok: true, error: null };
+  }
+
+  run.stopping = true;
+  await new Promise((resolve) => {
+    child.once('exit', resolve);
+    child.kill();
+    // Un processus figé ne doit pas tenir la fenêtre en otage.
+    setTimeout(() => {
+      try {
+        child.kill('SIGKILL');
+      } catch (e) {
+        /* déjà parti */
+      }
+      resolve();
+    }, 5000).unref?.();
+  });
+  log.info('[Tunnel] Dashboard withdrawn from the internet.');
+  return { ok: true, error: null };
 }
 
 /** Le tunnel meurt avec le bot : rien ne doit survivre à son propriétaire. */
 process.on('exit', () => {
-    if (run.child) {
-        try { run.child.kill(); } catch (e) { /* déjà parti */ }
+  if (run.child) {
+    try {
+      run.child.kill();
+    } catch (e) {
+      /* déjà parti */
     }
+  }
 });
 
 /* ═════════════════════ Le téléchargement ═════════════════════ */
@@ -387,49 +402,53 @@ process.on('exit', () => {
  * @returns {Promise<{ ok: boolean, error: string|null }>}
  */
 function download() {
-    if (downloading) return downloading;
+  if (downloading) return downloading;
 
-    const source = installer();
-    if (!source.direct) {
-        return Promise.resolve({ ok: false, error: 'pas de téléchargement direct sur ce système' });
-    }
+  const source = installer();
+  if (!source.direct) {
+    return Promise.resolve({ ok: false, error: 'pas de téléchargement direct sur ce système' });
+  }
 
-    downloading = (async () => {
-        const target = path.join(BIN_DIR, EXE);
-        const partial = `${target}.part`;
-        try {
-            fs.mkdirSync(BIN_DIR, { recursive: true });
-            const response = await fetch(source.url, { redirect: 'follow' });
-            if (!response.ok || !response.body) {
-                throw new Error(`HTTP ${response.status}`);
-            }
+  downloading = (async () => {
+    const target = path.join(BIN_DIR, EXE);
+    const partial = `${target}.part`;
+    try {
+      fs.mkdirSync(BIN_DIR, { recursive: true });
+      const response = await fetch(source.url, { redirect: 'follow' });
+      if (!response.ok || !response.body) {
+        throw new Error(`HTTP ${response.status}`);
+      }
 
-            const out = fs.createWriteStream(partial);
-            let received = 0;
-            try {
-                for await (const chunk of response.body) {
-                    received += chunk.length;
-                    if (received > MAX_DOWNLOAD_BYTES) throw new Error('fichier anormalement gros');
-                    if (!out.write(chunk)) await new Promise((r) => out.once('drain', r));
-                }
-            } finally {
-                await new Promise((r) => out.end(r));
-            }
-            if (received === 0) throw new Error('fichier vide');
-
-            fs.chmodSync(partial, 0o755);
-            fs.renameSync(partial, target);
-            log.success(`[Tunnel] cloudflared downloaded (${Math.round(received / 1024 / 1024)} MB).`);
-            return { ok: true, error: null };
-        } catch (err) {
-            try { fs.unlinkSync(partial); } catch (e) { /* rien à effacer */ }
-            log.warn(`[Tunnel] Cannot download cloudflared: ${err.message}`);
-            return { ok: false, error: err.message };
-        } finally {
-            downloading = null;
+      const out = fs.createWriteStream(partial);
+      let received = 0;
+      try {
+        for await (const chunk of response.body) {
+          received += chunk.length;
+          if (received > MAX_DOWNLOAD_BYTES) throw new Error('fichier anormalement gros');
+          if (!out.write(chunk)) await new Promise((r) => out.once('drain', r));
         }
-    })();
-    return downloading;
+      } finally {
+        await new Promise((r) => out.end(r));
+      }
+      if (received === 0) throw new Error('fichier vide');
+
+      fs.chmodSync(partial, 0o755);
+      fs.renameSync(partial, target);
+      log.success(`[Tunnel] cloudflared downloaded (${Math.round(received / 1024 / 1024)} MB).`);
+      return { ok: true, error: null };
+    } catch (err) {
+      try {
+        fs.unlinkSync(partial);
+      } catch (e) {
+        /* rien à effacer */
+      }
+      log.warn(`[Tunnel] Cannot download cloudflared: ${err.message}`);
+      return { ok: false, error: err.message };
+    } finally {
+      downloading = null;
+    }
+  })();
+  return downloading;
 }
 
 /* ═════════════════════ Le constat ═════════════════════ */
@@ -444,9 +463,9 @@ function download() {
  * @returns {string|null}
  */
 function sharedUrl() {
-    if (run.phase !== 'up') return null;
-    if (run.mode === MODE.NAMED) return declaredUrl() || null;
-    return run.url;
+  if (run.phase !== 'up') return null;
+  if (run.mode === MODE.NAMED) return declaredUrl() || null;
+  return run.url;
 }
 
 /**
@@ -460,27 +479,27 @@ function sharedUrl() {
  * @returns {object}
  */
 function decide(seen) {
-    const mode = seen.mode;
-    const fixed = seen.declaredUrl || null;
+  const mode = seen.mode;
+  const fixed = seen.declaredUrl || null;
 
-    if (!seen.cli) {
-        return { step: seen.downloading ? STEP.DOWNLOADING : STEP.ABSENT, mode };
-    }
-    if (mode === MODE.NAMED && !fixed) return { step: STEP.NEEDS_ADDRESS, mode };
+  if (!seen.cli) {
+    return { step: seen.downloading ? STEP.DOWNLOADING : STEP.ABSENT, mode };
+  }
+  if (mode === MODE.NAMED && !fixed) return { step: STEP.NEEDS_ADDRESS, mode };
 
-    const current = seen.run || { phase: 'idle' };
-    const publicUrl = mode === MODE.NAMED ? fixed : (current.url || null);
+  const current = seen.run || { phase: 'idle' };
+  const publicUrl = mode === MODE.NAMED ? fixed : current.url || null;
 
-    switch (current.phase) {
-        case 'starting':
-            return { step: STEP.STARTING, mode, publicUrl: mode === MODE.NAMED ? fixed : null };
-        case 'up':
-            return { step: STEP.SERVING, mode, publicUrl };
-        case 'exited':
-            return { step: STEP.FAILED, mode, detail: current.error || null };
-        default:
-            return { step: STEP.READY, mode, publicUrl: mode === MODE.NAMED ? fixed : null };
-    }
+  switch (current.phase) {
+    case 'starting':
+      return { step: STEP.STARTING, mode, publicUrl: mode === MODE.NAMED ? fixed : null };
+    case 'up':
+      return { step: STEP.SERVING, mode, publicUrl };
+    case 'exited':
+      return { step: STEP.FAILED, mode, detail: current.error || null };
+    default:
+      return { step: STEP.READY, mode, publicUrl: mode === MODE.NAMED ? fixed : null };
+  }
 }
 
 /**
@@ -492,16 +511,16 @@ function decide(seen) {
  * @returns {object}
  */
 function inspect() {
-    const cli = cliPath();
-    const state = decide({
-        cli,
-        downloading: Boolean(downloading),
-        mode: currentMode(),
-        declaredUrl: declaredUrl(),
-        run,
-    });
-    if (state.step === STEP.ABSENT) state.installer = installer();
-    return state;
+  const cli = cliPath();
+  const state = decide({
+    cli,
+    downloading: Boolean(downloading),
+    mode: currentMode(),
+    declaredUrl: declaredUrl(),
+    run,
+  });
+  if (state.step === STEP.ABSENT) state.installer = installer();
+  return state;
 }
 
 /**
@@ -514,50 +533,56 @@ function inspect() {
  * @returns {Promise<object>} L'état après l'éventuelle réouverture.
  */
 async function announce(port) {
-    const state = inspect();
+  const state = inspect();
 
-    if (remembered() && (state.step === STEP.READY || state.step === STEP.FAILED)) {
-        log.info('[Tunnel] The dashboard was shared before the restart: reopening the tunnel.');
-        const res = await mount(port);
-        if (!res.ok) log.warn(`[Tunnel] Cannot reopen the tunnel: ${res.error}`);
-        return inspect();
-    }
+  if (remembered() && (state.step === STEP.READY || state.step === STEP.FAILED)) {
+    log.info('[Tunnel] The dashboard was shared before the restart: reopening the tunnel.');
+    const res = await mount(port);
+    if (!res.ok) log.warn(`[Tunnel] Cannot reopen the tunnel: ${res.error}`);
+    return inspect();
+  }
 
-    switch (state.step) {
-        case STEP.ABSENT:
-            log.info('[Tunnel] The dashboard stays on this machine. To share it from outside, '
-                + 'open the sharing window of the dashboard: it downloads cloudflared and '
-                + 'opens the tunnel, no account needed.');
-            break;
-        case STEP.NEEDS_ADDRESS:
-            log.warn('[Tunnel] CLOUDFLARE_TUNNEL_TOKEN is set but PUBLIC_URL is not: write in '
-                + 'PUBLIC_URL the address given to this tunnel in the Cloudflare dashboard.');
-            break;
-        case STEP.READY:
-            log.info('[Tunnel] Everything is in place to share the dashboard; the tunnel is not '
-                + 'open. Opening it publishes the dashboard on the public internet, so it '
-                + 'waits for a deliberate go-ahead.');
-            break;
-        default:
-            break;
-    }
-    return state;
+  switch (state.step) {
+    case STEP.ABSENT:
+      log.info(
+        '[Tunnel] The dashboard stays on this machine. To share it from outside, ' +
+          'open the sharing window of the dashboard: it downloads cloudflared and ' +
+          'opens the tunnel, no account needed.',
+      );
+      break;
+    case STEP.NEEDS_ADDRESS:
+      log.warn(
+        '[Tunnel] CLOUDFLARE_TUNNEL_TOKEN is set but PUBLIC_URL is not: write in ' +
+          'PUBLIC_URL the address given to this tunnel in the Cloudflare dashboard.',
+      );
+      break;
+    case STEP.READY:
+      log.info(
+        '[Tunnel] Everything is in place to share the dashboard; the tunnel is not ' +
+          'open. Opening it publishes the dashboard on the public internet, so it ' +
+          'waits for a deliberate go-ahead.',
+      );
+      break;
+    default:
+      break;
+  }
+  return state;
 }
 
 module.exports = {
-    STEP,
-    MODE,
-    cliPath,
-    installer,
-    commandArgs,
-    decide,
-    inspect,
-    announce,
-    download,
-    mount,
-    unmount,
-    sharedUrl,
-    // Pour les tests : lire la sortie de cloudflared sans le lancer.
-    _readOutput: readOutput,
-    _run: run,
+  STEP,
+  MODE,
+  cliPath,
+  installer,
+  commandArgs,
+  decide,
+  inspect,
+  announce,
+  download,
+  mount,
+  unmount,
+  sharedUrl,
+  // Pour les tests : lire la sortie de cloudflared sans le lancer.
+  _readOutput: readOutput,
+  _run: run,
 };

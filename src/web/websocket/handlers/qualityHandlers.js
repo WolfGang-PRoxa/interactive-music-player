@@ -31,38 +31,42 @@ const VALID_VIDEO_HEIGHTS = ['2160', '1440', '1080', '720', '480', '360'];
  * un changement vidéo n'a pas d'équivalent à requalifier.
  */
 function handleSetTrackQuality(ctx) {
-    const { data, webServer, currentGuildId } = ctx;
+  const { data, webServer, currentGuildId } = ctx;
 
-    const { url, audio, video } = data;
-    if (!url) return;
+  const { url, audio, video } = data;
+  if (!url) return;
 
-    const patch = {};
-    if (audio !== undefined && VALID_AUDIO_BITRATES.includes(String(audio))) {
-        patch.audio = String(audio);
+  const patch = {};
+  if (audio !== undefined && VALID_AUDIO_BITRATES.includes(String(audio))) {
+    patch.audio = String(audio);
+  }
+  if (video !== undefined && VALID_VIDEO_HEIGHTS.includes(String(video))) {
+    patch.video = String(video);
+  }
+  if (Object.keys(patch).length === 0) return;
+
+  const settings = database.getSettings(currentGuildId);
+  database.setTrackQuality(url, patch, {
+    audio: String(settings.importAudioQuality || '320'),
+    video: String(settings.importVideoQuality || '720'),
+  });
+
+  if (patch.audio) {
+    try {
+      // Objet minimal : startDownload réhydrate la piste via player.search
+      // quand elle n'expose pas d'extracteur, comme pour les playlists.
+      preloadManager.requalify({ url, title: data.title || url }, patch.audio);
+    } catch (err) {
+      log.error('[WebServer] Preload requalification error:', err.message);
     }
-    if (video !== undefined && VALID_VIDEO_HEIGHTS.includes(String(video))) {
-        patch.video = String(video);
-    }
-    if (Object.keys(patch).length === 0) return;
+  }
 
-    const settings = database.getSettings(currentGuildId);
-    database.setTrackQuality(url, patch, {
-        audio: String(settings.importAudioQuality || '320'),
-        video: String(settings.importVideoQuality || '720')
-    });
-
-    if (patch.audio) {
-        try {
-            // Objet minimal : startDownload réhydrate la piste via player.search
-            // quand elle n'expose pas d'extracteur, comme pour les playlists.
-            preloadManager.requalify({ url, title: data.title || url }, patch.audio);
-        } catch (err) {
-            log.error('[WebServer] Preload requalification error:', err.message);
-        }
-    }
-
-    log.info(`[WebServer] Track quality updated (${Object.entries(patch).map(([k, v]) => `${k}=${v}`).join(', ')}) for ${url}`);
-    webServer.broadcastState(currentGuildId);
+  log.info(
+    `[WebServer] Track quality updated (${Object.entries(patch)
+      .map(([k, v]) => `${k}=${v}`)
+      .join(', ')}) for ${url}`,
+  );
+  webServer.broadcastState(currentGuildId);
 }
 
 /**
@@ -80,35 +84,35 @@ function handleSetTrackQuality(ctx) {
  * de régler garde la nouvelle.
  */
 function handleSetTrackLoudness(ctx) {
-    const { data, webServer, queue, currentGuildId } = ctx;
+  const { data, webServer, queue, currentGuildId } = ctx;
 
-    const { url } = data;
-    if (!url) return;
+  const { url } = data;
+  if (!url) return;
 
-    const settings = database.getSettings(currentGuildId);
+  const settings = database.getSettings(currentGuildId);
 
-    // « Valeur initiale » : la piste retrouve sa sonie d'origine, sans cible.
-    const cleared = data.target === null || data.target === 'reset';
-    const target = cleared ? null : loudness.clampTarget(data.target);
+  // « Valeur initiale » : la piste retrouve sa sonie d'origine, sans cible.
+  const cleared = data.target === null || data.target === 'reset';
+  const target = cleared ? null : loudness.clampTarget(data.target);
 
-    if (!cleared && !Number.isFinite(target)) return;
+  if (!cleared && !Number.isFinite(target)) return;
 
-    database.setTrackLoudnessTarget(url, target);
+  database.setTrackLoudnessTarget(url, target);
 
-    if (settings.lufsSyncEnabled) {
-        database.updateSettings(currentGuildId, { lufsSyncEnabled: false });
-        log.info('[WebServer] LUFS synchronization released: a track was set by hand.');
-    }
+  if (settings.lufsSyncEnabled) {
+    database.updateSettings(currentGuildId, { lufsSyncEnabled: false });
+    log.info('[WebServer] LUFS synchronization released: a track was set by hand.');
+  }
 
-    applyLoudness(queue);
+  applyLoudness(queue);
 
-    // Une piste jamais mesurée n'a pas de gain à recevoir : la demande de
-    // réglage vaut demande de mesure.
-    loudnessAnalyzer.forget(url);
-    loudnessAnalyzer.ensure(findTrack(ctx, url));
+  // Une piste jamais mesurée n'a pas de gain à recevoir : la demande de
+  // réglage vaut demande de mesure.
+  loudnessAnalyzer.forget(url);
+  loudnessAnalyzer.ensure(findTrack(ctx, url));
 
-    log.info(`[WebServer] Track loudness ${cleared ? 'reset' : `set to ${target} LUFS`} for ${url}`);
-    webServer.broadcastState(currentGuildId);
+  log.info(`[WebServer] Track loudness ${cleared ? 'reset' : `set to ${target} LUFS`} for ${url}`);
+  webServer.broadcastState(currentGuildId);
 }
 
 /**
@@ -118,16 +122,16 @@ function handleSetTrackLoudness(ctx) {
  * lire le fichier, qui n'est que sur le disque du bot.
  */
 function handleRequestTrackLoudness(ctx) {
-    const { data, webServer, currentGuildId } = ctx;
-    if (!data || !data.url) return;
+  const { data, webServer, currentGuildId } = ctx;
+  if (!data || !data.url) return;
 
-    const track = findTrack(ctx, data.url);
-    if (!track) return;
+  const track = findTrack(ctx, data.url);
+  if (!track) return;
 
-    // Une nouvelle demande vaut nouvelle chance : le fichier a pu arriver en
-    // cache depuis l'échec précédent.
-    loudnessAnalyzer.forget(data.url);
-    if (loudnessAnalyzer.ensure(track)) webServer.broadcastState(currentGuildId);
+  // Une nouvelle demande vaut nouvelle chance : le fichier a pu arriver en
+  // cache depuis l'échec précédent.
+  loudnessAnalyzer.forget(data.url);
+  if (loudnessAnalyzer.ensure(track)) webServer.broadcastState(currentGuildId);
 }
 
 /**
@@ -143,28 +147,32 @@ function handleRequestTrackLoudness(ctx) {
  * @returns {object|null}
  */
 function findTrack(ctx, url) {
-    const { queue } = ctx;
-    if (!url) return null;
+  const { queue } = ctx;
+  if (!url) return null;
 
-    const pools = [];
-    if (queue) {
-        if (queue.currentTrack) pools.push([queue.currentTrack]);
-        try { pools.push(queue.tracks.toArray()); } catch (e) {}
-        try { pools.push(queue.history.tracks.toArray()); } catch (e) {}
-    }
-    for (const playlist of database.getGlobalPlaylists()) {
-        pools.push(playlist.tracks || []);
-    }
+  const pools = [];
+  if (queue) {
+    if (queue.currentTrack) pools.push([queue.currentTrack]);
+    try {
+      pools.push(queue.tracks.toArray());
+    } catch (e) {}
+    try {
+      pools.push(queue.history.tracks.toArray());
+    } catch (e) {}
+  }
+  for (const playlist of database.getGlobalPlaylists()) {
+    pools.push(playlist.tracks || []);
+  }
 
-    for (const pool of pools) {
-        const found = (pool || []).find(t => t && t.url === url);
-        if (found) return found;
-    }
+  for (const pool of pools) {
+    const found = (pool || []).find((t) => t && t.url === url);
+    if (found) return found;
+  }
 
-    // Introuvable dans l'état courant — une playlist qu'aucun serveur n'a
-    // chargée, par exemple : l'URL suffit à la mesure, c'est elle qui donne le
-    // chemin du fichier local comme la clé du cache.
-    return { url, title: url };
+  // Introuvable dans l'état courant — une playlist qu'aucun serveur n'a
+  // chargée, par exemple : l'URL suffit à la mesure, c'est elle qui donne le
+  // chemin du fichier local comme la clé du cache.
+  return { url, title: url };
 }
 
 /**
@@ -184,40 +192,40 @@ function findTrack(ctx, url) {
  * sous-menu, et son résultat est retenu dix minutes.
  */
 async function handleRequestTrackFormats(ctx) {
-    const { ws, data } = ctx;
-    const url = data && typeof data.url === 'string' ? data.url.trim() : '';
-    if (!url) return;
+  const { ws, data } = ctx;
+  const url = data && typeof data.url === 'string' ? data.url.trim() : '';
+  if (!url) return;
 
-    const send = (payload) => {
-        try {
-            ws.send(JSON.stringify({ type: 'trackFormats', data: { url, ...payload } }));
-        } catch (e) {
-            // Socket fermée : le menu qui attendait n'existe plus non plus.
-        }
-    };
-
-    // Un fichier du disque n'a qu'une forme, la sienne : rien à inventorier, et
-    // l'interroger lancerait un processus pour rien.
-    if (!/^https?:\/\//i.test(url)) {
-        return send({ known: false, local: true, heights: [], audioKbps: null });
-    }
-
+  const send = (payload) => {
     try {
-        const playable = await preloadManager.resolvePlayableTrack({ url, title: url });
-        const target = (playable && playable.url) ? playable.url : url;
-        const found = await videoSource.inventory(target);
-        send({ ...found, local: false });
-    } catch (err) {
-        // Rien trouvé n'est pas une erreur d'interface : le menu retombe alors
-        // sur son comportement d'avant, qui propose tout.
-        log.debug(`[Quality] No format list for ${url}: ${err.message}`);
-        send({ known: false, local: false, heights: [], audioKbps: null });
+      ws.send(JSON.stringify({ type: 'trackFormats', data: { url, ...payload } }));
+    } catch (e) {
+      // Socket fermée : le menu qui attendait n'existe plus non plus.
     }
+  };
+
+  // Un fichier du disque n'a qu'une forme, la sienne : rien à inventorier, et
+  // l'interroger lancerait un processus pour rien.
+  if (!/^https?:\/\//i.test(url)) {
+    return send({ known: false, local: true, heights: [], audioKbps: null });
+  }
+
+  try {
+    const playable = await preloadManager.resolvePlayableTrack({ url, title: url });
+    const target = playable && playable.url ? playable.url : url;
+    const found = await videoSource.inventory(target);
+    send({ ...found, local: false });
+  } catch (err) {
+    // Rien trouvé n'est pas une erreur d'interface : le menu retombe alors
+    // sur son comportement d'avant, qui propose tout.
+    log.debug(`[Quality] No format list for ${url}: ${err.message}`);
+    send({ known: false, local: false, heights: [], audioKbps: null });
+  }
 }
 
 module.exports = {
-    handleRequestTrackFormats,
-    handleSetTrackQuality,
-    handleSetTrackLoudness,
-    handleRequestTrackLoudness,
+  handleRequestTrackFormats,
+  handleSetTrackQuality,
+  handleSetTrackLoudness,
+  handleRequestTrackLoudness,
 };

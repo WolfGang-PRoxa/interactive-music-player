@@ -21,18 +21,18 @@
  * @returns {string}
  */
 function formatMs(ms) {
-    // Aligné sur js/player.js : l'infini n'est pas une durée qu'on écrit.
-    if (!Number.isFinite(ms) || ms <= 0) return '0:00';
-    const totalSeconds = Math.floor(ms / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
+  // Aligné sur js/player.js : l'infini n'est pas une durée qu'on écrit.
+  if (!Number.isFinite(ms) || ms <= 0) return '0:00';
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
 
-    const paddedSeconds = seconds.toString().padStart(2, '0');
-    if (hours > 0) {
-        return `${hours}:${minutes.toString().padStart(2, '0')}:${paddedSeconds}`;
-    }
-    return `${minutes}:${paddedSeconds}`;
+  const paddedSeconds = seconds.toString().padStart(2, '0');
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${paddedSeconds}`;
+  }
+  return `${minutes}:${paddedSeconds}`;
 }
 
 /**
@@ -41,19 +41,19 @@ function formatMs(ms) {
  * @returns {number} 0 si le format est inexploitable
  */
 function parseDurationToMs(durationStr) {
-    if (!durationStr) return 0;
-    const parts = durationStr.split(':').map(Number);
-    if (parts.length === 3) {
-        return ((parts[0] * 3600) + (parts[1] * 60) + parts[2]) * 1000;
-    } else if (parts.length === 2) {
-        return ((parts[0] * 60) + parts[1]) * 1000;
-    } else if (parts.length === 1) {
-        return parts[0] * 1000;
-    }
-    return 0;
+  if (!durationStr) return 0;
+  const parts = durationStr.split(':').map(Number);
+  if (parts.length === 3) {
+    return (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000;
+  } else if (parts.length === 2) {
+    return (parts[0] * 60 + parts[1]) * 1000;
+  } else if (parts.length === 1) {
+    return parts[0] * 1000;
+  }
+  return 0;
 }
 
 module.exports = {
-    formatMs,
-    parseDurationToMs,
+  formatMs,
+  parseDurationToMs,
 };

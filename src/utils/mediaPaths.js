@@ -22,54 +22,50 @@ const config = require('../config');
 const DATA_DIR = path.join(process.cwd(), 'data');
 
 const MEDIA_EXTENSIONS = new Set(
-    [...config.supportedExtensions, ...config.supportedVideoExtensions]
-        .map(ext => ext.toLowerCase())
+  [...config.supportedExtensions, ...config.supportedVideoExtensions].map((ext) => ext.toLowerCase()),
 );
 
 function buildAllowedRoots() {
-    const roots = [
-        path.join(DATA_DIR, 'uploads'),
-        path.join(DATA_DIR, 'cache'),
-    ];
+  const roots = [path.join(DATA_DIR, 'uploads'), path.join(DATA_DIR, 'cache')];
 
-    const extra = process.env.MEDIA_ROOTS;
-    if (extra) {
-        for (const entry of extra.split(/[;,]/)) {
-            const trimmed = entry.trim();
-            if (trimmed) roots.push(trimmed);
-        }
+  const extra = process.env.MEDIA_ROOTS;
+  if (extra) {
+    for (const entry of extra.split(/[;,]/)) {
+      const trimmed = entry.trim();
+      if (trimmed) roots.push(trimmed);
     }
+  }
 
-    return roots.map(root => {
-        const resolved = path.resolve(root);
-        // realpath pour que la comparaison se fasse sur le chemin canonique des
-        // deux côtés — sinon un lien symbolique sur la racine ferait tout échouer.
-        try {
-            return fs.realpathSync(resolved);
-        } catch (e) {
-            return resolved;
-        }
-    });
+  return roots.map((root) => {
+    const resolved = path.resolve(root);
+    // realpath pour que la comparaison se fasse sur le chemin canonique des
+    // deux côtés — sinon un lien symbolique sur la racine ferait tout échouer.
+    try {
+      return fs.realpathSync(resolved);
+    } catch (e) {
+      return resolved;
+    }
+  });
 }
 
 const allowedRoots = buildAllowedRoots();
 
 /** Windows compare les chemins sans tenir compte de la casse. */
 function normalizeForCompare(p) {
-    return process.platform === 'win32' ? p.toLowerCase() : p;
+  return process.platform === 'win32' ? p.toLowerCase() : p;
 }
 
 function hasMediaExtension(filePath) {
-    return MEDIA_EXTENSIONS.has(path.extname(filePath).toLowerCase());
+  return MEDIA_EXTENSIONS.has(path.extname(filePath).toLowerCase());
 }
 
 function isUnderAllowedRoot(absolutePath) {
-    const target = normalizeForCompare(absolutePath);
-    return allowedRoots.some(root => {
-        const rel = path.relative(normalizeForCompare(root), target);
-        // rel vide = le chemin EST la racine ; '..' = en dehors ; absolu = autre volume.
-        return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
-    });
+  const target = normalizeForCompare(absolutePath);
+  return allowedRoots.some((root) => {
+    const rel = path.relative(normalizeForCompare(root), target);
+    // rel vide = le chemin EST la racine ; '..' = en dehors ; absolu = autre volume.
+    return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+  });
 }
 
 /**
@@ -78,33 +74,33 @@ function isUnderAllowedRoot(absolutePath) {
  * @returns {string|null} Chemin absolu canonique, ou null si non autorisé
  */
 function resolveMediaPath(input) {
-    if (!input || typeof input !== 'string') return null;
+  if (!input || typeof input !== 'string') return null;
 
-    let decoded = input;
-    try {
-        decoded = decodeURIComponent(input);
-    } catch (e) {
-        // Séquence d'échappement invalide : on garde la valeur brute
-    }
+  let decoded = input;
+  try {
+    decoded = decodeURIComponent(input);
+  } catch (e) {
+    // Séquence d'échappement invalide : on garde la valeur brute
+  }
 
-    // Un octet nul tronque le chemin au niveau des appels système sous-jacents.
-    if (decoded.includes('\0')) return null;
+  // Un octet nul tronque le chemin au niveau des appels système sous-jacents.
+  if (decoded.includes('\0')) return null;
 
-    // Une URL distante n'est pas un chemin disque : ce n'est pas notre rôle ici.
-    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(decoded)) return null;
+  // Une URL distante n'est pas un chemin disque : ce n'est pas notre rôle ici.
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(decoded)) return null;
 
-    if (!hasMediaExtension(decoded)) return null;
+  if (!hasMediaExtension(decoded)) return null;
 
-    let real;
-    try {
-        real = fs.realpathSync(path.resolve(decoded));
-    } catch (e) {
-        return null; // Fichier inexistant ou illisible
-    }
+  let real;
+  try {
+    real = fs.realpathSync(path.resolve(decoded));
+  } catch (e) {
+    return null; // Fichier inexistant ou illisible
+  }
 
-    if (!isUnderAllowedRoot(real)) return null;
+  if (!isUnderAllowedRoot(real)) return null;
 
-    return real;
+  return real;
 }
 
 /**
@@ -114,7 +110,7 @@ function resolveMediaPath(input) {
  * @returns {boolean}
  */
 function isAllowedMediaFilename(fileName) {
-    return typeof fileName === 'string' && hasMediaExtension(fileName);
+  return typeof fileName === 'string' && hasMediaExtension(fileName);
 }
 
 /**
@@ -133,28 +129,28 @@ function isAllowedMediaFilename(fileName) {
  * @returns {boolean} Faux aussi quand le chemin n'existe pas.
  */
 function isInsideAllowedRoots(input) {
-    if (!input || typeof input !== 'string') return false;
-    // Un octet nul tronque le chemin au niveau des appels systeme sous-jacents.
-    if (input.indexOf('\0') !== -1) return false;
+  if (!input || typeof input !== 'string') return false;
+  // Un octet nul tronque le chemin au niveau des appels systeme sous-jacents.
+  if (input.indexOf('\0') !== -1) return false;
 
-    let real;
-    try {
-        real = fs.realpathSync(path.resolve(input));
-    } catch (e) {
-        return false;
-    }
+  let real;
+  try {
+    real = fs.realpathSync(path.resolve(input));
+  } catch (e) {
+    return false;
+  }
 
-    const target = normalizeForCompare(real);
-    return allowedRoots.some((root) => {
-        const rel = path.relative(normalizeForCompare(root), target);
-        // rel vide = le chemin EST la racine, ce qui convient ici.
-        return !rel.startsWith('..') && !path.isAbsolute(rel);
-    });
+  const target = normalizeForCompare(real);
+  return allowedRoots.some((root) => {
+    const rel = path.relative(normalizeForCompare(root), target);
+    // rel vide = le chemin EST la racine, ce qui convient ici.
+    return !rel.startsWith('..') && !path.isAbsolute(rel);
+  });
 }
 
 module.exports = {
-    resolveMediaPath,
-    isAllowedMediaFilename,
-    isInsideAllowedRoots,
-    allowedRoots,
+  resolveMediaPath,
+  isAllowedMediaFilename,
+  isInsideAllowedRoots,
+  allowedRoots,
 };

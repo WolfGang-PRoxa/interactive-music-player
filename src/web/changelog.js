@@ -77,15 +77,15 @@ const KINDS = ['added', 'changed', 'fixed', 'removed', 'deprecated', 'security']
  * fichiers annexes qu'on pourrait déposer à côté.
  */
 function availableLangs() {
-    try {
-        return fs
-            .readdirSync(CHANGELOG_DIR, { withFileTypes: true })
-            .filter((entry) => entry.isFile() && /^[a-z]{2}\.md$/.test(entry.name))
-            .map((entry) => entry.name.slice(0, 2))
-            .sort();
-    } catch (e) {
-        return [];
-    }
+  try {
+    return fs
+      .readdirSync(CHANGELOG_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && /^[a-z]{2}\.md$/.test(entry.name))
+      .map((entry) => entry.name.slice(0, 2))
+      .sort();
+  } catch (e) {
+    return [];
+  }
 }
 
 /**
@@ -97,11 +97,11 @@ function availableLangs() {
  * simplement à aucune entrée et retombe sur la référence.
  */
 function resolveLang(requested) {
-    const available = availableLangs();
-    const wanted = String(requested || '');
-    const match = available.find((lang) => lang === wanted);
-    if (match) return match;
-    return available.find((lang) => lang === REFERENCE_LANG) || available[0] || REFERENCE_LANG;
+  const available = availableLangs();
+  const wanted = String(requested || '');
+  const match = available.find((lang) => lang === wanted);
+  if (match) return match;
+  return available.find((lang) => lang === REFERENCE_LANG) || available[0] || REFERENCE_LANG;
 }
 
 /** Une date de livraison, et rien d'autre : `## 2026-09-14 — Titre`. */
@@ -119,107 +119,107 @@ const RELEASE_LINE = /^##\s+(\d{4}-\d{2}-\d{2})\s*(?:[—–-]\s*(.*))?$/;
  * @returns {{title: string, intro: string, releases: Array, count: number}}
  */
 function parse(source) {
-    const lines = String(source).replace(/\r\n?/g, '\n').split('\n');
+  const lines = String(source).replace(/\r\n?/g, '\n').split('\n');
 
-    let title = '';
-    const intro = [];
-    const releases = [];
-    /** Livraison en cours de lecture, et sa catégorie en cours. */
-    let release = null;
-    let group = null;
-    /** Dans un commentaire HTML : tout est sauté jusqu'à sa fermeture. */
-    let inComment = false;
+  let title = '';
+  const intro = [];
+  const releases = [];
+  /** Livraison en cours de lecture, et sa catégorie en cours. */
+  let release = null;
+  let group = null;
+  /** Dans un commentaire HTML : tout est sauté jusqu'à sa fermeture. */
+  let inComment = false;
 
-    for (const raw of lines) {
-        const line = raw.trim();
+  for (const raw of lines) {
+    const line = raw.trim();
 
-        if (inComment) {
-            if (line.includes('-->')) inComment = false;
-            continue;
-        }
-        if (line.startsWith('<!--')) {
-            // Un commentaire d'une seule ligne se referme sur place.
-            if (!line.includes('-->')) inComment = true;
-            continue;
-        }
-        if (!line) continue;
+    if (inComment) {
+      if (line.includes('-->')) inComment = false;
+      continue;
+    }
+    if (line.startsWith('<!--')) {
+      // Un commentaire d'une seule ligne se referme sur place.
+      if (!line.includes('-->')) inComment = true;
+      continue;
+    }
+    if (!line) continue;
 
-        const releaseLine = RELEASE_LINE.exec(line);
-        if (releaseLine) {
-            release = {
-                date: releaseLine[1],
-                title: (releaseLine[2] || '').trim(),
-                summary: '',
-                groups: [],
-                count: 0,
-            };
-            group = null;
-            releases.push(release);
-            continue;
-        }
-
-        const kindLine = /^###\s+(.+?)\s*$/.exec(line);
-        if (kindLine && release) {
-            const kind = kindLine[1].trim().toLowerCase();
-            // Une catégorie citée deux fois dans la même livraison est une
-            // seule liste : on reprend celle qui existe plutôt que d'afficher
-            // deux fois le même en-tête.
-            group = release.groups.find((g) => g.kind === kind);
-            if (!group) {
-                group = { kind, entries: [] };
-                release.groups.push(group);
-            }
-            continue;
-        }
-
-        const titleLine = /^#\s+(.+?)\s*$/.exec(line);
-        if (titleLine && !release) {
-            if (!title) title = titleLine[1].trim();
-            continue;
-        }
-
-        const entryLine = /^[-*]\s+(.+)$/.exec(line);
-        if (entryLine && release) {
-            // Des entrées posées avant toute catégorie restent lisibles : elles
-            // tombent dans un groupe sans nom, que la fenêtre rend sans badge.
-            if (!group) {
-                group = { kind: '', entries: [] };
-                release.groups.push(group);
-            }
-            group.entries.push(entryLine[1].trim());
-            release.count++;
-            continue;
-        }
-
-        // Prose ordinaire. Avant la première livraison c'est l'introduction du
-        // journal ; sous une date et avant toute catégorie, le résumé de la
-        // livraison ; ailleurs, la suite de l'entrée qui précède — une entrée
-        // peut tenir sur plusieurs lignes dans le fichier sans en faire deux.
-        if (!release) {
-            intro.push(line);
-        } else if (!group) {
-            release.summary = release.summary ? `${release.summary} ${line}` : line;
-        } else if (group.entries.length) {
-            group.entries[group.entries.length - 1] += ` ${line}`;
-        }
+    const releaseLine = RELEASE_LINE.exec(line);
+    if (releaseLine) {
+      release = {
+        date: releaseLine[1],
+        title: (releaseLine[2] || '').trim(),
+        summary: '',
+        groups: [],
+        count: 0,
+      };
+      group = null;
+      releases.push(release);
+      continue;
     }
 
-    // Les catégories connues d'abord, dans l'ordre de `KINDS`, et les autres
-    // ensuite : le fichier décide du contenu, pas de l'ordre de lecture.
-    const rank = (kind) => {
-        const index = KINDS.indexOf(kind);
-        return index === -1 ? KINDS.length : index;
-    };
-    for (const entry of releases) {
-        entry.groups.sort((a, b) => rank(a.kind) - rank(b.kind));
+    const kindLine = /^###\s+(.+?)\s*$/.exec(line);
+    if (kindLine && release) {
+      const kind = kindLine[1].trim().toLowerCase();
+      // Une catégorie citée deux fois dans la même livraison est une
+      // seule liste : on reprend celle qui existe plutôt que d'afficher
+      // deux fois le même en-tête.
+      group = release.groups.find((g) => g.kind === kind);
+      if (!group) {
+        group = { kind, entries: [] };
+        release.groups.push(group);
+      }
+      continue;
     }
 
-    return {
-        title,
-        intro: intro.join(' '),
-        releases,
-        count: releases.reduce((total, entry) => total + entry.count, 0),
-    };
+    const titleLine = /^#\s+(.+?)\s*$/.exec(line);
+    if (titleLine && !release) {
+      if (!title) title = titleLine[1].trim();
+      continue;
+    }
+
+    const entryLine = /^[-*]\s+(.+)$/.exec(line);
+    if (entryLine && release) {
+      // Des entrées posées avant toute catégorie restent lisibles : elles
+      // tombent dans un groupe sans nom, que la fenêtre rend sans badge.
+      if (!group) {
+        group = { kind: '', entries: [] };
+        release.groups.push(group);
+      }
+      group.entries.push(entryLine[1].trim());
+      release.count++;
+      continue;
+    }
+
+    // Prose ordinaire. Avant la première livraison c'est l'introduction du
+    // journal ; sous une date et avant toute catégorie, le résumé de la
+    // livraison ; ailleurs, la suite de l'entrée qui précède — une entrée
+    // peut tenir sur plusieurs lignes dans le fichier sans en faire deux.
+    if (!release) {
+      intro.push(line);
+    } else if (!group) {
+      release.summary = release.summary ? `${release.summary} ${line}` : line;
+    } else if (group.entries.length) {
+      group.entries[group.entries.length - 1] += ` ${line}`;
+    }
+  }
+
+  // Les catégories connues d'abord, dans l'ordre de `KINDS`, et les autres
+  // ensuite : le fichier décide du contenu, pas de l'ordre de lecture.
+  const rank = (kind) => {
+    const index = KINDS.indexOf(kind);
+    return index === -1 ? KINDS.length : index;
+  };
+  for (const entry of releases) {
+    entry.groups.sort((a, b) => rank(a.kind) - rank(b.kind));
+  }
+
+  return {
+    title,
+    intro: intro.join(' '),
+    releases,
+    count: releases.reduce((total, entry) => total + entry.count, 0),
+  };
 }
 
 /**
@@ -235,17 +235,17 @@ function parse(source) {
  * @throws {Error} si le fichier de la langue retenue est illisible
  */
 function read(requested) {
-    const lang = resolveLang(requested);
-    const source = fs.readFileSync(path.join(CHANGELOG_DIR, `${lang}.md`), 'utf8');
-    return { lang, ...parse(source) };
+  const lang = resolveLang(requested);
+  const source = fs.readFileSync(path.join(CHANGELOG_DIR, `${lang}.md`), 'utf8');
+  return { lang, ...parse(source) };
 }
 
 module.exports = {
-    CHANGELOG_DIR,
-    REFERENCE_LANG,
-    KINDS,
-    availableLangs,
-    resolveLang,
-    parse,
-    read,
+  CHANGELOG_DIR,
+  REFERENCE_LANG,
+  KINDS,
+  availableLangs,
+  resolveLang,
+  parse,
+  read,
 };

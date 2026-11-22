@@ -31,28 +31,28 @@ const path = require('path');
 const Module = require('module');
 
 function installFileTypeCompat() {
-    const extractorEntry = require.resolve('@discord-player/extractor');
-    const requireFromExtractor = Module.createRequire(extractorEntry);
-    const resolved = requireFromExtractor.resolve('file-type');
-    const fileType = requireFromExtractor('file-type');
+  const extractorEntry = require.resolve('@discord-player/extractor');
+  const requireFromExtractor = Module.createRequire(extractorEntry);
+  const resolved = requireFromExtractor.resolve('file-type');
+  const fileType = requireFromExtractor('file-type');
 
-    // L'ancienne API est là : l'override a été retiré, rien à faire.
-    if (typeof fileType.fromFile === 'function') return false;
-    if (typeof fileType.fileTypeFromFile !== 'function') {
-        throw new Error(`file-type (${path.dirname(resolved)}) exposes neither fromFile nor fileTypeFromFile`);
-    }
+  // L'ancienne API est là : l'override a été retiré, rien à faire.
+  if (typeof fileType.fromFile === 'function') return false;
+  if (typeof fileType.fileTypeFromFile !== 'function') {
+    throw new Error(`file-type (${path.dirname(resolved)}) exposes neither fromFile nor fileTypeFromFile`);
+  }
 
-    const compat = Object.assign({}, fileType, {
-        fromFile: (filePath, options) => fileType.fileTypeFromFile(filePath, options),
-    });
+  const compat = Object.assign({}, fileType, {
+    fromFile: (filePath, options) => fileType.fileTypeFromFile(filePath, options),
+  });
 
-    const shim = new Module(resolved, module);
-    shim.filename = resolved;
-    shim.paths = Module._nodeModulePaths(path.dirname(resolved));
-    shim.exports = compat;
-    shim.loaded = true;
-    require.cache[resolved] = shim;
-    return true;
+  const shim = new Module(resolved, module);
+  shim.filename = resolved;
+  shim.paths = Module._nodeModulePaths(path.dirname(resolved));
+  shim.exports = compat;
+  shim.loaded = true;
+  require.cache[resolved] = shim;
+  return true;
 }
 
 module.exports = { installFileTypeCompat };

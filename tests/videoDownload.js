@@ -35,8 +35,13 @@ const videoSource = require(path.join(ROOT, 'src', 'audio', 'videoSource.js'));
 let failed = 0;
 let passed = 0;
 const check = (label, ok, detail = '') => {
-    if (ok) { passed++; console.log(`  ok    ${label}${detail ? ` — ${detail}` : ''}`); }
-    else { failed++; console.log(`  FAIL  ${label}${detail ? ` — ${detail}` : ''}`); }
+  if (ok) {
+    passed++;
+    console.log(`  ok    ${label}${detail ? ` — ${detail}` : ''}`);
+  } else {
+    failed++;
+    console.log(`  FAIL  ${label}${detail ? ` — ${detail}` : ''}`);
+  }
 };
 
 const ffmpeg = require('ffmpeg-static');
@@ -44,18 +49,30 @@ const box = fs.mkdtempSync(path.join(os.tmpdir(), 'video-dl-'));
 
 /** Lance ffmpeg et rend son code de sortie. */
 function run(args) {
-    const res = cp.spawnSync(ffmpeg, args, { windowsHide: true, encoding: 'utf8' });
-    return { code: res.status, err: (res.stderr || '').slice(-400) };
+  const res = cp.spawnSync(ffmpeg, args, { windowsHide: true, encoding: 'utf8' });
+  return { code: res.status, err: (res.stderr || '').slice(-400) };
 }
 
 /** Interroge un fichier : quels flux, quelle durée. */
 function probe(file) {
-    const bin = ffmpeg.replace(/ffmpeg(\.exe)?$/i, (m) => m.replace('ffmpeg', 'ffprobe'));
-    const args = ['-v', 'error', '-show_entries', 'stream=codec_type,codec_name,width,height',
-        '-show_entries', 'format=duration', '-of', 'json', file];
-    const res = cp.spawnSync(fs.existsSync(bin) ? bin : 'ffprobe', args,
-        { windowsHide: true, encoding: 'utf8' });
-    try { return JSON.parse(res.stdout); } catch (e) { return null; }
+  const bin = ffmpeg.replace(/ffmpeg(\.exe)?$/i, (m) => m.replace('ffmpeg', 'ffprobe'));
+  const args = [
+    '-v',
+    'error',
+    '-show_entries',
+    'stream=codec_type,codec_name,width,height',
+    '-show_entries',
+    'format=duration',
+    '-of',
+    'json',
+    file,
+  ];
+  const res = cp.spawnSync(fs.existsSync(bin) ? bin : 'ffprobe', args, { windowsHide: true, encoding: 'utf8' });
+  try {
+    return JSON.parse(res.stdout);
+  } catch (e) {
+    return null;
+  }
 }
 
 console.log('\n=== Le téléchargement en vidéo ===\n');
@@ -65,296 +82,389 @@ console.log('\n=== Le téléchargement en vidéo ===\n');
 console.log('Ce que le module distingue\n');
 
 {
-    check('les conteneurs vidéo sont reconnus comme tels',
-        formats.isVideo('mp4') && formats.isVideo('mkv'));
-    check('  … et les conteneurs sonores ne le sont pas',
-        !formats.isVideo('mp3') && !formats.isVideo('flac') && !formats.isVideo('webm'),
-        'WEBM reste audio : la clé est déjà prise');
+  check('les conteneurs vidéo sont reconnus comme tels', formats.isVideo('mp4') && formats.isVideo('mkv'));
+  check(
+    '  … et les conteneurs sonores ne le sont pas',
+    !formats.isVideo('mp3') && !formats.isVideo('flac') && !formats.isVideo('webm'),
+    'WEBM reste audio : la clé est déjà prise',
+  );
 
-    check('le menu peut proposer les deux familles',
-        formats.EXTENSIONS.includes('mp4') && formats.EXTENSIONS.includes('mp3'));
+  check(
+    'le menu peut proposer les deux familles',
+    formats.EXTENSIONS.includes('mp4') && formats.EXTENSIONS.includes('mp3'),
+  );
 
-    /*
-     * Le piège que l'élargissement de EXTENSIONS avait ouvert.
-     *
-     * `encodeArgs` validait contre cette liste, puis cherchait un codec dans la
-     * table audio : « mp4 » y passait la validation et plantait juste après, sur
-     * une entrée inexistante.
-     */
-    const audioSurVideo = formats.encodeArgs('mp4', 320);
-    check('un conteneur vidéo demandé à l\'encodeur audio ne casse rien',
-        audioSurVideo.ext === '.mp3',
-        'il retombe sur le repli plutôt que de chercher un codec absent');
+  /*
+   * Le piège que l'élargissement de EXTENSIONS avait ouvert.
+   *
+   * `encodeArgs` validait contre cette liste, puis cherchait un codec dans la
+   * table audio : « mp4 » y passait la validation et plantait juste après, sur
+   * une entrée inexistante.
+   */
+  const audioSurVideo = formats.encodeArgs('mp4', 320);
+  check(
+    "un conteneur vidéo demandé à l'encodeur audio ne casse rien",
+    audioSurVideo.ext === '.mp3',
+    'il retombe sur le repli plutôt que de chercher un codec absent',
+  );
 }
 
 {
-    const copie = formats.videoEncodeArgs('mp4', 192);
-    check('une image existante est recopiée, jamais réencodée',
-        copie.args.join(' ').includes('-c:v copy'),
-        'la réencoder perdrait ce qu\'on venait chercher');
+  const copie = formats.videoEncodeArgs('mp4', 192);
+  check(
+    'une image existante est recopiée, jamais réencodée',
+    copie.args.join(' ').includes('-c:v copy'),
+    "la réencoder perdrait ce qu'on venait chercher",
+  );
 
-    const noire = formats.videoEncodeArgs('mp4', 192, { still: true });
-    check('une image fabriquée est encodée, et cadrée sur le son',
-        noire.args.includes('-shortest') && noire.args.join(' ').includes('libx264'),
-        'sans -shortest le noir tournerait indéfiniment');
+  const noire = formats.videoEncodeArgs('mp4', 192, { still: true });
+  check(
+    'une image fabriquée est encodée, et cadrée sur le son',
+    noire.args.includes('-shortest') && noire.args.join(' ').includes('libx264'),
+    'sans -shortest le noir tournerait indéfiniment',
+  );
 
-    check('MP4 remonte ses tables en tête',
-        copie.args.join(' ').includes('-movflags +faststart'));
-    check('  … ce que MKV n\'a pas à faire',
-        !formats.videoEncodeArgs('mkv', 192).args.join(' ').includes('movflags'));
+  check('MP4 remonte ses tables en tête', copie.args.join(' ').includes('-movflags +faststart'));
+  check("  … ce que MKV n'a pas à faire", !formats.videoEncodeArgs('mkv', 192).args.join(' ').includes('movflags'));
 }
 
 // ───────────────────── L'image noire, pour de vrai ─────────────────────
 
-console.log('\nL\'image noire, produite et relue\n');
+console.log("\nL'image noire, produite et relue\n");
 
 {
-    const son = path.join(box, 'son.wav');
-    const fait = run(['-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=3',
-        '-ar', '44100', '-ac', '1', '-y', son]);
-    check('un son d\'essai est produit', fait.code === 0 && fs.existsSync(son), fait.err);
+  const son = path.join(box, 'son.wav');
+  const fait = run([
+    '-v',
+    'error',
+    '-f',
+    'lavfi',
+    '-i',
+    'sine=frequency=440:duration=3',
+    '-ar',
+    '44100',
+    '-ac',
+    '1',
+    '-y',
+    son,
+  ]);
+  check("un son d'essai est produit", fait.code === 0 && fs.existsSync(son), fait.err);
 
-    // Exactement ce que le gestionnaire assemble : l'entrée noire à la
-    // définition demandée, le son, puis les arguments du module.
-    const { ext, args } = formats.videoEncodeArgs('mp4', 192, { still: true });
-    const sortie = path.join(box, `resultat${ext}`);
-    const res = run(['-v', 'error',
-        '-f', 'lavfi', '-i', `color=c=black:s=${formats.blackCanvas(720)}:r=2`,
-        '-i', son, ...args, '-y', sortie]);
+  // Exactement ce que le gestionnaire assemble : l'entrée noire à la
+  // définition demandée, le son, puis les arguments du module.
+  const { ext, args } = formats.videoEncodeArgs('mp4', 192, { still: true });
+  const sortie = path.join(box, `resultat${ext}`);
+  const res = run([
+    '-v',
+    'error',
+    '-f',
+    'lavfi',
+    '-i',
+    `color=c=black:s=${formats.blackCanvas(720)}:r=2`,
+    '-i',
+    son,
+    ...args,
+    '-y',
+    sortie,
+  ]);
 
-    check('ffmpeg accepte la ligne de commande', res.code === 0, res.err);
-    check('  … et écrit un fichier', fs.existsSync(sortie) && fs.statSync(sortie).size > 0,
-        fs.existsSync(sortie) ? `${fs.statSync(sortie).size} octets` : 'absent');
+  check('ffmpeg accepte la ligne de commande', res.code === 0, res.err);
+  check(
+    '  … et écrit un fichier',
+    fs.existsSync(sortie) && fs.statSync(sortie).size > 0,
+    fs.existsSync(sortie) ? `${fs.statSync(sortie).size} octets` : 'absent',
+  );
 
-    const info = probe(sortie);
-    const flux = (info && info.streams) || [];
-    const image = flux.find((s) => s.codec_type === 'video');
-    const audio = flux.find((s) => s.codec_type === 'audio');
+  const info = probe(sortie);
+  const flux = (info && info.streams) || [];
+  const image = flux.find((s) => s.codec_type === 'video');
+  const audio = flux.find((s) => s.codec_type === 'audio');
 
-    check('le fichier porte bien une image', !!image,
-        image ? `${image.codec_name} ${image.width}×${image.height}` : 'aucune');
-    check('  … et le son d\'origine', !!audio, audio ? audio.codec_name : 'aucun');
+  check(
+    'le fichier porte bien une image',
+    !!image,
+    image ? `${image.codec_name} ${image.width}×${image.height}` : 'aucune',
+  );
+  check("  … et le son d'origine", !!audio, audio ? audio.codec_name : 'aucun');
 
-    // La durée du noir est celle du son, et non l'inverse : c'est `-shortest`
-    // qui le garantit, et c'est la seule chose qui empêche un fichier infini.
-    const duree = info && info.format ? parseFloat(info.format.duration) : 0;
-    check('  … sur la durée du son, pas au-delà', duree > 2.5 && duree < 4,
-        `${duree.toFixed(2)} s pour 3 s de son`);
+  // La durée du noir est celle du son, et non l'inverse : c'est `-shortest`
+  // qui le garantit, et c'est la seule chose qui empêche un fichier infini.
+  const duree = info && info.format ? parseFloat(info.format.duration) : 0;
+  check('  … sur la durée du son, pas au-delà', duree > 2.5 && duree < 4, `${duree.toFixed(2)} s pour 3 s de son`);
 
-    /*
-     * La définition demandée doit se retrouver dans le fichier.
-     *
-     * C'est tout l'objet du menu « Vidéo », qui restait grisé pour les
-     * téléchargements : demander du 480p et recevoir un noir en 720p serait un
-     * réglage qui ment. On l'éprouve sur une valeur qui n'est pas le défaut,
-     * sans quoi le test passerait même si la hauteur était ignorée.
-     */
-    const petite = path.join(box, `petite${ext}`);
-    run(['-v', 'error',
-        '-f', 'lavfi', '-i', `color=c=black:s=${formats.blackCanvas(480)}:r=2`,
-        '-i', son, ...args, '-y', petite]);
+  /*
+   * La définition demandée doit se retrouver dans le fichier.
+   *
+   * C'est tout l'objet du menu « Vidéo », qui restait grisé pour les
+   * téléchargements : demander du 480p et recevoir un noir en 720p serait un
+   * réglage qui ment. On l'éprouve sur une valeur qui n'est pas le défaut,
+   * sans quoi le test passerait même si la hauteur était ignorée.
+   */
+  const petite = path.join(box, `petite${ext}`);
+  run([
+    '-v',
+    'error',
+    '-f',
+    'lavfi',
+    '-i',
+    `color=c=black:s=${formats.blackCanvas(480)}:r=2`,
+    '-i',
+    son,
+    ...args,
+    '-y',
+    petite,
+  ]);
 
-    const image480 = ((probe(petite) || {}).streams || []).find((s) => s.codec_type === 'video');
-    check('la définition demandée est celle du fichier écrit',
-        !!image480 && image480.width === 854 && image480.height === 480,
-        image480 ? `${image480.width}×${image480.height} pour 480p demandé` : 'aucune image');
+  const image480 = ((probe(petite) || {}).streams || []).find((s) => s.codec_type === 'video');
+  check(
+    'la définition demandée est celle du fichier écrit',
+    !!image480 && image480.width === 854 && image480.height === 480,
+    image480 ? `${image480.width}×${image480.height} pour 480p demandé` : 'aucune image',
+  );
 }
 
 // ───────────────────── Les dimensions du noir ─────────────────────
 
-console.log('\nLa taille de l\'image fabriquée\n');
+console.log("\nLa taille de l'image fabriquée\n");
 
 {
-    // Chaque entrée du menu, et le 16/9 qui en découle.
-    const attendu = {
-        2160: '3840x2160', 1440: '2560x1440', 1080: '1920x1080',
-        720: '1280x720', 480: '854x480', 360: '640x360',
-    };
-    for (const [hauteur, taille] of Object.entries(attendu)) {
-        check(`${hauteur}p donne ${taille}`, formats.blackCanvas(hauteur) === taille,
-            formats.blackCanvas(hauteur));
-    }
+  // Chaque entrée du menu, et le 16/9 qui en découle.
+  const attendu = {
+    2160: '3840x2160',
+    1440: '2560x1440',
+    1080: '1920x1080',
+    720: '1280x720',
+    480: '854x480',
+    360: '640x360',
+  };
+  for (const [hauteur, taille] of Object.entries(attendu)) {
+    check(`${hauteur}p donne ${taille}`, formats.blackCanvas(hauteur) === taille, formats.blackCanvas(hauteur));
+  }
 
-    // 480p est le cas qui casse une implémentation naïve : sa largeur exacte
-    // vaut 853,33, et l'encodage en 4:2:0 refuse une dimension impaire.
-    check('  … dont 480p, dont la largeur tombe juste entre deux pixels',
-        formats.blackCanvas(480) === '854x480');
+  // 480p est le cas qui casse une implémentation naïve : sa largeur exacte
+  // vaut 853,33, et l'encodage en 4:2:0 refuse une dimension impaire.
+  check('  … dont 480p, dont la largeur tombe juste entre deux pixels', formats.blackCanvas(480) === '854x480');
 
-    check('un réglage absent ou absurde retombe sur une valeur qui existe',
-        formats.blackCanvas(null) === '1280x720'
-        && formats.blackCanvas('bêtise') === '1280x720'
-        && formats.blackCanvas(12) === '1280x720',
-        'une hauteur de douze pixels n\'est pas une demande');
+  check(
+    'un réglage absent ou absurde retombe sur une valeur qui existe',
+    formats.blackCanvas(null) === '1280x720' &&
+      formats.blackCanvas('bêtise') === '1280x720' &&
+      formats.blackCanvas(12) === '1280x720',
+    "une hauteur de douze pixels n'est pas une demande",
+  );
 }
 
 fs.rmSync(box, { recursive: true, force: true });
 
 // ───────────────────── Ce que la source répond ─────────────────────
 
-console.log('\nCe que la recherche d\'image répond\n');
+console.log("\nCe que la recherche d'image répond\n");
 
 (async () => {
-    const local = await videoSource.resolve('C:\\musique\\morceau.mp3');
-    check('un chemin local n\'a pas d\'image à chercher',
-        local.audioOnly === true && local.videoUrl === null,
-        'les fichiers du disque sont copiés tels quels');
+  const local = await videoSource.resolve('C:\\musique\\morceau.mp3');
+  check(
+    "un chemin local n'a pas d'image à chercher",
+    local.audioOnly === true && local.videoUrl === null,
+    'les fichiers du disque sont copiés tels quels',
+  );
 
-    const vide = await videoSource.resolve('');
-    check('une adresse vide non plus', vide.audioOnly === true);
+  const vide = await videoSource.resolve('');
+  check('une adresse vide non plus', vide.audioOnly === true);
 
-    // ───────────────────── Le manifeste, côté image ─────────────────────
+  // ───────────────────── Le manifeste, côté image ─────────────────────
 
-    console.log('\nCe qui n\'est pas un flux d\'image\n');
+  console.log("\nCe qui n'est pas un flux d'image\n");
 
-    {
-        /*
-         * Le même piège que pour le son, en plus discret.
-         *
-         * Les manifestes annoncent le plus haut débit de la liste — 4107 contre
-         * 1666 en 720p — si bien qu'un tri au mieux-disant les choisit
-         * systématiquement. Leur adresse est signée pour le client qui l'a
-         * demandée : ffmpeg s'y voyait refuser l'entrée par un 404, et le
-         * téléchargement échouait à toute définition où la source en propose un.
-         */
-        const image = (o) => Object.assign({
-            vcodec: 'avc1.640020', acodec: 'none', protocol: 'https',
-            url: `https://exemple/${o.format_id}`, width: 1280, height: 720,
-        }, o);
-
-        const entry = {
-            formats: [
-                image({ format_id: '311', protocol: 'm3u8_native', tbr: 4107.6 }),
-                image({ format_id: '612', protocol: 'm3u8_native', tbr: 2149.4 }),
-                image({ format_id: '298', tbr: 1666.2 }),
-                image({ format_id: '302', tbr: 1081.3 }),
-            ],
-        };
-
-        const gardes = videoSource.videoTracks(entry);
-        check('les manifestes sont écartés',
-            gardes.every((f) => f.protocol === 'https'), `${gardes.length} sur 4`);
-        check('  … alors même qu\'ils annoncent le meilleur débit',
-            entry.formats[0].tbr > gardes[0].tbr,
-            `${entry.formats[0].tbr} en manifeste contre ${gardes[0].tbr} en direct`);
-
-        // Une définition qui n'existe qu'en manifeste ne doit pas être offerte :
-        // la proposer serait promettre un fichier qu'on ne sait pas chercher.
-        const quEnManifeste = {
-            formats: [
-                image({ format_id: '701', protocol: 'm3u8_native', width: 3840, height: 2160 }),
-                image({ format_id: '298', tbr: 1666.2 }),
-            ],
-        };
-        check('une définition qui n\'existe qu\'en manifeste n\'est pas offerte',
-            videoSource.videoTracks(quEnManifeste).every((f) => f.height === 720),
-            'le menu ne promet que ce qui se télécharge');
-
-        // Un format sans adresse ne mène nulle part, comme pour le son.
-        check('un format sans adresse est écarté',
-            videoSource.videoTracks({ formats: [image({ format_id: 'x', url: null })] }).length === 0);
-    }
-
-    // ───────────────────── Le raccordement ─────────────────────
-
-    console.log('\nCe qui tient les deux bouts\n');
-
-    const HANDLER = fs.readFileSync(
-        path.join(ROOT, 'src', 'web', 'websocket', 'handlers', 'downloadHandlers.js'), 'utf8');
-
-    check('un conteneur vidéo prend le chemin vidéo',
-        /if \(downloadFormats\.isVideo\(container\)\)[\s\S]{0,200}transcodeVideo\(/.test(HANDLER),
-        'la résolution audio ne rendrait qu\'un flux sonore');
-
-    check('le repli reste dans la famille demandée',
-        /isVideo\(wanted\)\s*\n?\s*\?\s*downloadFormats\.DEFAULT_VIDEO_CONTAINER/.test(HANDLER),
-        'un MP3 pour une vidéo demandée ne répondrait pas à la question');
-
-    // Sans ces `-map`, ffmpeg prendrait la meilleure piste de chaque type toutes
-    // entrées confondues, et pourrait choisir le son muet de la vidéo.
-    check('les flux recousus disent lequel donne quoi',
-        /'-map', '0:v:0', '-map', '1:a:0'/.test(HANDLER));
-
-    check('le lancement de ffmpeg est partagé par les deux chemins',
-        /function runFfmpeg\(/.test(HANDLER)
-        && (HANDLER.match(/runFfmpeg\(/g) || []).length >= 3,
-        'la gestion d\'erreur ne se maintient pas en double');
-
+  {
     /*
-     * Les octets ne passent plus par une URL tendue à ffmpeg.
+     * Le même piège que pour le son, en plus discret.
      *
-     * Une requête continue est bridée par YouTube au débit de lecture : une
-     * vidéo de dix minutes mettait dix minutes à se télécharger. Deux stratégies
-     * selon le nombre d'entrées distantes, parce que ffmpeg n'a qu'une entrée
-     * standard.
+     * Les manifestes annoncent le plus haut débit de la liste — 4107 contre
+     * 1666 en 720p — si bien qu'un tri au mieux-disant les choisit
+     * systématiquement. Leur adresse est signée pour le client qui l'a
+     * demandée : ffmpeg s'y voyait refuser l'entrée par un 404, et le
+     * téléchargement échouait à toute définition où la source en propose un.
      */
-    check('une seule entrée distante passe par le tuyau',
-        /function pipeRemote\(/.test(HANDLER)
-        && /rangeStream\.chunkedFetch\(url, \{ headers: input\.headers \|\| \{\} \}\)/.test(HANDLER),
-        'rien à poser sur le disque quand une entrée suffit');
+    const image = (o) =>
+      Object.assign(
+        {
+          vcodec: 'avc1.640020',
+          acodec: 'none',
+          protocol: 'https',
+          url: `https://exemple/${o.format_id}`,
+          width: 1280,
+          height: 720,
+        },
+        o,
+      );
 
-    check('  … et le téléchargement audio l\'emprunte',
-        /const source = pipeRemote\(input\);/.test(HANDLER));
+    const entry = {
+      formats: [
+        image({ format_id: '311', protocol: 'm3u8_native', tbr: 4107.6 }),
+        image({ format_id: '612', protocol: 'm3u8_native', tbr: 2149.4 }),
+        image({ format_id: '298', tbr: 1666.2 }),
+        image({ format_id: '302', tbr: 1081.3 }),
+      ],
+    };
 
-    check('  … la vidéo noire aussi, son seul flux étant le son',
-        /const input = pipeRemote\(await preloadManager\.resolveAudioInput\(track, url\)\)/
-            .test(HANDLER),
-        'sinon le flux monté par le préchargeur ne serait poussé nulle part');
+    const gardes = videoSource.videoTracks(entry);
+    check(
+      'les manifestes sont écartés',
+      gardes.every((f) => f.protocol === 'https'),
+      `${gardes.length} sur 4`,
+    );
+    check(
+      "  … alors même qu'ils annoncent le meilleur débit",
+      entry.formats[0].tbr > gardes[0].tbr,
+      `${entry.formats[0].tbr} en manifeste contre ${gardes[0].tbr} en direct`,
+    );
 
-    check('image et son séparés passent par des fichiers',
-        /rangeStream\.fetchToFile\(adresse, chemin/.test(HANDLER)
-        && /await rapatrier\(source\.videoUrl, 'video', source\.videoHeaders\)/.test(HANDLER),
-        'ffmpeg n\'a qu\'une entrée standard, et il en faudrait deux');
+    // Une définition qui n'existe qu'en manifeste ne doit pas être offerte :
+    // la proposer serait promettre un fichier qu'on ne sait pas chercher.
+    const quEnManifeste = {
+      formats: [
+        image({ format_id: '701', protocol: 'm3u8_native', width: 3840, height: 2160 }),
+        image({ format_id: '298', tbr: 1666.2 }),
+      ],
+    };
+    check(
+      "une définition qui n'existe qu'en manifeste n'est pas offerte",
+      videoSource.videoTracks(quEnManifeste).every((f) => f.height === 720),
+      'le menu ne promet que ce qui se télécharge',
+    );
 
-    // Les en-têtes rejoués sont ceux que yt-dlp a présentés pour chaque flux,
-    // et non une valeur écrite en dur : celle d'avant se faisait passer pour
-    // le robot d'indexation de Google.
-    check('  … chacun avec les en-têtes que yt-dlp a employés pour lui',
-        /await rapatrier\(source\.audioUrl, 'audio', source\.audioHeaders\)/.test(HANDLER)
-        && /headers: choisi\.headers/.test(HANDLER)
-        && !/googlebot/.test(HANDLER),
-        'l\'image, le son recousu, et le son seul au débit choisi');
+    // Un format sans adresse ne mène nulle part, comme pour le son.
+    check(
+      'un format sans adresse est écarté',
+      videoSource.videoTracks({ formats: [image({ format_id: 'x', url: null })] }).length === 0,
+    );
+  }
 
-    check('  … posés là où le fichier final ira',
-        /const chemin = `\$\{partial\}\.\$\{role\}`/.test(HANDLER),
-        'le dossier système n\'a pas forcément la place d\'une vidéo en 2160p');
+  // ───────────────────── Le raccordement ─────────────────────
 
-    check('  … et retirés quoi qu\'il arrive',
-        /\} finally \{[\s\S]{0,300}fs\.unlinkSync\(chemin\)/.test(HANDLER),
-        'un échec ne doit pas laisser 300 Mo au milieu d\'un dossier de musique');
+  console.log('\nCe qui tient les deux bouts\n');
 
-    check('plus aucune reconnexion HTTP ne subsiste',
-        !/'-reconnect'/.test(HANDLER),
-        'elle ne servait qu\'aux URL tendues à ffmpeg, qu\'il n\'y a plus');
+  const HANDLER = fs.readFileSync(
+    path.join(ROOT, 'src', 'web', 'websocket', 'handlers', 'downloadHandlers.js'),
+    'utf8',
+  );
 
-    /*
-     * La hauteur sert deux fois : à choisir le flux, et à tailler le noir.
-     *
-     * Elle voyage désormais avec le débit demandé, les deux étant satisfaits
-     * séparément — une définition absente ne doit pas dégrader le son.
-     */
-    check('la définition demandée guide la recherche d\'image',
-        /videoSource\.resolve\(url, \{ height, audioKbps/.test(HANDLER));
-    check('  … et dimensionne l\'image fabriquée',
-        /blackCanvas\(height\)/.test(HANDLER)
-        && /color=c=black:s=\$\{canvas\}/.test(HANDLER),
-        'une taille fixe ignorerait le menu');
+  check(
+    'un conteneur vidéo prend le chemin vidéo',
+    /if \(downloadFormats\.isVideo\(container\)\)[\s\S]{0,200}transcodeVideo\(/.test(HANDLER),
+    "la résolution audio ne rendrait qu'un flux sonore",
+  );
 
-    const APP = fs.readFileSync(
-        path.join(ROOT, 'src', 'web', 'public', 'app.js'), 'utf8');
+  check(
+    'le repli reste dans la famille demandée',
+    /isVideo\(wanted\)\s*\n?\s*\?\s*downloadFormats\.DEFAULT_VIDEO_CONTAINER/.test(HANDLER),
+    'un MP3 pour une vidéo demandée ne répondrait pas à la question',
+  );
 
-    /*
-     * Le menu « Vidéo » restait grisé pour toute écriture sur le disque, et à
-     * raison tant que celle-ci n'écrivait que du son. Il ne l'est plus dès
-     * qu'un conteneur vidéo est choisi — sans quoi la définition ne pourrait
-     * pas être demandée, et le reste de ce fichier ne servirait à rien.
-     */
-    check('le menu de définition n\'est plus grisé pour un conteneur vidéo',
-        /not-applicable', !local && toDisk && !wantsVideo/.test(APP));
+  // Sans ces `-map`, ffmpeg prendrait la meilleure piste de chaque type toutes
+  // entrées confondues, et pourrait choisir le son muet de la vidéo.
+  check('les flux recousus disent lequel donne quoi', /'-map', '0:v:0', '-map', '1:a:0'/.test(HANDLER));
 
-    check('  … et la liste des conteneurs vient du menu, pas d\'une copie',
-        /optgroup\[data-i18n-label="import_group_video"\] option/.test(APP),
-        'une copie se désaccorderait du balisage sans prévenir');
+  check(
+    'le lancement de ffmpeg est partagé par les deux chemins',
+    /function runFfmpeg\(/.test(HANDLER) && (HANDLER.match(/runFfmpeg\(/g) || []).length >= 3,
+    "la gestion d'erreur ne se maintient pas en double",
+  );
 
-    console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
-    process.exit(failed > 0 ? 1 : 0);
+  /*
+   * Les octets ne passent plus par une URL tendue à ffmpeg.
+   *
+   * Une requête continue est bridée par YouTube au débit de lecture : une
+   * vidéo de dix minutes mettait dix minutes à se télécharger. Deux stratégies
+   * selon le nombre d'entrées distantes, parce que ffmpeg n'a qu'une entrée
+   * standard.
+   */
+  check(
+    'une seule entrée distante passe par le tuyau',
+    /function pipeRemote\(/.test(HANDLER) &&
+      /rangeStream\.chunkedFetch\(url, \{ headers: input\.headers \|\| \{\} \}\)/.test(HANDLER),
+    'rien à poser sur le disque quand une entrée suffit',
+  );
+
+  check("  … et le téléchargement audio l'emprunte", /const source = pipeRemote\(input\);/.test(HANDLER));
+
+  check(
+    '  … la vidéo noire aussi, son seul flux étant le son',
+    /const input = pipeRemote\(await preloadManager\.resolveAudioInput\(track, url\)\)/.test(HANDLER),
+    'sinon le flux monté par le préchargeur ne serait poussé nulle part',
+  );
+
+  check(
+    'image et son séparés passent par des fichiers',
+    /rangeStream\.fetchToFile\(adresse, chemin/.test(HANDLER) &&
+      /await rapatrier\(source\.videoUrl, 'video', source\.videoHeaders\)/.test(HANDLER),
+    "ffmpeg n'a qu'une entrée standard, et il en faudrait deux",
+  );
+
+  // Les en-têtes rejoués sont ceux que yt-dlp a présentés pour chaque flux,
+  // et non une valeur écrite en dur : celle d'avant se faisait passer pour
+  // le robot d'indexation de Google.
+  check(
+    '  … chacun avec les en-têtes que yt-dlp a employés pour lui',
+    /await rapatrier\(source\.audioUrl, 'audio', source\.audioHeaders\)/.test(HANDLER) &&
+      /headers: choisi\.headers/.test(HANDLER) &&
+      !/googlebot/.test(HANDLER),
+    "l'image, le son recousu, et le son seul au débit choisi",
+  );
+
+  check(
+    '  … posés là où le fichier final ira',
+    /const chemin = `\$\{partial\}\.\$\{role\}`/.test(HANDLER),
+    "le dossier système n'a pas forcément la place d'une vidéo en 2160p",
+  );
+
+  check(
+    "  … et retirés quoi qu'il arrive",
+    /\} finally \{[\s\S]{0,300}fs\.unlinkSync\(chemin\)/.test(HANDLER),
+    "un échec ne doit pas laisser 300 Mo au milieu d'un dossier de musique",
+  );
+
+  check(
+    'plus aucune reconnexion HTTP ne subsiste',
+    !/'-reconnect'/.test(HANDLER),
+    "elle ne servait qu'aux URL tendues à ffmpeg, qu'il n'y a plus",
+  );
+
+  /*
+   * La hauteur sert deux fois : à choisir le flux, et à tailler le noir.
+   *
+   * Elle voyage désormais avec le débit demandé, les deux étant satisfaits
+   * séparément — une définition absente ne doit pas dégrader le son.
+   */
+  check(
+    "la définition demandée guide la recherche d'image",
+    /videoSource\.resolve\(url, \{ height, audioKbps/.test(HANDLER),
+  );
+  check(
+    "  … et dimensionne l'image fabriquée",
+    /blackCanvas\(height\)/.test(HANDLER) && /color=c=black:s=\$\{canvas\}/.test(HANDLER),
+    'une taille fixe ignorerait le menu',
+  );
+
+  const APP = fs.readFileSync(path.join(ROOT, 'src', 'web', 'public', 'app.js'), 'utf8');
+
+  /*
+   * Le menu « Vidéo » restait grisé pour toute écriture sur le disque, et à
+   * raison tant que celle-ci n'écrivait que du son. Il ne l'est plus dès
+   * qu'un conteneur vidéo est choisi — sans quoi la définition ne pourrait
+   * pas être demandée, et le reste de ce fichier ne servirait à rien.
+   */
+  check(
+    "le menu de définition n'est plus grisé pour un conteneur vidéo",
+    /not-applicable', !local && toDisk && !wantsVideo/.test(APP),
+  );
+
+  check(
+    "  … et la liste des conteneurs vient du menu, pas d'une copie",
+    /optgroup\[data-i18n-label="import_group_video"\] option/.test(APP),
+    'une copie se désaccorderait du balisage sans prévenir',
+  );
+
+  console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
+  process.exit(failed > 0 ? 1 : 0);
 })();

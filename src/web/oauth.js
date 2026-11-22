@@ -45,11 +45,11 @@ const STATE_TTL_MS = 5 * 60 * 1000;
 const pendingStates = new Map();
 
 function clientId() {
-    return (process.env.DISCORD_CLIENT_ID || '').trim();
+  return (process.env.DISCORD_CLIENT_ID || '').trim();
 }
 
 function clientSecret() {
-    return (process.env.DISCORD_CLIENT_SECRET || '').trim();
+  return (process.env.DISCORD_CLIENT_SECRET || '').trim();
 }
 
 /**
@@ -57,7 +57,7 @@ function clientSecret() {
  * @returns {boolean}
  */
 function isConfigured() {
-    return Boolean(clientId() && clientSecret());
+  return Boolean(clientId() && clientSecret());
 }
 
 /**
@@ -71,13 +71,13 @@ const DEFAULT_RELAY_URL = 'https://imp-auth.romainpiau.dev/discord/callback';
 
 /** L'adresse écrite à la main dans `.env`, sans barre oblique finale, ou ''. */
 function declaredUrl() {
-    return (process.env.PUBLIC_URL || '').trim().replace(/\/+$/, '');
+  return (process.env.PUBLIC_URL || '').trim().replace(/\/+$/, '');
 }
 
 /** L'adresse locale du tableau de bord, celle qui marche sans rien déclarer. */
 function localUrl() {
-    const port = process.env.PORT || 3000;
-    return `http://localhost:${port}`;
+  const port = process.env.PORT || 3000;
+  return `http://localhost:${port}`;
 }
 
 /**
@@ -85,10 +85,10 @@ function localUrl() {
  * @returns {string|null}
  */
 function relayUrl() {
-    const raw = (process.env.OAUTH_RELAY_URL || '').trim();
-    if (!raw) return DEFAULT_RELAY_URL;
-    if (/^(off|none|false|0)$/i.test(raw)) return null;
-    return raw;
+  const raw = (process.env.OAUTH_RELAY_URL || '').trim();
+  if (!raw) return DEFAULT_RELAY_URL;
+  if (/^(off|none|false|0)$/i.test(raw)) return null;
+  return raw;
 }
 
 /**
@@ -103,7 +103,7 @@ function relayUrl() {
  * @returns {boolean}
  */
 function usesRelay() {
-    return !declaredUrl() && Boolean(relayUrl());
+  return !declaredUrl() && Boolean(relayUrl());
 }
 
 /**
@@ -118,11 +118,11 @@ function usesRelay() {
  * @returns {string|null}
  */
 function sharedUrl() {
-    try {
-        return require('./cloudflare').sharedUrl();
-    } catch (e) {
-        return null;
-    }
+  try {
+    return require('./cloudflare').sharedUrl();
+  } catch (e) {
+    return null;
+  }
 }
 
 /**
@@ -136,7 +136,7 @@ function sharedUrl() {
  * @returns {string}
  */
 function publicUrl() {
-    return declaredUrl() || sharedUrl() || localUrl();
+  return declaredUrl() || sharedUrl() || localUrl();
 }
 
 /**
@@ -154,13 +154,13 @@ function publicUrl() {
  * @returns {string}
  */
 function entryUrl() {
-    return declaredUrl() || localUrl();
+  return declaredUrl() || localUrl();
 }
 
 /** URL de rappel, telle qu'elle doit être déclarée dans le portail développeur. */
 function redirectUri() {
-    if (usesRelay()) return relayUrl();
-    return `${declaredUrl() || localUrl()}/auth/discord/callback`;
+  if (usesRelay()) return relayUrl();
+  return `${declaredUrl() || localUrl()}/auth/discord/callback`;
 }
 
 /**
@@ -177,17 +177,17 @@ function redirectUri() {
  *   réseau local, par exemple, qui demande une adresse déclarée.
  */
 function returnOrigin(req) {
-    const host = String(req.headers.host || '').toLowerCase();
-    if (!host) return null;
-    const relay = require('./oauthRelay');
-    return relay.acceptedTarget(`https://${host}`) || relay.acceptedTarget(`http://${host}`);
+  const host = String(req.headers.host || '').toLowerCase();
+  if (!host) return null;
+  const relay = require('./oauthRelay');
+  return relay.acceptedTarget(`https://${host}`) || relay.acceptedTarget(`http://${host}`);
 }
 
 function purgeStates() {
-    const now = Date.now();
-    for (const [value, entry] of pendingStates.entries()) {
-        if (now - entry.createdAt > STATE_TTL_MS) pendingStates.delete(value);
-    }
+  const now = Date.now();
+  for (const [value, entry] of pendingStates.entries()) {
+    if (now - entry.createdAt > STATE_TTL_MS) pendingStates.delete(value);
+  }
 }
 
 /**
@@ -219,66 +219,66 @@ function purgeStates() {
  * @returns {string} L'URL vers laquelle rediriger le navigateur.
  */
 function buildAuthorizeUrl(returnTo = '/', carried = {}) {
-    purgeStates();
+  purgeStates();
 
-    const state = usesRelay()
-        ? require('./oauthRelay').encodeState(carried.origin || localUrl())
-        : crypto.randomBytes(16).toString('hex');
-    pendingStates.set(state, {
-        createdAt: Date.now(),
-        returnTo,
-        holdsToken: Boolean(carried.holdsToken),
-        claim: Boolean(carried.claim),
-        /*
-         * La tentative muette, celle que personne n'a demandée.
-         *
-         * La porte du tableau de bord essaie de reconnaître son visiteur avant
-         * de lui montrer un bouton : c'est ce qui évite à un invité déjà admis
-         * de se reconnecter à chaque venue. Discord peut très bien répondre
-         * « je ne peux pas répondre sans lui parler », et ce n'est pas une
-         * erreur — c'est la réponse attendue une fois sur deux.
-         *
-         * Le rappel doit donc savoir d'où vient la demande : d'un clic, auquel
-         * un échec doit répondre par une page d'erreur, ou de cet essai-ci,
-         * auquel il doit répondre en rendant la main sans un mot.
-         */
-        silent: Boolean(carried.silent),
-        /*
-         * L'empreinte du navigateur qui a demandé ce trajet.
-         *
-         * Le `state` se prémunissait de la falsification par son seul
-         * caractère imprévisible, ce qui ne suffit pas : un attaquant peut en
-         * demander un pour lui-même, puis faire charger le rappel à sa victime
-         * avec son propre `code`. La victime se retrouvait alors connectée sous
-         * le compte de l'attaquant, et tout ce qu'elle faisait ensuite lui était
-         * imputé.
-         *
-         * Le `state` dit désormais *à qui* il a été remis. La valeur voyage dans
-         * un cookie que seul ce navigateur-là possède ; le rappel exige que les
-         * deux correspondent. Un `state` obtenu ailleurs ne vaut plus rien
-         * ailleurs.
-         */
-        nonce: carried.nonce || null,
-    });
-
-    const url = new URL(AUTHORIZE_URL);
-    url.searchParams.set('client_id', clientId());
-    url.searchParams.set('redirect_uri', redirectUri());
-    url.searchParams.set('response_type', 'code');
-    url.searchParams.set('scope', 'identify');
-    url.searchParams.set('state', state);
+  const state = usesRelay()
+    ? require('./oauthRelay').encodeState(carried.origin || localUrl())
+    : crypto.randomBytes(16).toString('hex');
+  pendingStates.set(state, {
+    createdAt: Date.now(),
+    returnTo,
+    holdsToken: Boolean(carried.holdsToken),
+    claim: Boolean(carried.claim),
     /*
-     * Discord ne montre son sélecteur de comptes que si on le lui demande.
+     * La tentative muette, celle que personne n'a demandée.
      *
-     * `none` reconnecte en silence celui qui est déjà ouvert : c'est ce qu'il
-     * faut d'ordinaire — l'invité a déjà dit oui une fois, et le bot ne
-     * demande que son nom — et exactement ce qu'il ne faut pas quand on vient
-     * précisément pour en changer. Sans ce détour, « changer de compte »
-     * rouvrirait la session du même compte, sans rien dire.
+     * La porte du tableau de bord essaie de reconnaître son visiteur avant
+     * de lui montrer un bouton : c'est ce qui évite à un invité déjà admis
+     * de se reconnecter à chaque venue. Discord peut très bien répondre
+     * « je ne peux pas répondre sans lui parler », et ce n'est pas une
+     * erreur — c'est la réponse attendue une fois sur deux.
+     *
+     * Le rappel doit donc savoir d'où vient la demande : d'un clic, auquel
+     * un échec doit répondre par une page d'erreur, ou de cet essai-ci,
+     * auquel il doit répondre en rendant la main sans un mot.
      */
-    url.searchParams.set('prompt', carried.claim ? 'consent' : 'none');
+    silent: Boolean(carried.silent),
+    /*
+     * L'empreinte du navigateur qui a demandé ce trajet.
+     *
+     * Le `state` se prémunissait de la falsification par son seul
+     * caractère imprévisible, ce qui ne suffit pas : un attaquant peut en
+     * demander un pour lui-même, puis faire charger le rappel à sa victime
+     * avec son propre `code`. La victime se retrouvait alors connectée sous
+     * le compte de l'attaquant, et tout ce qu'elle faisait ensuite lui était
+     * imputé.
+     *
+     * Le `state` dit désormais *à qui* il a été remis. La valeur voyage dans
+     * un cookie que seul ce navigateur-là possède ; le rappel exige que les
+     * deux correspondent. Un `state` obtenu ailleurs ne vaut plus rien
+     * ailleurs.
+     */
+    nonce: carried.nonce || null,
+  });
 
-    return url.toString();
+  const url = new URL(AUTHORIZE_URL);
+  url.searchParams.set('client_id', clientId());
+  url.searchParams.set('redirect_uri', redirectUri());
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('scope', 'identify');
+  url.searchParams.set('state', state);
+  /*
+   * Discord ne montre son sélecteur de comptes que si on le lui demande.
+   *
+   * `none` reconnecte en silence celui qui est déjà ouvert : c'est ce qu'il
+   * faut d'ordinaire — l'invité a déjà dit oui une fois, et le bot ne
+   * demande que son nom — et exactement ce qu'il ne faut pas quand on vient
+   * précisément pour en changer. Sans ce détour, « changer de compte »
+   * rouvrirait la session du même compte, sans rien dire.
+   */
+  url.searchParams.set('prompt', carried.claim ? 'consent' : 'none');
+
+  return url.toString();
 }
 
 /**
@@ -293,20 +293,20 @@ function buildAuthorizeUrl(returnTo = '/', carried = {}) {
  *   null si inconnu, déjà servi ou périmé.
  */
 function consumeState(state) {
-    purgeStates();
-    if (!state) return null;
+  purgeStates();
+  if (!state) return null;
 
-    const entry = pendingStates.get(state);
-    if (!entry) return null;
+  const entry = pendingStates.get(state);
+  if (!entry) return null;
 
-    pendingStates.delete(state);
-    return {
-        returnTo: entry.returnTo || '/',
-        holdsToken: Boolean(entry.holdsToken),
-        claim: Boolean(entry.claim),
-        silent: Boolean(entry.silent),
-        nonce: entry.nonce || null,
-    };
+  pendingStates.delete(state);
+  return {
+    returnTo: entry.returnTo || '/',
+    holdsToken: Boolean(entry.holdsToken),
+    claim: Boolean(entry.claim),
+    silent: Boolean(entry.silent),
+    nonce: entry.nonce || null,
+  };
 }
 
 /**
@@ -316,30 +316,30 @@ function consumeState(state) {
  * @throws {Error} Si Discord refuse l'échange.
  */
 async function exchangeCode(code) {
-    const body = new URLSearchParams({
-        client_id: clientId(),
-        client_secret: clientSecret(),
-        grant_type: 'authorization_code',
-        code,
-        redirect_uri: redirectUri(),
-    });
+  const body = new URLSearchParams({
+    client_id: clientId(),
+    client_secret: clientSecret(),
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: redirectUri(),
+  });
 
-    const response = await fetch(`${DISCORD_API}/oauth2/token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body,
-    });
+  const response = await fetch(`${DISCORD_API}/oauth2/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+  });
 
-    if (!response.ok) {
-        // Le corps d'erreur de Discord nomme la cause — le plus souvent une URL
-        // de rappel qui ne correspond pas à celle déclarée. Il mérite le journal.
-        const detail = await response.text().catch(() => '');
-        throw new Error(`code exchange refused (HTTP ${response.status}) ${detail}`.trim());
-    }
+  if (!response.ok) {
+    // Le corps d'erreur de Discord nomme la cause — le plus souvent une URL
+    // de rappel qui ne correspond pas à celle déclarée. Il mérite le journal.
+    const detail = await response.text().catch(() => '');
+    throw new Error(`code exchange refused (HTTP ${response.status}) ${detail}`.trim());
+  }
 
-    const payload = await response.json();
-    if (!payload.access_token) throw new Error('response without an access token');
-    return payload.access_token;
+  const payload = await response.json();
+  if (!payload.access_token) throw new Error('response without an access token');
+  return payload.access_token;
 }
 
 /**
@@ -348,17 +348,17 @@ async function exchangeCode(code) {
  * @returns {Promise<{ id: string, username: string, global_name?: string, avatar?: string }>}
  */
 async function fetchUser(accessToken) {
-    const response = await fetch(`${DISCORD_API}/users/@me`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-    });
+  const response = await fetch(`${DISCORD_API}/users/@me`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
 
-    if (!response.ok) {
-        throw new Error(`identity read refused (HTTP ${response.status})`);
-    }
+  if (!response.ok) {
+    throw new Error(`identity read refused (HTTP ${response.status})`);
+  }
 
-    const user = await response.json();
-    if (!user || !user.id) throw new Error('incomplete identity');
-    return user;
+  const user = await response.json();
+  if (!user || !user.id) throw new Error('incomplete identity');
+  return user;
 }
 
 /**
@@ -367,45 +367,49 @@ async function fetchUser(accessToken) {
  * @returns {Promise<{ id: string, username: string, global_name?: string, avatar?: string }>}
  */
 async function identifyFromCode(code) {
-    const accessToken = await exchangeCode(code);
-    return fetchUser(accessToken);
+  const accessToken = await exchangeCode(code);
+  return fetchUser(accessToken);
 }
 
 /** Trace au démarrage l'état de la configuration, pour éviter la chasse au bug. */
 function logConfiguration() {
-    if (!isConfigured()) {
-        log.warn('[OAuth] Control sharing unavailable: DISCORD_CLIENT_ID or '
-            + 'DISCORD_CLIENT_SECRET missing from .env.');
-        return;
-    }
-    log.info(`[OAuth] Discord authentication active. Callback URL to declare in the `
-        + `developer portal: ${redirectUri()}`);
-    if (usesRelay()) {
-        log.info('[OAuth] No fixed address declared: Discord returns through the relay, '
-            + 'which sends each sign-in back to the address it started from '
-            + '(this machine, or the quick share).');
-    } else if (!declaredUrl()) {
-        log.warn('[OAuth] PUBLIC_URL is not set and the relay is off: the callback URL '
-            + 'points at localhost, and will only work for a guest sitting at this machine.');
-    }
+  if (!isConfigured()) {
+    log.warn('[OAuth] Control sharing unavailable: DISCORD_CLIENT_ID or ' + 'DISCORD_CLIENT_SECRET missing from .env.');
+    return;
+  }
+  log.info(
+    `[OAuth] Discord authentication active. Callback URL to declare in the ` + `developer portal: ${redirectUri()}`,
+  );
+  if (usesRelay()) {
+    log.info(
+      '[OAuth] No fixed address declared: Discord returns through the relay, ' +
+        'which sends each sign-in back to the address it started from ' +
+        '(this machine, or the quick share).',
+    );
+  } else if (!declaredUrl()) {
+    log.warn(
+      '[OAuth] PUBLIC_URL is not set and the relay is off: the callback URL ' +
+        'points at localhost, and will only work for a guest sitting at this machine.',
+    );
+  }
 }
 
 module.exports = {
-    STATE_TTL_MS,
-    DEFAULT_RELAY_URL,
-    isConfigured,
-    clientId,
-    declaredUrl,
-    publicUrl,
-    entryUrl,
-    relayUrl,
-    usesRelay,
-    redirectUri,
-    returnOrigin,
-    buildAuthorizeUrl,
-    consumeState,
-    exchangeCode,
-    fetchUser,
-    identifyFromCode,
-    logConfiguration,
+  STATE_TTL_MS,
+  DEFAULT_RELAY_URL,
+  isConfigured,
+  clientId,
+  declaredUrl,
+  publicUrl,
+  entryUrl,
+  relayUrl,
+  usesRelay,
+  redirectUri,
+  returnOrigin,
+  buildAuthorizeUrl,
+  consumeState,
+  exchangeCode,
+  fetchUser,
+  identifyFromCode,
+  logConfiguration,
 };

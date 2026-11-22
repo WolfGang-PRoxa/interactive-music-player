@@ -54,38 +54,36 @@ const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
  * @returns {string|null}
  */
 function acceptedTarget(value) {
-    let url;
-    try {
-        url = new URL(String(value || ''));
-    } catch (e) {
-        return null;
-    }
-
-    if (url.username || url.password || url.search || url.hash) return null;
-    if (url.pathname !== '/' && url.pathname !== '') return null;
-
-    const host = url.hostname.toLowerCase();
-    if (url.protocol === 'https:' && QUICK_TUNNEL_HOST.test(host) && !url.port) {
-        return url.origin;
-    }
-    if (url.protocol === 'http:' && LOOPBACK_HOSTS.has(host)) {
-        return url.origin;
-    }
+  let url;
+  try {
+    url = new URL(String(value || ''));
+  } catch (e) {
     return null;
+  }
+
+  if (url.username || url.password || url.search || url.hash) return null;
+  if (url.pathname !== '/' && url.pathname !== '') return null;
+
+  const host = url.hostname.toLowerCase();
+  if (url.protocol === 'https:' && QUICK_TUNNEL_HOST.test(host) && !url.port) {
+    return url.origin;
+  }
+  if (url.protocol === 'http:' && LOOPBACK_HOSTS.has(host)) {
+    return url.origin;
+  }
+  return null;
 }
 
 function toBase64Url(text) {
-    return Buffer.from(text, 'utf8').toString('base64')
-        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return Buffer.from(text, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 function fromBase64Url(text) {
-    try {
-        return Buffer.from(String(text).replace(/-/g, '+').replace(/_/g, '/'), 'base64')
-            .toString('utf8');
-    } catch (e) {
-        return '';
-    }
+  try {
+    return Buffer.from(String(text).replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+  } catch (e) {
+    return '';
+  }
 }
 
 /**
@@ -100,9 +98,9 @@ function fromBase64Url(text) {
  * @returns {string}
  */
 function encodeState(origin) {
-    const target = acceptedTarget(origin);
-    if (!target) throw new Error(`origin not accepted by the relay: ${origin}`);
-    return `${crypto.randomBytes(16).toString('hex')}.${toBase64Url(target)}`;
+  const target = acceptedTarget(origin);
+  if (!target) throw new Error(`origin not accepted by the relay: ${origin}`);
+  return `${crypto.randomBytes(16).toString('hex')}.${toBase64Url(target)}`;
 }
 
 /**
@@ -111,14 +109,14 @@ function encodeState(origin) {
  * @returns {string|null}
  */
 function decodeState(state) {
-    const text = String(state || '');
-    const dot = text.indexOf('.');
-    if (dot <= 0) return null;
-    return acceptedTarget(fromBase64Url(text.slice(dot + 1)));
+  const text = String(state || '');
+  const dot = text.indexOf('.');
+  if (dot <= 0) return null;
+  return acceptedTarget(fromBase64Url(text.slice(dot + 1)));
 }
 
 module.exports = {
-    acceptedTarget,
-    encodeState,
-    decodeState,
+  acceptedTarget,
+  encodeState,
+  decodeState,
 };

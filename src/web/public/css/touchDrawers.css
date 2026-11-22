@@ -34,28 +34,28 @@
 
 /* ── Le panneau ─────────────────────────────────────────────── */
 
-[data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen),
-[data-touch-mode="true"] .floating-logs-window {
-    position: fixed !important;
-    top: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    left: auto !important;
-    width: 100% !important;
-    min-width: 0 !important;
-    max-width: 100% !important;
-    /* `auto` entre `top` et `bottom` : la hauteur est celle de la fenêtre du
+[data-touch-mode='true'] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen),
+[data-touch-mode='true'] .floating-logs-window {
+  position: fixed !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: auto !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  /* `auto` entre `top` et `bottom` : la hauteur est celle de la fenêtre du
        navigateur, y compris quand sa barre d'adresse se replie. */
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    margin: 0 !important;
-    border: none !important;
-    border-left: 1px solid var(--border-card, rgba(255, 255, 255, 0.08)) !important;
-    border-radius: 0 !important;
-    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5) !important;
-    transform: translateX(0);
-    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin: 0 !important;
+  border: none !important;
+  border-left: 1px solid var(--border-card, rgba(255, 255, 255, 0.08)) !important;
+  border-radius: 0 !important;
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5) !important;
+  transform: translateX(0);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /*
@@ -68,12 +68,12 @@
  * remplacer par une translation. Un élément `position: fixed` sorti de l'écran
  * n'y ajoute pas de défilement horizontal.
  */
-[data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window.hidden:not(.is-fullscreen),
-[data-touch-mode="true"] .floating-logs-window.hidden {
-    display: flex !important;
-    opacity: 1;
-    pointer-events: none;
-    transform: translateX(100%) !important;
+[data-touch-mode='true'] body:not(.video-fullscreen-active) .floating-video-window.hidden:not(.is-fullscreen),
+[data-touch-mode='true'] .floating-logs-window.hidden {
+  display: flex !important;
+  opacity: 1;
+  pointer-events: none;
+  transform: translateX(100%) !important;
 }
 
 /*
@@ -93,12 +93,12 @@
  * natif sur autre chose qu'un `<video>`, et js/video.js se rabat alors sur un
  * plein écran de pure CSS, où seul le z-index décide.
  */
-[data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen) {
-    z-index: 9980 !important;
+[data-touch-mode='true'] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen) {
+  z-index: 9980 !important;
 }
 
-[data-touch-mode="true"] .floating-logs-window {
-    z-index: 9970 !important;
+[data-touch-mode='true'] .floating-logs-window {
+  z-index: 9970 !important;
 }
 
 /*
@@ -107,12 +107,12 @@
  * accroche à `.drawer-backdrop.active` — mais se range sous les panneaux.
  */
 .touch-drawer-backdrop {
-    z-index: 9960;
+  z-index: 9960;
 }
 
 /* Au bureau, il n'a rien à voiler : les fenêtres y flottent. */
-html:not([data-touch-mode="true"]) .touch-drawer-backdrop {
-    display: none;
+html:not([data-touch-mode='true']) .touch-drawer-backdrop {
+  display: none;
 }
 
 /*
@@ -127,9 +127,9 @@ html:not([data-touch-mode="true"]) .touch-drawer-backdrop {
  * c'est le tiroir d'activité qui s'ouvre.
  */
 body.touch-drawer-is-open .drawer-edge-tab {
-    transform: translateX(100%) scaleX(0);
-    opacity: 0;
-    pointer-events: none;
+  transform: translateX(100%) scaleX(0);
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* ── Les languettes, une par tiroir ─────────────────────────── */
@@ -139,9 +139,9 @@ body.touch-drawer-is-open .drawer-edge-tab {
  * elle-même : l'en-tête en a besoin à son tour, pour s'arrêter avant elles — voir
  * plus bas.
  */
-[data-touch-mode="true"] {
-    /* Une languette de 6 px se vise à la souris, pas au doigt. */
-    --edge-tab-width: 10px;
+[data-touch-mode='true'] {
+  /* Une languette de 6 px se vise à la souris, pas au doigt. */
+  --edge-tab-width: 10px;
 }
 
 /*
@@ -154,26 +154,26 @@ body.touch-drawer-is-open .drawer-edge-tab {
  * du haut, soit presque la totalité d'un téléphone couché. À 64 elles tiennent
  * dans 286 px, et gardent leur allure.
  */
-[data-touch-mode="true"] .drawer-edge-tab {
-    --edge-tab-top: 70px;
-    --edge-tab-height: 64px;
-    --edge-tab-gap: 12px;
-    --edge-tab-pitch: calc(var(--edge-tab-height) + var(--edge-tab-gap));
+[data-touch-mode='true'] .drawer-edge-tab {
+  --edge-tab-top: 70px;
+  --edge-tab-height: 64px;
+  --edge-tab-gap: 12px;
+  --edge-tab-pitch: calc(var(--edge-tab-height) + var(--edge-tab-gap));
 
-    height: var(--edge-tab-height);
-    width: var(--edge-tab-width);
+  height: var(--edge-tab-height);
+  width: var(--edge-tab-width);
 }
 
-[data-touch-mode="true"] #drawer-edge-tab {
-    top: var(--edge-tab-top);
+[data-touch-mode='true'] #drawer-edge-tab {
+  top: var(--edge-tab-top);
 }
 
-[data-touch-mode="true"] #video-drawer-edge-tab {
-    top: calc(var(--edge-tab-top) + var(--edge-tab-pitch));
+[data-touch-mode='true'] #video-drawer-edge-tab {
+  top: calc(var(--edge-tab-top) + var(--edge-tab-pitch));
 }
 
-[data-touch-mode="true"] #logs-drawer-edge-tab {
-    top: calc(var(--edge-tab-top) + 2 * var(--edge-tab-pitch));
+[data-touch-mode='true'] #logs-drawer-edge-tab {
+  top: calc(var(--edge-tab-top) + 2 * var(--edge-tab-pitch));
 }
 
 /*
@@ -217,41 +217,37 @@ body.touch-drawer-is-open .drawer-edge-tab {
  * cents et plus, où la pile reste où elle a toujours été.
  */
 @media (orientation: landscape) {
-    [data-device-mode="phone"] .drawer-edge-tab {
-        --edge-tab-bottom: calc(
-            50vh - 1.5 * var(--edge-tab-height) - var(--edge-tab-gap)
-        );
-    }
+  [data-device-mode='phone'] .drawer-edge-tab {
+    --edge-tab-bottom: calc(50vh - 1.5 * var(--edge-tab-height) - var(--edge-tab-gap));
+  }
 
-    /*
+  /*
      * Le repli passe par `@supports`, et non par deux déclarations superposées :
      * une variable avale n'importe quelle suite de mots sans broncher, et une
      * unité inconnue ne s'y verrait qu'au moment de la substitution — trop tard
      * pour retomber sur la déclaration précédente, `bottom` reviendrait à
      * `auto` et les trois languettes s'empileraient au même endroit.
      */
-    @supports (height: 100lvh) {
-        [data-device-mode="phone"] .drawer-edge-tab {
-            --edge-tab-bottom: calc(
-                50lvh - 1.5 * var(--edge-tab-height) - var(--edge-tab-gap)
-            );
-        }
+  @supports (height: 100lvh) {
+    [data-device-mode='phone'] .drawer-edge-tab {
+      --edge-tab-bottom: calc(50lvh - 1.5 * var(--edge-tab-height) - var(--edge-tab-gap));
     }
+  }
 
-    [data-device-mode="phone"] #logs-drawer-edge-tab {
-        top: auto;
-        bottom: var(--edge-tab-bottom);
-    }
+  [data-device-mode='phone'] #logs-drawer-edge-tab {
+    top: auto;
+    bottom: var(--edge-tab-bottom);
+  }
 
-    [data-device-mode="phone"] #video-drawer-edge-tab {
-        top: auto;
-        bottom: calc(var(--edge-tab-bottom) + var(--edge-tab-pitch));
-    }
+  [data-device-mode='phone'] #video-drawer-edge-tab {
+    top: auto;
+    bottom: calc(var(--edge-tab-bottom) + var(--edge-tab-pitch));
+  }
 
-    [data-device-mode="phone"] #drawer-edge-tab {
-        top: auto;
-        bottom: calc(var(--edge-tab-bottom) + 2 * var(--edge-tab-pitch));
-    }
+  [data-device-mode='phone'] #drawer-edge-tab {
+    top: auto;
+    bottom: calc(var(--edge-tab-bottom) + 2 * var(--edge-tab-pitch));
+  }
 }
 
 /*
@@ -260,22 +256,26 @@ body.touch-drawer-is-open .drawer-edge-tab {
  * indice qu'une languette de dix pixels peut porter — trop étroite pour une
  * icône, et le survol qui révélerait une infobulle n'existe pas au doigt.
  */
-[data-touch-mode="true"] #video-drawer-edge-tab {
-    background: linear-gradient(180deg, var(--c-accent), var(--c-violet));
-    box-shadow: -3px 0 12px color-mix(in srgb, var(--c-accent) 45%, transparent);
+[data-touch-mode='true'] #video-drawer-edge-tab {
+  background: linear-gradient(180deg, var(--c-accent), var(--c-violet));
+  box-shadow: -3px 0 12px color-mix(in srgb, var(--c-accent) 45%, transparent);
 }
 
-[data-touch-mode="true"] #video-drawer-edge-tab:hover {
-    box-shadow: -5px 0 20px var(--c-accent), 0 0 10px rgba(255, 255, 255, 0.8);
+[data-touch-mode='true'] #video-drawer-edge-tab:hover {
+  box-shadow:
+    -5px 0 20px var(--c-accent),
+    0 0 10px rgba(255, 255, 255, 0.8);
 }
 
-[data-touch-mode="true"] #logs-drawer-edge-tab {
-    background: linear-gradient(180deg, var(--c-success), var(--c-primary));
-    box-shadow: -3px 0 12px color-mix(in srgb, var(--c-success) 45%, transparent);
+[data-touch-mode='true'] #logs-drawer-edge-tab {
+  background: linear-gradient(180deg, var(--c-success), var(--c-primary));
+  box-shadow: -3px 0 12px color-mix(in srgb, var(--c-success) 45%, transparent);
 }
 
-[data-touch-mode="true"] #logs-drawer-edge-tab:hover {
-    box-shadow: -5px 0 20px var(--c-success), 0 0 10px rgba(255, 255, 255, 0.8);
+[data-touch-mode='true'] #logs-drawer-edge-tab:hover {
+  box-shadow:
+    -5px 0 20px var(--c-success),
+    0 0 10px rgba(255, 255, 255, 0.8);
 }
 
 /*
@@ -297,13 +297,13 @@ body.touch-drawer-is-open .drawer-edge-tab {
  * gauche ; y prendre la même réserve décalerait pour rien le témoin de
  * connexion par rapport au bord des cartes, juste dessous.
  */
-[data-device-mode="phone"] .main-header {
-    padding-right: calc(var(--edge-tab-width) + 0.5rem);
+[data-device-mode='phone'] .main-header {
+  padding-right: calc(var(--edge-tab-width) + 0.5rem);
 }
 
 /* Au bureau, les deux fenêtres flottent : il n'y a pas de tiroir à tirer. */
-html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
-    display: none;
+html:not([data-touch-mode='true']) .touch-drawer-edge-tab {
+  display: none;
 }
 
 /* ── Ce que le tiroir rend inutile ──────────────────────────── */
@@ -314,14 +314,14 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
  * que l'appui simulé d'un navigateur mobile n'enregistre pas la géométrie du
  * tiroir à la place de celle du bureau.
  */
-[data-touch-mode="true"] .video-window-resize-handle,
-[data-touch-mode="true"] .logs-window-resize-handle {
-    display: none !important;
+[data-touch-mode='true'] .video-window-resize-handle,
+[data-touch-mode='true'] .logs-window-resize-handle {
+  display: none !important;
 }
 
-[data-touch-mode="true"] .video-window-header,
-[data-touch-mode="true"] .logs-window-header {
-    cursor: default;
+[data-touch-mode='true'] .video-window-header,
+[data-touch-mode='true'] .logs-window-header {
+  cursor: default;
 }
 
 /*
@@ -331,17 +331,17 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
  * que son texte illisible. Le curseur se retire, et la valeur revient à
  * l'opacité pleine — l'interrupteur du bureau ayant pu la laisser ailleurs.
  */
-[data-touch-mode="true"] .video-header-opacity,
-[data-touch-mode="true"] .logs-header-opacity {
-    display: none;
+[data-touch-mode='true'] .video-header-opacity,
+[data-touch-mode='true'] .logs-header-opacity {
+  display: none;
 }
 
-[data-touch-mode="true"] .floating-video-window {
-    --video-bg-opacity: 1 !important;
+[data-touch-mode='true'] .floating-video-window {
+  --video-bg-opacity: 1 !important;
 }
 
-[data-touch-mode="true"] .floating-logs-window {
-    --logs-bg-opacity: 1 !important;
+[data-touch-mode='true'] .floating-logs-window {
+  --logs-bg-opacity: 1 !important;
 }
 
 /* ── L'en-tête, au doigt ────────────────────────────────────── */
@@ -352,12 +352,12 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
  * ce qu'elle protège. Même partage que pour la documentation, voir
  * css/device.css.
  */
-[data-touch-mode="true"] .video-window-header,
-[data-touch-mode="true"] .logs-window-header {
-    padding-top: max(0.6rem, env(safe-area-inset-top));
-    padding-left: max(0.9rem, var(--drawer-inset-left));
-    padding-right: max(0.9rem, var(--drawer-inset-right));
-    flex-shrink: 0;
+[data-touch-mode='true'] .video-window-header,
+[data-touch-mode='true'] .logs-window-header {
+  padding-top: max(0.6rem, env(safe-area-inset-top));
+  padding-left: max(0.9rem, var(--drawer-inset-left));
+  padding-right: max(0.9rem, var(--drawer-inset-right));
+  flex-shrink: 0;
 }
 
 /*
@@ -372,22 +372,22 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
  * réservé aux largeurs où il n'y a vraiment plus rien à rogner — voir la
  * requête média plus bas.
  */
-[data-touch-mode="true"] .logs-header-filters {
-    min-width: 0;
-    overflow-x: auto;
-    scrollbar-width: none;
+[data-touch-mode='true'] .logs-header-filters {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
-[data-touch-mode="true"] .logs-header-filters::-webkit-scrollbar {
-    display: none;
+[data-touch-mode='true'] .logs-header-filters::-webkit-scrollbar {
+  display: none;
 }
 
-[data-touch-mode="true"] .log-filter-btn {
-    flex-shrink: 0;
+[data-touch-mode='true'] .log-filter-btn {
+  flex-shrink: 0;
 }
 
-[data-touch-mode="true"] .logs-header-actions {
-    margin-left: auto;
+[data-touch-mode='true'] .logs-header-actions {
+  margin-left: auto;
 }
 
 /*
@@ -408,17 +408,17 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
  * quand les filtres ne tiennent déjà plus.
  */
 @media (max-width: 39.99em) {
-    [data-touch-mode="true"] .logs-window-header {
-        flex-wrap: wrap;
-        row-gap: 8px;
-    }
+  [data-touch-mode='true'] .logs-window-header {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
 
-    [data-touch-mode="true"] .logs-header-filters {
-        order: 3;
-        /* Une base de 100 % force le passage à la ligne. */
-        flex-basis: 100%;
-        margin: 0;
-    }
+  [data-touch-mode='true'] .logs-header-filters {
+    order: 3;
+    /* Une base de 100 % force le passage à la ligne. */
+    flex-basis: 100%;
+    margin: 0;
+  }
 }
 
 /* ── Le corps ───────────────────────────────────────────────── */
@@ -442,8 +442,8 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
  * L'horodatage et l'étiquette sont écrits en `em` (voir css/logs.css) : ils
  * rétrécissent du même rapport, la ligne garde ses proportions.
  */
-[data-device-mode="phone"] .logs-window-body {
-    font-size: clamp(0.62rem, 3vw, 0.78rem);
+[data-device-mode='phone'] .logs-window-body {
+  font-size: clamp(0.62rem, 3vw, 0.78rem);
 }
 
 /*
@@ -452,10 +452,13 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
  * zone de sécurité, et la fenêtre fait toute la page —, le corps prend donc
  * simplement ce qui reste.
  */
-[data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen) .video-window-body {
-    flex: 1;
-    height: auto;
-    min-height: 0;
+[data-touch-mode='true']
+  body:not(.video-fullscreen-active)
+  .floating-video-window:not(.is-fullscreen)
+  .video-window-body {
+  flex: 1;
+  height: auto;
+  min-height: 0;
 }
 
 /*
@@ -467,10 +470,10 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
  * donc tomber à zéro sur tout appareil qui n'en déclare pas — la dernière ligne
  * de journal se retrouvait collée au bord.
  */
-[data-touch-mode="true"] .logs-terminal-container {
-    padding-left: max(12px, var(--drawer-inset-left));
-    padding-right: max(12px, var(--drawer-inset-right));
-    padding-bottom: max(10px, env(safe-area-inset-bottom));
+[data-touch-mode='true'] .logs-terminal-container {
+  padding-left: max(12px, var(--drawer-inset-left));
+  padding-right: max(12px, var(--drawer-inset-right));
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
 }
 
 /*
@@ -480,12 +483,12 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
  * où l'appui glisse la page au lieu de presser le bouton. Elles sont centrées
  * horizontalement, l'encoche ne les concerne pas.
  */
-[data-touch-mode="true"] .logs-scroll-bottom-btn {
-    bottom: max(16px, env(safe-area-inset-bottom));
+[data-touch-mode='true'] .logs-scroll-bottom-btn {
+  bottom: max(16px, env(safe-area-inset-bottom));
 }
 
-[data-touch-mode="true"] .logs-selection-bar {
-    bottom: max(8px, env(safe-area-inset-bottom));
+[data-touch-mode='true'] .logs-selection-bar {
+  bottom: max(8px, env(safe-area-inset-bottom));
 }
 
 /*
@@ -505,17 +508,17 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
  * seule. La spécificité — un identifiant et trois classes — passe devant
  * toutes les règles de révélation, qui n'en portent que deux.
  */
-[data-touch-mode="true"] #video-floating-window.user-inactive .video-top-overlay,
-[data-touch-mode="true"] #video-floating-window.user-inactive .video-custom-controls {
-    opacity: 0 !important;
-    pointer-events: none !important;
+[data-touch-mode='true'] #video-floating-window.user-inactive .video-top-overlay,
+[data-touch-mode='true'] #video-floating-window.user-inactive .video-custom-controls {
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 /* Le transport du centre suit, avec le `visibility` qui lui tient lieu de
    `pointer-events` — voir le bloc qui le décrit dans css/video.css. */
-[data-touch-mode="true"] #video-floating-window.user-inactive .video-center-controls {
-    opacity: 0 !important;
-    visibility: hidden !important;
+[data-touch-mode='true'] #video-floating-window.user-inactive .video-center-controls {
+  opacity: 0 !important;
+  visibility: hidden !important;
 }
 
 /*
@@ -548,24 +551,33 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
  * Le plein écran en est exclu : les commandes y sont faites pour disparaître,
  * et l'image doit prendre tout l'écran.
  */
-[data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen) .video-aspect-wrapper,
-[data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen) .video-placeholder {
-    /* Répétée depuis `.video-aspect-wrapper` : un élément ne peut pas interroger
+[data-touch-mode='true']
+  body:not(.video-fullscreen-active)
+  .floating-video-window:not(.is-fullscreen)
+  .video-aspect-wrapper,
+[data-touch-mode='true']
+  body:not(.video-fullscreen-active)
+  .floating-video-window:not(.is-fullscreen)
+  .video-placeholder {
+  /* Répétée depuis `.video-aspect-wrapper` : un élément ne peut pas interroger
        son propre conteneur, la valeur doit donc se calculer chez les enfants. */
-    --video-picture-height: min(100cqh, calc(100cqw * 9 / 16));
-    --video-picture-shift: min(
-        var(--video-controls-height, 0px),
-        max(0px, calc(100cqh - var(--video-picture-height)))
-    );
+  --video-picture-height: min(100cqh, calc(100cqw * 9 / 16));
+  --video-picture-shift: min(var(--video-controls-height, 0px), max(0px, calc(100cqh - var(--video-picture-height))));
 }
 
-[data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen) .video-aspect-wrapper {
-    margin-bottom: var(--video-picture-shift);
+[data-touch-mode='true']
+  body:not(.video-fullscreen-active)
+  .floating-video-window:not(.is-fullscreen)
+  .video-aspect-wrapper {
+  margin-bottom: var(--video-picture-shift);
 }
 
 /* Le message « aucune vidéo » couvre le cadre : il se retire du même bas. */
-[data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen) .video-placeholder {
-    bottom: var(--video-picture-shift);
+[data-touch-mode='true']
+  body:not(.video-fullscreen-active)
+  .floating-video-window:not(.is-fullscreen)
+  .video-placeholder {
+  bottom: var(--video-picture-shift);
 }
 
 /*
@@ -593,16 +605,16 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
  * ne change pas quand on passe en plein écran : la barre y débordait
  * exactement pareil, de 80 px sur un écran de 390.
  */
-[data-touch-mode="true"] #video-floating-window .video-controls-left,
-[data-touch-mode="true"] #video-floating-window .video-controls-right {
-    flex-wrap: wrap;
-    flex-shrink: 1;
-    justify-content: center;
-    min-width: 0;
+[data-touch-mode='true'] #video-floating-window .video-controls-left,
+[data-touch-mode='true'] #video-floating-window .video-controls-right {
+  flex-wrap: wrap;
+  flex-shrink: 1;
+  justify-content: center;
+  min-width: 0;
 }
 
-[data-touch-mode="true"] #video-floating-window .video-controls-bar {
-    justify-content: center;
+[data-touch-mode='true'] #video-floating-window .video-controls-bar {
+  justify-content: center;
 }
 
 /*
@@ -610,10 +622,13 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
  * redimensionnement, qui n'existe plus ici. Elle revient à la barre, et les
  * zones de sécurité prennent le relais sur les trois bords que la barre longe.
  */
-[data-touch-mode="true"] body:not(.video-fullscreen-active) .floating-video-window:not(.is-fullscreen) .video-custom-controls {
-    padding-left: max(12px, var(--drawer-inset-left));
-    padding-right: max(12px, var(--drawer-inset-right));
-    padding-bottom: max(8px, env(safe-area-inset-bottom));
+[data-touch-mode='true']
+  body:not(.video-fullscreen-active)
+  .floating-video-window:not(.is-fullscreen)
+  .video-custom-controls {
+  padding-left: max(12px, var(--drawer-inset-left));
+  padding-right: max(12px, var(--drawer-inset-right));
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
 }
 
 /*
@@ -627,17 +642,17 @@ html:not([data-touch-mode="true"]) .touch-drawer-edge-tab {
  * L'`!important` n'est pas un choix : les quatre variantes de plein écran de
  * css/video.css posent leur propre remplissage de la même façon.
  */
-[data-touch-mode="true"] #video-floating-window.is-fullscreen .video-custom-controls,
-[data-touch-mode="true"] body.video-fullscreen-active #video-floating-window .video-custom-controls {
-    padding-left: max(20px, var(--drawer-inset-left)) !important;
-    padding-right: max(20px, var(--drawer-inset-right)) !important;
-    padding-bottom: max(14px, env(safe-area-inset-bottom)) !important;
+[data-touch-mode='true'] #video-floating-window.is-fullscreen .video-custom-controls,
+[data-touch-mode='true'] body.video-fullscreen-active #video-floating-window .video-custom-controls {
+  padding-left: max(20px, var(--drawer-inset-left)) !important;
+  padding-right: max(20px, var(--drawer-inset-right)) !important;
+  padding-bottom: max(14px, env(safe-area-inset-bottom)) !important;
 }
 
 /* Le titre incrusté en haut longe les mêmes bords. */
-[data-touch-mode="true"] #video-floating-window.is-fullscreen .video-top-overlay,
-[data-touch-mode="true"] body.video-fullscreen-active #video-floating-window .video-top-overlay {
-    padding-top: max(10px, env(safe-area-inset-top));
-    padding-left: max(14px, var(--drawer-inset-left));
-    padding-right: max(14px, var(--drawer-inset-right));
+[data-touch-mode='true'] #video-floating-window.is-fullscreen .video-top-overlay,
+[data-touch-mode='true'] body.video-fullscreen-active #video-floating-window .video-top-overlay {
+  padding-top: max(10px, env(safe-area-inset-top));
+  padding-left: max(14px, var(--drawer-inset-left));
+  padding-right: max(14px, var(--drawer-inset-right));
 }

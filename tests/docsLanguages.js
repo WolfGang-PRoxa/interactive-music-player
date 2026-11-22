@@ -37,8 +37,13 @@ const REFERENCE = 'fr';
 let failed = 0;
 let passed = 0;
 const check = (label, ok, detail = '') => {
-    if (ok) { passed++; console.log(`  ok    ${label}${detail ? ` — ${detail}` : ''}`); }
-    else { failed++; console.log(`  FAIL ${label}${detail ? ` — ${detail}` : ''}`); }
+  if (ok) {
+    passed++;
+    console.log(`  ok    ${label}${detail ? ` — ${detail}` : ''}`);
+  } else {
+    failed++;
+    console.log(`  FAIL ${label}${detail ? ` — ${detail}` : ''}`);
+  }
 };
 
 const app = express();
@@ -47,100 +52,116 @@ app.use('/api', createApiRouter({ client: null, wss: null, inviteLink: () => nul
 const server = http.createServer(app);
 
 server.listen(0, '127.0.0.1', async () => {
-    const { port } = server.address();
+  const { port } = server.address();
 
-    const get = (route) =>
-        new Promise((resolve, reject) => {
-            http.get({ host: '127.0.0.1', port, path: route }, (res) => {
-                let body = '';
-                res.on('data', (chunk) => (body += chunk));
-                res.on('end', () => {
-                    let json = null;
-                    try { json = JSON.parse(body); } catch (e) {}
-                    resolve({ status: res.statusCode, json });
-                });
-            }).on('error', reject);
-        });
+  const get = (route) =>
+    new Promise((resolve, reject) => {
+      http
+        .get({ host: '127.0.0.1', port, path: route }, (res) => {
+          let body = '';
+          res.on('data', (chunk) => (body += chunk));
+          res.on('end', () => {
+            let json = null;
+            try {
+              json = JSON.parse(body);
+            } catch (e) {}
+            resolve({ status: res.statusCode, json });
+          });
+        })
+        .on('error', reject);
+    });
 
-    const inventory = (lang) => get(`/api/docs?lang=${encodeURIComponent(lang)}`);
-    const content = (id, lang) =>
-        get(`/api/docs/content?id=${encodeURIComponent(id)}&lang=${encodeURIComponent(lang)}`);
+  const inventory = (lang) => get(`/api/docs?lang=${encodeURIComponent(lang)}`);
+  const content = (id, lang) => get(`/api/docs/content?id=${encodeURIComponent(id)}&lang=${encodeURIComponent(lang)}`);
 
-    console.log('\n=== Inventory by language ===\n');
+  console.log('\n=== Inventory by language ===\n');
 
-    const reference = await inventory(REFERENCE);
-    check('the reference language answers',
-        reference.status === 200 && reference.json.documents.length > 0,
-        `${reference.json ? reference.json.documents.length : 0} documents`);
+  const reference = await inventory(REFERENCE);
+  check(
+    'the reference language answers',
+    reference.status === 200 && reference.json.documents.length > 0,
+    `${reference.json ? reference.json.documents.length : 0} documents`,
+  );
 
-    const referenceIds = reference.json.documents.map((d) => d.id);
+  const referenceIds = reference.json.documents.map((d) => d.id);
 
-    /**
-     * Groupes attendus dans le tiroir du lecteur : la racine de la langue, puis
-     * son sous-dossier `technique`.
-     *
-     * C'est le contrôle qui manquait quand `docs/` est passé au rangement par
-     * langue. L'inventaire partait encore de la racine partagée, y trouvait les
-     * quatre dossiers de langue et les prenait pour des groupes : le sommaire
-     * proposait « DE / EN / ES / FR » au lieu des documents, et se muait en
-     * sélecteur de langue alors que la langue ne se choisit que dans les
-     * réglages.
-     */
-    const GROUPS = ['', 'technique'];
+  /**
+   * Groupes attendus dans le tiroir du lecteur : la racine de la langue, puis
+   * son sous-dossier `technique`.
+   *
+   * C'est le contrôle qui manquait quand `docs/` est passé au rangement par
+   * langue. L'inventaire partait encore de la racine partagée, y trouvait les
+   * quatre dossiers de langue et les prenait pour des groupes : le sommaire
+   * proposait « DE / EN / ES / FR » au lieu des documents, et se muait en
+   * sélecteur de langue alors que la langue ne se choisit que dans les
+   * réglages.
+   */
+  const GROUPS = ['', 'technique'];
 
-    for (const lang of LANGS) {
-        const res = await inventory(lang);
-        const docs = res.json ? res.json.documents : [];
-        const ids = docs.map((d) => d.id);
+  for (const lang of LANGS) {
+    const res = await inventory(lang);
+    const docs = res.json ? res.json.documents : [];
+    const ids = docs.map((d) => d.id);
 
-        check(`${lang}: the table of contents is complete`,
-            res.status === 200 && ids.join(' ') === referenceIds.join(' '),
-            `${ids.length} documents`);
+    check(
+      `${lang}: the table of contents is complete`,
+      res.status === 200 && ids.join(' ') === referenceIds.join(' '),
+      `${ids.length} documents`,
+    );
 
-        // Un identifiant qui recommencerait par un code de langue signalerait
-        // que l'inventaire est reparti de `docs/` au lieu de `docs/<langue>/`.
-        check(`${lang}: identifiers do not carry the language`,
-            !ids.some((id) => LANGS.some((l) => id.startsWith(`${l}/`))),
-            ids[0]);
+    // Un identifiant qui recommencerait par un code de langue signalerait
+    // que l'inventaire est reparti de `docs/` au lieu de `docs/<langue>/`.
+    check(
+      `${lang}: identifiers do not carry the language`,
+      !ids.some((id) => LANGS.some((l) => id.startsWith(`${l}/`))),
+      ids[0],
+    );
 
-        // Le même symptôme, vu du tiroir : aucun groupe ne doit être une langue.
-        const groups = [...new Set(docs.map((d) => d.group))].sort();
-        check(`${lang}: groups are those of the table of contents, not languages`,
-            groups.join(' ') === GROUPS.join(' '),
-            `groups: ${groups.map((g) => g || '(root)').join(', ')}`);
+    // Le même symptôme, vu du tiroir : aucun groupe ne doit être une langue.
+    const groups = [...new Set(docs.map((d) => d.group))].sort();
+    check(
+      `${lang}: groups are those of the table of contents, not languages`,
+      groups.join(' ') === GROUPS.join(' '),
+      `groups: ${groups.map((g) => g || '(root)').join(', ')}`,
+    );
 
-        // Chaque document doit s'ouvrir, dans la langue demandée.
-        let unreadable = 0;
-        let mismatched = 0;
-        for (const doc of docs) {
-            const res2 = await content(doc.id, lang);
-            if (res2.status !== 200 || !res2.json || !res2.json.source) unreadable++;
-            else if (res2.json.lang !== lang) mismatched++;
-        }
-        check(`${lang}: every document opens`, unreadable === 0,
-            unreadable ? `${unreadable} illisible(s)` : `${docs.length} documents`);
-        check(`${lang}: the language served is the one requested`, mismatched === 0);
+    // Chaque document doit s'ouvrir, dans la langue demandée.
+    let unreadable = 0;
+    let mismatched = 0;
+    for (const doc of docs) {
+      const res2 = await content(doc.id, lang);
+      if (res2.status !== 200 || !res2.json || !res2.json.source) unreadable++;
+      else if (res2.json.lang !== lang) mismatched++;
     }
+    check(
+      `${lang}: every document opens`,
+      unreadable === 0,
+      unreadable ? `${unreadable} illisible(s)` : `${docs.length} documents`,
+    );
+    check(`${lang}: the language served is the one requested`, mismatched === 0);
+  }
 
-    console.log('\n=== Fallback and refusal ===\n');
+  console.log('\n=== Fallback and refusal ===\n');
 
-    // Une langue que le tableau de bord ne connaît pas, une chaîne vide, et deux
-    // tentatives de sortie du dossier : toutes retombent sur la référence.
-    for (const bad of ['zz', '', '..', '../..', 'fr/../..']) {
-        const res = await inventory(bad);
-        check(`language « ${bad} » → falls back to ${REFERENCE}`,
-            res.status === 200 && res.json.lang === REFERENCE,
-            res.json ? res.json.lang : String(res.status));
-    }
+  // Une langue que le tableau de bord ne connaît pas, une chaîne vide, et deux
+  // tentatives de sortie du dossier : toutes retombent sur la référence.
+  for (const bad of ['zz', '', '..', '../..', 'fr/../..']) {
+    const res = await inventory(bad);
+    check(
+      `language « ${bad} » → falls back to ${REFERENCE}`,
+      res.status === 200 && res.json.lang === REFERENCE,
+      res.json ? res.json.lang : String(res.status),
+    );
+  }
 
-    // L'identifiant n'est pas davantage transformé en chemin : il doit
-    // correspondre à une entrée de l'inventaire, ou rien.
-    for (const bad of ['../../../package.json', '../fr/GUIDE.md', '/etc/passwd', 'GUIDE.md.bak']) {
-        const res = await content(bad, REFERENCE);
-        check(`identifier « ${bad} » refused`, res.status === 404, String(res.status));
-    }
+  // L'identifiant n'est pas davantage transformé en chemin : il doit
+  // correspondre à une entrée de l'inventaire, ou rien.
+  for (const bad of ['../../../package.json', '../fr/GUIDE.md', '/etc/passwd', 'GUIDE.md.bak']) {
+    const res = await content(bad, REFERENCE);
+    check(`identifier « ${bad} » refused`, res.status === 404, String(res.status));
+  }
 
-    console.log(`\n=== ${passed} passed, ${failed} failed ===`);
-    server.close();
-    process.exit(failed === 0 ? 0 : 1);
+  console.log(`\n=== ${passed} passed, ${failed} failed ===`);
+  server.close();
+  process.exit(failed === 0 ? 0 : 1);
 });

@@ -65,39 +65,39 @@ let token = null;
  * @returns {string}
  */
 function getToken() {
-    if (token) return token;
+  if (token) return token;
 
-    const fromEnv = (process.env.DASHBOARD_TOKEN || '').trim();
-    if (fromEnv) {
-        token = fromEnv;
-        return token;
-    }
-
-    try {
-        const stored = fs.readFileSync(TOKEN_FILE, 'utf8').trim();
-        if (stored) {
-            token = stored;
-            // Les installations d'avant ce correctif ont un fichier ouvert :
-            // le refermer ici les rattrape, une fois, au premier démarrage.
-            hardenTokenFile();
-            return token;
-        }
-    } catch (e) {
-        // Premier démarrage : le fichier n'existe pas encore
-    }
-
-    token = crypto.randomBytes(32).toString('hex');
-    try {
-        fs.mkdirSync(path.dirname(TOKEN_FILE), { recursive: true });
-        fs.writeFileSync(TOKEN_FILE, token, { encoding: 'utf8', mode: 0o600 });
-        // `mode` ne vaut que sur les systèmes POSIX ; Windows demande une ACL.
-        hardenTokenFile();
-        log.info(`[Auth] Dashboard token generated and saved in ${TOKEN_FILE}`);
-    } catch (err) {
-        log.error(`[Auth] Cannot save the token: ${err.message}`);
-        log.error('[Auth] A new token will be generated on the next startup.');
-    }
+  const fromEnv = (process.env.DASHBOARD_TOKEN || '').trim();
+  if (fromEnv) {
+    token = fromEnv;
     return token;
+  }
+
+  try {
+    const stored = fs.readFileSync(TOKEN_FILE, 'utf8').trim();
+    if (stored) {
+      token = stored;
+      // Les installations d'avant ce correctif ont un fichier ouvert :
+      // le refermer ici les rattrape, une fois, au premier démarrage.
+      hardenTokenFile();
+      return token;
+    }
+  } catch (e) {
+    // Premier démarrage : le fichier n'existe pas encore
+  }
+
+  token = crypto.randomBytes(32).toString('hex');
+  try {
+    fs.mkdirSync(path.dirname(TOKEN_FILE), { recursive: true });
+    fs.writeFileSync(TOKEN_FILE, token, { encoding: 'utf8', mode: 0o600 });
+    // `mode` ne vaut que sur les systèmes POSIX ; Windows demande une ACL.
+    hardenTokenFile();
+    log.info(`[Auth] Dashboard token generated and saved in ${TOKEN_FILE}`);
+  } catch (err) {
+    log.error(`[Auth] Cannot save the token: ${err.message}`);
+    log.error('[Auth] A new token will be generated on the next startup.');
+  }
+  return token;
 }
 
 /**
@@ -124,58 +124,64 @@ function getToken() {
  * quand même, en le disant.
  */
 function hardenTokenFile() {
-    if (process.platform !== 'win32') return;
+  if (process.platform !== 'win32') return;
 
-    let user;
-    try {
-        user = require('os').userInfo().username;
-    } catch (e) {
-        return;
-    }
-    if (!user) return;
+  let user;
+  try {
+    user = require('os').userInfo().username;
+  } catch (e) {
+    return;
+  }
+  if (!user) return;
 
-    try {
-        require('child_process').execFileSync('icacls', [
-            TOKEN_FILE,
-            '/inheritance:r',
-            '/grant:r', `${user}:(F)`,
-            // S-1-5-32-544 : groupe Administrateurs. S-1-5-18 : compte Système.
-            '/grant:r', '*S-1-5-32-544:(F)',
-            '/grant:r', '*S-1-5-18:(F)',
-        ], { stdio: 'ignore', timeout: 5000, windowsHide: true });
-    } catch (err) {
-        log.warn('[Auth] Could not restrict the permissions of '
-            + `${TOKEN_FILE}: ${err.message}`);
-        log.warn('[Auth] Any account on this machine may be able to read it.');
-    }
+  try {
+    require('child_process').execFileSync(
+      'icacls',
+      [
+        TOKEN_FILE,
+        '/inheritance:r',
+        '/grant:r',
+        `${user}:(F)`,
+        // S-1-5-32-544 : groupe Administrateurs. S-1-5-18 : compte Système.
+        '/grant:r',
+        '*S-1-5-32-544:(F)',
+        '/grant:r',
+        '*S-1-5-18:(F)',
+      ],
+      { stdio: 'ignore', timeout: 5000, windowsHide: true },
+    );
+  } catch (err) {
+    log.warn('[Auth] Could not restrict the permissions of ' + `${TOKEN_FILE}: ${err.message}`);
+    log.warn('[Auth] Any account on this machine may be able to read it.');
+  }
 }
 
 /** Comparaison à temps constant, pour ne pas fuiter le jeton octet par octet. */
 function safeEquals(a, b) {
-    if (typeof a !== 'string' || typeof b !== 'string') return false;
-    const bufA = Buffer.from(a);
-    const bufB = Buffer.from(b);
-    if (bufA.length !== bufB.length) return false;
-    return crypto.timingSafeEqual(bufA, bufB);
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
 }
 
 function parseCookies(cookieHeader) {
-    const jar = {};
-    if (!cookieHeader) return jar;
-    for (const part of cookieHeader.split(';')) {
-        const index = part.indexOf('=');
-        if (index === -1) continue;
-        const key = part.slice(0, index).trim();
-        const value = part.slice(index + 1).trim();
-        if (key) {
-            try {
-                jar[key] = decodeURIComponent(value);
-            } catch (e) {
-                jar[key] = value;
-            }
-        }
+  const jar = {};
+  if (!cookieHeader) return jar;
+  for (const part of cookieHeader.split(';')) {
+    const index = part.indexOf('=');
+    if (index === -1) continue;
+    const key = part.slice(0, index).trim();
+    const value = part.slice(index + 1).trim();
+    if (key) {
+      try {
+        jar[key] = decodeURIComponent(value);
+      } catch (e) {
+        jar[key] = value;
+      }
     }
-    return jar;
+  }
+  return jar;
 }
 
 /**
@@ -184,27 +190,27 @@ function parseCookies(cookieHeader) {
  * @returns {{ value: string|null, source: 'query'|'cookie'|'header'|null }}
  */
 function extractToken(req) {
-    let queryToken = null;
-    try {
-        queryToken = new URL(req.url, 'http://localhost').searchParams.get('token');
-    } catch (e) {
-        // URL malformée : on poursuit avec les autres sources
-    }
-    if (queryToken) return { value: queryToken, source: 'query' };
+  let queryToken = null;
+  try {
+    queryToken = new URL(req.url, 'http://localhost').searchParams.get('token');
+  } catch (e) {
+    // URL malformée : on poursuit avec les autres sources
+  }
+  if (queryToken) return { value: queryToken, source: 'query' };
 
-    const cookies = parseCookies(req.headers.cookie);
-    if (cookies[COOKIE_NAME]) return { value: cookies[COOKIE_NAME], source: 'cookie' };
+  const cookies = parseCookies(req.headers.cookie);
+  if (cookies[COOKIE_NAME]) return { value: cookies[COOKIE_NAME], source: 'cookie' };
 
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-        return { value: authHeader.slice(7).trim(), source: 'header' };
-    }
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return { value: authHeader.slice(7).trim(), source: 'header' };
+  }
 
-    return { value: null, source: null };
+  return { value: null, source: null };
 }
 
 function isAuthorized(req) {
-    return identify(req).authorized;
+  return identify(req).authorized;
 }
 
 /**
@@ -219,11 +225,11 @@ function isAuthorized(req) {
 const PUBLIC_PATHS = new Set(['/auth/discord', '/auth/discord/callback']);
 
 function isPublicPath(url) {
-    try {
-        return PUBLIC_PATHS.has(new URL(url, 'http://localhost').pathname);
-    } catch (e) {
-        return false;
-    }
+  try {
+    return PUBLIC_PATHS.has(new URL(url, 'http://localhost').pathname);
+  } catch (e) {
+    return false;
+  }
 }
 
 /**
@@ -233,116 +239,116 @@ function isPublicPath(url) {
  * @returns {{ authorized: boolean, master: boolean, session: object|null, tokenSource: string|null }}
  */
 function identify(req) {
-    const { value, source } = extractToken(req);
-    const holdsToken = safeEquals(value, getToken());
+  const { value, source } = extractToken(req);
+  const holdsToken = safeEquals(value, getToken());
 
+  /*
+   * Le jeton présenté depuis l'ordinateur du bot lui-même : c'est le
+   * propriétaire, et personne d'autre.
+   *
+   * La porte demande à chacun de se nommer parce que le jeton voyage — dans
+   * un lien, un historique, un manifeste — et qu'un porteur distant peut être
+   * n'importe qui. Sur la machine même, la question ne se pose plus : il
+   * faut avoir la main sur la session Windows qui fait tourner le bot pour
+   * y être, et c'est de là que l'application de bureau pilote le bot (fenêtre
+   * du tableau de bord, Quitter et Redémarrer depuis l'icône).
+   *
+   * Exiger Discord ici enfermait le propriétaire hors de son propre bot dès
+   * que `DISCORD_CLIENT_SECRET` était renseigné : la fenêtre de l'application
+   * le traitait en invité, et même l'arrêt demandé par l'icône était refusé.
+   * Le tunnel n'en profite pas — Cloudflare pose `CF-Connecting-IP` —, ni le
+   * réseau local, dont les adresses ne sont pas des boucles locales.
+   */
+  const atTheMachine = holdsToken && fromThisMachine(req);
+
+  const cookies = parseCookies(req.headers.cookie);
+  const session = sessions.touch(cookies[sessions.COOKIE_NAME]);
+
+  /*
+   * La session Discord passe avant le jeton, et l'ordre compte.
+   *
+   * Le tableau de bord ne s'ouvre plus à un porteur de jeton anonyme : il lui
+   * demande d'abord de dire qui il est. Le propriétaire est donc reconnu à sa
+   * session, pas à son cookie de jeton — sans quoi il resterait le seul de
+   * toute l'installation à ne pas avoir de nom, et la fenêtre de connexion
+   * n'aurait aucun effet sur lui.
+   *
+   * Le jeton n'a pas pour autant disparu : il reste ce qui distingue celui
+   * qui est devant la machine de celui qui a cliqué sur un lien
+   * d'invitation, et c'est à ce titre qu'il désigne le propriétaire lors de
+   * la toute première connexion (voir owner.js).
+   */
+  if (session) {
     /*
-     * Le jeton présenté depuis l'ordinateur du bot lui-même : c'est le
-     * propriétaire, et personne d'autre.
+     * La revendication de dernier recours.
      *
-     * La porte demande à chacun de se nommer parce que le jeton voyage — dans
-     * un lien, un historique, un manifeste — et qu'un porteur distant peut être
-     * n'importe qui. Sur la machine même, la question ne se pose plus : il
-     * faut avoir la main sur la session Windows qui fait tourner le bot pour
-     * y être, et c'est de là que l'application de bureau pilote le bot (fenêtre
-     * du tableau de bord, Quitter et Redémarrer depuis l'icône).
+     * Elle a normalement lieu au retour de Discord, où le compte vient
+     * d'être reconnu. Mais une session peut très bien exister sans que
+     * l'installation ait été revendiquée : c'est le cas de celles ouvertes
+     * avant que cette règle n'existe, et de celles dont le rappel est
+     * arrivé sur une autre origine que le tableau de bord.
      *
-     * Exiger Discord ici enfermait le propriétaire hors de son propre bot dès
-     * que `DISCORD_CLIENT_SECRET` était renseigné : la fenêtre de l'application
-     * le traitait en invité, et même l'arrêt demandé par l'icône était refusé.
-     * Le tunnel n'en profite pas — Cloudflare pose `CF-Connecting-IP` —, ni le
-     * réseau local, dont les adresses ne sont pas des boucles locales.
+     * Sans ce rattrapage, ces comptes-là sont coincés : la fenêtre de
+     * connexion ne s'ouvre plus, puisqu'ils sont connectés, et rien ne leur
+     * offre plus l'occasion de revendiquer quoi que ce soit. Il faudrait
+     * effacer le cookie de session à la main pour s'en sortir.
+     *
+     * La condition reste la même — être connecté *et* porter le jeton —,
+     * seul le moment change.
      */
-    const atTheMachine = holdsToken && fromThisMachine(req);
-
-    const cookies = parseCookies(req.headers.cookie);
-    const session = sessions.touch(cookies[sessions.COOKIE_NAME]);
-
-    /*
-     * La session Discord passe avant le jeton, et l'ordre compte.
-     *
-     * Le tableau de bord ne s'ouvre plus à un porteur de jeton anonyme : il lui
-     * demande d'abord de dire qui il est. Le propriétaire est donc reconnu à sa
-     * session, pas à son cookie de jeton — sans quoi il resterait le seul de
-     * toute l'installation à ne pas avoir de nom, et la fenêtre de connexion
-     * n'aurait aucun effet sur lui.
-     *
-     * Le jeton n'a pas pour autant disparu : il reste ce qui distingue celui
-     * qui est devant la machine de celui qui a cliqué sur un lien
-     * d'invitation, et c'est à ce titre qu'il désigne le propriétaire lors de
-     * la toute première connexion (voir owner.js).
-     */
-    if (session) {
-        /*
-         * La revendication de dernier recours.
-         *
-         * Elle a normalement lieu au retour de Discord, où le compte vient
-         * d'être reconnu. Mais une session peut très bien exister sans que
-         * l'installation ait été revendiquée : c'est le cas de celles ouvertes
-         * avant que cette règle n'existe, et de celles dont le rappel est
-         * arrivé sur une autre origine que le tableau de bord.
-         *
-         * Sans ce rattrapage, ces comptes-là sont coincés : la fenêtre de
-         * connexion ne s'ouvre plus, puisqu'ils sont connectés, et rien ne leur
-         * offre plus l'occasion de revendiquer quoi que ce soit. Il faudrait
-         * effacer le cookie de session à la main pour s'en sortir.
-         *
-         * La condition reste la même — être connecté *et* porter le jeton —,
-         * seul le moment change.
-         */
-        if (holdsToken && !owner.isClaimed()) {
-            owner.claim({
-                id: session.userId,
-                username: session.displayName || session.username,
-                avatar: session.avatar,
-            });
-        }
-
-        return {
-            authorized: true,
-            master: owner.isOwner(session) || atTheMachine,
-            session,
-            holdsToken,
-            pendingLogin: false,
-            tokenSource: holdsToken ? source : null,
-        };
-    }
-
-    if (holdsToken) {
-        /*
-         * Le jeton sans session. Deux situations, et une seule porte ouverte.
-         *
-         * Application Discord configurée : l'accès est accordé — il faut bien
-         * servir la page qui porte la fenêtre de connexion — mais sans aucun
-         * droit, et `pendingLogin` dit au tableau de bord de la présenter.
-         *
-         * Application non configurée : la connexion Discord est matériellement
-         * impossible, et refuser serait enfermer quelqu'un hors de son propre
-         * bot pour un secret manquant dans un fichier. Le jeton reprend alors
-         * son rôle d'avant, et l'interface le signale au lieu de le taire.
-         *
-         * Depuis la machine du bot, le jeton suffit dans tous les cas : voir
-         * `atTheMachine` plus haut.
-         */
-        const canLogIn = oauthConfigured() && !atTheMachine;
-        return {
-            authorized: true,
-            master: !canLogIn,
-            session: null,
-            holdsToken: true,
-            pendingLogin: canLogIn,
-            tokenSource: source,
-        };
+    if (holdsToken && !owner.isClaimed()) {
+      owner.claim({
+        id: session.userId,
+        username: session.displayName || session.username,
+        avatar: session.avatar,
+      });
     }
 
     return {
-        authorized: false,
-        master: false,
-        session: null,
-        holdsToken: false,
-        pendingLogin: false,
-        tokenSource: null,
+      authorized: true,
+      master: owner.isOwner(session) || atTheMachine,
+      session,
+      holdsToken,
+      pendingLogin: false,
+      tokenSource: holdsToken ? source : null,
     };
+  }
+
+  if (holdsToken) {
+    /*
+     * Le jeton sans session. Deux situations, et une seule porte ouverte.
+     *
+     * Application Discord configurée : l'accès est accordé — il faut bien
+     * servir la page qui porte la fenêtre de connexion — mais sans aucun
+     * droit, et `pendingLogin` dit au tableau de bord de la présenter.
+     *
+     * Application non configurée : la connexion Discord est matériellement
+     * impossible, et refuser serait enfermer quelqu'un hors de son propre
+     * bot pour un secret manquant dans un fichier. Le jeton reprend alors
+     * son rôle d'avant, et l'interface le signale au lieu de le taire.
+     *
+     * Depuis la machine du bot, le jeton suffit dans tous les cas : voir
+     * `atTheMachine` plus haut.
+     */
+    const canLogIn = oauthConfigured() && !atTheMachine;
+    return {
+      authorized: true,
+      master: !canLogIn,
+      session: null,
+      holdsToken: true,
+      pendingLogin: canLogIn,
+      tokenSource: source,
+    };
+  }
+
+  return {
+    authorized: false,
+    master: false,
+    session: null,
+    holdsToken: false,
+    pendingLogin: false,
+    tokenSource: null,
+  };
 }
 
 /**
@@ -353,11 +359,11 @@ function identify(req) {
  * l'authentification de base d'un module qui peut très bien rester inerte.
  */
 function oauthConfigured() {
-    try {
-        return require('./oauth').isConfigured();
-    } catch (e) {
-        return false;
-    }
+  try {
+    return require('./oauth').isConfigured();
+  } catch (e) {
+    return false;
+  }
 }
 
 /**
@@ -379,37 +385,37 @@ function oauthConfigured() {
  * @returns {boolean}
  */
 function shouldTrySilentLogin(req) {
-    if (req.method !== 'GET') return false;
-    if (!(req.headers.accept || '').includes('text/html')) return false;
-    if (!oauthConfigured()) return false;
+  if (req.method !== 'GET') return false;
+  if (!(req.headers.accept || '').includes('text/html')) return false;
+  if (!oauthConfigured()) return false;
 
-    try {
-        const url = new URL(req.originalUrl || req.url, 'http://localhost');
-        if (url.searchParams.get('login') === 'manual') return false;
-    } catch (e) {
-        // URL illisible : mieux vaut la page de refus qu'une redirection bâtie
-        // sur une adresse qu'on n'a pas su lire.
-        return false;
-    }
+  try {
+    const url = new URL(req.originalUrl || req.url, 'http://localhost');
+    if (url.searchParams.get('login') === 'manual') return false;
+  } catch (e) {
+    // URL illisible : mieux vaut la page de refus qu'une redirection bâtie
+    // sur une adresse qu'on n'a pas su lire.
+    return false;
+  }
 
-    return true;
+  return true;
 }
 
 function unauthorizedPage() {
-    // Chargé ici et non en tête de fichier : oauth.js ne sert qu'au moment du
-    // refus, et l'exiger au chargement ferait dépendre l'authentification de
-    // base d'un module qui n'a de sens que pour le partage.
-    let button = '';
-    try {
-        const oauth = require('./oauth');
-        if (oauth.isConfigured()) {
-            button = `<p><a class="bouton" href="/auth/discord">Se connecter avec Discord</a></p>
+  // Chargé ici et non en tête de fichier : oauth.js ne sert qu'au moment du
+  // refus, et l'exiger au chargement ferait dépendre l'authentification de
+  // base d'un module qui n'a de sens que pour le partage.
+  let button = '';
+  try {
+    const oauth = require('./oauth');
+    if (oauth.isConfigured()) {
+      button = `<p><a class="bouton" href="/auth/discord">Se connecter avec Discord</a></p>
      <p class="note">Si le maître de la session vous a partagé le contrôle, c'est par ici.</p>`;
-        }
-    } catch (e) {
-        // Sans OAuth, la page reste celle du jeton seul.
     }
-    return UNAUTHORIZED_PAGE.replace('<!--connexion-->', button);
+  } catch (e) {
+    // Sans OAuth, la page reste celle du jeton seul.
+  }
+  return UNAUTHORIZED_PAGE.replace('<!--connexion-->', button);
 }
 
 const UNAUTHORIZED_PAGE = `<!doctype html>
@@ -443,62 +449,60 @@ const UNAUTHORIZED_PAGE = `<!doctype html>
  * Referer envoyé aux domaines tiers.
  */
 function middleware(req, res, next) {
-    // Le trajet OAuth2 précède toute identité : voir PUBLIC_PATHS.
-    if (isPublicPath(req.originalUrl || req.url)) return next();
+  // Le trajet OAuth2 précède toute identité : voir PUBLIC_PATHS.
+  if (isPublicPath(req.originalUrl || req.url)) return next();
 
-    const identity = identify(req);
+  const identity = identify(req);
 
-    if (!identity.authorized) {
-        /*
-         * La reconnaissance muette, avant la porte close.
-         *
-         * C'est ici que passe l'invité qui revient, et nulle part ailleurs : il
-         * n'a ni jeton ni session, donc `pendingLogin` est faux et la fenêtre de
-         * connexion du tableau de bord ne le verra jamais — il tombe sur cette
-         * page-ci. Sans ce détour, quelqu'un d'accepté la semaine dernière
-         * devait recliquer « Se connecter avec Discord » à chaque venue, son
-         * cookie de session ne durant que trente jours et ne franchissant pas la
-         * frontière entre deux navigateurs.
-         *
-         * On lui demande donc son nom sans le déranger : `silent=1` pose
-         * `prompt=none` sur la demande, ce qui interdit à Discord d'afficher
-         * quoi que ce soit. Ou bien il reconnaît le visiteur et le renvoie
-         * identifié — la page s'ouvre, ses droits retrouvés —, ou bien il répond
-         * « je ne peux pas sans lui parler », et le rappel revient ici avec
-         * `login=manual`, qui fait servir la page ci-dessous comme avant.
-         *
-         * Rien n'est accordé au passage : l'essai répond à « qui êtes-vous »,
-         * jamais à « pouvez-vous entrer ». Un compte membre d'aucun serveur du
-         * bot est refusé au rappel, comme il l'a toujours été.
-         */
-        if (shouldTrySilentLogin(req)) {
-            const returnTo = req.originalUrl || req.url || '/';
-            return res.redirect(302,
-                `/auth/discord?silent=1&returnTo=${encodeURIComponent(returnTo)}`);
-        }
-
-        res.status(401);
-        if ((req.headers.accept || '').includes('text/html')) {
-            return res.type('html').send(unauthorizedPage());
-        }
-        return res.json({ error: 'Jeton d\'accès manquant ou invalide' });
+  if (!identity.authorized) {
+    /*
+     * La reconnaissance muette, avant la porte close.
+     *
+     * C'est ici que passe l'invité qui revient, et nulle part ailleurs : il
+     * n'a ni jeton ni session, donc `pendingLogin` est faux et la fenêtre de
+     * connexion du tableau de bord ne le verra jamais — il tombe sur cette
+     * page-ci. Sans ce détour, quelqu'un d'accepté la semaine dernière
+     * devait recliquer « Se connecter avec Discord » à chaque venue, son
+     * cookie de session ne durant que trente jours et ne franchissant pas la
+     * frontière entre deux navigateurs.
+     *
+     * On lui demande donc son nom sans le déranger : `silent=1` pose
+     * `prompt=none` sur la demande, ce qui interdit à Discord d'afficher
+     * quoi que ce soit. Ou bien il reconnaît le visiteur et le renvoie
+     * identifié — la page s'ouvre, ses droits retrouvés —, ou bien il répond
+     * « je ne peux pas sans lui parler », et le rappel revient ici avec
+     * `login=manual`, qui fait servir la page ci-dessous comme avant.
+     *
+     * Rien n'est accordé au passage : l'essai répond à « qui êtes-vous »,
+     * jamais à « pouvez-vous entrer ». Un compte membre d'aucun serveur du
+     * bot est refusé au rappel, comme il l'a toujours été.
+     */
+    if (shouldTrySilentLogin(req)) {
+      const returnTo = req.originalUrl || req.url || '/';
+      return res.redirect(302, `/auth/discord?silent=1&returnTo=${encodeURIComponent(returnTo)}`);
     }
 
-    // Les routes lisent l'identité plutôt que de la redemander.
-    req.identity = identity;
-
-    if (identity.tokenSource === 'query') {
-        res.cookie(COOKIE_NAME, extractToken(req).value,
-            cookieOptions(1000 * 60 * 60 * 24 * 365));
-
-        if (req.method === 'GET') {
-            const url = new URL(req.originalUrl, 'http://localhost');
-            url.searchParams.delete('token');
-            return res.redirect(302, url.pathname + url.search);
-        }
+    res.status(401);
+    if ((req.headers.accept || '').includes('text/html')) {
+      return res.type('html').send(unauthorizedPage());
     }
+    return res.json({ error: "Jeton d'accès manquant ou invalide" });
+  }
 
-    next();
+  // Les routes lisent l'identité plutôt que de la redemander.
+  req.identity = identity;
+
+  if (identity.tokenSource === 'query') {
+    res.cookie(COOKIE_NAME, extractToken(req).value, cookieOptions(1000 * 60 * 60 * 24 * 365));
+
+    if (req.method === 'GET') {
+      const url = new URL(req.originalUrl, 'http://localhost');
+      url.searchParams.delete('token');
+      return res.redirect(302, url.pathname + url.search);
+    }
+  }
+
+  next();
 }
 
 /**
@@ -518,13 +522,13 @@ function middleware(req, res, next) {
  * @returns {boolean}
  */
 function useSecureCookies() {
-    const declared = (process.env.PUBLIC_URL || '').trim();
-    if (!declared) return false;
-    try {
-        return new URL(declared).protocol === 'https:';
-    } catch (e) {
-        return false;
-    }
+  const declared = (process.env.PUBLIC_URL || '').trim();
+  if (!declared) return false;
+  try {
+    return new URL(declared).protocol === 'https:';
+  } catch (e) {
+    return false;
+  }
 }
 
 /**
@@ -539,12 +543,12 @@ function useSecureCookies() {
  * @returns {object}
  */
 function cookieOptions(maxAge) {
-    return {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: useSecureCookies(),
-        maxAge,
-    };
+  return {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: useSecureCookies(),
+    maxAge,
+  };
 }
 
 /**
@@ -577,33 +581,33 @@ function cookieOptions(maxAge) {
  * @returns {boolean}
  */
 function originAllowed(req, identity) {
-    const origin = req.headers.origin;
-    // Pas de navigateur derrière : voir plus haut.
-    if (!origin) return true;
+  const origin = req.headers.origin;
+  // Pas de navigateur derrière : voir plus haut.
+  if (!origin) return true;
 
-    let host;
-    try {
-        host = new URL(origin).host;
-    } catch (e) {
-        // Origine illisible : un navigateur n'en produit pas de telles.
-        return false;
-    }
-
-    // L'hôte par lequel la requête est arrivée. C'est la comparaison qui tient
-    // quelle que soit l'adresse d'entrée — 127.0.0.1, le nom de la machine sur
-    // le réseau local, le tunnel — sans avoir à les énumérer.
-    if (req.headers.host && host === req.headers.host) return true;
-
-    // L'adresse publique déclarée, quand elle diffère de l'hôte d'arrivée :
-    // c'est le cas derrière un tunnel, qui présente son propre `Host`.
-    try {
-        const declared = (process.env.PUBLIC_URL || '').trim();
-        if (declared && new URL(declared).host === host) return true;
-    } catch (e) {
-        // PUBLIC_URL illisible : on s'en tient à l'hôte d'arrivée.
-    }
-
+  let host;
+  try {
+    host = new URL(origin).host;
+  } catch (e) {
+    // Origine illisible : un navigateur n'en produit pas de telles.
     return false;
+  }
+
+  // L'hôte par lequel la requête est arrivée. C'est la comparaison qui tient
+  // quelle que soit l'adresse d'entrée — 127.0.0.1, le nom de la machine sur
+  // le réseau local, le tunnel — sans avoir à les énumérer.
+  if (req.headers.host && host === req.headers.host) return true;
+
+  // L'adresse publique déclarée, quand elle diffère de l'hôte d'arrivée :
+  // c'est le cas derrière un tunnel, qui présente son propre `Host`.
+  try {
+    const declared = (process.env.PUBLIC_URL || '').trim();
+    if (declared && new URL(declared).host === host) return true;
+  } catch (e) {
+    // PUBLIC_URL illisible : on s'en tient à l'hôte d'arrivée.
+  }
+
+  return false;
 }
 
 /** Adresses par lesquelles la machine se parle à elle-même. */
@@ -626,9 +630,9 @@ const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
  * @returns {boolean}
  */
 function fromThisMachine(req) {
-    const address = req?.socket?.remoteAddress;
-    if (!LOOPBACK.has(address)) return false;
-    return !req.headers?.['cf-connecting-ip'];
+  const address = req?.socket?.remoteAddress;
+  if (!LOOPBACK.has(address)) return false;
+  return !req.headers?.['cf-connecting-ip'];
 }
 
 /**
@@ -637,35 +641,34 @@ function fromThisMachine(req) {
  * @returns {boolean}
  */
 function verifyUpgrade(info) {
-    const identity = identify(info.req);
-    if (!identity.authorized) {
-        log.warn('[Auth] WebSocket handshake refused: token missing or invalid.');
-        return false;
-    }
+  const identity = identify(info.req);
+  if (!identity.authorized) {
+    log.warn('[Auth] WebSocket handshake refused: token missing or invalid.');
+    return false;
+  }
 
-    if (!originAllowed(info.req, identity)) {
-        log.warn(`[Auth] WebSocket handshake refused: origin « ${info.req.headers.origin} » `
-            + 'is not this dashboard.');
-        return false;
-    }
-    // Rangée sur la requête, elle sera relue à l'ouverture de la connexion :
-    // c'est le seul endroit où les en-têtes du handshake sont encore là.
-    info.req.identity = identity;
-    return true;
+  if (!originAllowed(info.req, identity)) {
+    log.warn(`[Auth] WebSocket handshake refused: origin « ${info.req.headers.origin} » ` + 'is not this dashboard.');
+    return false;
+  }
+  // Rangée sur la requête, elle sera relue à l'ouverture de la connexion :
+  // c'est le seul endroit où les en-têtes du handshake sont encore là.
+  info.req.identity = identity;
+  return true;
 }
 
 module.exports = {
-    getToken,
-    parseCookies,
-    originAllowed,
-    useSecureCookies,
-    cookieOptions,
-    isAuthorized,
-    identify,
-    isPublicPath,
-    middleware,
-    verifyUpgrade,
-    fromThisMachine,
-    COOKIE_NAME,
-    TOKEN_FILE,
+  getToken,
+  parseCookies,
+  originAllowed,
+  useSecureCookies,
+  cookieOptions,
+  isAuthorized,
+  identify,
+  isPublicPath,
+  middleware,
+  verifyUpgrade,
+  fromThisMachine,
+  COOKIE_NAME,
+  TOKEN_FILE,
 };

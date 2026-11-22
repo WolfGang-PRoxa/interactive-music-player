@@ -81,10 +81,10 @@ const CLIP_SPAN_DB = 12;
 
 /** Ramène une cible dans les bornes du curseur, arrondie au pas. */
 function clampTarget(value) {
-    const number = Number(value);
-    if (!Number.isFinite(number)) return DEFAULT_SYNC_TARGET;
-    const stepped = Math.round(number / TARGET_STEP) * TARGET_STEP;
-    return Math.min(TARGET_MAX, Math.max(TARGET_MIN, stepped));
+  const number = Number(value);
+  if (!Number.isFinite(number)) return DEFAULT_SYNC_TARGET;
+  const stepped = Math.round(number / TARGET_STEP) * TARGET_STEP;
+  return Math.min(TARGET_MAX, Math.max(TARGET_MIN, stepped));
 }
 
 /**
@@ -93,12 +93,12 @@ function clampTarget(value) {
  * @returns {{ measured: number, peak: number }|null}
  */
 function measurement(url) {
-    const entry = url ? database.getTrackLoudness(url) : null;
-    if (!entry || !Number.isFinite(entry.measured)) return null;
-    return {
-        measured: entry.measured,
-        peak: Number.isFinite(entry.peak) ? entry.peak : 0,
-    };
+  const entry = url ? database.getTrackLoudness(url) : null;
+  if (!entry || !Number.isFinite(entry.measured)) return null;
+  return {
+    measured: entry.measured,
+    peak: Number.isFinite(entry.peak) ? entry.peak : 0,
+  };
 }
 
 /**
@@ -114,15 +114,13 @@ function measurement(url) {
  * @returns {number|null}
  */
 function effectiveTarget(url, settings) {
-    if (settings && settings.lufsSyncEnabled) {
-        return clampTarget(settings.lufsSyncTarget !== undefined
-            ? settings.lufsSyncTarget
-            : DEFAULT_SYNC_TARGET);
-    }
+  if (settings && settings.lufsSyncEnabled) {
+    return clampTarget(settings.lufsSyncTarget !== undefined ? settings.lufsSyncTarget : DEFAULT_SYNC_TARGET);
+  }
 
-    const entry = url ? database.getTrackLoudness(url) : null;
-    if (!entry || !Number.isFinite(entry.target)) return null;
-    return clampTarget(entry.target);
+  const entry = url ? database.getTrackLoudness(url) : null;
+  if (!entry || !Number.isFinite(entry.target)) return null;
+  return clampTarget(entry.target);
 }
 
 /**
@@ -136,18 +134,18 @@ function effectiveTarget(url, settings) {
  * @returns {number}
  */
 function gainDb(url, settings) {
-    const measure = measurement(url);
-    if (!measure) return 0;
+  const measure = measurement(url);
+  if (!measure) return 0;
 
-    const target = effectiveTarget(url, settings);
-    if (target === null) return 0;
+  const target = effectiveTarget(url, settings);
+  if (target === null) return 0;
 
-    return Math.min(GAIN_MAX_DB, Math.max(GAIN_MIN_DB, target - measure.measured));
+  return Math.min(GAIN_MAX_DB, Math.max(GAIN_MIN_DB, target - measure.measured));
 }
 
 /** Décibels → facteur multiplicatif. */
 function linear(db) {
-    return Math.pow(10, (Number(db) || 0) / 20);
+  return Math.pow(10, (Number(db) || 0) / 20);
 }
 
 /**
@@ -157,7 +155,7 @@ function linear(db) {
  * @returns {number}
  */
 function linearGain(url, settings) {
-    return linear(gainDb(url, settings));
+  return linear(gainDb(url, settings));
 }
 
 /**
@@ -179,25 +177,25 @@ function linearGain(url, settings) {
  * @returns {number}
  */
 function degradation(db, peakDb) {
-    const headroom = Math.max(0, -(Number.isFinite(peakDb) ? peakDb : 0));
-    const overshoot = (Number(db) || 0) - headroom;
-    if (overshoot <= 0) return 0;
-    return Math.min(1, overshoot / CLIP_SPAN_DB);
+  const headroom = Math.max(0, -(Number.isFinite(peakDb) ? peakDb : 0));
+  const overshoot = (Number(db) || 0) - headroom;
+  if (overshoot <= 0) return 0;
+  return Math.min(1, overshoot / CLIP_SPAN_DB);
 }
 
 module.exports = {
-    TARGET_MIN,
-    TARGET_MAX,
-    TARGET_STEP,
-    DEFAULT_SYNC_TARGET,
-    GAIN_MIN_DB,
-    GAIN_MAX_DB,
-    CLIP_SPAN_DB,
-    clampTarget,
-    measurement,
-    effectiveTarget,
-    gainDb,
-    linear,
-    linearGain,
-    degradation,
+  TARGET_MIN,
+  TARGET_MAX,
+  TARGET_STEP,
+  DEFAULT_SYNC_TARGET,
+  GAIN_MIN_DB,
+  GAIN_MAX_DB,
+  CLIP_SPAN_DB,
+  clampTarget,
+  measurement,
+  effectiveTarget,
+  gainDb,
+  linear,
+  linearGain,
+  degradation,
 };

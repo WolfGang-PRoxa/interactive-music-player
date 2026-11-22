@@ -38,15 +38,15 @@ let owner = null;
 let loaded = false;
 
 function load() {
-    if (loaded) return;
-    loaded = true;
+  if (loaded) return;
+  loaded = true;
 
-    cleanStaleTemp(OWNER_FILE);
-    const stored = readJsonSafe(OWNER_FILE, '[Owner]');
-    if (stored && stored.id) {
-        owner = stored;
-        log.info(`[Owner] Dashboard owned by ${owner.username} (${owner.id}).`);
-    }
+  cleanStaleTemp(OWNER_FILE);
+  const stored = readJsonSafe(OWNER_FILE, '[Owner]');
+  if (stored && stored.id) {
+    owner = stored;
+    log.info(`[Owner] Dashboard owned by ${owner.username} (${owner.id}).`);
+  }
 }
 
 /**
@@ -56,13 +56,13 @@ function load() {
  * @returns {{ id: string, username: string, avatar: string|null, since: number }|null}
  */
 function get() {
-    load();
-    return owner;
+  load();
+  return owner;
 }
 
 /** Une installation sans propriétaire attend son premier compte. */
 function isClaimed() {
-    return get() !== null;
+  return get() !== null;
 }
 
 /**
@@ -77,25 +77,25 @@ function isClaimed() {
  * @returns {boolean} true si ce compte vient d'être fait propriétaire
  */
 function claim(user) {
-    load();
-    if (owner || !user || !user.id) return false;
+  load();
+  if (owner || !user || !user.id) return false;
 
-    owner = {
-        id: String(user.id),
-        username: user.username || String(user.id),
-        avatar: user.avatar || null,
-        since: Date.now(),
-    };
+  owner = {
+    id: String(user.id),
+    username: user.username || String(user.id),
+    avatar: user.avatar || null,
+    since: Date.now(),
+  };
 
-    try {
-        writeJsonAtomic(OWNER_FILE, owner);
-        log.success(`[Owner] Dashboard claimed by ${owner.username} (${owner.id}).`);
-    } catch (err) {
-        // Sans écriture, la revendication ne survit pas au redémarrage : elle
-        // vaut pour cette session, et le prochain lancement la redemandera.
-        log.error('[Owner] Could not record the owner:', err.message);
-    }
-    return true;
+  try {
+    writeJsonAtomic(OWNER_FILE, owner);
+    log.success(`[Owner] Dashboard claimed by ${owner.username} (${owner.id}).`);
+  } catch (err) {
+    // Sans écriture, la revendication ne survit pas au redémarrage : elle
+    // vaut pour cette session, et le prochain lancement la redemandera.
+    log.error('[Owner] Could not record the owner:', err.message);
+  }
+  return true;
 }
 
 /**
@@ -115,25 +115,27 @@ function claim(user) {
  * @returns {boolean}
  */
 function transfer(user) {
-    load();
-    if (!user || !user.id) return false;
+  load();
+  if (!user || !user.id) return false;
 
-    const previous = owner;
-    owner = {
-        id: String(user.id),
-        username: user.username || String(user.id),
-        avatar: user.avatar || null,
-        since: Date.now(),
-    };
+  const previous = owner;
+  owner = {
+    id: String(user.id),
+    username: user.username || String(user.id),
+    avatar: user.avatar || null,
+    since: Date.now(),
+  };
 
-    try {
-        writeJsonAtomic(OWNER_FILE, owner);
-        log.success(`[Owner] Dashboard handed over to ${owner.username} (${owner.id})`
-            + (previous ? ` — was ${previous.username} (${previous.id}).` : '.'));
-    } catch (err) {
-        log.error('[Owner] Could not record the new owner:', err.message);
-    }
-    return true;
+  try {
+    writeJsonAtomic(OWNER_FILE, owner);
+    log.success(
+      `[Owner] Dashboard handed over to ${owner.username} (${owner.id})` +
+        (previous ? ` — was ${previous.username} (${previous.id}).` : '.'),
+    );
+  } catch (err) {
+    log.error('[Owner] Could not record the new owner:', err.message);
+  }
+  return true;
 }
 
 /**
@@ -142,9 +144,8 @@ function transfer(user) {
  * @returns {boolean}
  */
 function isOwner(session) {
-    const current = get();
-    return Boolean(current && session && session.userId
-        && String(session.userId) === current.id);
+  const current = get();
+  return Boolean(current && session && session.userId && String(session.userId) === current.id);
 }
 
 /**
@@ -152,9 +153,11 @@ function isOwner(session) {
  * main passe par la suppression du fichier, geste délibéré et visible.
  */
 function forget() {
-    owner = null;
-    loaded = false;
-    try { fs.rmSync(OWNER_FILE, { force: true }); } catch (e) {}
+  owner = null;
+  loaded = false;
+  try {
+    fs.rmSync(OWNER_FILE, { force: true });
+  } catch (e) {}
 }
 
 module.exports = { get, isClaimed, claim, transfer, isOwner, forget, OWNER_FILE };

@@ -38,120 +38,140 @@ const read = (...parts) => fs.readFileSync(path.join(PUBLIC, ...parts), 'utf8');
 let failed = 0;
 let passed = 0;
 const check = (label, ok, detail = '') => {
-    if (ok) { passed++; console.log(`  ok    ${label}${detail ? ` — ${detail}` : ''}`); }
-    else { failed++; console.log(`  FAIL  ${label}${detail ? ` — ${detail}` : ''}`); }
+  if (ok) {
+    passed++;
+    console.log(`  ok    ${label}${detail ? ` — ${detail}` : ''}`);
+  } else {
+    failed++;
+    console.log(`  FAIL  ${label}${detail ? ` — ${detail}` : ''}`);
+  }
 };
 
 /** Les menus que la carte des commandes désigne, avec le droit dont ils relèvent. */
 const MENUS = {
-    'playback-source-select': 'playback.source',
-    'download-format-select': 'queue.download',
-    'add-target-select': 'queue.add',
-    'import-audio-quality-select': 'volume.quality',
-    'import-video-quality-select': 'volume.quality',
-    'broadcast-mode-select': 'volume.broadcast',
-    'guild-select': 'volume.channel',
+  'playback-source-select': 'playback.source',
+  'download-format-select': 'queue.download',
+  'add-target-select': 'queue.add',
+  'import-audio-quality-select': 'volume.quality',
+  'import-video-quality-select': 'volume.quality',
+  'broadcast-mode-select': 'volume.broadcast',
+  'guild-select': 'volume.channel',
 };
 
 async function main() {
-    console.log('\n=== Les menus déroulants refusés à un invité ===\n');
+  console.log('\n=== Les menus déroulants refusés à un invité ===\n');
 
-    const SHARED = read('js', 'sharedControl.js');
-    for (const [id, right] of Object.entries(MENUS)) {
-        check(`#${id} figure dans la carte des commandes, sous « ${right} »`,
-            new RegExp(`'${right.replace('.', '\\.')}':\\s*\\[[^\\]]*'#${id}'`).test(SHARED));
+  const SHARED = read('js', 'sharedControl.js');
+  for (const [id, right] of Object.entries(MENUS)) {
+    check(
+      `#${id} figure dans la carte des commandes, sous « ${right} »`,
+      new RegExp(`'${right.replace('.', '\\.')}':\\s*\\[[^\\]]*'#${id}'`).test(SHARED),
+    );
+  }
+
+  let JSDOM;
+  try {
+    ({ JSDOM } = require('jsdom'));
+  } catch (e) {
+    JSDOM = null;
+    console.log('  passé — jsdom absent de cette installation');
+  }
+
+  if (JSDOM) {
+    const markup =
+      '<!doctype html><html><body>' +
+      Object.keys(MENUS)
+        .map((id) => `<select id="${id}"><option value="a" selected>A</option><option value="b">B</option></select>`)
+        .join('') +
+      '</body></html>';
+    const dom = new JSDOM(markup, { runScripts: 'outside-only', url: 'http://localhost:3000/' });
+    const win = dom.window;
+    const toasts = [];
+
+    win.eval(read('js', 'customSelect.js'));
+    win.MusicPlayer.showToast = (message) => toasts.push(message);
+    win.MusicPlayer.sendWS = () => {};
+    win.eval(read('js', 'sharedControl.js'));
+
+    // Le module s'installe à `DOMContentLoaded`, que jsdom émet après la
+    // construction : sans cette attente, le blocage des gestes n'est pas
+    // encore posé, et le test mesurerait une page à moitié prête.
+    if (win.document.readyState !== 'complete') {
+      await new Promise((resolve) => win.addEventListener('load', resolve));
     }
 
-    let JSDOM;
-    try {
-        ({ JSDOM } = require('jsdom'));
-    } catch (e) {
-        JSDOM = null;
-        console.log('  passé — jsdom absent de cette installation');
+    const menus = Object.keys(MENUS).map((id) => {
+      const select = win.document.getElementById(id);
+      win.eval(`new CustomSelect(document.getElementById('${id}'))`);
+      return { id, select, container: select._customSelect.container };
+    });
+
+    // Le voile arrive avec l'état : les menus existent déjà, ou pas encore —
+    // app.js les construit après le premier passage de sharedControl.js.
+    win.MusicPlayer.applyShareState({ role: 'guest', permissions: {} });
+
+    const click = (menu) =>
+      menu.container
+        .querySelector('.custom-select-trigger')
+        .dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }));
+
+    for (const menu of menus) {
+      check(`#${menu.id} : le menu visible est voilé`, menu.container.classList.contains('perm-denied'));
+      check('  … le <select> masqué aussi', menu.select.classList.contains('perm-denied'));
+      click(menu);
+      check("  … et le clic ne l'ouvre pas", !menu.container.classList.contains('open'));
     }
+    check(
+      "chaque clic refusé avertit l'invité",
+      toasts.length === menus.length,
+      `${toasts.length} avertissement(s) pour ${menus.length} clics`,
+    );
 
-    if (JSDOM) {
-        const markup = '<!doctype html><html><body>'
-            + Object.keys(MENUS).map((id) =>
-                `<select id="${id}"><option value="a" selected>A</option><option value="b">B</option></select>`)
-                .join('')
-            + '</body></html>';
-        const dom = new JSDOM(markup, { runScripts: 'outside-only', url: 'http://localhost:3000/' });
-        const win = dom.window;
-        const toasts = [];
+    const source = menus.find((m) => m.id === 'playback-source-select');
+    const broadcast = menus.find((m) => m.id === 'broadcast-mode-select');
 
-        win.eval(read('js', 'customSelect.js'));
-        win.MusicPlayer.showToast = (message) => toasts.push(message);
-        win.MusicPlayer.sendWS = () => {};
-        win.eval(read('js', 'sharedControl.js'));
+    win.MusicPlayer.applyShareState({ role: 'guest', permissions: { 'playback.source': true } });
+    check('un droit accordé lève le voile de son menu', !source.container.classList.contains('perm-denied'));
+    click(source);
+    check("  … qui s'ouvre de nouveau", source.container.classList.contains('open'));
+    check('  … et celui-là seul', broadcast.container.classList.contains('perm-denied'));
 
-        // Le module s'installe à `DOMContentLoaded`, que jsdom émet après la
-        // construction : sans cette attente, le blocage des gestes n'est pas
-        // encore posé, et le test mesurerait une page à moitié prête.
-        if (win.document.readyState !== 'complete') {
-            await new Promise((resolve) => win.addEventListener('load', resolve));
-        }
+    win.MusicPlayer.applyShareState({ role: 'guest', permissions: {} });
+    check(
+      'un droit retiré referme la liste restée ouverte',
+      !source.container.classList.contains('open') && source.container.classList.contains('perm-denied'),
+    );
 
-        const menus = Object.keys(MENUS).map((id) => {
-            const select = win.document.getElementById(id);
-            win.eval(`new CustomSelect(document.getElementById('${id}'))`);
-            return { id, select, container: select._customSelect.container };
-        });
+    win.MusicPlayer.applyShareState({ role: 'master' });
+    check(
+      'le maître retrouve tous ses menus',
+      menus.every((m) => !m.container.classList.contains('perm-denied')),
+    );
 
-        // Le voile arrive avec l'état : les menus existent déjà, ou pas encore —
-        // app.js les construit après le premier passage de sharedControl.js.
-        win.MusicPlayer.applyShareState({ role: 'guest', permissions: {} });
+    win.close();
+  }
 
-        const click = (menu) => menu.container.querySelector('.custom-select-trigger')
-            .dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }));
+  // ───────── La feuille de style ─────────
 
-        for (const menu of menus) {
-            check(`#${menu.id} : le menu visible est voilé`,
-                menu.container.classList.contains('perm-denied'));
-            check('  … le <select> masqué aussi', menu.select.classList.contains('perm-denied'));
-            click(menu);
-            check('  … et le clic ne l\'ouvre pas', !menu.container.classList.contains('open'));
-        }
-        check('chaque clic refusé avertit l\'invité', toasts.length === menus.length,
-            `${toasts.length} avertissement(s) pour ${menus.length} clics`);
+  const CSS = read('css', 'modals.css');
+  check(
+    "les menus des cartes n'ont pas de flou d'arrière-plan",
+    /\.card \.custom-select-trigger \{[^}]*backdrop-filter: none;[^}]*-webkit-backdrop-filter: none;/.test(CSS),
+    'Safari peignait le déclencheur en blanc dans « En cours de lecture »',
+  );
+  check(
+    "un menu voilé ne s'éclaire pas au survol",
+    /\.perm-denied \.custom-select-trigger:hover \{[^}]*cursor: not-allowed/.test(CSS) ||
+      /\.perm-denied \.custom-select-trigger,\s*\.perm-denied \.custom-select-trigger:hover \{[^}]*cursor: not-allowed/.test(
+        CSS,
+      ),
+  );
 
-        const source = menus.find((m) => m.id === 'playback-source-select');
-        const broadcast = menus.find((m) => m.id === 'broadcast-mode-select');
-
-        win.MusicPlayer.applyShareState({ role: 'guest', permissions: { 'playback.source': true } });
-        check('un droit accordé lève le voile de son menu',
-            !source.container.classList.contains('perm-denied'));
-        click(source);
-        check('  … qui s\'ouvre de nouveau', source.container.classList.contains('open'));
-        check('  … et celui-là seul', broadcast.container.classList.contains('perm-denied'));
-
-        win.MusicPlayer.applyShareState({ role: 'guest', permissions: {} });
-        check('un droit retiré referme la liste restée ouverte',
-            !source.container.classList.contains('open')
-            && source.container.classList.contains('perm-denied'));
-
-        win.MusicPlayer.applyShareState({ role: 'master' });
-        check('le maître retrouve tous ses menus',
-            menus.every((m) => !m.container.classList.contains('perm-denied')));
-
-        win.close();
-    }
-
-    // ───────── La feuille de style ─────────
-
-    const CSS = read('css', 'modals.css');
-    check('les menus des cartes n\'ont pas de flou d\'arrière-plan',
-        /\.card \.custom-select-trigger \{[^}]*backdrop-filter: none;[^}]*-webkit-backdrop-filter: none;/.test(CSS),
-        'Safari peignait le déclencheur en blanc dans « En cours de lecture »');
-    check('un menu voilé ne s\'éclaire pas au survol',
-        /\.perm-denied \.custom-select-trigger:hover \{[^}]*cursor: not-allowed/.test(CSS)
-        || /\.perm-denied \.custom-select-trigger,\s*\.perm-denied \.custom-select-trigger:hover \{[^}]*cursor: not-allowed/.test(CSS));
-
-    console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
-    process.exit(failed > 0 ? 1 : 0);
+  console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
+  process.exit(failed > 0 ? 1 : 0);
 }
 
 main().catch((err) => {
-    console.error(err);
-    process.exit(1);
+  console.error(err);
+  process.exit(1);
 });

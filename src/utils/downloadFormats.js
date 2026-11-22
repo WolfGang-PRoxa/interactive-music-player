@@ -32,13 +32,13 @@
  * « Audio » ne les concerne pas, et un `-ab` y serait ignoré par ffmpeg.
  */
 const CONTAINERS = {
-    mp3: { label: 'MP3', codec: 'libmp3lame', mux: 'mp3' },
-    m4a: { label: 'M4A', codec: 'aac', mux: 'ipod' },
-    flac: { label: 'FLAC', codec: 'flac', mux: 'flac', lossless: true },
-    wav: { label: 'WAV', codec: 'pcm_s16le', mux: 'wav', lossless: true },
-    ogg: { label: 'OGG', codec: 'libvorbis', mux: 'ogg' },
-    opus: { label: 'OPUS', codec: 'libopus', mux: 'opus' },
-    webm: { label: 'WEBM', codec: 'libopus', mux: 'webm' },
+  mp3: { label: 'MP3', codec: 'libmp3lame', mux: 'mp3' },
+  m4a: { label: 'M4A', codec: 'aac', mux: 'ipod' },
+  flac: { label: 'FLAC', codec: 'flac', mux: 'flac', lossless: true },
+  wav: { label: 'WAV', codec: 'pcm_s16le', mux: 'wav', lossless: true },
+  ogg: { label: 'OGG', codec: 'libvorbis', mux: 'ogg' },
+  opus: { label: 'OPUS', codec: 'libopus', mux: 'opus' },
+  webm: { label: 'WEBM', codec: 'libopus', mux: 'webm' },
 };
 
 /**
@@ -55,8 +55,8 @@ const CONTAINERS = {
  * tout lit.
  */
 const VIDEO_CONTAINERS = {
-    mp4: { label: 'MP4', mux: 'mp4', video: true },
-    mkv: { label: 'MKV', mux: 'matroska', video: true },
+  mp4: { label: 'MP4', mux: 'mp4', video: true },
+  mkv: { label: 'MKV', mux: 'matroska', video: true },
 };
 
 /** Le conteneur retenu quand rien n'a été choisi, ou que le choix est inconnu. */
@@ -77,7 +77,7 @@ const EXTENSIONS = [...Object.keys(CONTAINERS), ...Object.keys(VIDEO_CONTAINERS)
 
 /** Ce conteneur attend-il une image ? */
 function isVideo(container) {
-    return Object.prototype.hasOwnProperty.call(VIDEO_CONTAINERS, String(container));
+  return Object.prototype.hasOwnProperty.call(VIDEO_CONTAINERS, String(container));
 }
 
 /** Hauteur retenue quand le réglage manque ou n'a pas de sens. */
@@ -99,11 +99,11 @@ const DEFAULT_HEIGHT = 720;
  * @returns {string} « 1280x720 », tel que le filtre `color` l'attend.
  */
 function blackCanvas(height) {
-    const asked = parseInt(height, 10);
-    const safe = Number.isFinite(asked) && asked >= 144 ? asked : DEFAULT_HEIGHT;
-    const h = safe % 2 ? safe + 1 : safe;
-    const w = Math.round((h * 16) / 9);
-    return `${w % 2 ? w + 1 : w}x${h}`;
+  const asked = parseInt(height, 10);
+  const safe = Number.isFinite(asked) && asked >= 144 ? asked : DEFAULT_HEIGHT;
+  const h = safe % 2 ? safe + 1 : safe;
+  const w = Math.round((h * 16) / 9);
+  return `${w % 2 ? w + 1 : w}x${h}`;
 }
 
 /**
@@ -128,23 +128,22 @@ function blackCanvas(height) {
  * @returns {{ ext: string, args: string[] }}
  */
 function videoEncodeArgs(container, bitrate, options = {}) {
-    const key = isVideo(container) ? String(container) : DEFAULT_VIDEO_CONTAINER;
-    const spec = VIDEO_CONTAINERS[key];
+  const key = isVideo(container) ? String(container) : DEFAULT_VIDEO_CONTAINER;
+  const spec = VIDEO_CONTAINERS[key];
 
-    const kbps = parseInt(bitrate, 10);
-    const audio = ['-c:a', 'aac', '-b:a', `${Number.isFinite(kbps) && kbps > 0 ? kbps : 192}k`];
+  const kbps = parseInt(bitrate, 10);
+  const audio = ['-c:a', 'aac', '-b:a', `${Number.isFinite(kbps) && kbps > 0 ? kbps : 192}k`];
 
-    const args = options.still
-        ? ['-shortest', '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'stillimage',
-            '-pix_fmt', 'yuv420p', ...audio]
-        : ['-c:v', 'copy', ...audio];
+  const args = options.still
+    ? ['-shortest', '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'stillimage', '-pix_fmt', 'yuv420p', ...audio]
+    : ['-c:v', 'copy', ...audio];
 
-    // MP4 range ses tables en fin de fichier : les remonter en tête permet de
-    // lire le résultat sans l'avoir entièrement reçu.
-    if (key === 'mp4') args.push('-movflags', '+faststart');
+  // MP4 range ses tables en fin de fichier : les remonter en tête permet de
+  // lire le résultat sans l'avoir entièrement reçu.
+  if (key === 'mp4') args.push('-movflags', '+faststart');
 
-    args.push('-f', spec.mux);
-    return { ext: `.${key}`, args };
+  args.push('-f', spec.mux);
+  return { ext: `.${key}`, args };
 }
 
 /**
@@ -160,34 +159,34 @@ function videoEncodeArgs(container, bitrate, options = {}) {
  * @returns {{ ext: string, args: string[] }}
  */
 function encodeArgs(container, bitrate) {
-    // Validé sur les conteneurs audio, et non sur `EXTENSIONS` qui porte aussi
-    // les vidéo : « mp4 » y passerait, puis chercherait un codec audio qui
-    // n'existe pas. Un conteneur vidéo demandé ici est une erreur d'appelant,
-    // et retomber sur MP3 la rend visible sans casser le téléchargement.
-    const key = Object.prototype.hasOwnProperty.call(CONTAINERS, String(container))
-        ? String(container)
-        : DEFAULT_CONTAINER;
-    const spec = CONTAINERS[key];
+  // Validé sur les conteneurs audio, et non sur `EXTENSIONS` qui porte aussi
+  // les vidéo : « mp4 » y passerait, puis chercherait un codec audio qui
+  // n'existe pas. Un conteneur vidéo demandé ici est une erreur d'appelant,
+  // et retomber sur MP3 la rend visible sans casser le téléchargement.
+  const key = Object.prototype.hasOwnProperty.call(CONTAINERS, String(container))
+    ? String(container)
+    : DEFAULT_CONTAINER;
+  const spec = CONTAINERS[key];
 
-    const args = ['-acodec', spec.codec];
-    if (!spec.lossless) {
-        const kbps = parseInt(bitrate, 10);
-        args.push('-ab', `${Number.isFinite(kbps) && kbps > 0 ? kbps : 320}k`);
-    }
-    args.push('-f', spec.mux);
+  const args = ['-acodec', spec.codec];
+  if (!spec.lossless) {
+    const kbps = parseInt(bitrate, 10);
+    args.push('-ab', `${Number.isFinite(kbps) && kbps > 0 ? kbps : 320}k`);
+  }
+  args.push('-f', spec.mux);
 
-    return { ext: `.${key}`, args };
+  return { ext: `.${key}`, args };
 }
 
 module.exports = {
-    CONTAINERS,
-    VIDEO_CONTAINERS,
-    EXTENSIONS,
-    DEFAULT_CONTAINER,
-    DEFAULT_VIDEO_CONTAINER,
-    isVideo,
-    blackCanvas,
-    DEFAULT_HEIGHT,
-    encodeArgs,
-    videoEncodeArgs,
+  CONTAINERS,
+  VIDEO_CONTAINERS,
+  EXTENSIONS,
+  DEFAULT_CONTAINER,
+  DEFAULT_VIDEO_CONTAINER,
+  isVideo,
+  blackCanvas,
+  DEFAULT_HEIGHT,
+  encodeArgs,
+  videoEncodeArgs,
 };

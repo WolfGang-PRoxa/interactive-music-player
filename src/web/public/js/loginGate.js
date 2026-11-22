@@ -52,217 +52,221 @@
 window.MusicPlayer = window.MusicPlayer || {};
 
 (function () {
-    'use strict';
+  'use strict';
 
-    const gate = document.getElementById('login-gate');
-    if (!gate) return;
+  const gate = document.getElementById('login-gate');
+  if (!gate) return;
 
-    const fallback = document.getElementById('login-gate-fallback');
-    const callbackLine = document.getElementById('login-gate-callback');
-    const errorLine = document.getElementById('login-gate-error');
-    const loginBtn = document.getElementById('btn-login-discord');
-    const bypassBtn = document.getElementById('btn-login-bypass');
+  const fallback = document.getElementById('login-gate-fallback');
+  const callbackLine = document.getElementById('login-gate-callback');
+  const errorLine = document.getElementById('login-gate-error');
+  const loginBtn = document.getElementById('btn-login-discord');
+  const bypassBtn = document.getElementById('btn-login-bypass');
 
-    /** Traduction, avec repli sur le texte déjà présent dans le balisage. */
-    function t(key, fallbackText) {
-        const translated = window.MusicPlayer.t ? window.MusicPlayer.t(key) : key;
-        return translated === key ? fallbackText : translated;
+  /** Traduction, avec repli sur le texte déjà présent dans le balisage. */
+  function t(key, fallbackText) {
+    const translated = window.MusicPlayer.t ? window.MusicPlayer.t(key) : key;
+    return translated === key ? fallbackText : translated;
+  }
+
+  /**
+   * Retient le focus dans la fenêtre.
+   *
+   * Posé en capture sur le document : un écouteur sur la fenêtre elle-même ne
+   * verrait jamais les touches frappées pendant que le focus est ailleurs, et
+   * c'est précisément ce cas qu'il faut rattraper.
+   */
+  function trapKeys(event) {
+    if (gate.classList.contains('hidden')) return;
+
+    // Échapper ne referme rien : il n'y a rien à refermer.
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
     }
 
-    /**
-     * Retient le focus dans la fenêtre.
-     *
-     * Posé en capture sur le document : un écouteur sur la fenêtre elle-même ne
-     * verrait jamais les touches frappées pendant que le focus est ailleurs, et
-     * c'est précisément ce cas qu'il faut rattraper.
-     */
-    function trapKeys(event) {
-        if (gate.classList.contains('hidden')) return;
+    if (event.key !== 'Tab') return;
 
-        // Échapper ne referme rien : il n'y a rien à refermer.
-        if (event.key === 'Escape') {
-            event.preventDefault();
-            event.stopPropagation();
-            return;
-        }
+    const focusable = gate.querySelectorAll('a[href], button:not([disabled])');
+    const visible = [...focusable].filter((el) => el.offsetParent !== null);
+    if (visible.length === 0) return;
 
-        if (event.key !== 'Tab') return;
+    const first = visible[0];
+    const last = visible[visible.length - 1];
+    const target = document.activeElement;
 
-        const focusable = gate.querySelectorAll('a[href], button:not([disabled])');
-        const visible = [...focusable].filter(el => el.offsetParent !== null);
-        if (visible.length === 0) return;
+    // La tabulation ne sort pas de la fenêtre : elle en fait le tour.
+    if (!gate.contains(target)) {
+      event.preventDefault();
+      first.focus();
+    } else if (event.shiftKey && target === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && target === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
 
-        const first = visible[0];
-        const last = visible[visible.length - 1];
-        const target = document.activeElement;
+  /** Ferme la porte et bloque la page derrière elle. */
+  function open(state) {
+    const configured = Boolean(state && state.oauthReady);
 
-        // La tabulation ne sort pas de la fenêtre : elle en fait le tour.
-        if (!gate.contains(target)) {
-            event.preventDefault();
-            first.focus();
-        } else if (event.shiftKey && target === first) {
-            event.preventDefault();
-            last.focus();
-        } else if (!event.shiftKey && target === last) {
-            event.preventDefault();
-            first.focus();
-        }
+    loginBtn.hidden = !configured;
+    fallback.classList.toggle('hidden', configured);
+
+    if (!configured && callbackLine) {
+      callbackLine.textContent = state && state.callbackUrl ? state.callbackUrl : '';
     }
 
-    /** Ferme la porte et bloque la page derrière elle. */
-    function open(state) {
-        const configured = Boolean(state && state.oauthReady);
+    gate.classList.remove('hidden');
+    document.body.classList.add('login-gate-open');
+    document.addEventListener('keydown', trapKeys, true);
 
-        loginBtn.hidden = !configured;
-        fallback.classList.toggle('hidden', configured);
-
-        if (!configured && callbackLine) {
-            callbackLine.textContent = state && state.callbackUrl ? state.callbackUrl : '';
-        }
-
-        gate.classList.remove('hidden');
-        document.body.classList.add('login-gate-open');
-        document.addEventListener('keydown', trapKeys, true);
-
-        // Le premier élément atteignable prend le focus : un lecteur d'écran
-        // annonce alors la porte plutôt que le tableau de bord inerte.
-        const target = configured ? loginBtn : bypassBtn;
-        if (target) setTimeout(() => { try { target.focus(); } catch (e) {} }, 50);
-    }
-
-    /** Rend la page à l'utilisateur. */
-    function close() {
-        gate.classList.add('hidden');
-        document.body.classList.remove('login-gate-open');
-        document.removeEventListener('keydown', trapKeys, true);
-    }
-
-    /**
-     * A-t-on déjà tenté la reconnaissance muette dans ce navigateur ?
-     *
-     * Deux traces, parce qu'aucune ne suffit seule :
-     *
-     *  - le paramètre `?login=manual`, posé par le serveur au retour d'un essai
-     *    manqué. Il survit au changement d'origine — le rappel de Discord arrive
-     *    sur `PUBLIC_URL`, qui n'est pas toujours l'adresse d'où l'on est parti ;
-     *  - `sessionStorage`, qui survit lui au nettoyage de l'URL et aux
-     *    rechargements suivants de l'onglet.
-     *
-     * Sans cette mémoire, un essai manqué relancerait un essai, indéfiniment :
-     * la porte tournerait en rond au lieu de montrer son bouton.
-     */
-    const TRIED_KEY = 'loginGate.silentTried';
-
-    function alreadyTried() {
-        if (new URLSearchParams(window.location.search).get('login') === 'manual') return true;
+    // Le premier élément atteignable prend le focus : un lecteur d'écran
+    // annonce alors la porte plutôt que le tableau de bord inerte.
+    const target = configured ? loginBtn : bypassBtn;
+    if (target)
+      setTimeout(() => {
         try {
-            return sessionStorage.getItem(TRIED_KEY) === '1';
-        } catch (e) {
-            // Navigation privée, stockage refusé : on retombe sur le paramètre
-            // d'URL seul, qui suffit à empêcher la boucle.
-            return false;
-        }
+          target.focus();
+        } catch (e) {}
+      }, 50);
+  }
+
+  /** Rend la page à l'utilisateur. */
+  function close() {
+    gate.classList.add('hidden');
+    document.body.classList.remove('login-gate-open');
+    document.removeEventListener('keydown', trapKeys, true);
+  }
+
+  /**
+   * A-t-on déjà tenté la reconnaissance muette dans ce navigateur ?
+   *
+   * Deux traces, parce qu'aucune ne suffit seule :
+   *
+   *  - le paramètre `?login=manual`, posé par le serveur au retour d'un essai
+   *    manqué. Il survit au changement d'origine — le rappel de Discord arrive
+   *    sur `PUBLIC_URL`, qui n'est pas toujours l'adresse d'où l'on est parti ;
+   *  - `sessionStorage`, qui survit lui au nettoyage de l'URL et aux
+   *    rechargements suivants de l'onglet.
+   *
+   * Sans cette mémoire, un essai manqué relancerait un essai, indéfiniment :
+   * la porte tournerait en rond au lieu de montrer son bouton.
+   */
+  const TRIED_KEY = 'loginGate.silentTried';
+
+  function alreadyTried() {
+    if (new URLSearchParams(window.location.search).get('login') === 'manual') return true;
+    try {
+      return sessionStorage.getItem(TRIED_KEY) === '1';
+    } catch (e) {
+      // Navigation privée, stockage refusé : on retombe sur le paramètre
+      // d'URL seul, qui suffit à empêcher la boucle.
+      return false;
+    }
+  }
+
+  function rememberTried() {
+    try {
+      sessionStorage.setItem(TRIED_KEY, '1');
+    } catch (e) {
+      // Sans stockage, le paramètre d'URL fait seul office de mémoire.
+    }
+  }
+
+  /**
+   * Tente de reconnaître le visiteur sans lui rien demander.
+   *
+   * Un invité déjà admis n'a aucune raison de recliquer « Se connecter » à
+   * chaque venue : il a déjà autorisé l'application, et Discord sait
+   * parfaitement qui il est. La porte pose donc la question en silence — le
+   * serveur ajoute `prompt=none`, qui interdit à Discord d'afficher quoi que
+   * ce soit — et l'invité ne voit qu'un clignotement avant son tableau de
+   * bord, ses droits retrouvés.
+   *
+   * Si Discord ne peut pas répondre sans parler à l'utilisateur — jamais
+   * connecté sur ce navigateur, autorisation retirée — il refuse, et le rappel
+   * revient ici avec `?login=manual`. La porte montre alors son bouton, comme
+   * avant. C'est un aller-retour de perdu, une seule fois par onglet.
+   *
+   * @returns {boolean} Vrai si la page est en train de partir.
+   */
+  function trySilently(state) {
+    if (!state.oauthReady || alreadyTried()) return false;
+
+    rememberTried();
+    const returnTo = window.location.pathname + window.location.search;
+    window.location.href = '/auth/discord?silent=1&returnTo=' + encodeURIComponent(returnTo);
+    return true;
+  }
+
+  /**
+   * Demande au serveur où l'on en est, et agit.
+   *
+   * Une réponse illisible — serveur qui redémarre, réseau coupé — laisse la
+   * page ouverte plutôt que barrée : le serveur reste seul juge des droits, et
+   * une porte fermée sur un incident réseau empêcherait de travailler sans
+   * rien protéger de plus.
+   */
+  async function check() {
+    let state;
+    try {
+      const res = await fetch('/auth/state', { credentials: 'same-origin' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      state = await res.json();
+    } catch (e) {
+      console.warn('[LoginGate] État de connexion indisponible :', e.message);
+      close();
+      return null;
     }
 
-    function rememberTried() {
-        try {
-            sessionStorage.setItem(TRIED_KEY, '1');
-        } catch (e) {
-            // Sans stockage, le paramètre d'URL fait seul office de mémoire.
-        }
+    window.MusicPlayer.authState = state;
+
+    if (state.pendingLogin) {
+      // La reconnaissance muette d'abord : montrer un bouton pour le
+      // retirer un instant plus tard ferait clignoter la porte sous les
+      // yeux de quelqu'un qui n'avait rien à faire.
+      if (trySilently(state)) return state;
+      open(state);
+    } else {
+      close();
     }
+    return state;
+  }
 
-    /**
-     * Tente de reconnaître le visiteur sans lui rien demander.
-     *
-     * Un invité déjà admis n'a aucune raison de recliquer « Se connecter » à
-     * chaque venue : il a déjà autorisé l'application, et Discord sait
-     * parfaitement qui il est. La porte pose donc la question en silence — le
-     * serveur ajoute `prompt=none`, qui interdit à Discord d'afficher quoi que
-     * ce soit — et l'invité ne voit qu'un clignotement avant son tableau de
-     * bord, ses droits retrouvés.
-     *
-     * Si Discord ne peut pas répondre sans parler à l'utilisateur — jamais
-     * connecté sur ce navigateur, autorisation retirée — il refuse, et le rappel
-     * revient ici avec `?login=manual`. La porte montre alors son bouton, comme
-     * avant. C'est un aller-retour de perdu, une seule fois par onglet.
-     *
-     * @returns {boolean} Vrai si la page est en train de partir.
-     */
-    function trySilently(state) {
-        if (!state.oauthReady || alreadyTried()) return false;
+  if (loginBtn) {
+    loginBtn.addEventListener('click', (e) => {
+      // La destination de retour est le tableau de bord tel qu'il est
+      // ouvert : l'utilisateur revient là où il en était, et non à la
+      // racine, ce qui perdrait le serveur choisi ou la page consultée.
+      e.preventDefault();
+      const returnTo = window.location.pathname + window.location.search;
+      window.location.href = '/auth/discord?returnTo=' + encodeURIComponent(returnTo);
+    });
+  }
 
-        rememberTried();
-        const returnTo = window.location.pathname + window.location.search;
-        window.location.href = '/auth/discord?silent=1&returnTo=' + encodeURIComponent(returnTo);
-        return true;
+  if (bypassBtn) {
+    bypassBtn.addEventListener('click', () => {
+      // Sans application Discord configurée, le serveur accorde déjà les
+      // pleins droits au porteur du jeton : il n'y a rien à demander, la
+      // fenêtre n'a plus qu'à s'effacer.
+      close();
+    });
+  }
+
+  if (errorLine) {
+    // Discord renvoie parfois sur le tableau de bord avec une erreur en
+    // paramètre plutôt que sur la page d'erreur du trajet.
+    const failure = new URLSearchParams(window.location.search).get('authError');
+    if (failure) {
+      errorLine.textContent = t('login_gate_failed', "La connexion Discord n'a pas abouti. Réessayez.");
+      errorLine.classList.remove('hidden');
     }
+  }
 
-    /**
-     * Demande au serveur où l'on en est, et agit.
-     *
-     * Une réponse illisible — serveur qui redémarre, réseau coupé — laisse la
-     * page ouverte plutôt que barrée : le serveur reste seul juge des droits, et
-     * une porte fermée sur un incident réseau empêcherait de travailler sans
-     * rien protéger de plus.
-     */
-    async function check() {
-        let state;
-        try {
-            const res = await fetch('/auth/state', { credentials: 'same-origin' });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            state = await res.json();
-        } catch (e) {
-            console.warn('[LoginGate] État de connexion indisponible :', e.message);
-            close();
-            return null;
-        }
-
-        window.MusicPlayer.authState = state;
-
-        if (state.pendingLogin) {
-            // La reconnaissance muette d'abord : montrer un bouton pour le
-            // retirer un instant plus tard ferait clignoter la porte sous les
-            // yeux de quelqu'un qui n'avait rien à faire.
-            if (trySilently(state)) return state;
-            open(state);
-        } else {
-            close();
-        }
-        return state;
-    }
-
-    if (loginBtn) {
-        loginBtn.addEventListener('click', (e) => {
-            // La destination de retour est le tableau de bord tel qu'il est
-            // ouvert : l'utilisateur revient là où il en était, et non à la
-            // racine, ce qui perdrait le serveur choisi ou la page consultée.
-            e.preventDefault();
-            const returnTo = window.location.pathname + window.location.search;
-            window.location.href = '/auth/discord?returnTo=' + encodeURIComponent(returnTo);
-        });
-    }
-
-    if (bypassBtn) {
-        bypassBtn.addEventListener('click', () => {
-            // Sans application Discord configurée, le serveur accorde déjà les
-            // pleins droits au porteur du jeton : il n'y a rien à demander, la
-            // fenêtre n'a plus qu'à s'effacer.
-            close();
-        });
-    }
-
-    if (errorLine) {
-        // Discord renvoie parfois sur le tableau de bord avec une erreur en
-        // paramètre plutôt que sur la page d'erreur du trajet.
-        const failure = new URLSearchParams(window.location.search).get('authError');
-        if (failure) {
-            errorLine.textContent = t('login_gate_failed',
-                'La connexion Discord n\'a pas abouti. Réessayez.');
-            errorLine.classList.remove('hidden');
-        }
-    }
-
-    window.MusicPlayer.checkLoginGate = check;
-    check();
+  window.MusicPlayer.checkLoginGate = check;
+  check();
 })();

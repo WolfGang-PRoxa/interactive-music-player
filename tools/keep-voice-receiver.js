@@ -75,23 +75,22 @@ const HOST = 'discord-player';
  * @returns {boolean}
  */
 function hasReceiver(dir) {
-    try {
-        const loaded = require(dir);
-        if (loaded && typeof loaded.VoiceReceiver === 'function') return true;
-        // Chargé, et sans `VoiceReceiver` : la réponse est non, sans appel.
-        if (loaded) return false;
-    } catch (e) {
-        // Chargement impossible : on se rabat sur la lecture du fichier.
-    }
+  try {
+    const loaded = require(dir);
+    if (loaded && typeof loaded.VoiceReceiver === 'function') return true;
+    // Chargé, et sans `VoiceReceiver` : la réponse est non, sans appel.
+    if (loaded) return false;
+  } catch (e) {
+    // Chargement impossible : on se rabat sur la lecture du fichier.
+  }
 
-    try {
-        const manifest = JSON.parse(
-            fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
-        const entry = path.join(dir, manifest.main || 'index.js');
-        return fs.readFileSync(entry, 'utf8').includes('VoiceReceiver');
-    } catch (e) {
-        return false;
-    }
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+    const entry = path.join(dir, manifest.main || 'index.js');
+    return fs.readFileSync(entry, 'utf8').includes('VoiceReceiver');
+  } catch (e) {
+    return false;
+  }
 }
 
 /**
@@ -102,40 +101,44 @@ function hasReceiver(dir) {
  * @returns {'removed'|'absent'|'still-useful'|'no-replacement'} Ce qui a été fait
  */
 function keepVoiceReceiver(root, say = () => {}) {
-    const nested = path.join(root, 'node_modules', HOST, 'node_modules', PACKAGE);
-    const outer = path.join(root, 'node_modules', PACKAGE);
+  const nested = path.join(root, 'node_modules', HOST, 'node_modules', PACKAGE);
+  const outer = path.join(root, 'node_modules', PACKAGE);
 
-    if (!fs.existsSync(nested)) {
-        // Rien à faire : c'est l'état recherché, et c'est le cas le plus courant
-        // une fois le script passé une première fois.
-        return 'absent';
-    }
+  if (!fs.existsSync(nested)) {
+    // Rien à faire : c'est l'état recherché, et c'est le cas le plus courant
+    // une fois le script passé une première fois.
+    return 'absent';
+  }
 
-    if (hasReceiver(nested)) {
-        say(`[voice] ${HOST} embarque un ${PACKAGE} qui sait écouter : rien à changer.`);
-        return 'still-useful';
-    }
+  if (hasReceiver(nested)) {
+    say(`[voice] ${HOST} embarque un ${PACKAGE} qui sait écouter : rien à changer.`);
+    return 'still-useful';
+  }
 
-    if (!fs.existsSync(outer) || !hasReceiver(outer)) {
-        say(`[voice] Aucun ${PACKAGE} pourvu d'un receiver au niveau racine : `
-            + 'la copie imbriquée est laissée en place, sans quoi discord-player '
-            + 'se retrouverait sans sa dépendance. Le ducking restera inerte.');
-        return 'no-replacement';
-    }
+  if (!fs.existsSync(outer) || !hasReceiver(outer)) {
+    say(
+      `[voice] Aucun ${PACKAGE} pourvu d'un receiver au niveau racine : ` +
+        'la copie imbriquée est laissée en place, sans quoi discord-player ' +
+        'se retrouverait sans sa dépendance. Le ducking restera inerte.',
+    );
+    return 'no-replacement';
+  }
 
-    fs.rmSync(nested, { recursive: true, force: true });
-    say(`[voice] Copie imbriquée de ${PACKAGE} écartée : ${HOST} utilisera celle `
-        + 'du dessus, qui sait entendre parler. Le ducking peut fonctionner.');
-    return 'removed';
+  fs.rmSync(nested, { recursive: true, force: true });
+  say(
+    `[voice] Copie imbriquée de ${PACKAGE} écartée : ${HOST} utilisera celle ` +
+      'du dessus, qui sait entendre parler. Le ducking peut fonctionner.',
+  );
+  return 'removed';
 }
 
 module.exports = { keepVoiceReceiver, hasReceiver, PACKAGE, HOST };
 
 if (require.main === module) {
-    try {
-        keepVoiceReceiver(process.cwd(), (message) => console.log(message));
-    } catch (err) {
-        // Jamais au prix de l'installation : voir l'en-tête.
-        console.log(`[voice] Rangement impossible (${err.message}), on continue.`);
-    }
+  try {
+    keepVoiceReceiver(process.cwd(), (message) => console.log(message));
+  } catch (err) {
+    // Jamais au prix de l'installation : voir l'en-tête.
+    console.log(`[voice] Rangement impossible (${err.message}), on continue.`);
+  }
 }

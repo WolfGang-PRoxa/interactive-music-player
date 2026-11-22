@@ -26,181 +26,228 @@ const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
 
-const SOURCE = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'web', 'public', 'js', 'searchHistory.js'),
-    'utf8'
-);
+const SOURCE = fs.readFileSync(path.join(__dirname, '..', 'src', 'web', 'public', 'js', 'searchHistory.js'), 'utf8');
 
 let failed = 0;
 let passed = 0;
 const check = (label, ok, detail = '') => {
-    if (ok) { passed++; console.log(`  ok    ${label}${detail ? ` — ${detail}` : ''}`); }
-    else { failed++; console.log(`  FAIL ${label}${detail ? ` — ${detail}` : ''}`); }
+  if (ok) {
+    passed++;
+    console.log(`  ok    ${label}${detail ? ` — ${detail}` : ''}`);
+  } else {
+    failed++;
+    console.log(`  FAIL ${label}${detail ? ` — ${detail}` : ''}`);
+  }
 };
 
 /** Le premier enfant portant cette classe, ou un objet vide à défaut. */
 function childByClass(parent, className) {
-    return parent.children.find(c => c.classList.contains(className)) || { textContent: '' };
+  return parent.children.find((c) => c.classList.contains(className)) || { textContent: '' };
 }
 
 /** Élément factice : assez de DOM pour ce que le module touche. */
 function makeElement(tag = 'div') {
-    const listeners = {};
-    const classes = new Set();
-    const el = {
-        tagName: tag.toUpperCase(),
-        children: [],
-        style: {},
-        value: '',
-        offsetLeft: 12,
-        offsetTop: 8,
-        offsetWidth: 400,
-        offsetHeight: 48,
-        get className() { return [...classes].join(' '); },
-        set className(v) { classes.clear(); String(v).split(/\s+/).filter(Boolean).forEach(c => classes.add(c)); },
-        classList: {
-            add: (...n) => n.forEach(c => classes.add(c)),
-            remove: (...n) => n.forEach(c => classes.delete(c)),
-            contains: (c) => classes.has(c),
-        },
-        setAttribute() {},
-        getAttribute: () => null,
-        setSelectionRange() {},
-        focus() {},
-        closest: () => null,
-        appendChild(child) { el.children.push(child); return child; },
-        addEventListener: (type, fn) => {
-            (listeners[type] = listeners[type] || []).push(fn);
-        },
-        removeEventListener() {},
-        get textContent() { return el._text || ''; },
-        set textContent(v) {
-            el._text = v;
-            // Une chaîne vide vide l'élément : c'est ainsi que le module
-            // repeint son panneau.
-            if (v === '') el.children = [];
-        },
-        _listeners: listeners,
-        _fire(type, event = {}) {
-            (listeners[type] || []).forEach(fn => fn(event));
-        },
-    };
-    return el;
+  const listeners = {};
+  const classes = new Set();
+  const el = {
+    tagName: tag.toUpperCase(),
+    children: [],
+    style: {},
+    value: '',
+    offsetLeft: 12,
+    offsetTop: 8,
+    offsetWidth: 400,
+    offsetHeight: 48,
+    get className() {
+      return [...classes].join(' ');
+    },
+    set className(v) {
+      classes.clear();
+      String(v)
+        .split(/\s+/)
+        .filter(Boolean)
+        .forEach((c) => classes.add(c));
+    },
+    classList: {
+      add: (...n) => n.forEach((c) => classes.add(c)),
+      remove: (...n) => n.forEach((c) => classes.delete(c)),
+      contains: (c) => classes.has(c),
+    },
+    setAttribute() {},
+    getAttribute: () => null,
+    setSelectionRange() {},
+    focus() {},
+    closest: () => null,
+    appendChild(child) {
+      el.children.push(child);
+      return child;
+    },
+    addEventListener: (type, fn) => {
+      (listeners[type] = listeners[type] || []).push(fn);
+    },
+    removeEventListener() {},
+    get textContent() {
+      return el._text || '';
+    },
+    set textContent(v) {
+      el._text = v;
+      // Une chaîne vide vide l'élément : c'est ainsi que le module
+      // repeint son panneau.
+      if (v === '') el.children = [];
+    },
+    _listeners: listeners,
+    _fire(type, event = {}) {
+      (listeners[type] || []).forEach((fn) => fn(event));
+    },
+  };
+  return el;
 }
 
 /** Événement clavier factice, qui retient ce qu'on lui a demandé. */
 function keyEvent(key) {
-    return {
-        key,
-        defaultPrevented: false,
-        propagationStopped: false,
-        preventDefault() { this.defaultPrevented = true; },
-        stopPropagation() { this.propagationStopped = true; },
-    };
+  return {
+    key,
+    defaultPrevented: false,
+    propagationStopped: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    },
+    stopPropagation() {
+      this.propagationStopped = true;
+    },
+  };
 }
 
 function mount({ stored = null, clearsFieldFirst = false } = {}) {
-    const store = new Map();
-    if (stored) store.set('searchInputHistory', JSON.stringify(stored));
+  const store = new Map();
+  if (stored) store.set('searchInputHistory', JSON.stringify(stored));
 
-    const input = makeElement('input');
-    const form = makeElement('form');
-    const box = makeElement('div');
-    input.closest = (sel) => (sel === '.search-box' ? box : null);
+  const input = makeElement('input');
+  const form = makeElement('form');
+  const box = makeElement('div');
+  input.closest = (sel) => (sel === '.search-box' ? box : null);
 
-    const created = [];
-    const docCapture = {};
-    const docBubble = {};
-    const sandbox = {
-        window: { MusicPlayer: {}, addEventListener() {} },
-        document: {
-            readyState: 'complete',
-            getElementById: (id) => {
-                if (id === 'search-input') return input;
-                if (id === 'search-form') return form;
-                return null;
-            },
-            createElement: (tag) => { const el = makeElement(tag); created.push(el); return el; },
-            // Les icônes sont dessinées en SVG, qui vit dans son propre espace
-            // de noms : sans cette fabrique, le module tombe en construisant la
-            // note de musique d'une entrée sans image.
-            createElementNS: (ns, tag) => { const el = makeElement(tag); created.push(el); return el; },
-            // La capture est distinguée de la remontée : c'est elle que le
-            // module emploie pour lire le champ avant qu'un autre écouteur ne
-            // le vide, et un stub qui les confondrait ne prouverait rien.
-            addEventListener: (type, fn, capture) => {
-                const bucket = capture ? docCapture : docBubble;
-                (bucket[type] = bucket[type] || []).push(fn);
-            },
-        },
-        localStorage: {
-            getItem: (k) => (store.has(k) ? store.get(k) : null),
-            setItem: (k, v) => store.set(k, v),
-            removeItem: (k) => store.delete(k),
-        },
-        // `URL` n'est pas du langage mais de l'hôte : un contexte vm neuf ne
-        // l'a pas, quand tout navigateur le fournit.
-        JSON, Math, Array, console, URL,
-    };
-    sandbox.globalThis = sandbox;
-    vm.createContext(sandbox);
+  const created = [];
+  const docCapture = {};
+  const docBubble = {};
+  const sandbox = {
+    window: { MusicPlayer: {}, addEventListener() {} },
+    document: {
+      readyState: 'complete',
+      getElementById: (id) => {
+        if (id === 'search-input') return input;
+        if (id === 'search-form') return form;
+        return null;
+      },
+      createElement: (tag) => {
+        const el = makeElement(tag);
+        created.push(el);
+        return el;
+      },
+      // Les icônes sont dessinées en SVG, qui vit dans son propre espace
+      // de noms : sans cette fabrique, le module tombe en construisant la
+      // note de musique d'une entrée sans image.
+      createElementNS: (ns, tag) => {
+        const el = makeElement(tag);
+        created.push(el);
+        return el;
+      },
+      // La capture est distinguée de la remontée : c'est elle que le
+      // module emploie pour lire le champ avant qu'un autre écouteur ne
+      // le vide, et un stub qui les confondrait ne prouverait rien.
+      addEventListener: (type, fn, capture) => {
+        const bucket = capture ? docCapture : docBubble;
+        (bucket[type] = bucket[type] || []).push(fn);
+      },
+    },
+    localStorage: {
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => store.set(k, v),
+      removeItem: (k) => store.delete(k),
+    },
+    // `URL` n'est pas du langage mais de l'hôte : un contexte vm neuf ne
+    // l'a pas, quand tout navigateur le fournit.
+    JSON,
+    Math,
+    Array,
+    console,
+    URL,
+  };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
 
+  /*
+   * L'écouteur concurrent est posé AVANT le module, et c'est indispensable :
+   * c'est ainsi que les choses se passent dans la page, app.js se branchant
+   * dès son exécution quand le module attend `DOMContentLoaded`. Le poser
+   * après reviendrait à tester l'ordre inverse — celui qui ne pose problème
+   * à personne.
+   */
+  if (clearsFieldFirst) {
+    form.addEventListener('submit', () => {
+      input.value = '';
+    });
+  }
+
+  vm.runInContext(SOURCE, sandbox);
+
+  // Le panneau est le premier élément que le module ait créé et attaché.
+  const panel = box.children[0];
+
+  return {
+    input,
+    form,
+    box,
+    panel,
+    store,
+    sandbox,
     /*
-     * L'écouteur concurrent est posé AVANT le module, et c'est indispensable :
-     * c'est ainsi que les choses se passent dans la page, app.js se branchant
-     * dès son exécution quand le module attend `DOMContentLoaded`. Le poser
-     * après reviendrait à tester l'ordre inverse — celui qui ne pose problème
-     * à personne.
+     * Le texte des lignes actuellement peintes.
+     *
+     * Cherché par sa classe et non par sa place : une ligne porte
+     * maintenant une vignette avant son nom, et un index en dur se
+     * tromperait de fils au prochain ornement ajouté.
      */
-    if (clearsFieldFirst) {
-        form.addEventListener('submit', () => { input.value = ''; });
-    }
-
-    vm.runInContext(SOURCE, sandbox);
-
-    // Le panneau est le premier élément que le module ait créé et attaché.
-    const panel = box.children[0];
-
-    return {
-        input, form, box, panel, store, sandbox,
-        /*
-         * Le texte des lignes actuellement peintes.
-         *
-         * Cherché par sa classe et non par sa place : une ligne porte
-         * maintenant une vignette avant son nom, et un index en dur se
-         * tromperait de fils au prochain ornement ajouté.
-         */
-        rows: () => panel.children.map(r => childByClass(r, 'search-history-label').textContent),
-        /** La croix d'une ligne, cherchée de la même façon. */
-        removeButtonOf: (row) => childByClass(row, 'search-history-remove'),
-        highlightedIndex: () => panel.children.findIndex(r => r.classList.contains('is-highlighted')),
-        isOpen: () => !panel.classList.contains('hidden'),
-        type(value) { input.value = value; input._fire('input', {}); },
-        press(key) { const e = keyEvent(key); input._fire('keydown', e); return e; },
-        /**
-         * Envoie le formulaire comme le ferait le navigateur : la capture
-         * descend du document jusqu'à la cible, puis les écouteurs de la cible
-         * s'exécutent. C'est cet ordre-là, et non celui d'enregistrement, qui
-         * décide de qui lit le champ en premier.
-         */
-        submit(value) {
-            input.value = value;
-            const event = { target: form };
-            (docCapture.submit || []).forEach(fn => fn(event));
-            form._fire('submit', event);
-            (docBubble.submit || []).forEach(fn => fn(event));
-        },
-        focus() { input._fire('focus', {}); },
-        /*
-         * Les saisies retenues, réduites à leur texte.
-         *
-         * Une entrée est désormais un objet — la saisie, plus le nom et
-         * l'image appris ensuite. Les vérifications de stockage ne portent que
-         * sur le texte ; celles de l'enrichissement lisent `stored()`.
-         */
-        saved: () => JSON.parse(store.get('searchInputHistory') || '[]').map(e => e.q),
-        stored: () => JSON.parse(store.get('searchInputHistory') || '[]'),
-    };
+    rows: () => panel.children.map((r) => childByClass(r, 'search-history-label').textContent),
+    /** La croix d'une ligne, cherchée de la même façon. */
+    removeButtonOf: (row) => childByClass(row, 'search-history-remove'),
+    highlightedIndex: () => panel.children.findIndex((r) => r.classList.contains('is-highlighted')),
+    isOpen: () => !panel.classList.contains('hidden'),
+    type(value) {
+      input.value = value;
+      input._fire('input', {});
+    },
+    press(key) {
+      const e = keyEvent(key);
+      input._fire('keydown', e);
+      return e;
+    },
+    /**
+     * Envoie le formulaire comme le ferait le navigateur : la capture
+     * descend du document jusqu'à la cible, puis les écouteurs de la cible
+     * s'exécutent. C'est cet ordre-là, et non celui d'enregistrement, qui
+     * décide de qui lit le champ en premier.
+     */
+    submit(value) {
+      input.value = value;
+      const event = { target: form };
+      (docCapture.submit || []).forEach((fn) => fn(event));
+      form._fire('submit', event);
+      (docBubble.submit || []).forEach((fn) => fn(event));
+    },
+    focus() {
+      input._fire('focus', {});
+    },
+    /*
+     * Les saisies retenues, réduites à leur texte.
+     *
+     * Une entrée est désormais un objet — la saisie, plus le nom et
+     * l'image appris ensuite. Les vérifications de stockage ne portent que
+     * sur le texte ; celles de l'enrichissement lisent `stored()`.
+     */
+    saved: () => JSON.parse(store.get('searchInputHistory') || '[]').map((e) => e.q),
+    stored: () => JSON.parse(store.get('searchInputHistory') || '[]'),
+  };
 }
 
 console.log('\n=== Historique du champ d’ajout ===\n');
@@ -210,66 +257,73 @@ console.log('\n=== Historique du champ d’ajout ===\n');
 console.log('Ce qui est retenu\n');
 
 {
-    const s = mount();
-    s.submit('https://youtu.be/aaa');
-    s.submit('daft punk');
-    check('une saisie validée est retenue', s.saved().length === 2, s.saved().join(' | '));
-    check('la plus récente vient en tête', s.saved()[0] === 'daft punk', s.saved()[0]);
+  const s = mount();
+  s.submit('https://youtu.be/aaa');
+  s.submit('daft punk');
+  check('une saisie validée est retenue', s.saved().length === 2, s.saved().join(' | '));
+  check('la plus récente vient en tête', s.saved()[0] === 'daft punk', s.saved()[0]);
 
-    s.submit('https://youtu.be/aaa');
-    check('une entrée déjà connue remonte au lieu de se dédoubler',
-        s.saved().length === 2 && s.saved()[0] === 'https://youtu.be/aaa',
-        `${s.saved().length} entrée(s) : ${s.saved().join(' | ')}`);
+  s.submit('https://youtu.be/aaa');
+  check(
+    'une entrée déjà connue remonte au lieu de se dédoubler',
+    s.saved().length === 2 && s.saved()[0] === 'https://youtu.be/aaa',
+    `${s.saved().length} entrée(s) : ${s.saved().join(' | ')}`,
+  );
 
-    s.submit('   ');
-    check('une saisie vide n’est pas retenue', s.saved().length === 2);
+  s.submit('   ');
+  check('une saisie vide n’est pas retenue', s.saved().length === 2);
 
-    s.submit('  espaces autour  ');
-    check('les espaces de bord sont retirés',
-        s.saved()[0] === 'espaces autour', `« ${s.saved()[0]} »`);
+  s.submit('  espaces autour  ');
+  check('les espaces de bord sont retirés', s.saved()[0] === 'espaces autour', `« ${s.saved()[0]} »`);
 
-    s.submit('x'.repeat(401));
-    check('une entrée démesurée est écartée',
-        s.saved().every(e => e.length <= 400), `${s.saved().length} entrée(s)`);
+  s.submit('x'.repeat(401));
+  check(
+    'une entrée démesurée est écartée',
+    s.saved().every((e) => e.length <= 400),
+    `${s.saved().length} entrée(s)`,
+  );
 }
 
 {
-    /*
-     * Le champ vidé par un autre écouteur, et l'entrée retenue tout de même.
-     *
-     * C'est la panne qu'a connue la première version : app.js pose son écouteur
-     * de soumission dès son exécution, quand ce module attendait
-     * `DOMContentLoaded` pour poser le sien. Le sien passait donc en premier, et
-     * il vide le champ après envoi — on lisait une chaîne vide, et l'historique
-     * restait éternellement vide sans qu'aucune erreur ne le signale.
-     *
-     * La capture règle la question par la phase plutôt que par l'ordre : elle
-     * descend du document avant que la cible ne soit atteinte. Ce test pose donc
-     * un écouteur concurrent qui vide le champ, et vérifie qu'il ne prive de
-     * rien.
-     */
-    const s = mount({ clearsFieldFirst: true });
-    s.submit('https://youtu.be/zzz');
-    check('un écouteur qui vide le champ ne fait pas perdre l’entrée',
-        s.saved().length === 1 && s.saved()[0] === 'https://youtu.be/zzz',
-        s.saved().join(' | ') || 'rien retenu');
+  /*
+   * Le champ vidé par un autre écouteur, et l'entrée retenue tout de même.
+   *
+   * C'est la panne qu'a connue la première version : app.js pose son écouteur
+   * de soumission dès son exécution, quand ce module attendait
+   * `DOMContentLoaded` pour poser le sien. Le sien passait donc en premier, et
+   * il vide le champ après envoi — on lisait une chaîne vide, et l'historique
+   * restait éternellement vide sans qu'aucune erreur ne le signale.
+   *
+   * La capture règle la question par la phase plutôt que par l'ordre : elle
+   * descend du document avant que la cible ne soit atteinte. Ce test pose donc
+   * un écouteur concurrent qui vide le champ, et vérifie qu'il ne prive de
+   * rien.
+   */
+  const s = mount({ clearsFieldFirst: true });
+  s.submit('https://youtu.be/zzz');
+  check(
+    'un écouteur qui vide le champ ne fait pas perdre l’entrée',
+    s.saved().length === 1 && s.saved()[0] === 'https://youtu.be/zzz',
+    s.saved().join(' | ') || 'rien retenu',
+  );
 }
 
 {
-    const s = mount();
-    for (let i = 0; i < 30; i++) s.submit(`entree ${i}`);
-    check('le plafond de 25 entrées tient', s.saved().length === 25, `${s.saved().length}`);
-    check('  … et ce sont les plus anciennes qui tombent',
-        s.saved()[0] === 'entree 29' && !s.saved().includes('entree 0'),
-        `tête « ${s.saved()[0]} »`);
+  const s = mount();
+  for (let i = 0; i < 30; i++) s.submit(`entree ${i}`);
+  check('le plafond de 25 entrées tient', s.saved().length === 25, `${s.saved().length}`);
+  check(
+    '  … et ce sont les plus anciennes qui tombent',
+    s.saved()[0] === 'entree 29' && !s.saved().includes('entree 0'),
+    `tête « ${s.saved()[0]} »`,
+  );
 }
 
 {
-    // La persistance : un rechargement de page retrouve la liste.
-    const s = mount({ stored: ['un', 'deux'] });
-    s.focus();
-    check('l’historique est relu au chargement',
-        s.rows().length === 2 && s.rows()[0] === 'un', s.rows().join(' | '));
+  // La persistance : un rechargement de page retrouve la liste.
+  const s = mount({ stored: ['un', 'deux'] });
+  s.focus();
+  check('l’historique est relu au chargement', s.rows().length === 2 && s.rows()[0] === 'un', s.rows().join(' | '));
 }
 
 // ─────────────────────────── Les flèches ───────────────────────────
@@ -277,64 +331,77 @@ console.log('Ce qui est retenu\n');
 console.log('\nLe parcours aux flèches\n');
 
 {
-    const s = mount({ stored: ['alpha', 'bravo', 'charlie'] });
-    s.type('');
+  const s = mount({ stored: ['alpha', 'bravo', 'charlie'] });
+  s.type('');
 
-    const first = s.press('ArrowDown');
-    check('la première flèche ouvre le panneau', s.isOpen());
-    check('  … sur l’entrée la plus récente',
-        s.input.value === 'alpha' && s.highlightedIndex() === 0,
-        `« ${s.input.value} », ligne ${s.highlightedIndex()}`);
-    check('  … et neutralise le déplacement du curseur', first.defaultPrevented);
+  const first = s.press('ArrowDown');
+  check('la première flèche ouvre le panneau', s.isOpen());
+  check(
+    '  … sur l’entrée la plus récente',
+    s.input.value === 'alpha' && s.highlightedIndex() === 0,
+    `« ${s.input.value} », ligne ${s.highlightedIndex()}`,
+  );
+  check('  … et neutralise le déplacement du curseur', first.defaultPrevented);
 
-    s.press('ArrowDown');
-    check('la flèche du bas descend d’une entrée',
-        s.input.value === 'bravo' && s.highlightedIndex() === 1, `« ${s.input.value} »`);
+  s.press('ArrowDown');
+  check(
+    'la flèche du bas descend d’une entrée',
+    s.input.value === 'bravo' && s.highlightedIndex() === 1,
+    `« ${s.input.value} »`,
+  );
 
-    s.press('ArrowUp');
-    check('la flèche du haut remonte',
-        s.input.value === 'alpha' && s.highlightedIndex() === 0, `« ${s.input.value} »`);
+  s.press('ArrowUp');
+  check('la flèche du haut remonte', s.input.value === 'alpha' && s.highlightedIndex() === 0, `« ${s.input.value} »`);
 
-    s.press('ArrowDown'); s.press('ArrowDown'); s.press('ArrowDown');
-    check('elle s’arrête à la dernière au lieu de boucler',
-        s.input.value === 'charlie' && s.highlightedIndex() === 2, `« ${s.input.value} »`);
+  s.press('ArrowDown');
+  s.press('ArrowDown');
+  s.press('ArrowDown');
+  check(
+    'elle s’arrête à la dernière au lieu de boucler',
+    s.input.value === 'charlie' && s.highlightedIndex() === 2,
+    `« ${s.input.value} »`,
+  );
 }
 
 {
-    /*
-     * Le point qui compte : la saisie en cours doit revenir.
-     *
-     * La saisie choisie ici correspond aux deux entrées, et il le faut : une
-     * saisie qui ne correspond à rien referme le panneau, les flèches n'ont
-     * alors plus de liste à parcourir, et le champ ne bouge pas. Une première
-     * version de ce test partait de « daf » — qui ne trouve ni alpha ni
-     * bravo —, si bien que la restauration passait sans jamais avoir eu lieu.
-     */
-    const s = mount({ stored: ['alpha', 'bravo'] });
-    s.type('a');
+  /*
+   * Le point qui compte : la saisie en cours doit revenir.
+   *
+   * La saisie choisie ici correspond aux deux entrées, et il le faut : une
+   * saisie qui ne correspond à rien referme le panneau, les flèches n'ont
+   * alors plus de liste à parcourir, et le champ ne bouge pas. Une première
+   * version de ce test partait de « daf » — qui ne trouve ni alpha ni
+   * bravo —, si bien que la restauration passait sans jamais avoir eu lieu.
+   */
+  const s = mount({ stored: ['alpha', 'bravo'] });
+  s.type('a');
 
-    s.press('ArrowDown');
-    check('la saisie est remplacée par l’entrée parcourue',
-        s.input.value === 'alpha', `« ${s.input.value} »`);
+  s.press('ArrowDown');
+  check('la saisie est remplacée par l’entrée parcourue', s.input.value === 'alpha', `« ${s.input.value} »`);
 
-    s.press('ArrowUp');
-    check('remonter au-dessus de la première rend la saisie en cours',
-        s.input.value === 'a', `« ${s.input.value} »`);
-    check('  … et plus aucune ligne n’est mise en évidence',
-        s.highlightedIndex() === -1, `ligne ${s.highlightedIndex()}`);
+  s.press('ArrowUp');
+  check('remonter au-dessus de la première rend la saisie en cours', s.input.value === 'a', `« ${s.input.value} »`);
+  check(
+    '  … et plus aucune ligne n’est mise en évidence',
+    s.highlightedIndex() === -1,
+    `ligne ${s.highlightedIndex()}`,
+  );
 
-    s.press('ArrowUp');
-    check('insister ne va pas plus haut', s.input.value === 'a', `« ${s.input.value} »`);
+  s.press('ArrowUp');
+  check('insister ne va pas plus haut', s.input.value === 'a', `« ${s.input.value} »`);
 }
 
 {
-    // Une saisie sans correspondance : les flèches n'ont rien à proposer et
-    // laissent le champ tranquille, plutôt que d'ouvrir un panneau vide.
-    const s = mount({ stored: ['alpha', 'bravo'] });
-    s.type('zzz');
-    s.press('ArrowDown');
-    check('sans correspondance, les flèches ne touchent pas au champ',
-        s.input.value === 'zzz' && !s.isOpen(), `« ${s.input.value} »`);
+  // Une saisie sans correspondance : les flèches n'ont rien à proposer et
+  // laissent le champ tranquille, plutôt que d'ouvrir un panneau vide.
+  const s = mount({ stored: ['alpha', 'bravo'] });
+  s.type('zzz');
+  s.press('ArrowDown');
+  check(
+    'sans correspondance, les flèches ne touchent pas au champ',
+    s.input.value === 'zzz' && !s.isOpen(),
+    `« ${s.input.value} »`,
+  );
 }
 
 // ─────────────────────────── Le filtre ───────────────────────────
@@ -342,23 +409,21 @@ console.log('\nLe parcours aux flèches\n');
 console.log('\nLe filtre\n');
 
 {
-    const s = mount({ stored: [
-        'https://youtu.be/abc',
-        'daft punk one more time',
-        'https://soundcloud.com/daft',
-    ] });
+  const s = mount({ stored: ['https://youtu.be/abc', 'daft punk one more time', 'https://soundcloud.com/daft'] });
 
-    s.type('daft');
-    check('la liste se réduit à ce qui contient la saisie',
-        s.rows().length === 2, s.rows().join(' | '));
-    check('  … y compris au milieu d’une URL',
-        s.rows().some(r => r.includes('soundcloud')), s.rows().join(' | '));
+  s.type('daft');
+  check('la liste se réduit à ce qui contient la saisie', s.rows().length === 2, s.rows().join(' | '));
+  check(
+    '  … y compris au milieu d’une URL',
+    s.rows().some((r) => r.includes('soundcloud')),
+    s.rows().join(' | '),
+  );
 
-    s.type('zzz');
-    check('une saisie sans correspondance referme le panneau', !s.isOpen());
+  s.type('zzz');
+  check('une saisie sans correspondance referme le panneau', !s.isOpen());
 
-    s.type('');
-    check('un champ vidé rend toute la liste', s.rows().length === 3);
+  s.type('');
+  check('un champ vidé rend toute la liste', s.rows().length === 3);
 }
 
 // ─────────────────────────── La sortie ───────────────────────────
@@ -366,43 +431,42 @@ console.log('\nLe filtre\n');
 console.log('\nLa sortie du panneau\n');
 
 {
-    const s = mount({ stored: ['alpha', 'bravo'] });
-    s.type('br');
-    s.press('ArrowDown');
-    check('une entrée est portée dans le champ', s.input.value === 'bravo');
+  const s = mount({ stored: ['alpha', 'bravo'] });
+  s.type('br');
+  s.press('ArrowDown');
+  check('une entrée est portée dans le champ', s.input.value === 'bravo');
 
-    const esc = s.press('Escape');
-    check('Échap referme le panneau', !s.isOpen());
-    check('  … en rendant la saisie en cours', s.input.value === 'br', `« ${s.input.value} »`);
-    check('  … et retient la touche, qui fermerait sinon une fenêtre',
-        esc.propagationStopped);
+  const esc = s.press('Escape');
+  check('Échap referme le panneau', !s.isOpen());
+  check('  … en rendant la saisie en cours', s.input.value === 'br', `« ${s.input.value} »`);
+  check('  … et retient la touche, qui fermerait sinon une fenêtre', esc.propagationStopped);
 
-    s.type('al');
-    s.press('ArrowDown');
-    s.press('Enter');
-    check('Entrée referme le panneau', !s.isOpen());
-    check('  … en laissant l’entrée choisie dans le champ',
-        s.input.value === 'alpha', `« ${s.input.value} »`);
+  s.type('al');
+  s.press('ArrowDown');
+  s.press('Enter');
+  check('Entrée referme le panneau', !s.isOpen());
+  check('  … en laissant l’entrée choisie dans le champ', s.input.value === 'alpha', `« ${s.input.value} »`);
 }
 
 {
-    const s = mount({ stored: ['alpha', 'bravo'] });
-    s.focus();
-    const row = s.panel.children[1];
-    const removeBtn = s.removeButtonOf(row);
-    row._fire('mousedown', { target: removeBtn, preventDefault() {} });
+  const s = mount({ stored: ['alpha', 'bravo'] });
+  s.focus();
+  const row = s.panel.children[1];
+  const removeBtn = s.removeButtonOf(row);
+  row._fire('mousedown', { target: removeBtn, preventDefault() {} });
 
-    check('la croix d’une ligne retire son entrée',
-        s.saved().length === 1 && s.saved()[0] === 'alpha', s.saved().join(' | '));
-    check('  … et la liste affichée suit', s.rows().length === 1, s.rows().join(' | '));
+  check(
+    'la croix d’une ligne retire son entrée',
+    s.saved().length === 1 && s.saved()[0] === 'alpha',
+    s.saved().join(' | '),
+  );
+  check('  … et la liste affichée suit', s.rows().length === 1, s.rows().join(' | '));
 
-    const remaining = s.panel.children[0];
-    remaining._fire('mousedown', { target: remaining, preventDefault() {} });
-    check('un clic sur la ligne la porte dans le champ',
-        s.input.value === 'alpha', `« ${s.input.value} »`);
-    check('  … et referme le panneau', !s.isOpen());
+  const remaining = s.panel.children[0];
+  remaining._fire('mousedown', { target: remaining, preventDefault() {} });
+  check('un clic sur la ligne la porte dans le champ', s.input.value === 'alpha', `« ${s.input.value} »`);
+  check('  … et referme le panneau', !s.isOpen());
 }
-
 
 // ─────────────────────── Vignette, nom et infobulle ───────────────────────
 
@@ -418,60 +482,73 @@ console.log('\nCe que montre une ligne\n');
 
 /** La vignette d'une ligne : son image, ou l'icône par défaut. */
 function thumbOf(row) {
-    const holder = childByClass(row, 'search-history-thumb');
-    const child = (holder.children || [])[0] || {};
-    return { tag: child.tagName || null, src: child.src || null };
+  const holder = childByClass(row, 'search-history-thumb');
+  const child = (holder.children || [])[0] || {};
+  return { tag: child.tagName || null, src: child.src || null };
 }
 
 {
-    const s = mount({
-        stored: [
-            { q: 'https://youtu.be/aaa', title: 'Around the World', thumb: 'https://img/aaa.jpg' },
-            { q: 'C:\\Musique\\Daft Punk\\Da Funk.mp3', title: null, thumb: null },
-            { q: 'daft punk', title: null, thumb: null },
-        ],
-    });
-    s.focus();
+  const s = mount({
+    stored: [
+      { q: 'https://youtu.be/aaa', title: 'Around the World', thumb: 'https://img/aaa.jpg' },
+      { q: 'C:\\Musique\\Daft Punk\\Da Funk.mp3', title: null, thumb: null },
+      { q: 'daft punk', title: null, thumb: null },
+    ],
+  });
+  s.focus();
 
-    check('un titre connu remplace l’adresse',
-        s.rows()[0] === 'Around the World', s.rows()[0]);
-    check('  … et son image est posée sur la ligne',
-        thumbOf(s.panel.children[0]).tag === 'IMG'
-            && thumbOf(s.panel.children[0]).src === 'https://img/aaa.jpg',
-        JSON.stringify(thumbOf(s.panel.children[0])));
-    check('  … l’adresse complète restant au survol',
-        s.panel.children[0].title === 'https://youtu.be/aaa',
-        String(s.panel.children[0].title));
+  check('un titre connu remplace l’adresse', s.rows()[0] === 'Around the World', s.rows()[0]);
+  check(
+    '  … et son image est posée sur la ligne',
+    thumbOf(s.panel.children[0]).tag === 'IMG' && thumbOf(s.panel.children[0]).src === 'https://img/aaa.jpg',
+    JSON.stringify(thumbOf(s.panel.children[0])),
+  );
+  check(
+    '  … l’adresse complète restant au survol',
+    s.panel.children[0].title === 'https://youtu.be/aaa',
+    String(s.panel.children[0].title),
+  );
 
-    check('un chemin est réduit au nom du fichier',
-        s.rows()[1] === 'Da Funk.mp3', s.rows()[1]);
-    check('  … avec le chemin entier au survol',
-        s.panel.children[1].title === 'C:\\Musique\\Daft Punk\\Da Funk.mp3',
-        String(s.panel.children[1].title));
-    check('  … et la note de musique faute d’image',
-        thumbOf(s.panel.children[1]).tag === 'SVG', String(thumbOf(s.panel.children[1]).tag));
+  check('un chemin est réduit au nom du fichier', s.rows()[1] === 'Da Funk.mp3', s.rows()[1]);
+  check(
+    '  … avec le chemin entier au survol',
+    s.panel.children[1].title === 'C:\\Musique\\Daft Punk\\Da Funk.mp3',
+    String(s.panel.children[1].title),
+  );
+  check(
+    '  … et la note de musique faute d’image',
+    thumbOf(s.panel.children[1]).tag === 'SVG',
+    String(thumbOf(s.panel.children[1]).tag),
+  );
 
-    check('une recherche en toutes lettres s’affiche telle quelle',
-        s.rows()[2] === 'daft punk', s.rows()[2]);
-    check('  … et ne s’encombre pas d’une infobulle qui la répéterait',
-        !s.panel.children[2].title, String(s.panel.children[2].title));
+  check('une recherche en toutes lettres s’affiche telle quelle', s.rows()[2] === 'daft punk', s.rows()[2]);
+  check(
+    '  … et ne s’encombre pas d’une infobulle qui la répéterait',
+    !s.panel.children[2].title,
+    String(s.panel.children[2].title),
+  );
 }
 
 {
-    // Le format d'avant : de simples chaînes. Elles doivent se relire sans
-    // migration à la main, et paraître comme des saisies pas encore reconnues.
-    const s = mount({ stored: ['https://youtu.be/zzz', 'un titre'] });
-    s.focus();
-    check('les entrées d’avant se relisent sans rien perdre',
-        s.rows().length === 2 && s.rows()[0] === 'https://youtu.be/zzz', s.rows().join(' | '));
+  // Le format d'avant : de simples chaînes. Elles doivent se relire sans
+  // migration à la main, et paraître comme des saisies pas encore reconnues.
+  const s = mount({ stored: ['https://youtu.be/zzz', 'un titre'] });
+  s.focus();
+  check(
+    'les entrées d’avant se relisent sans rien perdre',
+    s.rows().length === 2 && s.rows()[0] === 'https://youtu.be/zzz',
+    s.rows().join(' | '),
+  );
 
-    // La conversion n'est pas écrite à la lecture : relire n'a pas à toucher au
-    // stockage. Elle l'est à la première sauvegarde, celle-ci par exemple.
-    s.submit('https://youtu.be/nouveau');
-    check('  … et se rangent au nouveau format dès la première écriture',
-        s.stored().every(e => typeof e.q === 'string')
-            && s.stored().some(e => e.q === 'https://youtu.be/zzz' && e.title === null),
-        JSON.stringify(s.stored()));
+  // La conversion n'est pas écrite à la lecture : relire n'a pas à toucher au
+  // stockage. Elle l'est à la première sauvegarde, celle-ci par exemple.
+  s.submit('https://youtu.be/nouveau');
+  check(
+    '  … et se rangent au nouveau format dès la première écriture',
+    s.stored().every((e) => typeof e.q === 'string') &&
+      s.stored().some((e) => e.q === 'https://youtu.be/zzz' && e.title === null),
+    JSON.stringify(s.stored()),
+  );
 }
 
 // ─────────────────────── L'enrichissement par l'état ───────────────────────
@@ -479,135 +556,165 @@ function thumbOf(row) {
 console.log('\nCe que l’état vient compléter\n');
 
 {
-    const s = mount({ stored: ['https://youtu.be/aaa', 'daft punk', 'introuvable'] });
+  const s = mount({ stored: ['https://youtu.be/aaa', 'daft punk', 'introuvable'] });
 
-    s.sandbox.window.MusicPlayer.enrichSearchHistory([
-        { url: 'https://youtu.be/aaa', title: 'Around the World', thumbnail: 'https://img/a.jpg' },
-        { url: 'https://autre/bbb', title: 'daft punk', thumbnail: 'https://img/b.jpg' },
-    ]);
+  s.sandbox.window.MusicPlayer.enrichSearchHistory([
+    { url: 'https://youtu.be/aaa', title: 'Around the World', thumbnail: 'https://img/a.jpg' },
+    { url: 'https://autre/bbb', title: 'daft punk', thumbnail: 'https://img/b.jpg' },
+  ]);
 
-    check('une entrée est reconnue par son adresse',
-        s.stored()[0].title === 'Around the World' && s.stored()[0].thumb === 'https://img/a.jpg',
-        JSON.stringify(s.stored()[0]));
-    check('une recherche est reconnue par le titre revenu',
-        s.stored()[1].title === 'daft punk' && s.stored()[1].thumb === 'https://img/b.jpg',
-        JSON.stringify(s.stored()[1]));
-    check('ce qu’aucune piste ne retrouve garde son texte',
-        s.stored()[2].title === null && s.stored()[2].thumb === null,
-        JSON.stringify(s.stored()[2]));
+  check(
+    'une entrée est reconnue par son adresse',
+    s.stored()[0].title === 'Around the World' && s.stored()[0].thumb === 'https://img/a.jpg',
+    JSON.stringify(s.stored()[0]),
+  );
+  check(
+    'une recherche est reconnue par le titre revenu',
+    s.stored()[1].title === 'daft punk' && s.stored()[1].thumb === 'https://img/b.jpg',
+    JSON.stringify(s.stored()[1]),
+  );
+  check(
+    'ce qu’aucune piste ne retrouve garde son texte',
+    s.stored()[2].title === null && s.stored()[2].thumb === null,
+    JSON.stringify(s.stored()[2]),
+  );
 
-    s.focus();
-    check('  … et la ligne montre alors le nom appris',
-        s.rows()[0] === 'Around the World', s.rows()[0]);
+  s.focus();
+  check('  … et la ligne montre alors le nom appris', s.rows()[0] === 'Around the World', s.rows()[0]);
 }
 
 {
-    // La casse ne doit pas empêcher le rapprochement : une adresse recopiée à
-    // la main, un chemin Windows saisi en minuscules.
-    const s = mount({ stored: ['C:\\Musique\\Air.mp3'] });
-    s.sandbox.window.MusicPlayer.enrichSearchHistory([
-        { url: 'c:\\musique\\air.mp3', title: 'La Femme d’Argent', thumbnail: null },
-    ]);
-    check('le rapprochement ignore la casse',
-        s.stored()[0].title === 'La Femme d’Argent', JSON.stringify(s.stored()[0]));
+  // La casse ne doit pas empêcher le rapprochement : une adresse recopiée à
+  // la main, un chemin Windows saisi en minuscules.
+  const s = mount({ stored: ['C:\\Musique\\Air.mp3'] });
+  s.sandbox.window.MusicPlayer.enrichSearchHistory([
+    { url: 'c:\\musique\\air.mp3', title: 'La Femme d’Argent', thumbnail: null },
+  ]);
+  check('le rapprochement ignore la casse', s.stored()[0].title === 'La Femme d’Argent', JSON.stringify(s.stored()[0]));
 }
 
 {
-    /*
-     * Les adresses que le bot réécrit.
-     *
-     * C'était la panne : l'extracteur YouTube rend `https://youtube.com/watch?v=…`,
-     * sans `www.` ni paramètres, quand on colle presque toujours autre chose. Les
-     * adresses des pistes ci-dessous sont celles que les extracteurs produisent
-     * réellement (discord-player-youtubei, @discord-player/extractor), et non des
-     * copies de la saisie — c'est ce qui avait laissé passer la panne.
-     */
-    const s = mount({ stored: [
-        'https://www.youtube.com/watch?v=wBqfzj6CEzI',
-        'https://www.youtube.com/watch?v=I1bW68QJMUI&pp=ugUEEgJmcg%3D%3D',
-        'https://youtu.be/tE9MMqYu2Bk?si=Zx81kQ',
-        'https://music.youtube.com/watch?v=mQqvg9lMkSM&feature=share',
-        'https://www.youtube.com/shorts/tlhxJzPmziY',
-        'https://open.spotify.com/intl-fr/track/4uLU6hMCjMI75M1A2tKUQC?si=9f3a',
-        'https://soundcloud.com/daftpunk/one-more-time/?utm_source=clipboard&utm_medium=text',
-    ] });
+  /*
+   * Les adresses que le bot réécrit.
+   *
+   * C'était la panne : l'extracteur YouTube rend `https://youtube.com/watch?v=…`,
+   * sans `www.` ni paramètres, quand on colle presque toujours autre chose. Les
+   * adresses des pistes ci-dessous sont celles que les extracteurs produisent
+   * réellement (discord-player-youtubei, @discord-player/extractor), et non des
+   * copies de la saisie — c'est ce qui avait laissé passer la panne.
+   */
+  const s = mount({
+    stored: [
+      'https://www.youtube.com/watch?v=wBqfzj6CEzI',
+      'https://www.youtube.com/watch?v=I1bW68QJMUI&pp=ugUEEgJmcg%3D%3D',
+      'https://youtu.be/tE9MMqYu2Bk?si=Zx81kQ',
+      'https://music.youtube.com/watch?v=mQqvg9lMkSM&feature=share',
+      'https://www.youtube.com/shorts/tlhxJzPmziY',
+      'https://open.spotify.com/intl-fr/track/4uLU6hMCjMI75M1A2tKUQC?si=9f3a',
+      'https://soundcloud.com/daftpunk/one-more-time/?utm_source=clipboard&utm_medium=text',
+    ],
+  });
 
-    const yt = (id, title) => ({
-        url: `https://youtube.com/watch?v=${id}`, title, thumbnail: `https://i.ytimg.com/vi/${id}/hq.jpg`,
-    });
-    s.sandbox.window.MusicPlayer.enrichSearchHistory([
-        yt('wBqfzj6CEzI', 'Premier'),
-        yt('I1bW68QJMUI', 'Deuxième'),
-        yt('tE9MMqYu2Bk', 'Troisième'),
-        { url: 'https://youtube.com/watch?v=mQqvg9lMkSM&dpymeta=ytmusic', title: 'Quatrième', thumbnail: 't4' },
-        yt('tlhxJzPmziY', 'Cinquième'),
-        { url: 'https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC', title: 'Sixième', thumbnail: 't6' },
-        { url: 'https://soundcloud.com/daftpunk/one-more-time', title: 'Septième', thumbnail: 't7' },
-    ]);
+  const yt = (id, title) => ({
+    url: `https://youtube.com/watch?v=${id}`,
+    title,
+    thumbnail: `https://i.ytimg.com/vi/${id}/hq.jpg`,
+  });
+  s.sandbox.window.MusicPlayer.enrichSearchHistory([
+    yt('wBqfzj6CEzI', 'Premier'),
+    yt('I1bW68QJMUI', 'Deuxième'),
+    yt('tE9MMqYu2Bk', 'Troisième'),
+    { url: 'https://youtube.com/watch?v=mQqvg9lMkSM&dpymeta=ytmusic', title: 'Quatrième', thumbnail: 't4' },
+    yt('tlhxJzPmziY', 'Cinquième'),
+    { url: 'https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC', title: 'Sixième', thumbnail: 't6' },
+    { url: 'https://soundcloud.com/daftpunk/one-more-time', title: 'Septième', thumbnail: 't7' },
+  ]);
 
-    const titles = s.stored().map(e => e.title);
-    check('un lien www. est reconnu malgré la réécriture du bot',
-        titles[0] === 'Premier' && s.stored()[0].thumb === 'https://i.ytimg.com/vi/wBqfzj6CEzI/hq.jpg',
-        JSON.stringify(s.stored()[0]));
-    check('  … comme un lien portant « &pp= »', titles[1] === 'Deuxième', String(titles[1]));
-    check('  … un lien court youtu.be avec « ?si= »', titles[2] === 'Troisième', String(titles[2]));
-    check('  … un lien YouTube Music', titles[3] === 'Quatrième', String(titles[3]));
-    check('  … un Short', titles[4] === 'Cinquième', String(titles[4]));
-    check('un lien Spotify régionalisé retrouve son morceau', titles[5] === 'Sixième', String(titles[5]));
-    check('un lien SoundCloud chargé de paramètres de suivi aussi',
-        titles[6] === 'Septième', String(titles[6]));
-    check('  … et la saisie reste celle qui a été collée',
-        s.stored()[0].q === 'https://www.youtube.com/watch?v=wBqfzj6CEzI', s.stored()[0].q);
+  const titles = s.stored().map((e) => e.title);
+  check(
+    'un lien www. est reconnu malgré la réécriture du bot',
+    titles[0] === 'Premier' && s.stored()[0].thumb === 'https://i.ytimg.com/vi/wBqfzj6CEzI/hq.jpg',
+    JSON.stringify(s.stored()[0]),
+  );
+  check('  … comme un lien portant « &pp= »', titles[1] === 'Deuxième', String(titles[1]));
+  check('  … un lien court youtu.be avec « ?si= »', titles[2] === 'Troisième', String(titles[2]));
+  check('  … un lien YouTube Music', titles[3] === 'Quatrième', String(titles[3]));
+  check('  … un Short', titles[4] === 'Cinquième', String(titles[4]));
+  check('un lien Spotify régionalisé retrouve son morceau', titles[5] === 'Sixième', String(titles[5]));
+  check('un lien SoundCloud chargé de paramètres de suivi aussi', titles[6] === 'Septième', String(titles[6]));
+  check(
+    '  … et la saisie reste celle qui a été collée',
+    s.stored()[0].q === 'https://www.youtube.com/watch?v=wBqfzj6CEzI',
+    s.stored()[0].q,
+  );
 }
 
 {
-    // L'identifiant YouTube tient compte de la casse : deux vidéos peuvent ne
-    // différer que par elle. Une liste de lecture, elle, ne désigne aucune
-    // vidéo en particulier et n'a pas à en prendre le nom.
-    // Au format objet : sans correspondance rien n'est réécrit, et des chaînes
-    // resteraient des chaînes — on lirait `undefined` là où l'on attend `null`.
-    const s = mount({ stored: [
-        { q: 'https://www.youtube.com/watch?v=abcDEF12345', title: null, thumb: null },
-        { q: 'https://www.youtube.com/playlist?list=PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG', title: null, thumb: null },
-    ] });
-    s.sandbox.window.MusicPlayer.enrichSearchHistory([
-        { url: 'https://youtube.com/watch?v=abcdef12345', title: 'Une autre', thumbnail: 'x' },
-        { url: 'https://youtube.com/watch?v=PLx0sYbCqOb', title: 'Vidéo', thumbnail: 'y' },
-    ]);
-    check('deux identifiants ne différant que par la casse restent distincts',
-        s.stored()[0].title === null, JSON.stringify(s.stored()[0]));
-    check('une liste de lecture n’emprunte pas le nom d’une vidéo',
-        s.stored()[1].title === null, JSON.stringify(s.stored()[1]));
+  // L'identifiant YouTube tient compte de la casse : deux vidéos peuvent ne
+  // différer que par elle. Une liste de lecture, elle, ne désigne aucune
+  // vidéo en particulier et n'a pas à en prendre le nom.
+  // Au format objet : sans correspondance rien n'est réécrit, et des chaînes
+  // resteraient des chaînes — on lirait `undefined` là où l'on attend `null`.
+  const s = mount({
+    stored: [
+      { q: 'https://www.youtube.com/watch?v=abcDEF12345', title: null, thumb: null },
+      { q: 'https://www.youtube.com/playlist?list=PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG', title: null, thumb: null },
+    ],
+  });
+  s.sandbox.window.MusicPlayer.enrichSearchHistory([
+    { url: 'https://youtube.com/watch?v=abcdef12345', title: 'Une autre', thumbnail: 'x' },
+    { url: 'https://youtube.com/watch?v=PLx0sYbCqOb', title: 'Vidéo', thumbnail: 'y' },
+  ]);
+  check(
+    'deux identifiants ne différant que par la casse restent distincts',
+    s.stored()[0].title === null,
+    JSON.stringify(s.stored()[0]),
+  );
+  check(
+    'une liste de lecture n’emprunte pas le nom d’une vidéo',
+    s.stored()[1].title === null,
+    JSON.stringify(s.stored()[1]),
+  );
 }
 
 {
-    // Le même morceau collé sous deux formes : une seule ligne, qui garde ce
-    // qu'on savait déjà et prend la forme saisie en dernier.
-    const s = mount({ stored: [
-        { q: 'https://youtu.be/wBqfzj6CEzI?si=abc', title: 'Premier', thumb: 't' },
-        'daft punk',
-    ] });
-    s.submit('https://www.youtube.com/watch?v=wBqfzj6CEzI');
-    check('un même morceau collé sous une autre forme ne se dédouble pas',
-        s.stored().length === 2, s.saved().join(' | '));
-    check('  … remonte en tête avec la dernière forme saisie',
-        s.stored()[0].q === 'https://www.youtube.com/watch?v=wBqfzj6CEzI', s.stored()[0].q);
-    check('  … et garde le titre et l’image déjà appris',
-        s.stored()[0].title === 'Premier' && s.stored()[0].thumb === 't',
-        JSON.stringify(s.stored()[0]));
+  // Le même morceau collé sous deux formes : une seule ligne, qui garde ce
+  // qu'on savait déjà et prend la forme saisie en dernier.
+  const s = mount({
+    stored: [{ q: 'https://youtu.be/wBqfzj6CEzI?si=abc', title: 'Premier', thumb: 't' }, 'daft punk'],
+  });
+  s.submit('https://www.youtube.com/watch?v=wBqfzj6CEzI');
+  check(
+    'un même morceau collé sous une autre forme ne se dédouble pas',
+    s.stored().length === 2,
+    s.saved().join(' | '),
+  );
+  check(
+    '  … remonte en tête avec la dernière forme saisie',
+    s.stored()[0].q === 'https://www.youtube.com/watch?v=wBqfzj6CEzI',
+    s.stored()[0].q,
+  );
+  check(
+    '  … et garde le titre et l’image déjà appris',
+    s.stored()[0].title === 'Premier' && s.stored()[0].thumb === 't',
+    JSON.stringify(s.stored()[0]),
+  );
 }
 
 {
-    // Le cas le plus fréquent : rien de nouveau à apprendre. La fonction est
-    // appelée à chaque état, soit une fois par seconde.
-    const s = mount({ stored: [{ q: 'a', title: 'A', thumb: 'i' }] });
-    const before = s.store.get('searchInputHistory');
-    s.sandbox.window.MusicPlayer.enrichSearchHistory([{ url: 'a', title: 'Autre', thumbnail: 'j' }]);
-    check('une entrée déjà complète n’est pas retouchée',
-        s.store.get('searchInputHistory') === before, s.store.get('searchInputHistory'));
+  // Le cas le plus fréquent : rien de nouveau à apprendre. La fonction est
+  // appelée à chaque état, soit une fois par seconde.
+  const s = mount({ stored: [{ q: 'a', title: 'A', thumb: 'i' }] });
+  const before = s.store.get('searchInputHistory');
+  s.sandbox.window.MusicPlayer.enrichSearchHistory([{ url: 'a', title: 'Autre', thumbnail: 'j' }]);
+  check(
+    'une entrée déjà complète n’est pas retouchée',
+    s.store.get('searchInputHistory') === before,
+    s.store.get('searchInputHistory'),
+  );
 
-    s.sandbox.window.MusicPlayer.enrichSearchHistory([]);
-    check('une liste de pistes vide ne fait rien tomber', true);
+  s.sandbox.window.MusicPlayer.enrichSearchHistory([]);
+  check('une liste de pistes vide ne fait rien tomber', true);
 }
 
 console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);

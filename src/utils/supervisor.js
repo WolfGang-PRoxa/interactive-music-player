@@ -24,7 +24,7 @@ const RESTART_EXIT_CODE = 75;
 const RESTART_REQUEST = 'desktop-restart.json';
 
 function isSupervised(env = process.env) {
-    return env.IMP_SUPERVISOR === 'desktop';
+  return env.IMP_SUPERVISOR === 'desktop';
 }
 
 /**
@@ -38,16 +38,16 @@ function isSupervised(env = process.env) {
  * @returns {string} Le fichier écrit
  */
 function writeRestartRequest(entryPoint, root = process.cwd()) {
-    const dir = path.join(root, 'data');
-    fs.mkdirSync(dir, { recursive: true });
-    const file = path.join(dir, RESTART_REQUEST);
-    fs.writeFileSync(file, JSON.stringify({ entryPoint: path.resolve(entryPoint) }, null, 2));
-    return file;
+  const dir = path.join(root, 'data');
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, RESTART_REQUEST);
+  fs.writeFileSync(file, JSON.stringify({ entryPoint: path.resolve(entryPoint) }, null, 2));
+  return file;
 }
 
 module.exports = {
-    RESTART_EXIT_CODE,
-    RESTART_REQUEST,
-    isSupervised,
-    writeRestartRequest,
+  RESTART_EXIT_CODE,
+  RESTART_REQUEST,
+  isSupervised,
+  writeRestartRequest,
 };

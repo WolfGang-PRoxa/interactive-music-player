@@ -39,11 +39,11 @@ To use the Software, each person:
 
 This produces a division of roles that never varies:
 
-| Role | Who | Responsibility |
-|---|---|---|
-| **Author** | The repository maintainer | Publishing the source code. Nothing else. |
-| **Operator** | Anyone who installs and runs an instance | The Discord application, the machine, the configuration, the data, the usage |
-| **End user** | Members of a Discord server where an instance has been invited | Their own use of the bot and the dashboard |
+| Role         | Who                                                            | Responsibility                                                               |
+| ------------ | -------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| **Author**   | The repository maintainer                                      | Publishing the source code. Nothing else.                                    |
+| **Operator** | Anyone who installs and runs an instance                       | The Discord application, the machine, the configuration, the data, the usage |
+| **End user** | Members of a Discord server where an instance has been invited | Their own use of the bot and the dashboard                                   |
 
 The author operates no instance, has no access to the data of any instance, and
 is not party to any relationship between an operator and their users. An
@@ -152,7 +152,7 @@ The Software must not be used to:
 - harass, threaten or harm a person or group;
 - disrupt a Discord server: spam, raiding, evading a sanction, flooding a voice
   channel;
-- automate a Discord user account (*self-botting*), which Discord prohibits;
+- automate a Discord user account (_self-botting_), which Discord prohibits;
 - collect data about Discord members beyond what the described functionality
   requires;
 - circumvent the dashboard's access protections, or reach files outside the
@@ -167,12 +167,12 @@ The Software must not be used to:
 The Software communicates with independent services, each governed by its own
 terms:
 
-| Service | Role |
-|---|---|
-| Discord | Host platform, voice connection, OAuth2 authentication |
-| YouTube, Spotify, SoundCloud, Apple Music | Resolving searches and streams |
-| GitHub | Distribution of the code and the installer, update checks |
-| Cloudflare | Sharing the dashboard through a tunnel, sign-in relay |
+| Service                                   | Role                                                      |
+| ----------------------------------------- | --------------------------------------------------------- |
+| Discord                                   | Host platform, voice connection, OAuth2 authentication    |
+| YouTube, Spotify, SoundCloud, Apple Music | Resolving searches and streams                            |
+| GitHub                                    | Distribution of the code and the installer, update checks |
+| Cloudflare                                | Sharing the dashboard through a tunnel, sign-in relay     |
 
 None of these services is affiliated with, sponsors, or endorses the Software.
 The trademarks named belong to their respective holders.
@@ -282,4 +282,4 @@ contact the person who invited it there: they alone are its operator.
 
 ---
 
-*[Version française](CONDITIONS.md) · [Privacy Policy](PRIVACY.md)*
+_[Version française](CONDITIONS.md) · [Privacy Policy](PRIVACY.md)_
