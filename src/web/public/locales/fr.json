@@ -525,7 +525,7 @@
   "changelog_releases_one": "{n} livraison",
   "changelog_releases_many": "{n} livraisons",
   "changelog_no_match": "Aucun changement ne correspond.",
-  "changelog_empty": "Aucun journal trouvé dans le dossier changelog/.",
+  "changelog_empty": "Aucun journal trouvé (CHANGELOG.md).",
   "changelog_load_failed": "Journal illisible.",
   "changelog_lang_note": "Journal disponible en français et en anglais ; affiché en {lang}.",
   "changelog_lang_fr": "français",

@@ -525,7 +525,7 @@
   "changelog_releases_one": "{n} Lieferung",
   "changelog_releases_many": "{n} Lieferungen",
   "changelog_no_match": "Keine Änderung stimmt überein.",
-  "changelog_empty": "Kein Protokoll im Ordner changelog/ gefunden.",
+  "changelog_empty": "Kein Protokoll gefunden (CHANGELOG.md).",
   "changelog_load_failed": "Protokoll nicht lesbar.",
   "changelog_lang_note": "Protokoll auf Französisch und Englisch verfügbar; angezeigt auf {lang}.",
   "changelog_lang_fr": "Französisch",

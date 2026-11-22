@@ -11,7 +11,9 @@
  *    exactement les pièges du vrai fichier : un commentaire HTML qui décrit le
  *    format — et qui ne doit être compté ni comme livraison ni comme entrée —,
  *    une entrée sur deux lignes, un résumé sur deux lignes, une livraison sans
- *    titre, une catégorie inconnue.
+ *    titre, une catégorie inconnue. Une seconde source porte ceux du format
+ *    Keep a Changelog : `[Unreleased]`, une version, des rubriques en français,
+ *    une livraison datée d'avant les versions, des définitions de liens.
  *
  *  - **La parité des langues.** Le journal est écrit à la main en français et en
  *    anglais. Une livraison ajoutée d'un côté et pas de l'autre, une entrée
@@ -141,6 +143,104 @@ check(
   first.groups.map((g) => g.kind).join(' → '),
 );
 
+console.log('\n=== Format Keep a Changelog ===\n');
+
+const KAC = [
+  '# Journal',
+  '',
+  'Introduction.',
+  '',
+  '## [Unreleased]',
+  '',
+  '### Ajouts',
+  '',
+  '- À venir.',
+  '',
+  '## [1.2.0] - 2026-03-03',
+  '',
+  'Résumé de la version.',
+  '',
+  '### Corrections',
+  '',
+  '- Une correction.',
+  '',
+  '### Ajouts',
+  '',
+  '- Un ajout.',
+  '',
+  '## 2026-01-01 — Avant les versions',
+  '',
+  '### Fixed',
+  '',
+  '- La dernière entrée.',
+  '',
+  '[Unreleased]: https://example.com/compare/v1.2.0...HEAD',
+  '[1.2.0]: https://example.com/releases/tag/v1.2.0',
+  '',
+].join('\n');
+
+const kac = changelog.parse(KAC);
+
+check(
+  "« Unreleased » n'est pas une livraison, et ses entrées sont gardées à part",
+  kac.releases.length === 2 && kac.unreleased.count === 1 && kac.unreleased.groups[0].kind === 'added',
+  `${kac.releases.length} livraison(s), ${kac.unreleased.count} entrée(s) à venir`,
+);
+
+const version = kac.releases[0];
+check(
+  'une version est lue avec sa date, et prend son numéro pour titre',
+  version.version === '1.2.0' && version.date === '2026-03-03' && version.title === 'Version 1.2.0',
+  `${version.version} — ${version.date} — ${version.title}`,
+);
+check('  … et garde son résumé', version.summary === 'Résumé de la version.', version.summary);
+check(
+  '  … et ses rubriques en français sont ramenées aux catégories',
+  version.groups.map((g) => g.kind).join(' ') === 'added fixed',
+  version.groups.map((g) => g.kind).join(' → '),
+);
+
+const legacy = kac.releases[1];
+check(
+  "une livraison d'avant les versions reste lue à sa date",
+  legacy.version === '' && legacy.date === '2026-01-01' && legacy.title === 'Avant les versions',
+  `${legacy.date} — ${legacy.title}`,
+);
+check(
+  'les définitions de liens ne prolongent pas la dernière entrée',
+  legacy.groups[0].entries[0] === 'La dernière entrée.',
+  legacy.groups[0].entries[0],
+);
+
+check(
+  'chaque langue a son fichier, la référence le nom nu',
+  changelog.fileOf('en') === 'CHANGELOG.md' && changelog.fileOf('fr') === 'CHANGELOG.fr.md',
+  `${changelog.fileOf('en')}, ${changelog.fileOf('fr')}`,
+);
+
+/* ══════════════════ Une seule source de version ══════════════════ */
+
+console.log('\n=== La version ===\n');
+
+{
+  // `package.json` porte la version ; le paquet de l'application de bureau la
+  // suit, et le journal ne peut annoncer comme dernière qu'elle.
+  const rootPkg = require(path.join(__dirname, '..', 'package.json'));
+  const desktopPkg = require(path.join(__dirname, '..', 'desktop', 'package.json'));
+  check('la version est au format X.Y.Z', /^\d+\.\d+\.\d+$/.test(rootPkg.version), rootPkg.version);
+  check(
+    "l'application de bureau suit package.json",
+    desktopPkg.version === rootPkg.version,
+    `${desktopPkg.version} / ${rootPkg.version}`,
+  );
+  const newest = changelog.read('en').releases.find((r) => r.version);
+  check(
+    'la dernière version du journal est celle de package.json',
+    Boolean(newest) && newest.version === rootPkg.version,
+    newest ? newest.version : 'aucune version',
+  );
+}
+
 /* ═════════════════════════ Le service ═════════════════════════ */
 
 const app = express();
@@ -181,8 +281,11 @@ server.listen(0, '127.0.0.1', async () => {
 
   /** Charpente d'un journal : dates, catégories, nombres — jamais la prose. */
   const skeleton = (payload) =>
-    payload.releases
-      .map((release) => `${release.date} [${release.groups.map((g) => `${g.kind}:${g.entries.length}`).join(' ')}]`)
+    [{ date: 'unreleased', groups: payload.unreleased.groups }, ...payload.releases]
+      .map(
+        (release) =>
+          `${release.version || ''}@${release.date} [${release.groups.map((g) => `${g.kind}:${g.entries.length}`).join(' ')}]`,
+      )
       .join('\n');
 
   const referenceSkeleton = skeleton(reference.json);

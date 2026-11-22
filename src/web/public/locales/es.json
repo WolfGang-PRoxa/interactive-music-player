@@ -525,7 +525,7 @@
   "changelog_releases_one": "{n} entrega",
   "changelog_releases_many": "{n} entregas",
   "changelog_no_match": "Ningún cambio coincide.",
-  "changelog_empty": "No se ha encontrado ningún registro en la carpeta changelog/.",
+  "changelog_empty": "No se ha encontrado ningún registro (CHANGELOG.md).",
   "changelog_load_failed": "Registro ilegible.",
   "changelog_lang_note": "Registro disponible en francés e inglés; se muestra en {lang}.",
   "changelog_lang_fr": "francés",

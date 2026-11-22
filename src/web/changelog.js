@@ -20,20 +20,33 @@
  *
  * ## Le format
  *
- *     ## AAAA-MM-JJ — Titre de la livraison
+ * Celui de Keep a Changelog :
+ *
+ *     ## [Unreleased]
+ *     ## [X.Y.Z] - AAAA-MM-JJ
  *     Une phrase de résumé, facultative.
  *     ### Added
  *     - Un changement par ligne.
  *
- * Les mots des sections restent en anglais dans toutes les langues : ce sont
- * les mots-clés de Keep a Changelog, reconnus ici et affichés traduits par le
- * tableau de bord. Les traduire dans les fichiers demanderait une table de
- * correspondance par langue, qui se désaccorderait au premier synonyme.
+ * Les livraisons d'avant la 0.0.1, notées au jour le jour, gardent leur
+ * ancien titre : `## AAAA-MM-JJ — Titre de la livraison`. Les deux formes
+ * se lisent ici de la même façon ; une version reçoit pour titre
+ * « Version X.Y.Z ».
+ *
+ * `[Unreleased]` n'est pas une livraison : ses entrées sont rendues à part,
+ * sous `unreleased`, et la frise du tableau de bord ne montre que ce qui a été
+ * livré. Les définitions de liens de fin de fichier (`[0.0.2]: https://…`) sont
+ * sautées.
+ *
+ * Les rubriques sont écrites dans la langue du fichier — Added ou Ajouts,
+ * Fixed ou Corrections — et ramenées ici aux six catégories de `KINDS`, que le
+ * tableau de bord affiche traduites.
  *
  * ## Les langues
  *
- * Le journal est écrit à la main en français et en anglais, et le dossier fait
- * foi : ce qui n'y est pas retombe sur `REFERENCE_LANG`. La documentation, elle,
+ * Le journal est écrit à la main en anglais (`CHANGELOG.md`) et traduit en
+ * français (`CHANGELOG.fr.md`), et les fichiers font foi : ce qui n'y est pas
+ * retombe sur `REFERENCE_LANG`. La documentation, elle,
  * retombe sur le français, et pour une raison qui ne vaut pas ici — c'est sa
  * langue d'écriture, dont les autres sont traduites. Le journal a deux langues
  * d'écriture ; un lecteur dont la langue manque est mieux servi par celle qui
@@ -44,16 +57,25 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Dossier `changelog/` de la **version en cours d'exécution**.
+ * Racine de la **version en cours d'exécution**, où vivent `CHANGELOG.md` et
+ * ses traductions.
  *
- * Résolu depuis `__dirname` et non depuis `process.cwd()`, pour la même raison
+ * Résolue depuis `__dirname` et non depuis `process.cwd()`, pour la même raison
  * que `DOCS_DIR` dans routes/api.js : sur une release installée, le journal lu
  * dans le tableau de bord doit être celui de la version qui tourne.
  */
-const CHANGELOG_DIR = path.resolve(__dirname, '..', '..', 'changelog');
+const CHANGELOG_DIR = path.resolve(__dirname, '..', '..');
 
 /** Langue servie quand celle demandée n'est pas écrite — voir l'en-tête. */
 const REFERENCE_LANG = 'en';
+
+/**
+ * Nom du fichier d'une langue : `CHANGELOG.md` pour la référence, que tout
+ * dépôt lit en premier, `CHANGELOG.<langue>.md` pour ses traductions.
+ */
+function fileOf(lang) {
+  return lang === REFERENCE_LANG ? 'CHANGELOG.md' : `CHANGELOG.${lang}.md`;
+}
 
 /**
  * Catégories connues, dans l'ordre où elles paraissent dans une livraison.
@@ -67,10 +89,31 @@ const REFERENCE_LANG = 'en';
 const KINDS = ['added', 'changed', 'fixed', 'removed', 'deprecated', 'security'];
 
 /**
+ * Les mots de rubrique de chaque langue écrite, ramenés à leur catégorie.
+ *
+ * En minuscules : la comparaison se fait sur le mot du fichier mis en
+ * minuscules. Un mot absent de la table passe tel quel — voir `KINDS`.
+ */
+const KIND_WORDS = {
+  added: 'added',
+  changed: 'changed',
+  fixed: 'fixed',
+  removed: 'removed',
+  deprecated: 'deprecated',
+  security: 'security',
+  ajouts: 'added',
+  améliorations: 'changed',
+  corrections: 'fixed',
+  suppressions: 'removed',
+  dépréciations: 'deprecated',
+  sécurité: 'security',
+};
+
+/**
  * Langues effectivement écrites, lues sur le disque à chaque appel.
  *
  * Une liste en dur devrait être tenue à jour à la main, et se tromperait sur une
- * version installée qui n'en embarque pas autant. Le dossier fait foi.
+ * version installée qui n'en embarque pas autant. Les fichiers font foi.
  *
  * Le filtre sur deux lettres minuscules n'est pas de la validation d'entrée —
  * rien de ce qui vient du client n'arrive ici — mais une garde contre les
@@ -80,8 +123,10 @@ function availableLangs() {
   try {
     return fs
       .readdirSync(CHANGELOG_DIR, { withFileTypes: true })
-      .filter((entry) => entry.isFile() && /^[a-z]{2}\.md$/.test(entry.name))
-      .map((entry) => entry.name.slice(0, 2))
+      .filter((entry) => entry.isFile())
+      .map((entry) => /^CHANGELOG(?:\.([a-z]{2}))?\.md$/.exec(entry.name))
+      .filter(Boolean)
+      .map((match) => match[1] || REFERENCE_LANG)
       .sort();
   } catch (e) {
     return [];
@@ -104,8 +149,17 @@ function resolveLang(requested) {
   return available.find((lang) => lang === REFERENCE_LANG) || available[0] || REFERENCE_LANG;
 }
 
-/** Une date de livraison, et rien d'autre : `## 2026-09-14 — Titre`. */
+/** Une version livrée : `## [0.0.2] - 2026-11-21`. */
+const VERSION_LINE = /^##\s+\[(\d+\.\d+\.\d+)\]\s*-\s*(\d{4}-\d{2}-\d{2})\s*$/;
+
+/** Ce qui attend la prochaine version : `## [Unreleased]`. */
+const UNRELEASED_LINE = /^##\s+\[unreleased\]\s*$/i;
+
+/** Une livraison d'avant les versions, à sa date : `## 2026-09-14 — Titre`. */
 const RELEASE_LINE = /^##\s+(\d{4}-\d{2}-\d{2})\s*(?:[—–-]\s*(.*))?$/;
+
+/** Une définition de lien, en fin de fichier : `[0.0.2]: https://…`. */
+const LINK_DEFINITION = /^\[[^\]]+\]:\s+\S+$/;
 
 /**
  * Extrait la charpente d'un journal.
@@ -116,7 +170,8 @@ const RELEASE_LINE = /^##\s+(\d{4}-\d{2}-\d{2})\s*(?:[—–-]\s*(.*))?$/;
  * prose ne doit ni compter comme une entrée ni interrompre la lecture.
  *
  * @param {string} source Markdown du journal
- * @returns {{title: string, intro: string, releases: Array, count: number}}
+ * @returns {{title: string, intro: string, releases: Array, count: number,
+ *   unreleased: {groups: Array, count: number}}}
  */
 function parse(source) {
   const lines = String(source).replace(/\r\n?/g, '\n').split('\n');
@@ -124,6 +179,8 @@ function parse(source) {
   let title = '';
   const intro = [];
   const releases = [];
+  /** Ce qui attend la prochaine version : lu comme une livraison, rendu à part. */
+  const unreleased = { groups: [], count: 0 };
   /** Livraison en cours de lecture, et sa catégorie en cours. */
   let release = null;
   let group = null;
@@ -142,13 +199,21 @@ function parse(source) {
       if (!line.includes('-->')) inComment = true;
       continue;
     }
-    if (!line) continue;
+    if (!line || LINK_DEFINITION.test(line)) continue;
 
-    const releaseLine = RELEASE_LINE.exec(line);
-    if (releaseLine) {
+    if (UNRELEASED_LINE.test(line)) {
+      release = unreleased;
+      group = null;
+      continue;
+    }
+
+    const versionLine = VERSION_LINE.exec(line);
+    const releaseLine = versionLine ? null : RELEASE_LINE.exec(line);
+    if (versionLine || releaseLine) {
       release = {
-        date: releaseLine[1],
-        title: (releaseLine[2] || '').trim(),
+        version: versionLine ? versionLine[1] : '',
+        date: versionLine ? versionLine[2] : releaseLine[1],
+        title: versionLine ? `Version ${versionLine[1]}` : (releaseLine[2] || '').trim(),
         summary: '',
         groups: [],
         count: 0,
@@ -160,7 +225,8 @@ function parse(source) {
 
     const kindLine = /^###\s+(.+?)\s*$/.exec(line);
     if (kindLine && release) {
-      const kind = kindLine[1].trim().toLowerCase();
+      const word = kindLine[1].trim().toLowerCase();
+      const kind = KIND_WORDS[word] || word;
       // Une catégorie citée deux fois dans la même livraison est une
       // seule liste : on reprend celle qui existe plutôt que d'afficher
       // deux fois le même en-tête.
@@ -198,7 +264,7 @@ function parse(source) {
     if (!release) {
       intro.push(line);
     } else if (!group) {
-      release.summary = release.summary ? `${release.summary} ${line}` : line;
+      if (release !== unreleased) release.summary = release.summary ? `${release.summary} ${line}` : line;
     } else if (group.entries.length) {
       group.entries[group.entries.length - 1] += ` ${line}`;
     }
@@ -210,7 +276,7 @@ function parse(source) {
     const index = KINDS.indexOf(kind);
     return index === -1 ? KINDS.length : index;
   };
-  for (const entry of releases) {
+  for (const entry of [...releases, unreleased]) {
     entry.groups.sort((a, b) => rank(a.kind) - rank(b.kind));
   }
 
@@ -219,6 +285,7 @@ function parse(source) {
     intro: intro.join(' '),
     releases,
     count: releases.reduce((total, entry) => total + entry.count, 0),
+    unreleased,
   };
 }
 
@@ -231,12 +298,13 @@ function parse(source) {
  * pas qu'on tienne un cache à jour.
  *
  * @param {string} requested Langue demandée par le tableau de bord
- * @returns {{lang: string, title: string, intro: string, releases: Array, count: number}}
+ * @returns {{lang: string, title: string, intro: string, releases: Array, count: number,
+ *   unreleased: {groups: Array, count: number}}}
  * @throws {Error} si le fichier de la langue retenue est illisible
  */
 function read(requested) {
   const lang = resolveLang(requested);
-  const source = fs.readFileSync(path.join(CHANGELOG_DIR, `${lang}.md`), 'utf8');
+  const source = fs.readFileSync(path.join(CHANGELOG_DIR, fileOf(lang)), 'utf8');
   return { lang, ...parse(source) };
 }
 
@@ -244,6 +312,8 @@ module.exports = {
   CHANGELOG_DIR,
   REFERENCE_LANG,
   KINDS,
+  KIND_WORDS,
+  fileOf,
   availableLangs,
   resolveLang,
   parse,

@@ -1,7 +1,7 @@
 /**
  * Changelog — Lecture du journal des modifications, en frise.
  *
- * Le bot est livré avec son dossier `changelog/` ; cette fenêtre le donne à lire
+ * Le bot est livré avec son `CHANGELOG.md` ; cette fenêtre le donne à lire
  * sans quitter le tableau de bord, sous la forme qui convient à un journal : une
  * suite de livraisons datées, la plus récente en tête, chacune découpée en
  * catégories — ajouts, changements, correctifs, sécurité.
@@ -372,7 +372,7 @@ window.MusicPlayer = window.MusicPlayer || {};
       empty.className = 'changelog-toc-empty';
       empty.textContent = journal
         ? t('changelog_no_match', 'Aucun changement ne correspond.')
-        : t('changelog_empty', 'Aucun journal trouvé dans le dossier changelog/.');
+        : t('changelog_empty', 'Aucun journal trouvé (CHANGELOG.md).');
       summary.appendChild(empty);
       return;
     }
@@ -415,7 +415,7 @@ window.MusicPlayer = window.MusicPlayer || {};
       empty.className = 'changelog-empty';
       empty.textContent = journal
         ? t('changelog_no_match', 'Aucun changement ne correspond.')
-        : t('changelog_empty', 'Aucun journal trouvé dans le dossier changelog/.');
+        : t('changelog_empty', 'Aucun journal trouvé (CHANGELOG.md).');
       host.appendChild(empty);
       updateFooter();
       return;

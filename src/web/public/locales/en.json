@@ -525,7 +525,7 @@
   "changelog_releases_one": "{n} release",
   "changelog_releases_many": "{n} releases",
   "changelog_no_match": "No change matches.",
-  "changelog_empty": "No changelog found in the changelog/ folder.",
+  "changelog_empty": "No changelog found (CHANGELOG.md).",
   "changelog_load_failed": "Changelog unreadable.",
   "changelog_lang_note": "Changelog available in French and English; shown in {lang}.",
   "changelog_lang_fr": "French",

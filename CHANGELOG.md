@@ -1,27 +1,44 @@
 # Changelog
 
-Every change to the bot, newest first. Each entry carries the date the change
-was delivered.
+All notable changes to Interactive Music Player, newest first. The format
+follows Keep a Changelog, and versions follow Semantic Versioning. Before
+version 0.0.1, changes were logged by the day they were delivered: those
+entries keep their date and their title.
 
 <!--
     Format — read by src/web/changelog.js, displayed by js/changelog.js.
 
-    ## YYYY-MM-DD — Release title
+    ## [Unreleased]
+    ## [X.Y.Z] - YYYY-MM-DD
     An optional one-line summary.
-    ### Added | Changed | Fixed | Removed | Security
+    ### Added | Changed | Fixed | Removed | Deprecated | Security
     - One change per line.
 
-    The six section words stay in English in every language: they are Keep a
-    Changelog's structural keywords, which the parser recognises and the
-    dashboard displays translated. Translating them here would mean keeping a
-    lookup table per language, which the first synonym would put out of step.
-
-    The changelog is written by hand in French and English. The dashboard's
-    other languages fall back to English — see REFERENCE_LANG in
-    src/web/changelog.js.
+    Entries from before 0.0.1 keep their old heading, `## YYYY-MM-DD — Title`.
+    The French translation, CHANGELOG.fr.md, has the same releases and the
+    same number of entries in each section, under French section names
+    (Ajouts, Améliorations, Corrections, Suppressions, Dépréciations,
+    Sécurité). The dashboard's other languages fall back to English: see
+    REFERENCE_LANG in src/web/changelog.js.
 -->
 
-## 2026-11-21 — Version 0.0.2: a cleaner desktop app that is yours again
+## [Unreleased]
+
+### Added
+
+- `npm run check` checks the formatting with Prettier and the code with ESLint, and continuous integration runs it with the tests on every push.
+
+### Changed
+
+- The README and the changelog are written in English, with their French translation alongside: `README.fr.md` and `CHANGELOG.fr.md`. The changelog moves to the root of the project, in the Keep a Changelog format.
+
+### Fixed
+
+- “Play now” in personal mode no longer fails when the chosen track comes without its duration in milliseconds.
+
+## [0.0.2] - 2026-11-21
+
+A cleaner desktop app that is yours again.
 
 ### Fixed
 
@@ -29,9 +46,9 @@ was delivered.
 - External links in the dashboard (GitHub, Buy Me a Coffee, documentation, Discord portal) open in the browser instead of doing nothing in the app window.
 - The app icon no longer sits on a black background, and the startup window shows that icon instead of a rough drawing. The beamed note is redrawn cleanly, with no stroke sticking out of the beam.
 
-## 2026-11-14 — Configuration in the dashboard
+## [0.0.1] - 2026-11-14
 
-The `.env` file can now be edited from the settings, without having to find it on disk.
+Configuration in the dashboard: the `.env` file can now be edited from the settings, without having to find it on disk.
 
 ### Added
 
@@ -432,3 +449,7 @@ The dashboard had no notion of who was acting: one shared token, in a cookie, gr
 ### Added
 
 - Audio playback in a Discord voice channel, automatic volume ducking when someone speaks, and a web dashboard to drive it all.
+
+[Unreleased]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.2...HEAD
+[0.0.2]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.1...v0.0.2
+[0.0.1]: https://github.com/WolfGang-PRoxa/interactive-music-player/releases/tag/v0.0.1
