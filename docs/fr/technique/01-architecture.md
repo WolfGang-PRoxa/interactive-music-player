@@ -154,10 +154,12 @@ ouvrir les journaux.
 
 Trois points méritent d'être connus avant d'y toucher :
 
-- **Le signal de « prêt » est le port du tableau de bord.** Le bot ne l'ouvre
-  qu'une fois connecté à Discord (`ClientReady` dans `src/index.js`) : une
-  simple connexion TCP sur `127.0.0.1:PORT` est donc le seul témoin fiable, là
-  où l'existence du processus ne prouve rien. La fenêtre s'efface dès que le
+- **Le signal de « prêt » est le port du tableau de bord.** Le bot l'ouvre dès
+  le lancement de son processus, avant la connexion à Discord
+  (`webServer.listen` dans `src/index.js`) : une simple connexion TCP sur
+  `127.0.0.1:PORT` prouve donc que le tableau de bord peut s'afficher, ce que
+  l'existence du processus ne prouve pas. Le tableau de bord dit ensuite
+  lui-même ce qui attend la fin du démarrage. La fenêtre s'efface dès que le
   port répond, et le navigateur est ouvert par le bot lui-même
   (`WebServer.start`), jamais par le script.
 - **Un port déjà ouvert arrête le lancement.** Sans cette vérification
@@ -233,7 +235,12 @@ démarrage.
 **4. Création du client Discord** avec les intentions `Guilds`,
 `GuildVoiceStates` et `GuildMessages`.
 
-**5. Chargement des commandes** depuis `src/commands/`.
+**5. Ouverture du serveur web** (`webServer.listen`), puis chargement des
+commandes depuis `src/commands/`. Le tableau de bord est servi dès ce moment,
+dans un état _démarrage_ : jusqu'à `ClientReady`, les messages WebSocket et les
+routes HTTP qui demandent Discord, une file ou le lecteur sont écartés, et la
+page affiche un bandeau (voir [05](05-tableau-de-bord.md)). L'application de
+bureau ouvre ainsi sa fenêtre en une ou deux secondes.
 
 **6. Initialisation de discord-player**, enregistrement des extracteurs, des
 écouteurs d'événements et du gestionnaire de préchargement.
@@ -242,7 +249,8 @@ démarrage.
 - annonce de la version en cours et balayage des installations interrompues ;
 - choix du salon d'ouverture — le favori à l'allumage, le dernier visité à la
   reprise (voir [06](06-persistance.md#database)) ;
-- démarrage du serveur web ;
+- le serveur web reçoit le client, lève la barrière du démarrage et sert les
+  tableaux de bord ouverts entre-temps (`webServer.start`) ;
 - restauration de l'état de lecture sauvegardé, préchargement suspendu jusqu'au
   bout ;
 - programmation de la sauvegarde périodique (toutes les 5 s) et du filet de
@@ -255,6 +263,7 @@ index.js
   ├─ AudioFilters : speed_0_20 … speed_3_05, muffled
   ├─ installBridge()            (lecteur discord-player → bus de mixage)
   ├─ new Client(...)
+  ├─ webServer.listen(PORT, HOST)   (tableau de bord servi, « démarrage »)
   ├─ loadCommands()
   ├─ initPlayer()
   │    ├─ extractors.register(Youtubei, Spotify, SoundCloud, AppleMusic, Attachment)
@@ -264,7 +273,7 @@ index.js
        └─ ClientReady
             ├─ versioning.currentVersion() + cleanTempDirs()
             ├─ database.applyStartupChannel({ resuming })
-            ├─ webServer.start(client, PORT, HOST)
+            ├─ webServer.start(client, PORT, HOST)   (barrière levée)
             ├─ playbackStateManager.restoreAll()
             │    └─ finally : preloadManager.setSuspended(false)
             ├─ presenceManager.evaluate(guildId)   (pour chaque serveur)

@@ -76,6 +76,23 @@
       <div class="circle circle-2"></div>
     </div>
 
+    <!--
+      Bandeau du démarrage : le serveur s'ouvre avant la connexion à Discord,
+      et le tableau de bord s'affiche donc avant que le bot soit prêt. Montré
+      sur le statut « starting », retiré au statut « ready » (voir app.js).
+    -->
+    <div id="startup-banner" class="startup-banner hidden" role="status" aria-live="polite">
+      <svg class="startup-banner-spinner" viewBox="0 0 50 50" aria-hidden="true">
+        <circle cx="25" cy="25" r="20" fill="none" stroke-width="6"></circle>
+      </svg>
+      <div>
+        <p class="startup-banner-title" data-i18n="startup_banner_title">Le bot finit de démarrer…</p>
+        <p class="startup-banner-desc" data-i18n="startup_banner_desc">
+          La lecture, les files et les salons seront disponibles dès la fin du lancement.
+        </p>
+      </div>
+    </div>
+
     <div class="app-container">
       <!-- Header -->
       <header class="main-header">

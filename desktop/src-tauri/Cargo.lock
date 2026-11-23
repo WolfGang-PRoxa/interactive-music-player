@@ -1812,6 +1812,7 @@ name = "interactive-music-player-desktop"
 version = "0.0.2"
 dependencies = [
  "flate2",
+ "semver",
  "serde",
  "serde_json",
  "tar",

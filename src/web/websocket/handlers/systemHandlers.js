@@ -68,13 +68,19 @@ function handleClientLog(ctx) {
 function restartProcess(webServer, options = {}) {
   const entryPoint = options.entryPoint || process.argv[1];
 
-  try {
-    const { useMainPlayer } = require('discord-player');
-    const player = useMainPlayer();
-    playbackStateManager.saveState(player);
-    log.info('[WebServer] Playback state saved instantly before the restart.');
-  } catch (saveErr) {
-    log.error('[WebServer] Error saving the state before the restart:', saveErr.message);
+  // Pendant le démarrage, l'état de lecture n'est pas encore restauré : le
+  // sauvegarder écraserait celui de la session précédente par une file vide.
+  if (webServer.ready === false) {
+    log.info('[WebServer] Restart during startup: the saved playback state is kept as it is.');
+  } else {
+    try {
+      const { useMainPlayer } = require('discord-player');
+      const player = useMainPlayer();
+      playbackStateManager.saveState(player);
+      log.info('[WebServer] Playback state saved instantly before the restart.');
+    } catch (saveErr) {
+      log.error('[WebServer] Error saving the state before the restart:', saveErr.message);
+    }
   }
 
   try {
@@ -134,6 +140,19 @@ function handleRestartBot(ctx) {
 
 async function handleShutdownBot(ctx) {
   const { ws, webServer } = ctx;
+
+  // Rien ne joue encore, et l'état de lecture n'est pas restauré : pas de
+  // fondu, et surtout pas de sauvegarde, qui écraserait celui de la session
+  // précédente par une file vide.
+  if (webServer.ready === false) {
+    log.info('[WebServer] Shutdown requested during startup: stopping right away.');
+    try {
+      webServer.wss.close();
+      webServer.server.close();
+    } catch (e) {}
+    process.exit(0);
+    return;
+  }
 
   const guildId = ws.guildId || webServer.client?.guilds?.cache?.first()?.id;
   const settings = database.getSettings(guildId);

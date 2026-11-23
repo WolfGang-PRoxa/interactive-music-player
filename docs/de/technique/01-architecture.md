@@ -154,10 +154,12 @@ die weiterhilft: Node.js herunterladen, `.env` öffnen, die Protokolle öffnen.
 
 Drei Punkte sollte man kennen, bevor man daran rührt:
 
-- **Das Signal „bereit" ist der Port des Dashboards.** Der Bot öffnet ihn erst,
-  wenn er mit Discord verbunden ist (`ClientReady` in `src/index.js`): eine
-  schlichte TCP-Verbindung zu `127.0.0.1:PORT` ist daher der einzige verlässliche
-  Zeuge, wo doch die Existenz des Prozesses nichts beweist. Das Fenster
+- **Das Signal „bereit" ist der Port des Dashboards.** Der Bot öffnet ihn gleich
+  beim Start seines Prozesses, noch vor der Verbindung zu Discord
+  (`webServer.listen` in `src/index.js`): eine schlichte TCP-Verbindung zu
+  `127.0.0.1:PORT` beweist daher, dass das Dashboard angezeigt werden kann, was
+  die Existenz des Prozesses nicht beweist. Was auf das Ende des Starts wartet,
+  sagt das Dashboard dann selbst. Das Fenster
   verschwindet, sobald der Port antwortet, und der Browser wird vom Bot selbst
   geöffnet (`WebServer.start`), niemals vom Skript.
 - **Ein bereits offener Port hält den Start an.** Ohne diese Vorabprüfung würde
@@ -238,7 +240,12 @@ werden deklariert (siehe
 **4. Erzeugung des Discord-Clients** mit den Intents `Guilds`,
 `GuildVoiceStates` und `GuildMessages`.
 
-**5. Laden der Befehle** aus `src/commands/`.
+**5. Öffnen des Webservers** (`webServer.listen`), dann Laden der Befehle aus
+`src/commands/`. Das Dashboard wird ab hier ausgeliefert, im Zustand _Start_:
+bis `ClientReady` werden WebSocket-Nachrichten und HTTP-Routen, die Discord,
+eine Warteschlange oder den Player brauchen, zurückgestellt, und die Seite zeigt
+ein Banner (siehe [05](05-tableau-de-bord.md)). Die Desktop-App öffnet ihr
+Fenster so in ein bis zwei Sekunden.
 
 **6. Initialisierung von discord-player**, Registrierung der Extraktoren, der
 Ereignis-Listener und des Vorlade-Managers.
@@ -247,7 +254,8 @@ Ereignis-Listener und des Vorlade-Managers.
 - Bekanntgabe der laufenden Version und Kehren abgebrochener Installationen;
 - Wahl des Eröffnungskanals — der Favorit beim Einschalten, der zuletzt besuchte
   bei der Wiederaufnahme (siehe [06](06-persistance.md#database));
-- Start des Webservers;
+- der Webserver erhält den Client, hebt die Startsperre auf und bedient die
+  inzwischen geöffneten Dashboards (`webServer.start`);
 - Wiederherstellung des gesicherten Wiedergabezustands, das Vorladen bis zum
   Ende ausgesetzt;
 - Einplanung der regelmäßigen Sicherung (alle 5 s) und des Sicherheitsnetzes der
@@ -260,6 +268,7 @@ index.js
   ├─ AudioFilters : speed_0_20 … speed_3_05, muffled
   ├─ installBridge()            (discord-player-Knoten → Mischbus)
   ├─ new Client(...)
+  ├─ webServer.listen(PORT, HOST)   (Dashboard ausgeliefert, „Start")
   ├─ loadCommands()
   ├─ initPlayer()
   │    ├─ extractors.register(Youtubei, Spotify, SoundCloud, AppleMusic, Attachment)
@@ -269,7 +278,7 @@ index.js
        └─ ClientReady
             ├─ versioning.currentVersion() + cleanTempDirs()
             ├─ database.applyStartupChannel({ resuming })
-            ├─ webServer.start(client, PORT, HOST)
+            ├─ webServer.start(client, PORT, HOST)   (Sperre aufgehoben)
             ├─ playbackStateManager.restoreAll()
             │    └─ finally : preloadManager.setSuspended(false)
             ├─ presenceManager.evaluate(guildId)   (für jeden Server)

@@ -22,6 +22,22 @@ const database = require('../../database/Database');
 const GUILDLESS_TYPES = new Set(['listVersions', 'installVersion']);
 
 /**
+ * Messages acceptés pendant le démarrage, avant la connexion à Discord.
+ *
+ * Le serveur web s'ouvre dès le lancement (voir `WebServer.listen`) ; tant que
+ * le bot n'est pas prêt, il n'y a ni serveur Discord, ni salon, ni file, et
+ * tout le reste attend. Restent permis ce qui ne touche qu'au process :
+ * l'éteindre ou le relancer — l'application de bureau en a besoin à tout
+ * instant —, lire le catalogue des versions, journaliser, suivre la mémoire.
+ *
+ * Les autres sont écartés sans réponse : le tableau de bord, prévenu par le
+ * statut `starting`, dit lui-même à l'utilisateur d'attendre la fin du
+ * démarrage, et ceux qu'il envoie de lui-même à la connexion (`requestState`…)
+ * ne doivent pas se solder par un avertissement.
+ */
+const STARTUP_TYPES = new Set(['shutdownBot', 'restartBot', 'listVersions', 'clientLog', 'memoryStream']);
+
+/**
  * Droits du demandeur, relus à chaque message.
  *
  * Jamais mis en cache sur la socket : le maître peut révoquer un invité pendant
@@ -82,8 +98,14 @@ function denied(ws, type, identity, refusedFields = []) {
 async function handleMessage(ws, payload, webServer, options = {}) {
   const { type, guildId, data } = payload;
 
+  const starting = webServer.ready === false;
+  if (starting && !STARTUP_TYPES.has(type)) {
+    log.debug(`[WebServer] Message « ${type} » set aside: the bot is still starting.`);
+    return;
+  }
+
   const currentGuildId = guildId || ws.selectedGuildId || webServer._getFirstGuildId();
-  if (!currentGuildId && !GUILDLESS_TYPES.has(type)) return;
+  if (!currentGuildId && !GUILDLESS_TYPES.has(type) && !starting) return;
 
   const handler = routes[type];
   if (!handler) {
@@ -118,8 +140,14 @@ async function handleMessage(ws, payload, webServer, options = {}) {
     }
   }
 
-  const { useMainPlayer } = require('discord-player');
-  const player = useMainPlayer();
+  // Pendant le démarrage, le lecteur peut ne pas exister encore.
+  let player = null;
+  try {
+    const { useMainPlayer } = require('discord-player');
+    player = useMainPlayer();
+  } catch (e) {
+    if (!starting) throw e;
+  }
 
   await handler({
     ws,
@@ -132,7 +160,7 @@ async function handleMessage(ws, payload, webServer, options = {}) {
     // Créée à la demande en diffusion personnelle, où la lecture n'a pas
     // besoin de salon vocal — voir `ensurePlaybackQueue`. Ailleurs, c'est
     // toujours la file existante, ou `null`.
-    queue: webServer.ensurePlaybackQueue(currentGuildId),
+    queue: starting ? null : webServer.ensurePlaybackQueue(currentGuildId),
     currentGuildId,
     // Permet à un handler d'en réutiliser un autre (playNow délègue à play).
     // Le relais est marqué interne : le droit a été vérifié à l'entrée, et

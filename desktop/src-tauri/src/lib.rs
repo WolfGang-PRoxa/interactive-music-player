@@ -12,6 +12,7 @@ mod layout;
 mod payload;
 mod supervisor;
 mod tray;
+mod versions;
 mod view;
 
 use std::sync::{Arc, Mutex};
@@ -76,9 +77,8 @@ pub fn run() {
             let supervisor: Arc<Supervisor> = Supervisor::new(handle.clone(), background);
             app.manage(supervisor.clone());
             tray::build(&handle)?;
-            if !background {
-                supervisor.show_launcher();
-            }
+            // La fenêtre principale s'ouvre tout de suite, avant même que le
+            // bot ne soit lancé : voir `Supervisor::start`.
             supervisor.start();
             Ok(())
         })

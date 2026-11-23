@@ -30,11 +30,13 @@ entries keep their date and their title.
 
 ### Changed
 
+- The desktop app no longer has a startup window: it opens straight on the dashboard, which loads within a second or two. Until the bot is connected to Discord, a banner says so, and playback, queues and channels wait for the end of startup.
 - The README and the changelog are written in English, with their French translation alongside: `README.fr.md` and `CHANGELOG.fr.md`. The changelog moves to the root of the project, in the Keep a Changelog format.
 
 ### Fixed
 
 - “Play now” in personal mode no longer fails when the chosen track comes without its duration in milliseconds.
+- The desktop app always starts the newest installed version: a version installed from the dashboard no longer gives way to the one the installer deployed (shown as “dev”) at the next launch.
 
 ## [0.0.2] - 2026-11-21
 

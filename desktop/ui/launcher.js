@@ -1,5 +1,6 @@
 /*
- * Fenêtre de lancement.
+ * Fenêtre d'état : première configuration, pannes, extinction. Elle ne paraît
+ * plus au lancement ordinaire, qui ouvre directement le tableau de bord.
  *
  * Elle ne décide de rien : l'application (src-tauri/src/supervisor.rs) lui
  * envoie un instantané complet à chaque changement, la page le dessine, et

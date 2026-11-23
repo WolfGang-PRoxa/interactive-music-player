@@ -1,4 +1,7 @@
-//! Ce que la fenêtre de lancement affiche.
+//! Ce que la fenêtre d'état affiche : première configuration, pannes,
+//! extinction. Au lancement ordinaire, elle ne paraît pas — l'application
+//! s'ouvre sur le tableau de bord (voir supervisor.rs) —, mais l'étape en cours
+//! est recopiée sur la page d'attente de la fenêtre principale.
 //!
 //! Toute la logique vit côté Rust ; la page ne fait que dessiner l'instantané
 //! qu'on lui envoie à chaque changement, et renvoyer l'identifiant du bouton

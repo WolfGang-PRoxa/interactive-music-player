@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Interactive Music Player</title>
+    <link rel="stylesheet" href="starting.css" />
+  </head>
+  <body>
+    <!--
+      Ce que montre la fenêtre principale pendant la seconde où le serveur du
+      bot n'écoute pas encore. Le tableau de bord la remplace dès qu'il répond,
+      et c'est lui qui dit ce qui attend la fin du démarrage.
+    -->
+    <main class="waiting" aria-live="polite">
+      <img class="logo" src="logo.png" alt="" aria-hidden="true" />
+      <h1>Interactive Music Player</h1>
+      <p id="caption" class="caption">Démarrage du serveur…</p>
+      <div id="track" class="track"><div id="bar" class="bar"></div></div>
+    </main>
+    <script src="starting.js"></script>
+  </body>
+</html>

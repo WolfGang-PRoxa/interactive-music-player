@@ -513,6 +513,21 @@ function createAuthRouter(webServer) {
         );
     }
 
+    // Le serveur s'ouvre avant la connexion à Discord : tant que le bot n'est
+    // pas prêt, il ne connaît encore aucun serveur, et refuserait à tort
+    // quelqu'un qui en est membre.
+    if (webServer && webServer.ready === false) {
+      return res
+        .status(503)
+        .type('html')
+        .send(
+          errorPage(
+            'Le bot finit de démarrer',
+            "Il n'est pas encore connecté à Discord. Réessayez de vous connecter dans quelques secondes.",
+          ),
+        );
+    }
+
     if (!(await isKnownMember(webServer?.client, user.id))) {
       log.warn(`[OAuth] Access denied to ${user.username} (${user.id}): member of no guild the bot is in.`);
       // Le refus se dit, même au terme d'un essai muet : celui-ci portait

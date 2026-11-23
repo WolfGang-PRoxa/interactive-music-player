@@ -100,6 +100,21 @@ class WebServer {
     this.client = null;
     this.port = 3000;
     this.host = '127.0.0.1';
+
+    /**
+     * Le serveur écoute-t-il, et le bot est-il prêt ?
+     *
+     * Le serveur s'ouvre dès le lancement du process, avant la connexion à
+     * Discord (voir `listen`) : le tableau de bord s'affiche en une ou deux
+     * secondes au lieu d'attendre la passerelle. Tant que `ready` est faux,
+     * il n'y a ni serveur Discord, ni salon, ni file : les onglets connectés
+     * l'apprennent par le statut `starting`, et les messages qui en
+     * dépendent sont écartés (voir wsHandler.js). `start` lève la barrière.
+     */
+    this.listening = false;
+    this.ready = false;
+    /** Onglets ouverts pendant le démarrage, servis dès que le bot est prêt. */
+    this._startupClients = new Set();
     /**
      * Tableau de bord pilote de chaque serveur : guildId → WebSocket.
      *
@@ -163,14 +178,19 @@ class WebServer {
   }
 
   /**
-   * Démarre le serveur web.
-   * @param {import('discord.js').Client} client - Instance du client Discord
+   * Ouvre le serveur web, avant même que le bot soit connecté à Discord.
+   *
+   * Le tableau de bord, sa documentation et son journal sont servis dès cet
+   * instant ; ce qui demande le bot attend `start`. Sans effet au second
+   * appel.
+   *
    * @param {number} port - Port d'écoute
    * @param {string} host - Interface d'écoute (127.0.0.1 par défaut ; mettre
    *   HOST=0.0.0.0 pour exposer le dashboard sur le réseau local)
    */
-  start(client, port = 3000, host = '127.0.0.1') {
-    this.client = client;
+  listen(port = 3000, host = '127.0.0.1') {
+    if (this.listening) return;
+    this.listening = true;
     this.port = port;
     this.host = host;
 
@@ -347,6 +367,22 @@ class WebServer {
         }
       }, 5000);
     });
+  }
+
+  /**
+   * Le bot est connecté à Discord : le tableau de bord devient pleinement
+   * utilisable.
+   *
+   * Ouvre le serveur s'il ne l'est pas encore, puis sert les onglets ouverts
+   * pendant le démarrage.
+   *
+   * @param {import('discord.js').Client} client - Instance du client Discord
+   * @param {number} port - Port d'écoute
+   * @param {string} host - Interface d'écoute
+   */
+  start(client, port = 3000, host = '127.0.0.1') {
+    this.client = client;
+    this.listen(port, host);
 
     preloadManager.onProgress = () => {
       try {
@@ -483,6 +519,27 @@ class WebServer {
         // Ignorer
       }
     }, 1000);
+
+    this.ready = true;
+    this._serveStartupClients();
+  }
+
+  /**
+   * Sert les onglets ouverts pendant le démarrage : statut `ready`, puis
+   * sélection du serveur et état, comme à une connexion ordinaire.
+   */
+  _serveStartupClients() {
+    const waiting = [...this._startupClients];
+    this._startupClients.clear();
+    for (const ws of waiting) {
+      if (ws.readyState !== 1) continue;
+      try {
+        ws.send(JSON.stringify({ type: 'status', data: { status: 'ready' } }));
+        this._selectForClient(ws);
+      } catch (err) {
+        log.error('[WebServer] Could not serve a dashboard opened during startup:', err.message);
+      }
+    }
   }
 
   _initExpress() {
@@ -710,6 +767,15 @@ class WebServer {
       // tableau de bord au mauvais moment suffirait à arrêter le bot.
       try {
         this._initClient(ws);
+        if (this.ready) {
+          this._selectForClient(ws);
+        } else {
+          // Le bot n'est pas encore connecté à Discord : pas de serveur à
+          // sélectionner, pas d'état à envoyer. L'onglet le dit, et sera
+          // servi par `_serveStartupClients`.
+          ws.send(JSON.stringify({ type: 'status', data: { status: 'starting' } }));
+          this._startupClients.add(ws);
+        }
       } catch (err) {
         log.error('[WebServer] WebSocket client initialisation failed:', err);
         try {
@@ -728,8 +794,9 @@ class WebServer {
   }
 
   /**
-   * Prépare un client fraîchement connecté : historique des journaux,
-   * sélection du serveur et du salon, envoi de l'état initial.
+   * Prépare un client fraîchement connecté : battement, historique des
+   * journaux, réception des messages. Rien ici ne demande le bot : c'est
+   * aussi ce que reçoit un onglet ouvert pendant le démarrage.
    * @param {import('ws').WebSocket} ws
    */
   _initClient(ws) {
@@ -759,6 +826,46 @@ class WebServer {
 
     log.success('[WebServer] Client connected over WebSocket.');
 
+    ws.on('message', async (message) => {
+      try {
+        // require différé : wsHandler dépend indirectement de ce module
+        const wsHandler = require('./websocket/wsHandler');
+        const parsed = JSON.parse(message);
+        await wsHandler.handleMessage(ws, parsed, this);
+      } catch (err) {
+        log.error('[WebServer] WebSocket message error:', err.message);
+        // Un handler interrompu n'a pas atteint son broadcastState : sans
+        // ce renvoi, l'IHM resterait sur son état optimiste (interrupteur
+        // coché, curseur déplacé…) jusqu'au prochain événement, en
+        // désaccord avec le réglage réellement enregistré.
+        if (this.ready && ws.readyState === 1 && ws.selectedGuildId) {
+          try {
+            ws.send(
+              JSON.stringify({
+                type: 'state',
+                data: this.getState(ws.selectedGuildId, ws.selectedVoiceChannelId),
+              }),
+            );
+          } catch (e) {}
+        }
+      }
+    });
+
+    // Un client parti ne doit pas maintenir le flux mémoire en vie, ni
+    // laisser la lecture sans pilote.
+    ws.on('close', () => {
+      this._startupClients.delete(ws);
+      this.setMemoryStream(ws, false);
+      this._removeClient(ws);
+    });
+  }
+
+  /**
+   * Choisit le serveur et le salon d'un onglet, puis lui envoie l'état.
+   * Demande le bot connecté à Discord.
+   * @param {import('ws').WebSocket} ws
+   */
+  _selectForClient(ws) {
     let selectedGuildId = null;
     let selectedChannelId = null;
 
@@ -844,38 +951,6 @@ class WebServer {
        */
       setImmediate(() => this.broadcastState(selectedGuildId));
     }
-
-    ws.on('message', async (message) => {
-      try {
-        // require différé : wsHandler dépend indirectement de ce module
-        const wsHandler = require('./websocket/wsHandler');
-        const parsed = JSON.parse(message);
-        await wsHandler.handleMessage(ws, parsed, this);
-      } catch (err) {
-        log.error('[WebServer] WebSocket message error:', err.message);
-        // Un handler interrompu n'a pas atteint son broadcastState : sans
-        // ce renvoi, l'IHM resterait sur son état optimiste (interrupteur
-        // coché, curseur déplacé…) jusqu'au prochain événement, en
-        // désaccord avec le réglage réellement enregistré.
-        if (ws.readyState === 1 && ws.selectedGuildId) {
-          try {
-            ws.send(
-              JSON.stringify({
-                type: 'state',
-                data: this.getState(ws.selectedGuildId, ws.selectedVoiceChannelId),
-              }),
-            );
-          } catch (e) {}
-        }
-      }
-    });
-
-    // Un client parti ne doit pas maintenir le flux mémoire en vie, ni
-    // laisser la lecture sans pilote.
-    ws.on('close', () => {
-      this.setMemoryStream(ws, false);
-      this._removeClient(ws);
-    });
   }
 
   /**

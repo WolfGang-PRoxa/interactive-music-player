@@ -151,10 +151,11 @@ open `.env`, open the logs.
 
 Three points are worth knowing before touching any of it:
 
-- **The "ready" signal is the dashboard's port.** The bot only opens it once
-  connected to Discord (`ClientReady` in `src/index.js`): a simple TCP
-  connection to `127.0.0.1:PORT` is therefore the only reliable witness, where
-  the existence of the process proves nothing. The window disappears as soon as
+- **The "ready" signal is the dashboard's port.** The bot opens it as soon as
+  its process starts, before connecting to Discord (`webServer.listen` in
+  `src/index.js`): a simple TCP connection to `127.0.0.1:PORT` therefore proves
+  the dashboard can be shown, which the existence of the process does not. The
+  dashboard then says by itself what waits for the end of startup. The window disappears as soon as
   the port answers, and the browser is opened by the bot itself
   (`WebServer.start`), never by the script.
 - **An already open port halts the launch.** Without this preliminary check, a
@@ -227,7 +228,12 @@ declared (see [02 — Audio playback](02-lecture-audio.md#playback-speed)).
 **4. Creation of the Discord client** with the `Guilds`, `GuildVoiceStates` and
 `GuildMessages` intents.
 
-**5. Loading of the commands** from `src/commands/`.
+**5. Opening of the web server** (`webServer.listen`), then loading of the
+commands from `src/commands/`. The dashboard is served from here on, in a
+_starting_ state: until `ClientReady`, the WebSocket messages and HTTP routes
+that need Discord, a queue or the player are set aside, and the page shows a
+banner (see [05](05-tableau-de-bord.md)). The desktop app thus opens its window
+within a second or two.
 
 **6. Initialisation of discord-player**, registration of the extractors, of the
 event listeners and of the preload manager.
@@ -236,7 +242,8 @@ event listeners and of the preload manager.
 - announcement of the running version and sweep of interrupted installations;
 - choice of the opening channel — the favourite on a cold start, the last
   visited one on a resume (see [06](06-persistance.md#database));
-- startup of the web server;
+- the web server receives the client, lifts the startup barrier and serves the
+  dashboards opened meanwhile (`webServer.start`);
 - restoration of the saved playback state, preloading suspended throughout;
 - scheduling of the periodic save (every 5 s) and of the presence-rule safety
   net (every 30 s).
@@ -248,6 +255,7 @@ index.js
   ├─ AudioFilters : speed_0_20 … speed_3_05, muffled
   ├─ installBridge()            (discord-player node → mixing bus)
   ├─ new Client(...)
+  ├─ webServer.listen(PORT, HOST)   (dashboard served, "starting")
   ├─ loadCommands()
   ├─ initPlayer()
   │    ├─ extractors.register(Youtubei, Spotify, SoundCloud, AppleMusic, Attachment)
@@ -257,7 +265,7 @@ index.js
        └─ ClientReady
             ├─ versioning.currentVersion() + cleanTempDirs()
             ├─ database.applyStartupChannel({ resuming })
-            ├─ webServer.start(client, PORT, HOST)
+            ├─ webServer.start(client, PORT, HOST)   (barrier lifted)
             ├─ playbackStateManager.restoreAll()
             │    └─ finally : preloadManager.setSuspended(false)
             ├─ presenceManager.evaluate(guildId)   (for each server)

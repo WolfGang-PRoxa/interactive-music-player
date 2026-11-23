@@ -16,16 +16,34 @@
 //! l'application qui relance — la même instance pour un redémarrage, une autre
 //! version pour une bascule depuis le tableau de bord. Voir
 //! src/utils/supervisor.js.
+//!
+//! ## Pas de fenêtre de lancement
+//!
+//! L'application s'ouvre aussitôt sur sa fenêtre principale, celle du tableau
+//! de bord. Tant que le serveur du bot n'écoute pas encore, elle affiche une
+//! page d'attente embarquée (`ui/starting.html`) ; dès qu'il répond, elle
+//! charge le tableau de bord. Le bot ouvre son serveur avant de se connecter à
+//! Discord : la page s'affiche donc en une ou deux secondes, et c'est elle qui
+//! dit à l'utilisateur ce qui attend la fin du démarrage (voir
+//! `WebServer.listen` côté bot).
+//!
+//! La fenêtre d'état (`launcher`) ne sert plus qu'aux moments où il n'y a pas
+//! de tableau de bord à montrer : première configuration, panne, extinction.
+//!
+//! ## Quelle version
+//!
+//! Au lancement, c'est la version installée la plus récente qui démarre (voir
+//! `versions.rs`).
 
 use std::fs::{self, File};
-use std::io::{self, Read, Seek, SeekFrom};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_opener::OpenerExt;
 
 use crate::dashboard::Endpoint;
@@ -33,6 +51,7 @@ use crate::discord;
 use crate::env_file;
 use crate::layout::{self, Layout, Origin};
 use crate::payload;
+use crate::versions;
 use crate::view::{Action, Card, Footer, Screen, Snapshot, StepState, Tone};
 
 /// Code de sortie par lequel le bot demande à être relancé.
@@ -43,6 +62,10 @@ const RESTART_REQUEST: &str = "desktop-restart.json";
 
 pub const LAUNCHER: &str = "launcher";
 pub const DASHBOARD: &str = "dashboard";
+
+/// Page embarquée que montre la fenêtre principale tant que le serveur du bot
+/// ne répond pas.
+const STARTING_PAGE: &str = "starting.html";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Phase {
@@ -74,6 +97,9 @@ struct Inner {
     snapshot: Snapshot,
     layout: Option<Layout>,
     child: Option<Child>,
+    /// Point d'entrée du processus en cours : un redémarrage forcé, sans
+    /// demande du bot, repart sur la même version.
+    entry: Option<PathBuf>,
     /// Incrémenté à chaque processus lancé : la surveillance d'un processus
     /// remplacé se tait au lieu de rapporter une mort qui n'en est plus une.
     generation: u64,
@@ -104,6 +130,7 @@ impl Supervisor {
                 snapshot: Snapshot::default(),
                 layout: None,
                 child: None,
+                entry: None,
                 generation: 0,
                 last_exit: None,
                 quitting: false,
@@ -138,8 +165,29 @@ impl Supervisor {
             inner.snapshot.idle = matches!(inner.phase, Phase::Idle | Phase::Setup);
             (inner.snapshot.clone(), inner.phase)
         };
-        let _ = self.app.emit_to(LAUNCHER, "launcher://state", snapshot);
+        let _ = self.app.emit_to(LAUNCHER, "launcher://state", &snapshot);
+        self.paint_starting(&snapshot);
         crate::tray::refresh(&self.app, phase);
+    }
+
+    /// Recopie l'étape en cours sur la page d'attente, si elle est affichée.
+    ///
+    /// Par `eval` plutôt que par l'IPC : la fenêtre principale n'y a pas accès,
+    /// puisqu'elle finit sur une page servie par le bot. Le script ne touche
+    /// qu'à une fonction que seule la page d'attente définit.
+    fn paint_starting(&self, snapshot: &Snapshot) {
+        let Some(window) = self.app.get_webview_window(DASHBOARD) else { return };
+        if !on_app_page(&window) {
+            return;
+        }
+        let caption = snapshot
+            .steps
+            .iter()
+            .find(|step| step.state == StepState::Running)
+            .map(|step| step.caption.clone())
+            .unwrap_or_else(|| snapshot.headline.clone());
+        let state = serde_json::json!({ "caption": caption, "progress": snapshot.progress });
+        let _ = window.eval(format!("window.impStarting && window.impStarting({state});"));
     }
 
     fn set_step(&self, index: usize, state: StepState) {
@@ -164,6 +212,13 @@ impl Supervisor {
     }
 
     fn show_failure(&self, message: &str, details: Option<String>, log: Option<String>, actions: Vec<Action>) {
+        // La page d'attente n'a plus rien à attendre : la panne se dit dans la
+        // fenêtre d'état. Un tableau de bord chargé, lui, reste ouvert.
+        if let Some(window) = self.app.get_webview_window(DASHBOARD) {
+            if on_app_page(&window) {
+                let _ = window.destroy();
+            }
+        }
         self.update(|inner| {
             inner.phase = if inner.child.is_some() { Phase::Running } else { Phase::Idle };
             inner.snapshot.screen = Screen::Steps;
@@ -192,17 +247,13 @@ impl Supervisor {
     }
 
     /// Ce qu'un clic sur l'icône, ou une seconde ouverture de l'application,
-    /// doit montrer : le tableau de bord quand le bot tourne, la fenêtre de
-    /// lancement sinon.
+    /// doit montrer : la fenêtre principale tant que le bot tourne ou démarre,
+    /// la fenêtre d'état sinon.
     pub fn show_main(self: &Arc<Self>) {
         let phase = self.phase();
-        if matches!(phase, Phase::Running) {
-            if let Some(window) = self.app.get_webview_window(DASHBOARD) {
-                let _ = window.show();
-                let _ = window.unminimize();
-                let _ = window.set_focus();
-                return;
-            }
+        if matches!(phase, Phase::Running | Phase::Attached | Phase::Launching | Phase::Restarting) {
+            // Hors du fil des événements : construire une fenêtre depuis un
+            // gestionnaire d'événement peut bloquer sous Windows.
             let this = self.clone();
             thread::spawn(move || this.open_dashboard());
             return;
@@ -210,23 +261,13 @@ impl Supervisor {
         self.show_launcher();
     }
 
-    /// Ouvre le tableau de bord dans la fenêtre de l'application.
-    ///
-    /// La page vient du serveur du bot, comme dans un navigateur : elle n'a
-    /// aucun accès à l'IPC de l'application (voir capabilities/launcher.json).
-    pub fn open_dashboard(&self) {
-        let Some(layout) = self.layout() else { return };
+    /// La fenêtre principale, créée au besoin sur la page d'attente.
+    fn main_window(&self) -> tauri::Result<WebviewWindow> {
         if let Some(window) = self.app.get_webview_window(DASHBOARD) {
-            let _ = window.show();
-            let _ = window.unminimize();
-            let _ = window.set_focus();
-            self.hide_launcher();
-            return;
+            return Ok(window);
         }
-        let address = Endpoint::of(&layout).url();
-        let Ok(url) = tauri::Url::parse(&address) else { return };
         let app = self.app.clone();
-        let built = WebviewWindowBuilder::new(&self.app, DASHBOARD, WebviewUrl::External(url))
+        WebviewWindowBuilder::new(&self.app, DASHBOARD, WebviewUrl::App(STARTING_PAGE.into()))
             .title("Interactive Music Player")
             // Les liens qui s'ouvrent ailleurs — GitHub, le don, la
             // documentation, le portail Discord, le partage — visent un onglet
@@ -242,20 +283,39 @@ impl Supervisor {
             .inner_size(1360.0, 860.0)
             .min_inner_size(420.0, 560.0)
             .center()
-            .build();
-        match built {
-            Ok(window) => {
-                let _ = window.set_focus();
-                self.hide_launcher();
-            }
+            .build()
+    }
+
+    /// Montre la fenêtre principale, et y charge le tableau de bord dès que le
+    /// serveur du bot répond.
+    ///
+    /// La page vient du serveur du bot, comme dans un navigateur : elle n'a
+    /// aucun accès à l'IPC de l'application (voir capabilities/launcher.json).
+    pub fn open_dashboard(&self) {
+        let window = match self.main_window() {
+            Ok(window) => window,
             Err(err) => {
-                self.fail(
+                return self.fail(
                     "Le tableau de bord n'a pas pu s'ouvrir dans l'application.",
                     Some(err.to_string()),
                     vec![Action::primary("open-browser", "Ouvrir dans le navigateur")],
                 );
             }
+        };
+        if on_app_page(&window) {
+            if let Some(layout) = self.layout() {
+                let endpoint = Endpoint::of(&layout);
+                if endpoint.answers() {
+                    if let Ok(url) = tauri::Url::parse(&endpoint.url()) {
+                        let _ = window.navigate(url);
+                    }
+                }
+            }
         }
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+        self.hide_launcher();
     }
 
     pub fn open_in_browser(&self) {
@@ -290,6 +350,12 @@ impl Supervisor {
                 return;
             }
             inner.phase = Phase::Launching;
+        }
+        // L'application s'ouvre sans attendre le bot : la fenêtre principale
+        // paraît aussitôt, sur la page d'attente. Sauf au démarrage avec
+        // Windows, où rien ne s'affiche tant que tout va bien.
+        if !self.lock().background {
+            self.open_dashboard();
         }
         let this = self.clone();
         thread::spawn(move || this.launch());
@@ -338,11 +404,7 @@ impl Supervisor {
         if install_deps {
             captions.push("Installation des dépendances");
         }
-        if deploy {
-            captions.push("Enregistrement des commandes Discord");
-        }
-        captions.push("Démarrage du bot");
-        captions.push("Ouverture du tableau de bord");
+        captions.push("Démarrage du serveur");
         self.update(|inner| inner.snapshot.sequence("Démarrage en cours…", &captions));
 
         let mut index = 0;
@@ -392,24 +454,31 @@ impl Supervisor {
             index += 1;
         }
 
-        // L'échec de l'enregistrement n'est pas bloquant : le bot démarre très
-        // bien sans, et il se rattrapera au prochain lancement.
+        // La version installée la plus récente : celle de l'installeur, ou une
+        // version plus récente installée depuis le tableau de bord.
+        let version = versions::to_launch(&layout);
+        let code_root = version.as_ref().map(|v| v.root.clone()).unwrap_or_else(|| layout.root.clone());
+
+        // L'enregistrement des commandes slash passe par l'API REST de
+        // Discord, sans rien attendre du bot : il se fait à côté, sans
+        // retarder l'ouverture. Son échec n'est pas bloquant — le bot démarre
+        // très bien sans, et il se rattrapera au prochain lancement.
         if deploy {
-            self.set_step(index, StepState::Running);
-            let log = layout.logs_dir().join("npm-deploy.log");
-            let mut command = Command::new(layout.node());
-            command.arg(layout.root.join("src").join("deploy-commands.js"));
-            if run_logged(&layout, &mut command, &log) {
-                self.set_step(index, StepState::Done);
-            } else {
-                self.lock().deploy_pending = true;
-                self.set_step(index, StepState::Warned);
-            }
-            index += 1;
+            let this = self.clone();
+            let layout = layout.clone();
+            let script = code_root.join("src").join("deploy-commands.js");
+            thread::spawn(move || {
+                let log = layout.logs_dir().join("npm-deploy.log");
+                let mut command = Command::new(layout.node());
+                command.arg(script);
+                if !run_logged(&layout, &mut command, &log) {
+                    this.lock().deploy_pending = true;
+                }
+            });
         }
 
         self.set_step(index, StepState::Running);
-        if let Err(err) = self.spawn_bot(&layout, None, false) {
+        if let Err(err) = self.spawn_bot(&layout, version.as_ref().map(|v| v.entry_point()), false) {
             self.set_step(index, StepState::Failed);
             return self.fail(
                 "Node.js n'a pas pu être lancé.",
@@ -417,29 +486,15 @@ impl Supervisor {
                 vec![Action::primary("start", "Réessayer"), Action::secondary("quit", "Quitter")],
             );
         }
-        // Un jeton invalide, un port occupé, un module cassé : le processus
-        // meurt en quelques secondes. L'étape n'est franchie qu'après.
-        let started = Instant::now();
-        while started.elapsed() < Duration::from_millis(2500) {
-            let exited = self.lock().last_exit;
-            if let Some(code) = exited {
-                self.set_step(index, StepState::Failed);
-                return self.report_exit(&layout, code, true);
-            }
-            thread::sleep(Duration::from_millis(100));
-        }
-        self.set_step(index, StepState::Done);
-        index += 1;
-
-        self.set_step(index, StepState::Running);
         self.await_dashboard(&layout, index);
     }
 
-    /// Attend que le tableau de bord réponde, puis l'ouvre.
+    /// Attend que le serveur du tableau de bord réponde, puis l'y charge.
     ///
-    /// La connexion à Discord puis la restauration de l'état de lecture peuvent
-    /// prendre un moment sur une grosse file d'attente. Au-delà de 90 s, mieux
-    /// vaut rendre la main que laisser la fenêtre tourner sans fin.
+    /// Le bot ouvre son serveur avant de se connecter à Discord : il répond
+    /// d'ordinaire en une ou deux secondes, et le tableau de bord dit lui-même
+    /// ce qui attend la fin du démarrage. Le délai de 90 s ne couvre que les
+    /// machines très lentes ; au-delà, mieux vaut rendre la main.
     fn await_dashboard(self: &Arc<Self>, layout: &Layout, index: usize) {
         let started = Instant::now();
         loop {
@@ -470,17 +525,22 @@ impl Supervisor {
         }
 
         self.set_step(index, StepState::Done);
-        let background = {
+        let (background, exited) = {
             let mut inner = self.lock();
             inner.phase = Phase::Running;
             let background = inner.background;
             // Le démarrage avec Windows ne vaut que pour le premier lancement :
             // un redémarrage demandé ensuite doit se voir.
             inner.background = false;
-            background
+            (background, inner.last_exit)
         };
+        // Mort entre la réponse du port et le passage en « en marche » : la
+        // surveillance s'est tue, la phase étant encore au lancement.
+        if let Some(code) = exited {
+            return self.exited(code);
+        }
         self.update(|inner| {
-            inner.snapshot.headline = "Le bot est prêt.".into();
+            inner.snapshot.headline = "Le serveur répond.".into();
             inner.snapshot.footer = None;
         });
         if !background {
@@ -493,10 +553,13 @@ impl Supervisor {
         // Ce que Node écrit avant que le journal du bot ne soit ouvert — un
         // module introuvable, une erreur de syntaxe — n'irait nulle part sans
         // console. On le garde ici.
-        let output = File::create(layout.logs_dir().join("desktop-process.log"))?;
+        let mut output = File::create(layout.logs_dir().join("desktop-process.log"))?;
+        let entry = entry.unwrap_or_else(|| layout.entry_point());
+        // De quoi savoir, après coup, quelle version l'application a lancée.
+        let _ = writeln!(output, "[Interactive Music Player] node {}", entry.display());
         let mut command = Command::new(layout.node());
         command
-            .arg(entry.unwrap_or_else(|| layout.entry_point()))
+            .arg(&entry)
             .current_dir(&layout.root)
             .env("PATH", layout.child_path())
             // Le tableau de bord s'ouvre dans l'application, pas dans un onglet.
@@ -517,6 +580,7 @@ impl Supervisor {
             let mut inner = self.lock();
             inner.generation += 1;
             inner.child = Some(child);
+            inner.entry = Some(entry);
             inner.last_exit = None;
             inner.generation
         };
@@ -580,7 +644,8 @@ impl Supervisor {
     /// Le bot a demandé à être relancé : même instance, ou autre version.
     fn relaunch(self: &Arc<Self>) {
         let Some(layout) = self.layout() else { return };
-        let entry = take_restart_request(&layout);
+        // Sans demande du bot — un redémarrage forcé —, la même version.
+        let entry = take_restart_request(&layout).or_else(|| self.lock().entry.clone());
         self.update(|inner| {
             inner.phase = Phase::Restarting;
             inner.snapshot.sequence("Redémarrage en cours…", &["Redémarrage du bot", "Ouverture du tableau de bord"]);
@@ -627,11 +692,13 @@ impl Supervisor {
             inner.phase = Phase::Running;
             inner.snapshot.headline = "Le bot a redémarré.".into();
         });
-        // La page ouverte se reconnecte d'elle-même ; on ne l'ouvre que si
-        // elle ne l'était pas.
-        if self.app.get_webview_window(DASHBOARD).is_none()
-            && self.app.get_webview_window(LAUNCHER).map(|w| w.is_visible().unwrap_or(false)).unwrap_or(false)
-        {
+        // Une page de tableau de bord ouverte se reconnecte d'elle-même. Il
+        // ne reste qu'à charger celle qui attendait, ou à rouvrir la fenêtre
+        // quand le redémarrage a été demandé depuis la fenêtre d'état.
+        let waiting = self.app.get_webview_window(DASHBOARD).map(|w| on_app_page(&w)).unwrap_or(false);
+        let from_launcher =
+            self.app.get_webview_window(LAUNCHER).map(|w| w.is_visible().unwrap_or(false)).unwrap_or(false);
+        if waiting || (from_launcher && self.app.get_webview_window(DASHBOARD).is_none()) {
             self.open_dashboard();
         }
     }
@@ -724,8 +791,10 @@ impl Supervisor {
                 },
             ];
         });
+        // L'application s'ouvre sur le tableau de bord du bot déjà lancé ; ses
+        // commandes restent dans la fenêtre d'état et l'icône de notification.
         if !background {
-            self.show_launcher();
+            self.open_dashboard();
         }
     }
 
@@ -950,6 +1019,7 @@ impl Supervisor {
     // ------------------------------------------------------------------
 
     fn enter_setup(&self) {
+        self.close_dashboard();
         self.update(|inner| {
             inner.phase = Phase::Setup;
             inner.snapshot.screen = Screen::Setup;
@@ -1167,6 +1237,18 @@ pub fn tail(path: &Path, lines: usize) -> Option<String> {
     Some(kept[kept.len().saturating_sub(lines)..].join("\n"))
 }
 
+/// La fenêtre montre-t-elle une page embarquée — la page d'attente — plutôt
+/// que le tableau de bord servi par le bot ?
+fn on_app_page(window: &WebviewWindow) -> bool {
+    window.url().map(|url| is_app_url(&url)).unwrap_or(true)
+}
+
+/// Une adresse des pages embarquées : `tauri://localhost` sous macOS et Linux,
+/// `http(s)://tauri.localhost` sous Windows.
+fn is_app_url(url: &tauri::Url) -> bool {
+    url.scheme() == "tauri" || url.host_str() == Some("tauri.localhost")
+}
+
 /// Un lien que le navigateur de l'utilisateur saura ouvrir.
 ///
 /// Ce qui sort d'ici est confié au système : seuls le web et le courriel
@@ -1211,6 +1293,15 @@ mod tests {
         assert!(!link("file:///C:/Windows/System32/calc.exe"));
         assert!(!link("ms-settings:privacy"));
         assert!(!link("about:blank"));
+    }
+
+    #[test]
+    fn app_pages_are_told_apart_from_the_dashboard() {
+        let app = |s: &str| is_app_url(&tauri::Url::parse(s).unwrap());
+        assert!(app("tauri://localhost/starting.html"));
+        assert!(app("http://tauri.localhost/starting.html"));
+        assert!(!app("http://localhost:3000/"));
+        assert!(!app("https://imp.example.dev/"));
     }
 
     #[test]

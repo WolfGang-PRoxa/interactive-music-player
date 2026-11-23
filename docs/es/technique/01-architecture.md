@@ -152,10 +152,11 @@ descargar Node.js, abrir `.env`, abrir los registros.
 
 Tres puntos merecen conocerse antes de tocarlos:
 
-- **La señal de «listo» es el puerto del panel de control.** El bot solo lo abre
-  una vez conectado a Discord (`ClientReady` en `src/index.js`): una simple
-  conexión TCP a `127.0.0.1:PORT` es, pues, el único testigo fiable, allí donde
-  la existencia del proceso no prueba nada. La ventana se borra en cuanto el
+- **La señal de «listo» es el puerto del panel de control.** El bot lo abre en
+  cuanto arranca su proceso, antes de conectarse a Discord (`webServer.listen`
+  en `src/index.js`): una simple conexión TCP a `127.0.0.1:PORT` prueba, pues,
+  que el panel puede mostrarse, cosa que la existencia del proceso no prueba. El
+  panel dice luego por sí mismo qué espera al final del arranque. La ventana se borra en cuanto el
   puerto responde, y el navegador lo abre el bot mismo (`WebServer.start`),
   nunca el script.
 - **Un puerto ya abierto detiene el lanzamiento.** Sin esta verificación previa,
@@ -231,7 +232,12 @@ arranque.
 **4. Creación del cliente Discord** con las intenciones `Guilds`,
 `GuildVoiceStates` y `GuildMessages`.
 
-**5. Carga de los comandos** desde `src/commands/`.
+**5. Apertura del servidor web** (`webServer.listen`), y luego carga de los
+comandos desde `src/commands/`. El panel se sirve desde aquí, en estado
+_arranque_: hasta `ClientReady`, los mensajes WebSocket y las rutas HTTP que
+necesitan Discord, una cola o el reproductor quedan apartados, y la página
+muestra un aviso (ver [05](05-tableau-de-bord.md)). La aplicación de escritorio
+abre así su ventana en uno o dos segundos.
 
 **6. Inicialización de discord-player**, registro de los extractores, de los
 escuchadores de eventos y del gestor de precarga.
@@ -240,7 +246,8 @@ escuchadores de eventos y del gestor de precarga.
 - anuncio de la versión en curso y barrido de las instalaciones interrumpidas;
 - elección del canal de apertura — el favorito al encender, el último visitado
   al reanudar (véase [06](06-persistance.md#database));
-- arranque del servidor web;
+- el servidor web recibe el cliente, levanta la barrera del arranque y atiende
+  los paneles abiertos entretanto (`webServer.start`);
 - restauración del estado de reproducción guardado, con la precarga suspendida
   hasta el final;
 - programación del guardado periódico (cada 5 s) y de la red de seguridad de la
@@ -253,6 +260,7 @@ index.js
   ├─ AudioFilters : speed_0_20 … speed_3_05, muffled
   ├─ installBridge()            (nodo de discord-player → bus de mezcla)
   ├─ new Client(...)
+  ├─ webServer.listen(PORT, HOST)   (panel servido, «arranque»)
   ├─ loadCommands()
   ├─ initPlayer()
   │    ├─ extractors.register(Youtubei, Spotify, SoundCloud, AppleMusic, Attachment)
@@ -262,7 +270,7 @@ index.js
        └─ ClientReady
             ├─ versioning.currentVersion() + cleanTempDirs()
             ├─ database.applyStartupChannel({ resuming })
-            ├─ webServer.start(client, PORT, HOST)
+            ├─ webServer.start(client, PORT, HOST)   (barrera levantada)
             ├─ playbackStateManager.restoreAll()
             │    └─ finally : preloadManager.setSuspended(false)
             ├─ presenceManager.evaluate(guildId)   (para cada servidor)

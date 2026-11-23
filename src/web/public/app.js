@@ -512,6 +512,61 @@
 
   let isShuttingDown = false;
 
+  const startupBanner = document.getElementById('startup-banner');
+
+  /**
+   * Le bot démarre encore, ou vient de finir.
+   *
+   * Le serveur s'ouvre avant la connexion à Discord : la page s'affiche, mais
+   * sans serveur, ni salon, ni file. Le bandeau le dit, et `sendWS` retient en
+   * attendant ce qui ne peut pas encore aboutir (voir js/websocket.js).
+   */
+  function setBotStarting(starting) {
+    const was = window.MusicPlayer.botStarting;
+    window.MusicPlayer.botStarting = starting;
+    if (startupBanner) startupBanner.classList.toggle('hidden', !starting);
+    // Ce qu'on annonce au bot à la connexion n'a pas pu passer pendant le
+    // démarrage : on le lui redit maintenant qu'il est prêt.
+    if (was && !starting) resyncWithBot();
+  }
+
+  /**
+   * Ce que la page annonce au bot quand elle le (re)trouve : à la connexion,
+   * et de nouveau à la fin du démarrage.
+   */
+  function resyncWithBot() {
+    // Le bot qui revient n'est pas forcément celui qui est parti :
+    // une bascule de version passe par un redémarrage.
+    if (typeof window.MusicPlayer.refreshVersionBadge === 'function') {
+      window.MusicPlayer.refreshVersionBadge();
+    }
+
+    // Un redémarrage du bot ne coupe pas le son : la page est restée
+    // ouverte et l'élément audio a continué de jouer pendant que le
+    // serveur, lui, était absent. Sa position est donc en retard sur
+    // la nôtre — on la lui annonce immédiatement, et on se déclare
+    // prioritaire le temps qu'il en tienne compte, sinon le premier
+    // état reçu nous ferait revenir en arrière.
+    if (personalAudio && personalAudio.src && !personalAudio.paused) {
+      clientPositionWins = true;
+      window.MusicPlayer.sendWS({
+        type: 'syncProgress',
+        data: { progressMs: Math.round(personalAudio.currentTime * 1000) },
+      });
+    }
+
+    // Le préchargement est piloté par le serveur mais réglé ici :
+    // après un redémarrage du bot, il repartirait sur ses valeurs
+    // par défaut tant que l'utilisateur n'a pas touché un curseur.
+    // Réglage du serveur, donc de l'administrateur : un invité n'a
+    // rien à y recopier, et le refus lui reviendrait en notification.
+    const preloading = window.MusicPlayer.dashboardSettings?.preloading;
+    const guest = typeof window.MusicPlayer.isGuest === 'function' && window.MusicPlayer.isGuest();
+    if (preloading && !guest) {
+      window.MusicPlayer.sendWS({ type: 'updateSettings', data: { preloading } });
+    }
+  }
+
   // Connect to WebSocket Server
   function connectWebSocket() {
     window.MusicPlayer.connectWebSocket(handleServerMessage, {
@@ -519,37 +574,8 @@
         isShuttingDown = false;
         if (restartOverlay) restartOverlay.classList.add('hidden');
         if (btnRestartBot) btnRestartBot.disabled = false;
-
-        // Le bot qui revient n'est pas forcément celui qui est parti :
-        // une bascule de version passe par un redémarrage.
-        if (typeof window.MusicPlayer.refreshVersionBadge === 'function') {
-          window.MusicPlayer.refreshVersionBadge();
-        }
-
-        // Un redémarrage du bot ne coupe pas le son : la page est restée
-        // ouverte et l'élément audio a continué de jouer pendant que le
-        // serveur, lui, était absent. Sa position est donc en retard sur
-        // la nôtre — on la lui annonce immédiatement, et on se déclare
-        // prioritaire le temps qu'il en tienne compte, sinon le premier
-        // état reçu nous ferait revenir en arrière.
-        if (personalAudio && personalAudio.src && !personalAudio.paused) {
-          clientPositionWins = true;
-          window.MusicPlayer.sendWS({
-            type: 'syncProgress',
-            data: { progressMs: Math.round(personalAudio.currentTime * 1000) },
-          });
-        }
-
-        // Le préchargement est piloté par le serveur mais réglé ici :
-        // après un redémarrage du bot, il repartirait sur ses valeurs
-        // par défaut tant que l'utilisateur n'a pas touché un curseur.
-        // Réglage du serveur, donc de l'administrateur : un invité n'a
-        // rien à y recopier, et le refus lui reviendrait en notification.
-        const preloading = window.MusicPlayer.dashboardSettings?.preloading;
-        const guest = typeof window.MusicPlayer.isGuest === 'function' && window.MusicPlayer.isGuest();
-        if (preloading && !guest) {
-          window.MusicPlayer.sendWS({ type: 'updateSettings', data: { preloading } });
-        }
+        if (startupBanner) startupBanner.classList.add('hidden');
+        resyncWithBot();
       },
     });
   }
@@ -567,6 +593,9 @@
     const { type, data } = payload;
 
     if (type === 'state') {
+      // Un état complet suppose un bot prêt : à une reconnexion, le serveur
+      // n'envoie pas de statut `ready`, seulement l'état.
+      if (window.MusicPlayer.botStarting) setBotStarting(false);
       const now = Date.now();
       const isRecentClick = now - lastPlayPauseClickTime < 600;
 
@@ -695,7 +724,11 @@
     } else if (type === 'error') {
       showToast(data.message);
     } else if (type === 'status') {
-      if (data.status === 'restarting') {
+      if (data.status === 'starting') {
+        setBotStarting(true);
+      } else if (data.status === 'ready') {
+        setBotStarting(false);
+      } else if (data.status === 'restarting') {
         if (restartOverlay) {
           const h2 = restartOverlay.querySelector('h2');
           const p = restartOverlay.querySelector('p');

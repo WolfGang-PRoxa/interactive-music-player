@@ -14,19 +14,36 @@ before.
 
 ## What it does
 
-|                            |                                                                                                       |
-| -------------------------- | ----------------------------------------------------------------------------------------------------- |
-| **No prerequisites**       | Node.js is bundled; the installer brings the bot and all its dependencies                             |
-| **Guided first setup**     | Pasting the token is enough: it is checked with Discord, `.env` is written, the invite prepared       |
-| **Built-in dashboard**     | It opens in the app window once the bot is ready; _Open in browser_ stays one click away              |
-| **Notification area**      | Closing the window stops nothing: the bot keeps running, the icon lets you reopen, restart, shut down |
-| **Restart and versions**   | The dashboard's restart and version switch go through the app, which relaunches the right code        |
-| **Start with the session** | A checkbox in the icon's menu: the bot starts in the background, with no window                       |
-| **A single instance**      | Reopening the app shows the one already running                                                       |
+|                            |                                                                                                                |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| **No prerequisites**       | Node.js is bundled; the installer brings the bot and all its dependencies                                      |
+| **Guided first setup**     | Pasting the token is enough: it is checked with Discord, `.env` is written, the invite prepared                |
+| **Opens at once**          | The dashboard window appears as soon as the app starts; what needs Discord says to wait for the end of startup |
+| **Notification area**      | Closing the window stops nothing: the bot keeps running, the icon lets you reopen, restart, shut down          |
+| **Restart and versions**   | The app always starts the newest installed version; the dashboard's restart and version switch go through it   |
+| **Start with the session** | A checkbox in the icon's menu: the bot starts in the background, with no window                                |
+| **A single instance**      | Reopening the app shows the one already running                                                                |
 
-Closing the startup window while nothing is running quits the app. _Quit_ from
-the icon shuts the bot down gently — fade-out, playback state saved — before
-closing.
+There is no startup window: the app opens straight on the dashboard. For the
+second or two before the bot's server answers, the window shows a waiting
+page; then the dashboard loads, with a banner until the bot is connected to
+Discord. Meanwhile, playback, queues and channels wait, and saying so is the
+dashboard's job.
+
+A status window only appears when there is no dashboard to show: first setup,
+a failure, or a bot that was shut down. Closing it while nothing is running
+quits the app. _Quit_ from the icon shuts the bot down gently — fade-out,
+playback state saved — before closing.
+
+### Which version starts
+
+Versions installed from the dashboard go to `bot\versions\<tag>\`, next to the
+code the installer deployed. On every launch, the app starts the newest of all
+of them (semver order); on a tie, the installer's code wins. Switching to an
+older version from the dashboard lasts until the app is closed.
+
+Installing a version from the dashboard only brings the bot's code: the app
+itself — its window, its icons — is updated by its installer.
 
 ---
 
@@ -80,8 +97,8 @@ _Back to the app's folder_, at the bottom of the window, undoes this choice.
 ### A bot already running
 
 If a bot already answers on the dashboard's port — started by `Start bot.vbs`,
-for example —, the app attaches to it without starting a second one, and offers
-to open it, restart it or shut it down.
+for example —, the app attaches to it without starting a second one, and opens
+its dashboard; restarting or shutting it down stays in the icon's menu.
 
 ---
 
@@ -128,7 +145,7 @@ Without a payload, the app runs the repository itself, with the machine's Node.
 
 ```
 desktop/
-├── ui/                     Startup window: HTML and JS with no dependency
+├── ui/                     Waiting page and status window: HTML and JS with no dependency
 ├── scripts/
 │   └── build-payload.js    Prepares the archive bundled by the installer
 └── src-tauri/
@@ -137,14 +154,15 @@ desktop/
         ├── supervisor.rs   Bot lifecycle: preparation, launch, watch, shutdown
         ├── layout.rs       Which bot folder, which Node
         ├── payload.rs      Deploying the bundled archive
+        ├── versions.rs     Which installed version to start
         ├── dashboard.rs    Dashboard port, address and commands
         ├── discord.rs      Token check, invite
         ├── env_file.rs     Reading and writing .env
         ├── tray.rs         Notification area icon and menu
-        └── view.rs         The snapshot the startup window draws
+        └── view.rs         The snapshot the status window draws
 ```
 
-The startup window decides nothing: the app sends it a full snapshot on every
+The status window decides nothing: the app sends it a full snapshot on every
 change, and it sends back the ID of the clicked button. The dashboard, for its
 part, is loaded from the bot's server and has no access to the app's commands.
 
@@ -160,5 +178,5 @@ The app sets two variables in the bot's environment:
   [`src/utils/supervisor.js`](../src/utils/supervisor.js).
 
 The rest goes through what already existed for the PowerShell launcher: the
-port that opens when the bot is ready, `/api/clients` for the dashboard's
+port that opens as soon as the bot's process starts (before Discord), `/api/clients` for the dashboard's
 address, and the WebSocket for `restartBot` and `shutdownBot`.

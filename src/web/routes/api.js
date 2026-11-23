@@ -511,6 +511,29 @@ function createApiRouter(webServer) {
    */
   const { local, right } = require('../httpGuards').createGuards(webServer);
 
+  /*
+   * Pendant le démarrage.
+   *
+   * Le serveur s'ouvre avant la connexion à Discord (voir WebServer.listen).
+   * Ce qui décrit l'installation — version, documentation, journal des
+   * modifications, dossier de téléchargement — se sert aussitôt ; ce qui
+   * demande un serveur Discord, une file ou le lecteur attend que le bot
+   * soit prêt, et le dit.
+   */
+  const READY_ANYTIME = new Set([
+    '/version',
+    '/clients',
+    '/docs',
+    '/docs/content',
+    '/changelog',
+    '/download-dir',
+    '/browse-dirs',
+  ]);
+  router.use((req, res, next) => {
+    if (webServer.ready !== false || READY_ANYTIME.has(req.path)) return next();
+    res.status(503).json({ error: 'Le bot finit de démarrer : réessayez dans un instant.', starting: true });
+  });
+
   /**
    * Version en cours d'exécution.
    *

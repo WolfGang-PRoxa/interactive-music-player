@@ -41,8 +41,10 @@ impl Endpoint {
 
     /// Le serveur du tableau de bord accepte-t-il une connexion ?
     ///
-    /// C'est le seul signal fiable que le bot est prêt : il n'ouvre son port
-    /// qu'une fois connecté à Discord (événement ClientReady de src/index.js).
+    /// C'est le signal que le tableau de bord peut s'afficher : le bot ouvre son
+    /// port dès le lancement de son processus, avant la connexion à Discord
+    /// (`webServer.listen` dans src/index.js). Ce qui attend la fin du
+    /// démarrage, le tableau de bord le dit lui-même.
     pub fn answers(&self) -> bool {
         port_answers(self.port)
     }

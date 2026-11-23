@@ -28,11 +28,13 @@ au jour de leur livraison : ces entrées gardent leur date et leur titre.
 
 ### Améliorations
 
+- L'application de bureau n'a plus de fenêtre de lancement : elle s'ouvre directement sur le tableau de bord, chargé en une ou deux secondes. Tant que le bot n'est pas connecté à Discord, un bandeau le dit, et la lecture, les files et les salons attendent la fin du démarrage.
 - Le README et le journal des modifications sont écrits en anglais, avec leur traduction française à côté : `README.fr.md` et `CHANGELOG.fr.md`. Le journal passe à la racine du projet, au format Keep a Changelog.
 
 ### Corrections
 
 - « Jouer maintenant » en mode personnel n'échoue plus quand la piste choisie arrive sans sa durée en millisecondes.
+- L'application de bureau démarre toujours la version installée la plus récente : une version installée depuis le tableau de bord ne cède plus la place, au lancement suivant, à celle qu'a déployée l'installeur (affichée « dev »).
 
 ## [0.0.2] - 2026-11-21
 

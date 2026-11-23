@@ -4923,3 +4923,67 @@ html[data-role]:not([data-role='master']) #config-section {
   margin-top: 1rem;
   word-break: break-all;
 }
+
+/*
+ * Bandeau du démarrage.
+ *
+ * Le tableau de bord s'affiche avant que le bot soit connecté à Discord : ce
+ * bandeau dit ce qui attend la fin du lancement, sans rien masquer de la page.
+ * Sous les surcouches (redémarrage, connexion) qui, elles, prennent l'écran.
+ */
+.startup-banner {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20000;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 0.7rem 1.1rem;
+  border: 1px solid var(--border-card-hover);
+  border-radius: 14px;
+  background: rgba(18, 16, 25, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  font-family: var(--font-primary);
+}
+
+.startup-banner p {
+  margin: 0;
+}
+
+.startup-banner-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.startup-banner-desc {
+  margin-top: 0.15rem !important;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.startup-banner-spinner {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  animation: rotate 2s linear infinite;
+}
+
+.startup-banner-spinner circle {
+  stroke: var(--c-primary);
+  stroke-linecap: round;
+  animation: dash 1.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .startup-banner-spinner,
+  .startup-banner-spinner circle {
+    animation: none;
+  }
+}

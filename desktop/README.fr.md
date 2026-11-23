@@ -14,19 +14,39 @@ autre ordinateur, un invité, exactement comme avant.
 
 ## Ce qu'elle fait
 
-|                                   |                                                                                                                |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| **Aucun prérequis**               | Node.js est embarqué ; l'installeur apporte le bot et toutes ses dépendances                                   |
-| **Première configuration guidée** | Coller le jeton suffit : il est vérifié auprès de Discord, `.env` est écrit, l'invitation préparée             |
-| **Tableau de bord intégré**       | Il s'ouvre dans la fenêtre de l'application une fois le bot prêt ; _Ouvrir dans le navigateur_ reste à un clic |
-| **Zone de notification**          | Fermer la fenêtre ne coupe rien : le bot continue, l'icône permet de rouvrir, redémarrer, éteindre             |
-| **Redémarrage et versions**       | Le redémarrage du tableau de bord et la bascule de version passent par l'application, qui relance le bon code  |
-| **Démarrage avec la session**     | À cocher dans le menu de l'icône : le bot démarre en arrière-plan, sans fenêtre                                |
-| **Une seule instance**            | Rouvrir l'application montre celle qui tourne déjà                                                             |
+|                                   |                                                                                                                   |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **Aucun prérequis**               | Node.js est embarqué ; l'installeur apporte le bot et toutes ses dépendances                                      |
+| **Première configuration guidée** | Coller le jeton suffit : il est vérifié auprès de Discord, `.env` est écrit, l'invitation préparée                |
+| **Ouverture immédiate**           | La fenêtre du tableau de bord paraît dès le lancement ; ce qui demande Discord dit d'attendre la fin du démarrage |
+| **Zone de notification**          | Fermer la fenêtre ne coupe rien : le bot continue, l'icône permet de rouvrir, redémarrer, éteindre                |
+| **Redémarrage et versions**       | L'application démarre toujours la version installée la plus récente ; redémarrage et bascule passent par elle     |
+| **Démarrage avec la session**     | À cocher dans le menu de l'icône : le bot démarre en arrière-plan, sans fenêtre                                   |
+| **Une seule instance**            | Rouvrir l'application montre celle qui tourne déjà                                                                |
 
-Fermer la fenêtre de lancement alors que rien ne tourne quitte l'application.
-_Quitter_ depuis l'icône éteint le bot en douceur — fondu, sauvegarde de l'état
-de lecture — avant de fermer.
+Il n'y a plus de fenêtre de lancement : l'application s'ouvre directement sur
+le tableau de bord. Pendant la seconde ou deux où le serveur du bot ne répond
+pas encore, la fenêtre montre une page d'attente ; puis le tableau de bord se
+charge, avec un bandeau tant que le bot n'est pas connecté à Discord. Entre-temps,
+la lecture, les files et les salons attendent, et c'est le tableau de bord qui
+le dit.
+
+Une fenêtre d'état ne paraît que s'il n'y a pas de tableau de bord à montrer :
+première configuration, panne, ou bot éteint. La fermer alors que rien ne tourne
+quitte l'application. _Quitter_ depuis l'icône éteint le bot en douceur — fondu,
+sauvegarde de l'état de lecture — avant de fermer.
+
+### Quelle version démarre
+
+Les versions installées depuis le tableau de bord vont dans
+`bot\versions\<tag>\`, à côté du code déployé par l'installeur. À chaque
+lancement, l'application démarre la plus récente de toutes (ordre semver) ; à
+égalité, le code de l'installeur l'emporte. Revenir à une version plus ancienne
+depuis le tableau de bord vaut jusqu'à la fermeture de l'application.
+
+Installer une version depuis le tableau de bord n'apporte que le code du bot :
+l'application elle-même — sa fenêtre, ses icônes — se met à jour par son
+installeur.
 
 ---
 
@@ -82,7 +102,8 @@ _Revenir au dossier de l'application_, en bas de la fenêtre, défait ce choix.
 
 Si un bot répond déjà sur le port du tableau de bord — lancé par
 `Start bot.vbs`, par exemple —, l'application s'y rattache sans en démarrer un
-second, et propose de l'ouvrir, de le redémarrer ou de l'éteindre.
+second, et ouvre son tableau de bord ; le redémarrer ou l'éteindre reste dans le
+menu de l'icône.
 
 ---
 
@@ -129,7 +150,7 @@ machine. `IMP_BOT_ROOT` désigne un autre dossier de bot.
 
 ```
 desktop/
-├── ui/                     Fenêtre de lancement : HTML et JS sans dépendance
+├── ui/                     Page d'attente et fenêtre d'état : HTML et JS sans dépendance
 ├── scripts/
 │   └── build-payload.js    Prépare l'archive embarquée par l'installeur
 └── src-tauri/
@@ -138,14 +159,15 @@ desktop/
         ├── supervisor.rs   Cycle de vie du bot : préparation, lancement, garde, arrêt
         ├── layout.rs       Quel dossier de bot, quel Node
         ├── payload.rs      Déploiement de l'archive embarquée
+        ├── versions.rs     Quelle version installée démarrer
         ├── dashboard.rs    Port, adresse et commandes du tableau de bord
         ├── discord.rs      Vérification du jeton, invitation
         ├── env_file.rs     Lecture et écriture de .env
         ├── tray.rs         Icône et menu de la zone de notification
-        └── view.rs         L'instantané que dessine la fenêtre de lancement
+        └── view.rs         L'instantané que dessine la fenêtre d'état
 ```
 
-La fenêtre de lancement ne décide de rien : l'application lui envoie un
+La fenêtre d'état ne décide de rien : l'application lui envoie un
 instantané complet à chaque changement, et elle renvoie l'identifiant du bouton
 cliqué. Le tableau de bord, lui, est chargé depuis le serveur du bot et n'a
 aucun accès aux commandes de l'application.
@@ -163,5 +185,5 @@ L'application pose deux variables dans l'environnement du bot :
   [`src/utils/supervisor.js`](../src/utils/supervisor.js).
 
 Le reste passe par ce qui existait déjà pour le lanceur PowerShell : le port
-qui s'ouvre quand le bot est prêt, `/api/clients` pour l'adresse du tableau de
+qui s'ouvre dès le lancement du processus du bot (avant Discord), `/api/clients` pour l'adresse du tableau de
 bord, et la WebSocket pour `restartBot` et `shutdownBot`.

@@ -456,10 +456,9 @@ client.once(Events.ClientReady, async (readyClient) => {
     );
   }
 
-  // Démarrer le serveur Web intégré pour le Dashboard
-  const port = process.env.PORT || 3000;
-  const host = process.env.HOST || '127.0.0.1';
-  webServer.start(readyClient, port, host);
+  // Le tableau de bord, ouvert dès le lancement, devient pleinement
+  // utilisable : il reçoit le client Discord et sert ses onglets en attente.
+  webServer.start(readyClient, DASHBOARD_PORT, DASHBOARD_HOST);
 
   // Restaurer l'état de lecture sauvegardé. Le préchargement reste suspendu
   // jusqu'au bout : il purge du cache toute piste absente des files, et
@@ -495,8 +494,10 @@ client.once(Events.ClientReady, async (readyClient) => {
 process.on('SIGINT', async () => {
   log.info('\n[Shutdown] Shutting down with a fade-out...');
 
-  // Sauvegarder l'état de lecture avec fade-out avant l'arrêt
-  if (playerInstance) {
+  // Sauvegarder l'état de lecture avec fade-out avant l'arrêt. Pas pendant
+  // le démarrage : l'état n'est pas encore restauré, et une file vide
+  // écraserait celui de la session précédente.
+  if (playerInstance && webServer.ready) {
     try {
       await playbackStateManager.fadeOutAndSaveState(playerInstance, 3000);
     } catch (err) {
@@ -530,7 +531,14 @@ process.on('SIGINT', async () => {
 });
 
 // --- Start ---
+const DASHBOARD_PORT = process.env.PORT || 3000;
+const DASHBOARD_HOST = process.env.HOST || '127.0.0.1';
+
 (async () => {
+  // Le tableau de bord s'ouvre avant tout le reste : l'application de bureau
+  // l'affiche aussitôt, et il dit lui-même ce qui attend la fin du démarrage
+  // (connexion à Discord, restauration de la lecture). Voir WebServer.listen.
+  webServer.listen(DASHBOARD_PORT, DASHBOARD_HOST);
   loadCommands();
   await initPlayer();
   await client.login(process.env.DISCORD_TOKEN);
