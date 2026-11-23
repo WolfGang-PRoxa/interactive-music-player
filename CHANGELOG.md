@@ -22,7 +22,9 @@ entries keep their date and their title.
     REFERENCE_LANG in src/web/changelog.js.
 -->
 
-## [Unreleased]
+## [0.0.3] - 2026-11-24
+
+The desktop app opens at once, on the newest version you installed.
 
 ### Added
 
@@ -452,6 +454,7 @@ The dashboard had no notion of who was acting: one shared token, in a cookie, gr
 
 - Audio playback in a Discord voice channel, automatic volume ducking when someone speaks, and a web dashboard to drive it all.
 
-[Unreleased]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.2...HEAD
+[Unreleased]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.3...HEAD
+[0.0.3]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/WolfGang-PRoxa/interactive-music-player/releases/tag/v0.0.1

@@ -20,7 +20,9 @@ au jour de leur livraison : ces entrées gardent leur date et leur titre.
     retombent sur l'anglais : voir REFERENCE_LANG dans src/web/changelog.js.
 -->
 
-## [Unreleased]
+## [0.0.3] - 2026-11-24
+
+L'application de bureau s'ouvre aussitôt, sur la dernière version installée.
 
 ### Ajouts
 
@@ -450,6 +452,7 @@ Le tableau de bord n'avait aucune notion de qui agissait : un jeton partagé, da
 
 - Lecture audio dans un salon vocal Discord, atténuation automatique du volume quand quelqu'un parle, et tableau de bord web pour tout piloter.
 
-[Unreleased]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.2...HEAD
+[Unreleased]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.3...HEAD
+[0.0.3]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/WolfGang-PRoxa/interactive-music-player/releases/tag/v0.0.1

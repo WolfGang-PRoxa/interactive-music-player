@@ -1,6 +1,6 @@
 {
   "name": "interactive-music-player",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Bot Discord de musique interactive avec audio ducking automatique dans les salons vocaux",
   "main": "src/index.js",
   "repository": {
