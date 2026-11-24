@@ -22,11 +22,14 @@ entries keep their date and their title.
     REFERENCE_LANG in src/web/changelog.js.
 -->
 
-## [Unreleased]
+## [0.0.4] - 2026-11-24
+
+The desktop app's new icon shows up right after an update.
 
 ### Fixed
 
 - After an update of the desktop app, Windows shows its new icon right away on the desktop shortcut, the taskbar and the Start menu, instead of the previous version's icon kept in its cache.
+- The dashboard's changelog marks only the newest version as the latest, even when two versions come out the same day.
 
 ## [0.0.3] - 2026-11-24
 
@@ -460,7 +463,8 @@ The dashboard had no notion of who was acting: one shared token, in a cookie, gr
 
 - Audio playback in a Discord voice channel, automatic volume ducking when someone speaks, and a web dashboard to drive it all.
 
-[Unreleased]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.3...HEAD
+[Unreleased]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.4...HEAD
+[0.0.4]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/WolfGang-PRoxa/interactive-music-player/releases/tag/v0.0.1

@@ -435,11 +435,13 @@ window.MusicPlayer = window.MusicPlayer || {};
 
     // La plus récente est la première du fichier, et le reste même si un
     // filtre la masque : c'est une propriété du journal, pas de la vue.
-    const newest = journal.releases.length ? journal.releases[0].date : null;
+    // Reconnue à elle-même plutôt qu'à sa date : deux versions peuvent
+    // sortir le même jour, et la seconde ne doit pas être marquée aussi.
+    const newest = journal.releases.length ? journal.releases[0] : null;
 
     for (const { release, groups, count } of visible) {
       const section = document.createElement('section');
-      section.className = `changelog-release${release.date === newest ? ' latest' : ''}`;
+      section.className = `changelog-release${release === newest ? ' latest' : ''}`;
       section.dataset.date = release.date;
 
       const dot = document.createElement('span');
@@ -455,7 +457,7 @@ window.MusicPlayer = window.MusicPlayer || {};
       date.textContent = formatDate(release.date);
       meta.appendChild(date);
 
-      if (release.date === newest) {
+      if (release === newest) {
         const badge = document.createElement('span');
         badge.className = 'changelog-release-badge';
         badge.textContent = t('changelog_latest', 'Dernière livraison');

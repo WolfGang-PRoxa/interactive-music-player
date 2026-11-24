@@ -20,11 +20,14 @@ au jour de leur livraison : ces entrées gardent leur date et leur titre.
     retombent sur l'anglais : voir REFERENCE_LANG dans src/web/changelog.js.
 -->
 
-## [Unreleased]
+## [0.0.4] - 2026-11-24
+
+La nouvelle icône de l'application de bureau s'affiche dès la mise à jour.
 
 ### Corrections
 
 - Après une mise à jour de l'application de bureau, Windows affiche aussitôt sa nouvelle icône sur le raccourci du bureau, la barre des tâches et le menu Démarrer, au lieu de l'icône de la version précédente gardée en cache.
+- Le journal des modifications du tableau de bord ne marque que la version la plus récente comme dernière livraison, même quand deux versions sortent le même jour.
 
 ## [0.0.3] - 2026-11-24
 
@@ -458,7 +461,8 @@ Le tableau de bord n'avait aucune notion de qui agissait : un jeton partagé, da
 
 - Lecture audio dans un salon vocal Discord, atténuation automatique du volume quand quelqu'un parle, et tableau de bord web pour tout piloter.
 
-[Unreleased]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.3...HEAD
+[Unreleased]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.4...HEAD
+[0.0.4]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/WolfGang-PRoxa/interactive-music-player/releases/tag/v0.0.1
