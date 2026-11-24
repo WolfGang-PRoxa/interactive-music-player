@@ -22,6 +22,12 @@ entries keep their date and their title.
     REFERENCE_LANG in src/web/changelog.js.
 -->
 
+## [Unreleased]
+
+### Fixed
+
+- After an update of the desktop app, Windows shows its new icon right away on the desktop shortcut, the taskbar and the Start menu, instead of the previous version's icon kept in its cache.
+
 ## [0.0.3] - 2026-11-24
 
 The desktop app opens at once, on the newest version you installed.

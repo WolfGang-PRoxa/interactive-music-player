@@ -20,6 +20,12 @@ au jour de leur livraison : ces entrées gardent leur date et leur titre.
     retombent sur l'anglais : voir REFERENCE_LANG dans src/web/changelog.js.
 -->
 
+## [Unreleased]
+
+### Corrections
+
+- Après une mise à jour de l'application de bureau, Windows affiche aussitôt sa nouvelle icône sur le raccourci du bureau, la barre des tâches et le menu Démarrer, au lieu de l'icône de la version précédente gardée en cache.
+
 ## [0.0.3] - 2026-11-24
 
 L'application de bureau s'ouvre aussitôt, sur la dernière version installée.
