@@ -20,7 +20,9 @@ au jour de leur livraison : ces entrées gardent leur date et leur titre.
     retombent sur l'anglais : voir REFERENCE_LANG dans src/web/changelog.js.
 -->
 
-## [Unreleased]
+## [0.0.5] - 2026-11-27
+
+Les boutons GitHub et Buy Me a Coffee de l'application de bureau ouvrent de nouveau le navigateur.
 
 ### Corrections
 
@@ -467,7 +469,8 @@ Le tableau de bord n'avait aucune notion de qui agissait : un jeton partagé, da
 
 - Lecture audio dans un salon vocal Discord, atténuation automatique du volume quand quelqu'un parle, et tableau de bord web pour tout piloter.
 
-[Unreleased]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.4...HEAD
+[Unreleased]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.5...HEAD
+[0.0.5]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.1...v0.0.2

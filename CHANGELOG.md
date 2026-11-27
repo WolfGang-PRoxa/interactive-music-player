@@ -22,7 +22,9 @@ entries keep their date and their title.
     REFERENCE_LANG in src/web/changelog.js.
 -->
 
-## [Unreleased]
+## [0.0.5] - 2026-11-27
+
+The desktop app's GitHub and Buy Me a Coffee buttons open the browser again.
 
 ### Fixed
 
@@ -469,7 +471,8 @@ The dashboard had no notion of who was acting: one shared token, in a cookie, gr
 
 - Audio playback in a Discord voice channel, automatic volume ducking when someone speaks, and a web dashboard to drive it all.
 
-[Unreleased]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.4...HEAD
+[Unreleased]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.5...HEAD
+[0.0.5]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/WolfGang-PRoxa/interactive-music-player/compare/v0.0.1...v0.0.2
