@@ -20,6 +20,12 @@ au jour de leur livraison : ces entrées gardent leur date et leur titre.
     retombent sur l'anglais : voir REFERENCE_LANG dans src/web/changelog.js.
 -->
 
+## [Unreleased]
+
+### Corrections
+
+- Dans l'application de bureau, les boutons GitHub et Buy Me a Coffee, et les autres liens qui s'ouvrent ailleurs (issue, portail Discord), ouvrent de nouveau le navigateur : ils ne dépendent plus de la seule demande de nouvel onglet de la webview, qui n'ouvrait rien sous Windows.
+
 ## [0.0.4] - 2026-11-24
 
 La nouvelle icône de l'application de bureau s'affiche dès la mise à jour.

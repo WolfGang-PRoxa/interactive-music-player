@@ -22,6 +22,12 @@ entries keep their date and their title.
     REFERENCE_LANG in src/web/changelog.js.
 -->
 
+## [Unreleased]
+
+### Fixed
+
+- In the desktop app, the GitHub and Buy Me a Coffee buttons, and the other links that open elsewhere (issue, Discord portal), open in the browser again: they no longer rely on the webview's new-tab request alone, which opened nothing on Windows.
+
 ## [0.0.4] - 2026-11-24
 
 The desktop app's new icon shows up right after an update.
