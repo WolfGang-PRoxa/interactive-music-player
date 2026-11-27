@@ -70,7 +70,13 @@ pub fn run() {
             Some(vec!["--background"]),
         ))
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_opener::init())
+        // Sans son script de clic : injecté dans toutes les pages, y compris
+        // le tableau de bord servi par le bot, il interceptait les liens
+        // `target="_blank"` pour les ouvrir par l'IPC — que cette page n'a
+        // pas le droit d'appeler (« not allowed by ACL »). Le clic était
+        // annulé, et rien ne s'ouvrait : ni le navigateur, ni la demande de
+        // nouvel onglet que `on_new_window` sait relayer (supervisor.rs).
+        .plugin(tauri_plugin_opener::Builder::new().open_js_links_on_click(false).build())
         .manage(tray::TrayState(Mutex::new(None)))
         .setup(move |app| {
             let handle = app.handle().clone();

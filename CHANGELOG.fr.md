@@ -20,6 +20,12 @@ au jour de leur livraison : ces entrées gardent leur date et leur titre.
     retombent sur l'anglais : voir REFERENCE_LANG dans src/web/changelog.js.
 -->
 
+## [Unreleased]
+
+### Corrections
+
+- Dans l'application de bureau, les boutons GitHub et Buy Me a Coffee, et les autres liens qui s'ouvrent ailleurs, ouvrent vraiment le navigateur : le script de clic du greffon opener les interceptait d'abord et demandait une permission que le tableau de bord n'a pas, si bien que le clic était perdu. Le contournement de la 0.0.5, qui ne traitait pas cette cause, est retiré.
+
 ## [0.0.5] - 2026-11-27
 
 Les boutons GitHub et Buy Me a Coffee de l'application de bureau ouvrent de nouveau le navigateur.

@@ -22,6 +22,12 @@ entries keep their date and their title.
     REFERENCE_LANG in src/web/changelog.js.
 -->
 
+## [Unreleased]
+
+### Fixed
+
+- In the desktop app, the GitHub and Buy Me a Coffee buttons, and the other links that open elsewhere, really open the browser: the opener plugin's own click script caught them first and asked for a permission the dashboard does not have, so the click was dropped. The 0.0.5 workaround, which did not address this, is removed.
+
 ## [0.0.5] - 2026-11-27
 
 The desktop app's GitHub and Buy Me a Coffee buttons open the browser again.

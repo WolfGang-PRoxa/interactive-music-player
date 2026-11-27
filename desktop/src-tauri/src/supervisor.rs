@@ -266,32 +266,17 @@ impl Supervisor {
         if let Some(window) = self.app.get_webview_window(DASHBOARD) {
             return Ok(window);
         }
-        let relay_app = self.app.clone();
-        let tab_app = self.app.clone();
+        let app = self.app.clone();
         WebviewWindowBuilder::new(&self.app, DASHBOARD, WebviewUrl::App(STARTING_PAGE.into()))
             .title("Interactive Music Player")
             // Les liens qui s'ouvrent ailleurs — GitHub, le don, la
             // documentation, le portail Discord, le partage — visent un onglet
             // (`target="_blank"`, `window.open`). Une fenêtre d'application n'a
             // pas d'onglets : ils partent dans le navigateur de l'utilisateur.
-            //
-            // La demande d'onglet seule (`on_new_window`) n'y suffisait pas :
-            // sous Windows, le clic ne menait toujours nulle part. Le script
-            // injecté fait passer ces liens par une navigation vers l'adresse
-            // relais, que `on_navigation` intercepte avant qu'elle ne commence.
-            // La demande d'onglet reste le filet de ce qui lui échapperait.
-            .initialization_script(EXTERNAL_LINKS_SCRIPT)
-            .on_navigation(move |url| match route_navigation(url) {
-                Navigation::Proceed => true,
-                Navigation::Drop => false,
-                Navigation::Open(target) => {
-                    open_external(&relay_app, target);
-                    false
-                }
-            })
+            // Le greffon opener ne doit pas les intercepter avant : voir lib.rs.
             .on_new_window(move |url, _features| {
                 if is_external_link(&url) {
-                    open_external(&tab_app, url);
+                    let _ = app.opener().open_url(url.as_str(), None::<&str>);
                 }
                 tauri::webview::NewWindowResponse::Deny
             })
@@ -1264,54 +1249,6 @@ fn is_app_url(url: &tauri::Url) -> bool {
     url.scheme() == "tauri" || url.host_str() == Some("tauri.localhost")
 }
 
-/// L'hôte de l'adresse relais : une navigation vers lui demande d'ouvrir son
-/// paramètre `u` dans le navigateur. `.invalid` ne se résout jamais — si
-/// l'interception manquait, la page n'irait nulle part. Doit rester celui de
-/// `RELAY`, dans external_links.js.
-const OPEN_EXTERNAL_HOST: &str = "imp-open.invalid";
-
-/// Injecté dans chaque page de la fenêtre principale : voir external_links.js.
-const EXTERNAL_LINKS_SCRIPT: &str = include_str!("external_links.js");
-
-/// Ce que devient une navigation de la fenêtre principale.
-#[derive(Debug, PartialEq)]
-enum Navigation {
-    /// Une navigation ordinaire : elle suit son cours.
-    Proceed,
-    /// L'adresse relais, avec un paramètre qui ne peut pas sortir.
-    Drop,
-    /// L'adresse relais : son paramètre part dans le navigateur.
-    Open(tauri::Url),
-}
-
-fn route_navigation(url: &tauri::Url) -> Navigation {
-    if url.host_str() != Some(OPEN_EXTERNAL_HOST) {
-        return Navigation::Proceed;
-    }
-    url.query_pairs()
-        .find(|(key, _)| key == "u")
-        .and_then(|(_, value)| tauri::Url::parse(&value).ok())
-        .filter(is_external_link)
-        .map_or(Navigation::Drop, Navigation::Open)
-}
-
-/// Confie un lien au navigateur de l'utilisateur.
-///
-/// Sur le fil principal, mais hors du gestionnaire d'événement de la webview
-/// qui l'a demandé : l'ouverture passe par le shell de Windows, qui n'a rien à
-/// faire au milieu d'un événement WebView2. Si le shell refuse, l'Explorateur
-/// prend le relais — il sait lui aussi remettre une adresse au navigateur par
-/// défaut.
-fn open_external(app: &AppHandle, url: tauri::Url) {
-    let handle = app.clone();
-    let _ = app.run_on_main_thread(move || {
-        if handle.opener().open_url(url.as_str(), None::<&str>).is_err() {
-            #[cfg(windows)]
-            let _ = Command::new("explorer.exe").arg(url.as_str()).spawn();
-        }
-    });
-}
-
 /// Un lien que le navigateur de l'utilisateur saura ouvrir.
 ///
 /// Ce qui sort d'ici est confié au système : seuls le web et le courriel
@@ -1356,39 +1293,6 @@ mod tests {
         assert!(!link("file:///C:/Windows/System32/calc.exe"));
         assert!(!link("ms-settings:privacy"));
         assert!(!link("about:blank"));
-    }
-
-    #[test]
-    fn relayed_links_open_in_the_browser_and_nothing_else_does() {
-        let route = |s: &str| route_navigation(&tauri::Url::parse(s).unwrap());
-        let relay = |target: &str| {
-            let mut url = tauri::Url::parse(&format!("https://{OPEN_EXTERNAL_HOST}/")).unwrap();
-            url.query_pairs_mut().append_pair("u", target);
-            route(url.as_str())
-        };
-        let open = |s: &str| Navigation::Open(tauri::Url::parse(s).unwrap());
-
-        assert_eq!(relay("https://buymeacoffee.com/wolfgang_proxa"), open("https://buymeacoffee.com/wolfgang_proxa"));
-        assert_eq!(
-            relay("https://github.com/WolfGang-PRoxa/interactive-music-player/issues/new?title=a&b=c"),
-            open("https://github.com/WolfGang-PRoxa/interactive-music-player/issues/new?title=a&b=c")
-        );
-        // Ce que le script injecté envoie : encodeURIComponent.
-        assert_eq!(
-            route("https://imp-open.invalid/?u=https%3A%2F%2Fgithub.com%2FWolfGang-PRoxa%2Finteractive-music-player"),
-            open("https://github.com/WolfGang-PRoxa/interactive-music-player")
-        );
-        assert_eq!(relay("file:///C:/Windows/System32/calc.exe"), Navigation::Drop);
-        assert_eq!(relay("not a url"), Navigation::Drop);
-        assert_eq!(route("https://imp-open.invalid/"), Navigation::Drop);
-        assert_eq!(route("http://localhost:3000/?token=abc"), Navigation::Proceed);
-        assert_eq!(route("https://discord.com/oauth2/authorize?u=https%3A%2F%2Fexample.com"), Navigation::Proceed);
-        assert_eq!(route("tauri://localhost/starting.html"), Navigation::Proceed);
-    }
-
-    #[test]
-    fn the_injected_script_targets_the_relay() {
-        assert!(EXTERNAL_LINKS_SCRIPT.contains(&format!("'https://{OPEN_EXTERNAL_HOST}/?u='")));
     }
 
     #[test]
