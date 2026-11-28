@@ -568,6 +568,13 @@ impl Supervisor {
             .stdin(Stdio::null())
             .stdout(output.try_clone()?)
             .stderr(output);
+        // Le code de base vient de l'installeur : le tableau de bord le nomme
+        // par sa version, pas « DEV » (src/versioning/locations.js).
+        if layout.origin == Origin::Managed {
+            command.env("IMP_BASE_ORIGIN", "installer");
+        } else {
+            command.env_remove("IMP_BASE_ORIGIN");
+        }
         if restart {
             command.env("IMP_RESTART", "1");
         } else {

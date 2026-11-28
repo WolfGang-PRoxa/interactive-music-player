@@ -48,9 +48,28 @@ window.MusicPlayer = window.MusicPlayer || {};
     return `${(bytes / 1024 / 1024).toFixed(1)} Mo`;
   }
 
+  /**
+   * Le code de base vient-il de l'installeur de l'application ? C'est alors
+   * une version publiée, nommée par son numéro — pas « DEV ».
+   */
+  function isBundled(version) {
+    return !!(version && version.bundled && version.packageVersion);
+  }
+
+  /** Libellé du code de base dans le menu et la confirmation. */
+  function baseOptionLabel(base) {
+    if (isBundled(base)) {
+      return `v${base.packageVersion} — ${t('version_option_bundled', "installée avec l'application")}`;
+    }
+    return `${t('version_option_dev', 'DEV — code local')}${base && base.packageVersion ? ` (${base.packageVersion})` : ''}`;
+  }
+
   /** Libellé lisible d'une version, DEV compris. */
   function versionLabel(version) {
     if (!version) return '—';
+    if (isBundled(version) && (version.type === 'dev' || version.tag === DEV_TAG)) {
+      return `v${version.packageVersion}`;
+    }
     if (version.type === 'dev' || version.tag === DEV_TAG) {
       return version.packageVersion
         ? `${t('version_dev_short', 'DEV')} (${version.packageVersion})`
@@ -65,7 +84,7 @@ window.MusicPlayer = window.MusicPlayer || {};
     const value = el('drawer-version-value');
     if (value) {
       value.textContent = versionLabel(currentVersion);
-      value.classList.toggle('is-dev', !!currentVersion && currentVersion.type === 'dev');
+      value.classList.toggle('is-dev', !!currentVersion && currentVersion.type === 'dev' && !isBundled(currentVersion));
       // Tant qu'on ne connaît pas la version, le bouton n'affiche qu'un
       // tiret : le copier ne rendrait service à personne.
       value.disabled = !currentVersion;
@@ -275,14 +294,7 @@ window.MusicPlayer = window.MusicPlayer || {};
 
     if (catalog.dev && catalog.dev.available) {
       const suffix = catalog.dev.current ? ` · ${t('version_tag_current', 'actuelle')}` : '';
-      addOption(
-        select,
-        DEV_TAG,
-        `${t('version_option_dev', 'DEV — code local')}${
-          catalog.dev.packageVersion ? ` (${catalog.dev.packageVersion})` : ''
-        }${suffix}`,
-        { selected: currentTag === DEV_TAG },
-      );
+      addOption(select, DEV_TAG, `${baseOptionLabel(catalog.dev)}${suffix}`, { selected: currentTag === DEV_TAG });
     }
 
     (catalog.releases || []).forEach((entry) => {
@@ -385,7 +397,7 @@ window.MusicPlayer = window.MusicPlayer || {};
     const endPoint = el('version-target-to');
     if (startPoint) startPoint.textContent = versionLabel(currentVersion);
     if (endPoint) {
-      endPoint.textContent = toDev ? t('version_option_dev', 'DEV — code local') : tag;
+      endPoint.textContent = toDev ? baseOptionLabel(catalog && catalog.dev) : tag;
     }
 
     const description = el('version-modal-desc');
@@ -403,10 +415,11 @@ window.MusicPlayer = window.MusicPlayer || {};
 
     const note = el('version-modal-note');
     if (note) {
-      note.textContent = toDev
+      const toDevRepo = toDev && !isBundled(catalog && catalog.dev);
+      note.textContent = toDevRepo
         ? t('version_note_dev', "La version de développement n'est jamais modifiée ni écrasée par ce système.")
         : t('version_note_keep', "Votre version actuelle est conservée intacte : rien n'est jamais écrasé.");
-      note.classList.toggle('is-warning', toDev);
+      note.classList.toggle('is-warning', toDevRepo);
     }
 
     const buttonLabel = el('btn-version-confirm-label');

@@ -426,7 +426,12 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 // --- Ready ---
 client.once(Events.ClientReady, async (readyClient) => {
   const version = versioning.currentVersion();
-  const versionLabel = version.type === 'dev' ? `DEV (${version.packageVersion || '?'})` : version.tag;
+  const versionLabel =
+    version.type !== 'dev'
+      ? version.tag
+      : version.bundled && version.packageVersion
+        ? `v${version.packageVersion}`
+        : `DEV (${version.packageVersion || '?'})`;
 
   log.success('╔══════════════════════════════════════════════════╗');
   log.success('║   🎵 Interactive Music Bot — Ready!              ║');

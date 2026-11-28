@@ -562,6 +562,7 @@ function createApiRouter(webServer) {
       type: current.type,
       tag: current.tag,
       packageVersion: current.packageVersion,
+      bundled: !!current.bundled,
     });
   });
 

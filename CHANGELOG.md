@@ -27,6 +27,7 @@ entries keep their date and their title.
 ### Fixed
 
 - In the desktop app, the GitHub and Buy Me a Coffee buttons, and the other links that open elsewhere, really open the browser: the opener plugin's own click script caught them first and asked for a permission the dashboard does not have, so the click was dropped. The 0.0.5 workaround, which did not address this, is removed.
+- The dashboard no longer calls the bot installed by the desktop app "DEV": it shows it by its version, as "v0.0.5 — installed with the app" in the version menu. "DEV" stays for a clone of the repository.
 
 ## [0.0.5] - 2026-11-27
 

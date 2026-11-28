@@ -74,9 +74,13 @@ async function catalog() {
       type: current.type,
       tag: current.tag,
       packageVersion: current.packageVersion,
+      bundled: current.type === 'dev' && locations.baseFromInstaller(),
     },
     dev: {
       tag: locations.DEV_TAG,
+      // Le code de base déployé par l'installeur : affiché par sa version,
+      // pas comme « DEV » (voir locations.baseFromInstaller).
+      bundled: locations.baseFromInstaller(),
       available: locations.devAvailable(),
       current: current.type === 'dev',
       packageVersion: (locations.readPackage(locations.devRoot()) || {}).version || null,

@@ -308,6 +308,20 @@ function mount(options = {}) {
   }
 
   {
+    // Le code de base posé par l'installeur de l'application est une version
+    // publiée : il porte son numéro, pas « DEV ».
+    const s = mount({ version: { tag: 'dev', type: 'dev', packageVersion: '0.0.5', bundled: true } });
+    await s.settle();
+
+    check(
+      "le code posé par l'installeur s'affiche par sa version",
+      s.button.textContent === 'v0.0.5',
+      s.button.textContent,
+    );
+    check("  … sans l'allure d'une version de développement", !s.button.classList.contains('is-dev'));
+  }
+
+  {
     const s = mount({ version: null });
     await s.settle();
 

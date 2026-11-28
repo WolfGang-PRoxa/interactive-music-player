@@ -464,6 +464,7 @@
   "version_current_prefix": "Actuelle :",
   "version_dev_short": "DEV",
   "version_option_dev": "DEV — code local",
+  "version_option_bundled": "installée avec l'application",
   "version_searching": "Recherche des versions…",
   "version_none_published": "Aucune release publiée sur le dépôt",
   "version_tag_current": "actuelle",

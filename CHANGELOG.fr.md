@@ -25,6 +25,7 @@ au jour de leur livraison : ces entrées gardent leur date et leur titre.
 ### Corrections
 
 - Dans l'application de bureau, les boutons GitHub et Buy Me a Coffee, et les autres liens qui s'ouvrent ailleurs, ouvrent vraiment le navigateur : le script de clic du greffon opener les interceptait d'abord et demandait une permission que le tableau de bord n'a pas, si bien que le clic était perdu. Le contournement de la 0.0.5, qui ne traitait pas cette cause, est retiré.
+- Le tableau de bord n'appelle plus « DEV » le bot installé par l'application de bureau : il le montre par sa version, « v0.0.5 — installée avec l'application » dans le menu des versions. « DEV » reste réservé à un clone du dépôt.
 
 ## [0.0.5] - 2026-11-27
 

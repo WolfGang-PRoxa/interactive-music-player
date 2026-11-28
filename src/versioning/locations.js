@@ -131,7 +131,21 @@ function currentVersion() {
     };
   }
 
-  return { type: 'dev', tag: DEV_TAG, packageVersion, root: INSTALL_ROOT };
+  return { type: 'dev', tag: DEV_TAG, packageVersion, root: INSTALL_ROOT, bundled: baseFromInstaller() };
+}
+
+/**
+ * Le code de base vient-il de l'installeur de l'application de bureau ?
+ *
+ * Sous l'application, la racine partagée porte le bot que l'installeur a
+ * déployé : c'est une version publiée comme les autres, pas un dépôt de
+ * développement, et l'interface ne doit pas l'appeler « DEV ». Seule
+ * l'application le sait — elle le dit par `IMP_BASE_ORIGIN`
+ * (desktop/src-tauri/src/supervisor.rs). Un clone lancé à la main, ou par
+ * l'application en développement, reste « DEV ».
+ */
+function baseFromInstaller() {
+  return process.env.IMP_BASE_ORIGIN === 'installer';
 }
 
 /** Le dépôt de développement est-il lançable depuis cette machine ? */
@@ -244,6 +258,7 @@ module.exports = {
   INSTALL_ROOT,
   VERSIONS_DIR,
   devAvailable,
+  baseFromInstaller,
   entryPointFor,
   isSubdirectory,
   isInstallComplete,
